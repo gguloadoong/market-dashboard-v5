@@ -1,52 +1,116 @@
-// CoinGecko API - 실시간 코인 데이터
+// 코인 실시간 데이터: Upbit(KRW) + CoinGecko(USD·시총·스파크라인)
 
-const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
-
-const COIN_IDS = [
-  'bitcoin', 'ethereum', 'binancecoin', 'solana', 'ripple',
-  'cardano', 'dogecoin', 'avalanche-2', 'shiba-inu', 'polkadot',
-  'chainlink', 'uniswap', 'litecoin', 'near', 'aptos',
-  'arbitrum', 'sui', 'optimism', 'pepe', 'stellar',
+// 업비트에 상장된 코인 마켓 목록
+const UPBIT_MARKETS = [
+  'KRW-BTC','KRW-ETH','KRW-SOL','KRW-XRP','KRW-ADA','KRW-DOGE',
+  'KRW-AVAX','KRW-SHIB','KRW-DOT','KRW-LINK','KRW-UNI','KRW-NEAR',
+  'KRW-APT','KRW-ARB','KRW-SUI','KRW-OP','KRW-PEPE','KRW-XLM',
 ];
 
-export async function fetchCoins(krwRate = 1335) {
-  const ids = COIN_IDS.join(',');
-  const url = `${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h`;
+// Upbit 심볼 → CoinGecko ID 매핑
+const UPBIT_TO_CG = {
+  'BTC':'bitcoin','ETH':'ethereum','SOL':'solana','XRP':'ripple',
+  'ADA':'cardano','DOGE':'dogecoin','AVAX':'avalanche-2','SHIB':'shiba-inu',
+  'DOT':'polkadot','LINK':'chainlink','UNI':'uniswap','NEAR':'near',
+  'APT':'aptos','ARB':'arbitrum','SUI':'sui','OP':'optimism',
+  'PEPE':'pepe','XLM':'stellar',
+  // CoinGecko-only (업비트 미상장)
+  'BNB':'binancecoin','LTC':'litecoin',
+};
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`CoinGecko API error: ${res.status}`);
+// CoinGecko ID → Upbit 심볼
+const CG_TO_UPBIT = Object.fromEntries(
+  Object.entries(UPBIT_TO_CG).map(([u, cg]) => [cg, u])
+);
+
+const CG_IDS = Object.values(UPBIT_TO_CG).filter((v, i, a) => a.indexOf(v) === i);
+
+// ─── Upbit 실시간 호가 ─────────────────────────────────────────
+export async function fetchUpbit() {
+  const res = await fetch(
+    `https://api.upbit.com/v1/ticker?markets=${UPBIT_MARKETS.join(',')}`
+  );
+  if (!res.ok) throw new Error('Upbit API error');
   const data = await res.json();
 
-  return data.map(coin => ({
-    id: coin.id,
-    symbol: coin.symbol.toUpperCase(),
-    name: coin.name,
-    priceUsd: coin.current_price,
-    priceKrw: coin.current_price * krwRate,
-    change24h: coin.price_change_percentage_24h ?? 0,
-    volume24h: coin.total_volume,
-    marketCap: coin.market_cap,
-    high24h: coin.high_24h,
-    low24h: coin.low_24h,
-    sparkline: coin.sparkline_in_7d?.price?.slice(-20) ?? [],
-    image: coin.image,
-  }));
+  const map = {};
+  for (const d of data) {
+    const sym  = d.market.replace('KRW-', '');
+    const cgId = UPBIT_TO_CG[sym];
+    if (cgId) {
+      map[cgId] = {
+        priceKrw:  d.trade_price,
+        change24h: d.signed_change_rate * 100,
+        volume24hKrw: d.acc_trade_price_24h,
+        high24hKrw:   d.high_price,
+        low24hKrw:    d.low_price,
+        high52wKrw:   d.highest_52_week_price,
+        low52wKrw:    d.lowest_52_week_price,
+      };
+    }
+  }
+  return map;
 }
 
+// ─── CoinGecko (USD + 시총 + 스파크라인) ──────────────────────
+export async function fetchCoinGecko() {
+  const ids = CG_IDS.join(',');
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
+  return res.json();
+}
+
+// ─── 환율 (Upbit BTC로 역산) ──────────────────────────────────
 export async function fetchExchangeRate() {
-  // Yahoo Finance KRW=X via allorigins proxy
   try {
-    const symbol = 'KRW=X';
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('proxy error');
-    const json = await res.json();
-    const parsed = JSON.parse(json.contents);
-    const price = parsed?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    if (price) return price;
-  } catch {
-    // fallback
-  }
-  return 1335; // 기본값
+    const res = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC');
+    const data = await res.json();
+    const btcKrw = data[0]?.trade_price;
+
+    const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    const cgData = await cgRes.json();
+    const btcUsd = cgData?.bitcoin?.usd;
+
+    if (btcKrw && btcUsd) return Math.round(btcKrw / btcUsd);
+  } catch {}
+  return 1466; // 폴백
+}
+
+// ─── 통합 코인 데이터 ──────────────────────────────────────────
+export async function fetchCoins(krwRate = 1466) {
+  const [upbitMap, cgList] = await Promise.all([
+    fetchUpbit().catch(() => ({})),
+    fetchCoinGecko().catch(() => []),
+  ]);
+
+  if (!cgList.length) throw new Error('CoinGecko 실패');
+
+  return cgList.map(coin => {
+    const upbit = upbitMap[coin.id] ?? {};
+    const priceKrw = upbit.priceKrw ?? coin.current_price * krwRate;
+    const priceUsd = coin.current_price;
+    const change24h = upbit.change24h ?? coin.price_change_percentage_24h ?? 0;
+    const sparkRaw  = coin.sparkline_in_7d?.price ?? [];
+    const sparkline = sparkRaw.length > 20
+      ? sparkRaw.filter((_, i) => i % Math.ceil(sparkRaw.length / 20) === 0).slice(0, 20)
+      : sparkRaw;
+
+    return {
+      id: coin.id,
+      symbol: coin.symbol.toUpperCase(),
+      name: coin.name,
+      priceUsd,
+      priceKrw,
+      change24h,
+      volume24h: (upbit.volume24hKrw ?? 0) / krwRate || coin.total_volume,
+      marketCap: coin.market_cap,
+      high24h: upbit.high24hKrw ? upbit.high24hKrw / krwRate : coin.high_24h,
+      low24h:  upbit.low24hKrw  ? upbit.low24hKrw  / krwRate : coin.low_24h,
+      high52w: upbit.high52wKrw ? upbit.high52wKrw / krwRate : null,
+      low52w:  upbit.low52wKrw  ? upbit.low52wKrw  / krwRate : null,
+      sparkline,
+      image: coin.image,
+    };
+  });
 }
