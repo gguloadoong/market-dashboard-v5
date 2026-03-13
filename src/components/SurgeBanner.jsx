@@ -1,33 +1,32 @@
 import { useMemo } from 'react';
-import { fmtPct, getPct } from '../utils/format';
+import { getPct } from '../utils/format';
 
 export default function SurgeBanner({ stocks = [], coins = [] }) {
   const items = useMemo(() => {
     const all = [
-      ...stocks.map(s => ({ symbol: s.symbol, name: s.name, pct: s.changePct ?? 0 })),
-      ...coins.map(c => ({ symbol: c.symbol, name: c.name, pct: c.change24h ?? 0 })),
+      ...stocks.map(s => ({ symbol: s.symbol, pct: s.changePct ?? 0 })),
+      ...coins.map(c => ({ symbol: c.symbol, pct: c.change24h ?? 0 })),
     ].filter(i => Math.abs(i.pct) >= 0.5)
      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
-     .slice(0, 24);
-    return [...all, ...all]; // 무한 루프용 복제
+     .slice(0, 20);
+    return [...all, ...all];
   }, [stocks, coins]);
 
   if (!items.length) return null;
-  const dur = Math.max(30, items.length * 2);
+  const dur = Math.max(25, items.length * 1.8);
 
   return (
-    <div className="bg-[#111] h-7 flex items-center ticker-wrap overflow-hidden">
+    <div style={{ background: '#0D0D0D', height: '28px', overflow: 'hidden' }} className="flex items-center ticker-wrap">
       <div className="ticker-track" style={{ '--dur': `${dur}s` }}>
         {items.map((item, i) => {
           const isUp = item.pct > 0;
-          const isDown = item.pct < 0;
           return (
-            <span key={i} className="inline-flex items-center gap-1.5 px-4 text-[12px]">
-              <span className="text-white/60">{item.symbol}</span>
-              <span className={isUp ? 'text-[#FF6B6B]' : isDown ? 'text-[#5B9BF5]' : 'text-white/40'}>
-                {isUp ? '▲' : isDown ? '▼' : '—'}{fmtPct(Math.abs(item.pct))}
+            <span key={i} className="inline-flex items-center gap-1.5 px-5 text-[11px] font-medium tracking-[0.2px]">
+              <span style={{ color: 'rgba(255,255,255,0.5)' }}>{item.symbol}</span>
+              <span style={{ color: isUp ? '#FF6B77' : item.pct < 0 ? '#5B9BF5' : 'rgba(255,255,255,0.3)' }}>
+                {isUp ? '▲' : item.pct < 0 ? '▼' : '—'}{Math.abs(item.pct).toFixed(2)}%
               </span>
-              <span className="text-white/20 text-[10px] ml-1">|</span>
+              <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: '9px', marginLeft: '2px' }}>|</span>
             </span>
           );
         })}

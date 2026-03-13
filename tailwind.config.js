@@ -4,42 +4,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        up:      '#FF4136',
-        down:    '#1A73E8',
-        neutral: '#8B95A1',
-        bg:      '#F8F9FA',
+        up:      '#F04452',   // 토스 빨강 (상승)
+        down:    '#1764ED',   // 토스 파랑 (하락)
+        neutral: '#6B7684',
+        bg:      '#F2F4F6',   // 토스 배경 회색
         surface: '#FFFFFF',
-        border:  '#E8ECF0',
-        text1:   '#191F28',
-        text2:   '#8B95A1',
-        text3:   '#B0B8C1',
-        primary: '#3182F6',
+        border:  '#E5E8EB',
+        text1:   '#191F28',   // 토스 primary text
+        text2:   '#6B7684',   // 토스 secondary text
+        text3:   '#B0B8C1',   // 토스 tertiary text
+        primary: '#3182F6',   // 토스 blue
+        blue50:  '#EBF3FE',
+        red50:   '#FEF0F1',
       },
       fontFamily: {
-        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
-        sans: ['Pretendard', '-apple-system', '"Apple SD Gothic Neo"', '"Noto Sans KR"', 'sans-serif'],
+        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', '"Noto Sans KR"', 'sans-serif'],
+        mono: ['"Roboto Mono"', '"SF Mono"', 'monospace'],
+      },
+      borderRadius: {
+        '2.5xl': '20px',
       },
       boxShadow: {
-        card:  '0 1px 4px rgba(0,0,0,0.06)',
-        hover: '0 6px 20px rgba(0,0,0,0.1)',
-        modal: '0 20px 60px rgba(0,0,0,0.15)',
-      },
-      animation: {
-        ticker:    'ticker var(--dur,40s) linear infinite',
-        surgeGlow: 'surgeGlow 2s ease infinite',
-        fadeIn:    'fadeIn 0.15s ease',
-        slideUp:   'slideUp 0.2s ease',
-        modalIn:   'modalIn 0.2s ease',
-      },
-      keyframes: {
-        ticker:    { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
-        surgeGlow: { '0%,100%': { boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }, '50%': { boxShadow: '0 4px 20px rgba(255,65,54,0.25)' } },
-        fadeIn:    { from: { opacity: 0 }, to: { opacity: 1 } },
-        slideUp:   { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-        modalIn:   { from: { opacity: 0, transform: 'translateY(20px) scale(0.97)' }, to: { opacity: 1, transform: 'translateY(0) scale(1)' } },
+        modal: '0 -4px 40px rgba(0,0,0,0.12)',
       },
     },
   },
   plugins: [],
 }
-

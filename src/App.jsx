@@ -7,34 +7,33 @@ import KoreanTab from './components/tabs/KoreanTab';
 import UsTab from './components/tabs/UsTab';
 import EtfTab from './components/tabs/EtfTab';
 import CoinTab from './components/tabs/CoinTab';
+import NewsTab from './components/tabs/NewsTab';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
 import { fetchCoins, fetchExchangeRate } from './api/coins';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
 
 const TABS = [
-  { id: 'home', label: '홈' },
+  { id: 'home', label: '홈'  },
   { id: 'kr',   label: '국장' },
   { id: 'us',   label: '미장' },
-  { id: 'etf',  label: 'ETF' },
   { id: 'coin', label: '코인' },
+  { id: 'etf',  label: 'ETF' },
+  { id: 'news', label: '뉴스' },
 ];
 
 const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
 
-// 국장 장중 시뮬레이션 (실제 API 실패 시 fallback)
 function simulateKorean(stocks) {
   return stocks.map(s => {
-    const delta = s.price * (Math.random() - 0.5) * 0.003;
+    const delta    = s.price * (Math.random() - 0.5) * 0.003;
     const newPrice = Math.round(s.price + delta);
-    const base = newPrice - s.change;
-    const newChange = newPrice - base;
-    const newPct = base > 0 ? (newChange / base) * 100 : 0;
+    const base     = newPrice - s.change;
     return {
       ...s,
-      price: newPrice,
-      change: Math.round(s.change + delta),
-      changePct: parseFloat(newPct.toFixed(2)),
+      price:     newPrice,
+      change:    Math.round(s.change + delta * 0.7),
+      changePct: base > 0 ? parseFloat(((newPrice - base) / base * 100).toFixed(2)) : s.changePct,
       sparkline: [...(s.sparkline ?? []).slice(1), newPrice],
     };
   });
@@ -54,7 +53,6 @@ export default function App() {
   const [coinUnit]                = useState('usd');
   const loadingRef = useRef(false);
 
-  // ── 코인: Upbit(KRW) + CoinGecko(USD·시총·스파크라인) ────────
   const refreshCoins = useCallback(async () => {
     try {
       const rate = await fetchExchangeRate().catch(() => krwRate);
@@ -66,48 +64,40 @@ export default function App() {
           return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
         }));
       }
-    } catch (e) { console.warn('코인 로드 실패:', e.message); }
+    } catch (e) { console.warn('코인:', e.message); }
   }, [krwRate]);
 
-  // ── 미국 주식: Yahoo Finance ─────────────────────────────────
   const refreshUsStocks = useCallback(async () => {
     try {
       const data = await fetchUsStocksBatch(US_SYMBOLS);
       if (data.length > 0) {
         setUsStocks(prev => prev.map(s => {
           const u = data.find(d => d.symbol === s.symbol);
-          if (!u || !u.price) return s;
-          return { ...s, price: u.price, change: u.change ?? s.change, changePct: u.changePct ?? s.changePct, volume: u.volume ?? s.volume, marketCap: u.marketCap ?? s.marketCap, high52w: u.high52w ?? s.high52w, low52w: u.low52w ?? s.low52w, sparkline: u.sparkline?.length ? u.sparkline : s.sparkline };
+          return u?.price ? { ...s, ...u, sparkline: u.sparkline?.length ? u.sparkline : s.sparkline } : s;
         }));
       }
-    } catch (e) { console.warn('미장 로드 실패:', e.message); }
+    } catch (e) { console.warn('미장:', e.message); }
   }, []);
 
-  // ── 국장: Yahoo Finance .KS, 실패 시 시뮬레이션 ──────────────
   const refreshKoreanStocks = useCallback(async () => {
     try {
       const data = await fetchKoreanStocksBatch(KOREAN_STOCKS);
       if (data.length > 0) {
         setKrStocks(prev => prev.map(s => {
           const u = data.find(d => d.symbol === s.symbol);
-          if (!u || !u.price) return s;
-          return { ...s, price: u.price, change: u.change ?? s.change, changePct: u.changePct ?? s.changePct, volume: u.volume ?? s.volume, marketCap: u.marketCap ?? s.marketCap, high52w: u.high52w ?? s.high52w, low52w: u.low52w ?? s.low52w, sparkline: [...s.sparkline.slice(1), u.price] };
+          return u?.price ? { ...s, ...u, sparkline: [...s.sparkline.slice(1), u.price] } : s;
         }));
       }
-    } catch (e) {
-      console.warn('국장 로드 실패, 시뮬레이션 유지:', e.message);
-    }
+    } catch (e) { console.warn('국장:', e.message); }
   }, []);
 
-  // ── 지수 ─────────────────────────────────────────────────────
   const refreshIndices = useCallback(async () => {
     try {
       const data = await fetchIndices();
       if (data.length > 0) setIndices(prev => prev.map(idx => ({ ...idx, ...(data.find(d => d.id === idx.id) ?? {}) })));
-    } catch (e) { console.warn('지수 로드 실패:', e.message); }
+    } catch (e) { console.warn('지수:', e.message); }
   }, []);
 
-  // ── 전체 새로고침 ─────────────────────────────────────────────
   const refreshAll = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -118,30 +108,26 @@ export default function App() {
     } finally { setLoading(false); loadingRef.current = false; }
   }, [refreshCoins, refreshUsStocks, refreshKoreanStocks, refreshIndices]);
 
-  // 초기 로드
   useEffect(() => { refreshAll(); }, [refreshAll]);
-  // 코인 10초 (Upbit 실시간)
-  useEffect(() => {
-    const id = setInterval(() => refreshCoins().then(() => setLastUpdated(Date.now())), 10000);
-    return () => clearInterval(id);
-  }, [refreshCoins]);
-  // 미장 30초
-  useEffect(() => { const id = setInterval(refreshUsStocks, 30000); return () => clearInterval(id); }, [refreshUsStocks]);
-  // 국장 30초 (장중) + 15초 시뮬레이션 fallback
-  useEffect(() => { const id = setInterval(refreshKoreanStocks, 30000); return () => clearInterval(id); }, [refreshKoreanStocks]);
+  useEffect(() => { const id = setInterval(() => refreshCoins().then(() => setLastUpdated(Date.now())), 10000); return () => clearInterval(id); }, [refreshCoins]);
+  useEffect(() => { const id = setInterval(refreshUsStocks,    30000); return () => clearInterval(id); }, [refreshUsStocks]);
+  useEffect(() => { const id = setInterval(refreshKoreanStocks,30000); return () => clearInterval(id); }, [refreshKoreanStocks]);
   useEffect(() => { const id = setInterval(() => setKrStocks(p => simulateKorean(p)), 15000); return () => clearInterval(id); }, []);
-  // 지수 1분
-  useEffect(() => { const id = setInterval(refreshIndices, 60000); return () => clearInterval(id); }, [refreshIndices]);
+  useEffect(() => { const id = setInterval(refreshIndices,     60000); return () => clearInterval(id); }, [refreshIndices]);
 
   const allStocks = [...krStocks, ...usStocks];
 
   return (
     <div className="min-h-screen bg-[#F2F4F6]">
+      {/* 실시간 티커 배너 */}
       <SurgeBanner stocks={allStocks} coins={coins} />
+
+      {/* 헤더 */}
       <Header krwRate={krwRate} lastUpdated={lastUpdated} onRefresh={refreshAll} loading={loading} />
 
-      <div className="bg-surface border-b border-[#F2F4F6] sticky top-12 z-30">
-        <div className="max-w-4xl mx-auto px-4 flex overflow-x-auto no-scrollbar">
+      {/* 탭 바 */}
+      <div className="bg-white sticky top-[52px] z-30" style={{ borderBottom: '1px solid #F2F4F6' }}>
+        <div className="max-w-[480px] mx-auto px-1 flex overflow-x-auto no-scrollbar">
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -149,18 +135,22 @@ export default function App() {
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
-              {tab.id === 'coin' && <span className="ml-1 text-[9px] text-green-500 font-bold">LIVE</span>}
+              {tab.id === 'coin' && (
+                <span className="ml-1 text-[9px] font-bold" style={{ color: '#2AC769' }}>●</span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      <main className="max-w-4xl mx-auto px-3 pt-3">
+      {/* 콘텐츠 */}
+      <main className="max-w-[480px] mx-auto px-2.5 pt-2.5">
         {activeTab === 'home' && <HomeTab krStocks={krStocks} usStocks={usStocks} coins={coins} indices={indices} coinUnit={coinUnit} onCardClick={setModal} onTabChange={setActiveTab} />}
         {activeTab === 'kr'   && <KoreanTab stocks={krStocks} onCardClick={setModal} />}
         {activeTab === 'us'   && <UsTab stocks={usStocks} onCardClick={setModal} />}
-        {activeTab === 'etf'  && <EtfTab etfs={etfs} onCardClick={setModal} />}
         {activeTab === 'coin' && <CoinTab coins={coins} onCardClick={setModal} />}
+        {activeTab === 'etf'  && <EtfTab etfs={etfs} onCardClick={setModal} />}
+        {activeTab === 'news' && <NewsTab />}
       </main>
 
       {modal && <StockModal item={modal} coinUnit={coinUnit} onClose={() => setModal(null)} />}
