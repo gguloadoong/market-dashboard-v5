@@ -1,29 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+// 마켓 대시보드 — 데스크탑 2열 레이아웃
+// 좌: 마켓바 + 워치리스트 테이블
+// 우: 뉴스·속보 패널 (고정)
+// 오버레이: 차트 사이드 패널 (종목 클릭 시)
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Header from './components/Header';
 import SurgeBanner from './components/SurgeBanner';
-import StockModal from './components/StockModal';
-import HomeTab from './components/HomeTab';
-import KoreanTab from './components/tabs/KoreanTab';
-import UsTab from './components/tabs/UsTab';
-import EtfTab from './components/tabs/EtfTab';
-import CoinTab from './components/tabs/CoinTab';
-import NewsTab from './components/tabs/NewsTab';
+import MarketSummaryBar from './components/MarketSummaryBar';
+import WatchlistTable from './components/WatchlistTable';
+import BreakingNewsPanel from './components/BreakingNewsPanel';
+import ChartSidePanel from './components/ChartSidePanel';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
 import { fetchCoins, fetchExchangeRate } from './api/coins';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
 
-const TABS = [
-  { id: 'home', label: '홈'  },
-  { id: 'kr',   label: '국장' },
-  { id: 'us',   label: '미장' },
-  { id: 'coin', label: '코인' },
-  { id: 'etf',  label: 'ETF' },
-  { id: 'news', label: '뉴스' },
-];
-
 const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
 
+// 장 외 시간에도 국장 데이터 소폭 변동 시뮬레이션
 function simulateKorean(stocks) {
   return stocks.map(s => {
     const delta    = s.price * (Math.random() - 0.5) * 0.003;
@@ -40,19 +34,19 @@ function simulateKorean(stocks) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [coins, setCoins]         = useState(COINS_INITIAL);
-  const [usStocks, setUsStocks]   = useState(US_STOCKS_INITIAL);
-  const [krStocks, setKrStocks]   = useState(KOREAN_STOCKS);
-  const [etfs]                    = useState(ETF_DATA);
-  const [indices, setIndices]     = useState(INDICES_INITIAL);
-  const [krwRate, setKrwRate]     = useState(1466);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [modal, setModal]         = useState(null);
-  const [coinUnit]                = useState('usd');
+  const [activeTab, setActiveTab]         = useState('kr');
+  const [coins, setCoins]                 = useState(COINS_INITIAL);
+  const [usStocks, setUsStocks]           = useState(US_STOCKS_INITIAL);
+  const [krStocks, setKrStocks]           = useState(KOREAN_STOCKS);
+  const [etfs]                            = useState(ETF_DATA);
+  const [indices, setIndices]             = useState(INDICES_INITIAL);
+  const [krwRate, setKrwRate]             = useState(1466);
+  const [lastUpdated, setLastUpdated]     = useState(null);
+  const [loading, setLoading]             = useState(false);
+  const [selectedItem, setSelectedItem]   = useState(null);
   const loadingRef = useRef(false);
 
+  // ── 코인 갱신 (10초) ────────────────────────────────────────
   const refreshCoins = useCallback(async () => {
     try {
       const rate = await fetchExchangeRate().catch(() => krwRate);
@@ -64,9 +58,10 @@ export default function App() {
           return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
         }));
       }
-    } catch (e) { console.warn('코인:', e.message); }
+    } catch (e) { console.warn('코인 갱신 실패:', e.message); }
   }, [krwRate]);
 
+  // ── 미장 갱신 (30초) ────────────────────────────────────────
   const refreshUsStocks = useCallback(async () => {
     try {
       const data = await fetchUsStocksBatch(US_SYMBOLS);
@@ -76,9 +71,10 @@ export default function App() {
           return u?.price ? { ...s, ...u, sparkline: u.sparkline?.length ? u.sparkline : s.sparkline } : s;
         }));
       }
-    } catch (e) { console.warn('미장:', e.message); }
+    } catch (e) { console.warn('미장 갱신 실패:', e.message); }
   }, []);
 
+  // ── 국장 갱신 (30초) ────────────────────────────────────────
   const refreshKoreanStocks = useCallback(async () => {
     try {
       const data = await fetchKoreanStocksBatch(KOREAN_STOCKS);
@@ -88,72 +84,122 @@ export default function App() {
           return u?.price ? { ...s, ...u, sparkline: [...s.sparkline.slice(1), u.price] } : s;
         }));
       }
-    } catch (e) { console.warn('국장:', e.message); }
+    } catch (e) { console.warn('국장 갱신 실패:', e.message); }
   }, []);
 
+  // ── 지수 갱신 (60초) ────────────────────────────────────────
   const refreshIndices = useCallback(async () => {
     try {
       const data = await fetchIndices();
-      if (data.length > 0) setIndices(prev => prev.map(idx => ({ ...idx, ...(data.find(d => d.id === idx.id) ?? {}) })));
-    } catch (e) { console.warn('지수:', e.message); }
+      if (data.length > 0) {
+        setIndices(prev => prev.map(idx => ({ ...idx, ...(data.find(d => d.id === idx.id) ?? {}) })));
+      }
+    } catch (e) { console.warn('지수 갱신 실패:', e.message); }
   }, []);
 
+  // ── 전체 갱신 ────────────────────────────────────────────────
   const refreshAll = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     try {
-      await Promise.allSettled([refreshCoins(), refreshUsStocks(), refreshKoreanStocks(), refreshIndices()]);
+      await Promise.allSettled([
+        refreshCoins(),
+        refreshUsStocks(),
+        refreshKoreanStocks(),
+        refreshIndices(),
+      ]);
       setLastUpdated(Date.now());
-    } finally { setLoading(false); loadingRef.current = false; }
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
+    }
   }, [refreshCoins, refreshUsStocks, refreshKoreanStocks, refreshIndices]);
 
+  // ── 초기 로드 + 폴링 인터벌 ─────────────────────────────────
   useEffect(() => { refreshAll(); }, [refreshAll]);
-  useEffect(() => { const id = setInterval(() => refreshCoins().then(() => setLastUpdated(Date.now())), 10000); return () => clearInterval(id); }, [refreshCoins]);
+  useEffect(() => {
+    const id = setInterval(() => refreshCoins().then(() => setLastUpdated(Date.now())), 10000);
+    return () => clearInterval(id);
+  }, [refreshCoins]);
   useEffect(() => { const id = setInterval(refreshUsStocks,    30000); return () => clearInterval(id); }, [refreshUsStocks]);
   useEffect(() => { const id = setInterval(refreshKoreanStocks,30000); return () => clearInterval(id); }, [refreshKoreanStocks]);
   useEffect(() => { const id = setInterval(() => setKrStocks(p => simulateKorean(p)), 15000); return () => clearInterval(id); }, []);
   useEffect(() => { const id = setInterval(refreshIndices,     60000); return () => clearInterval(id); }, [refreshIndices]);
 
+  // ── 탭별 종목 데이터 ─────────────────────────────────────────
+  const tabItems = useMemo(() => {
+    switch (activeTab) {
+      case 'kr':   return krStocks;
+      case 'us':   return usStocks;
+      case 'coin': return coins;
+      case 'etf':  return etfs.map(e => ({ ...e, marketCap: e.aum }));
+      case 'all':
+      default:
+        return [
+          ...krStocks,
+          ...usStocks,
+          ...coins.map(c => ({ ...c, changePct: c.change24h })),
+        ];
+    }
+  }, [activeTab, krStocks, usStocks, coins, etfs]);
+
   const allStocks = [...krStocks, ...usStocks];
 
   return (
     <div className="min-h-screen bg-[#F2F4F6]">
-      {/* 실시간 티커 배너 */}
-      <SurgeBanner stocks={allStocks} coins={coins} />
+      {/* 급상승 배너 (항상 최상단, sticky) */}
+      <div className="sticky top-0 z-50">
+        <SurgeBanner stocks={allStocks} coins={coins} />
+      </div>
 
-      {/* 헤더 */}
-      <Header krwRate={krwRate} lastUpdated={lastUpdated} onRefresh={refreshAll} loading={loading} />
+      {/* 헤더 (탭 내장, sticky) */}
+      <Header
+        krwRate={krwRate}
+        lastUpdated={lastUpdated}
+        onRefresh={refreshAll}
+        loading={loading}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
-      {/* 탭 바 */}
-      <div className="bg-white sticky top-[52px] z-30" style={{ borderBottom: '1px solid #F2F4F6' }}>
-        <div className="max-w-[480px] mx-auto px-1 flex overflow-x-auto no-scrollbar">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-              {tab.id === 'coin' && (
-                <span className="ml-1 text-[9px] font-bold" style={{ color: '#2AC769' }}>●</span>
-              )}
-            </button>
-          ))}
+      {/* ── 2열 그리드 레이아웃 ────────────────────────────── */}
+      <div
+        className="max-w-[1440px] mx-auto"
+        style={{ display: 'grid', gridTemplateColumns: '1fr 360px' }}
+      >
+        {/* 좌: 마켓 서머리 + 워치리스트 */}
+        <div className="p-5 space-y-4 min-w-0 overflow-hidden">
+          <MarketSummaryBar
+            indices={indices}
+            krwRate={krwRate}
+            loading={loading && indices.every(i => !i.value)}
+          />
+          <WatchlistTable
+            items={tabItems}
+            type={activeTab}
+            krwRate={krwRate}
+            onRowClick={setSelectedItem}
+          />
+        </div>
+
+        {/* 우: 뉴스·속보 패널 (sticky 고정) */}
+        <div
+          className="self-start"
+          style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
+        >
+          <BreakingNewsPanel />
         </div>
       </div>
 
-      {/* 콘텐츠 */}
-      <main className="max-w-[480px] mx-auto px-2.5 pt-2.5">
-        {activeTab === 'home' && <HomeTab krStocks={krStocks} usStocks={usStocks} coins={coins} indices={indices} coinUnit={coinUnit} onCardClick={setModal} onTabChange={setActiveTab} />}
-        {activeTab === 'kr'   && <KoreanTab stocks={krStocks} onCardClick={setModal} />}
-        {activeTab === 'us'   && <UsTab stocks={usStocks} onCardClick={setModal} />}
-        {activeTab === 'coin' && <CoinTab coins={coins} onCardClick={setModal} />}
-        {activeTab === 'etf'  && <EtfTab etfs={etfs} onCardClick={setModal} />}
-        {activeTab === 'news' && <NewsTab />}
-      </main>
-
-      {modal && <StockModal item={modal} coinUnit={coinUnit} onClose={() => setModal(null)} />}
+      {/* 차트 사이드 패널 (오버레이) */}
+      {selectedItem && (
+        <ChartSidePanel
+          item={selectedItem}
+          krwRate={krwRate}
+          onClose={() => setSelectedItem(null)}
+        />
+      )}
     </div>
   );
 }

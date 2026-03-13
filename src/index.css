@@ -148,5 +148,6 @@
 @keyframes ticker   { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes fadeIn   { from { opacity: 0; }               to { opacity: 1; } }
 @keyframes slideUp  { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
 @keyframes flashUp  { 0%,100% { background: transparent; } 40% { background: rgba(240,68,82,0.08); } }
 @keyframes flashDown{ 0%,100% { background: transparent; } 40% { background: rgba(23,100,237,0.08); } }

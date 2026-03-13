@@ -26,7 +26,7 @@ export async function fetchCoinCandles(coinId, days = 14) {
   if (!res.ok) throw new Error(`CoinGecko OHLC ${res.status}`);
   const raw = await res.json(); // [[timestamp, open, high, low, close], ...]
   return raw.map(([ts, open, high, low, close]) => ({
-    time:  new Date(ts).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+    time:  new Date(ts).toISOString().split('T')[0],
     open, high, low, close,
   }));
 }
@@ -45,7 +45,7 @@ export async function fetchStockCandles(symbol, range = '1mo') {
   const { open = [], high = [], low = [], close = [] } = quotes;
 
   return timestamps.map((ts, i) => ({
-    time:  new Date(ts * 1000).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+    time:  new Date(ts * 1000).toISOString().split('T')[0],
     open:  open[i],
     high:  high[i],
     low:   low[i],
