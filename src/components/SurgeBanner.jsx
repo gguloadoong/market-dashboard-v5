@@ -1,15 +1,22 @@
 import { useMemo } from 'react';
-import { getPct } from '../utils/format';
 
 export default function SurgeBanner({ stocks = [], coins = [] }) {
   const items = useMemo(() => {
     const all = [
-      ...stocks.map(s => ({ symbol: s.symbol, pct: s.changePct ?? 0 })),
-      ...coins.map(c => ({ symbol: c.symbol, pct: c.change24h ?? 0 })),
+      ...stocks.map(s => ({
+        label: s.name || s.symbol,   // 한국어 이름 우선
+        sub:   s.symbol,
+        pct:   s.changePct ?? 0,
+      })),
+      ...coins.map(c => ({
+        label: c.symbol,
+        sub:   c.name,
+        pct:   c.change24h ?? 0,
+      })),
     ].filter(i => Math.abs(i.pct) >= 0.5)
      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
      .slice(0, 20);
-    return [...all, ...all];
+    return [...all, ...all]; // 루프용 복사
   }, [stocks, coins]);
 
   if (!items.length) return null;
@@ -22,7 +29,7 @@ export default function SurgeBanner({ stocks = [], coins = [] }) {
           const isUp = item.pct > 0;
           return (
             <span key={i} className="inline-flex items-center gap-1.5 px-5 text-[11px] font-medium tracking-[0.2px]">
-              <span style={{ color: 'rgba(255,255,255,0.5)' }}>{item.symbol}</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{item.label}</span>
               <span style={{ color: isUp ? '#FF6B77' : item.pct < 0 ? '#5B9BF5' : 'rgba(255,255,255,0.3)' }}>
                 {isUp ? '▲' : item.pct < 0 ? '▼' : '—'}{Math.abs(item.pct).toFixed(2)}%
               </span>

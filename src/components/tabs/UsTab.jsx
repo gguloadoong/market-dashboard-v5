@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import StockRow from '../StockRow';
 
-const SECTORS = ['Technology','Semiconductor','Finance','Consumer','EV'];
+const SECTORS = ['테크', '반도체', '금융', '소비재', '전기차'];
 
 export default function UsTab({ stocks = [], onCardClick }) {
   const [sector, setSector] = useState(null);

@@ -45,16 +45,16 @@ export const KOREAN_STOCKS = [
 
 // ─── 미국 주식 (Yahoo Finance로 실시간 갱신) ─────────────────
 export const US_STOCKS_INITIAL = [
-  { symbol:'AAPL',  name:'Apple',      market:'us', sector:'Technology',    price:222.13, change:3.21,  changePct:1.47,  volume:52000000,  marketCap:3.33e12, high52w:260.10,  low52w:164.08 },
-  { symbol:'MSFT',  name:'Microsoft',  market:'us', sector:'Technology',    price:398.82, change:-2.15, changePct:-0.54, volume:18000000,  marketCap:2.97e12, high52w:468.35,  low52w:344.79 },
-  { symbol:'GOOGL', name:'Alphabet',   market:'us', sector:'Technology',    price:169.74, change:1.82,  changePct:1.08,  volume:22000000,  marketCap:2.08e12, high52w:208.70,  low52w:140.53 },
-  { symbol:'AMZN',  name:'Amazon',     market:'us', sector:'Consumer',      price:199.88, change:-1.23, changePct:-0.61, volume:31000000,  marketCap:2.14e12, high52w:242.52,  low52w:151.61 },
-  { symbol:'NVDA',  name:'NVIDIA',     market:'us', sector:'Semiconductor', price:117.93, change:4.52,  changePct:3.99,  volume:280000000, marketCap:2.87e12, high52w:153.13,  low52w:66.25  },
-  { symbol:'META',  name:'Meta',       market:'us', sector:'Technology',    price:607.11, change:8.45,  changePct:1.41,  volume:14000000,  marketCap:1.53e12, high52w:740.91,  low52w:414.50 },
-  { symbol:'TSLA',  name:'Tesla',      market:'us', sector:'EV',            price:275.35, change:-8.45, changePct:-2.98, volume:95000000,  marketCap:0.88e12, high52w:488.54,  low52w:138.80 },
-  { symbol:'AVGO',  name:'Broadcom',   market:'us', sector:'Semiconductor', price:197.82, change:2.10,  changePct:1.07,  volume:25000000,  marketCap:0.93e12, high52w:251.88,  low52w:120.39 },
-  { symbol:'JPM',   name:'JPMorgan',   market:'us', sector:'Finance',       price:249.88, change:2.15,  changePct:0.87,  volume:9000000,   marketCap:0.72e12, high52w:280.25,  low52w:185.04 },
-  { symbol:'BRK-B', name:'Berkshire',  market:'us', sector:'Finance',       price:522.14, change:-1.52, changePct:-0.29, volume:3500000,   marketCap:1.14e12, high52w:545.19,  low52w:358.09 },
+  { symbol:'AAPL',  name:'애플',          nameEn:'Apple',      market:'us', sector:'테크',      price:222.13, change:3.21,  changePct:1.47,  volume:52000000,  marketCap:3.33e12, high52w:260.10,  low52w:164.08 },
+  { symbol:'MSFT',  name:'마이크로소프트', nameEn:'Microsoft',  market:'us', sector:'테크',      price:398.82, change:-2.15, changePct:-0.54, volume:18000000,  marketCap:2.97e12, high52w:468.35,  low52w:344.79 },
+  { symbol:'GOOGL', name:'알파벳',        nameEn:'Alphabet',   market:'us', sector:'테크',      price:169.74, change:1.82,  changePct:1.08,  volume:22000000,  marketCap:2.08e12, high52w:208.70,  low52w:140.53 },
+  { symbol:'AMZN',  name:'아마존',        nameEn:'Amazon',     market:'us', sector:'소비재',    price:199.88, change:-1.23, changePct:-0.61, volume:31000000,  marketCap:2.14e12, high52w:242.52,  low52w:151.61 },
+  { symbol:'NVDA',  name:'엔비디아',      nameEn:'NVIDIA',     market:'us', sector:'반도체',    price:117.93, change:4.52,  changePct:3.99,  volume:280000000, marketCap:2.87e12, high52w:153.13,  low52w:66.25  },
+  { symbol:'META',  name:'메타',          nameEn:'Meta',       market:'us', sector:'테크',      price:607.11, change:8.45,  changePct:1.41,  volume:14000000,  marketCap:1.53e12, high52w:740.91,  low52w:414.50 },
+  { symbol:'TSLA',  name:'테슬라',        nameEn:'Tesla',      market:'us', sector:'전기차',    price:275.35, change:-8.45, changePct:-2.98, volume:95000000,  marketCap:0.88e12, high52w:488.54,  low52w:138.80 },
+  { symbol:'AVGO',  name:'브로드컴',      nameEn:'Broadcom',   market:'us', sector:'반도체',    price:197.82, change:2.10,  changePct:1.07,  volume:25000000,  marketCap:0.93e12, high52w:251.88,  low52w:120.39 },
+  { symbol:'JPM',   name:'JP모건',        nameEn:'JPMorgan',   market:'us', sector:'금융',      price:249.88, change:2.15,  changePct:0.87,  volume:9000000,   marketCap:0.72e12, high52w:280.25,  low52w:185.04 },
+  { symbol:'BRK-B', name:'버크셔해서웨이', nameEn:'Berkshire', market:'us', sector:'금융',      price:522.14, change:-1.52, changePct:-0.29, volume:3500000,   marketCap:1.14e12, high52w:545.19,  low52w:358.09 },
 ].map(s => ({ ...s, sparkline: genSparkline(s.price, 20, 0.015) }));
 
 // ─── 코인 초기값 (Upbit 2026-03-13 실제가, CoinGecko로 즉시 갱신됨) ─
