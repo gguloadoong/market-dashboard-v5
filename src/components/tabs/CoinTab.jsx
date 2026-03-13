@@ -1,76 +1,54 @@
-// 코인 탭
-
 import { useState, useMemo } from 'react';
-import StockCard from '../StockCard';
-import SortFilter from '../SortFilter';
-
-function sortCoins(coins, key, dir) {
-  return [...coins].sort((a, b) => {
-    let va, vb;
-    if (key === 'changePct' || key === 'changePct') {
-      va = a.change24h ?? 0;
-      vb = b.change24h ?? 0;
-    } else if (key === 'price') {
-      va = a.priceUsd ?? 0;
-      vb = b.priceUsd ?? 0;
-    } else if (key === 'volume') {
-      va = a.volume24h ?? 0;
-      vb = b.volume24h ?? 0;
-    } else if (key === 'marketCap') {
-      va = a.marketCap ?? 0;
-      vb = b.marketCap ?? 0;
-    } else if (key === 'name') {
-      return dir === 'asc'
-        ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name);
-    } else {
-      va = a[key] ?? 0;
-      vb = b[key] ?? 0;
-    }
-    return dir === 'asc' ? va - vb : vb - va;
-  });
-}
+import StockRow from '../StockRow';
 
 export default function CoinTab({ coins = [], onCardClick }) {
+  const [search, setSearch]   = useState('');
   const [sortKey, setSortKey] = useState('marketCap');
   const [sortDir, setSortDir] = useState('desc');
-  const [search, setSearch] = useState('');
-  const [coinUnit, setCoinUnit] = useState('usd'); // 'usd' | 'krw'
+  const [coinUnit, setCoinUnit] = useState('usd');
 
   const items = useMemo(() => {
     let list = [...coins];
-    if (search) list = list.filter(c =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.symbol.toLowerCase().includes(search.toLowerCase())
-    );
-    return sortCoins(list, sortKey, sortDir);
+    if (search) list = list.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.symbol.toLowerCase().includes(search.toLowerCase()));
+    return list.sort((a, b) => {
+      const keyMap = { changePct: 'change24h', price: 'priceUsd', volume: 'volume24h', marketCap: 'marketCap' };
+      const k = keyMap[sortKey] || sortKey;
+      const va = Math.abs(a[k] ?? 0);
+      const vb = Math.abs(b[k] ?? 0);
+      return sortDir === 'desc' ? vb - va : va - vb;
+    });
   }, [coins, search, sortKey, sortDir]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <SortFilter
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={(k, d) => { setSortKey(k); setSortDir(d); }}
-          searchQuery={search}
-          onSearch={setSearch}
+    <div className="space-y-3 pb-8">
+      <div className="section-card px-4 py-3 flex items-center gap-3">
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="코인명·심볼 검색"
+          className="flex-1 text-[14px] bg-[#F7F8FA] rounded-xl px-3 py-2 outline-none placeholder:text-text3"
         />
-        {/* USD/KRW 토글 */}
-        <div className="flex border border-border rounded-md overflow-hidden ml-auto flex-shrink-0">
+        <div className="flex border border-border rounded-lg overflow-hidden flex-shrink-0">
           <button className={`unit-btn ${coinUnit === 'usd' ? 'active' : ''}`} onClick={() => setCoinUnit('usd')}>USD</button>
           <button className={`unit-btn ${coinUnit === 'krw' ? 'active' : ''}`} onClick={() => setCoinUnit('krw')}>KRW</button>
         </div>
+        <select
+          value={sortKey + '_' + sortDir}
+          onChange={e => { const [k, d] = e.target.value.split('_'); setSortKey(k); setSortDir(d); }}
+          className="text-[13px] border border-border rounded-lg px-2 py-1.5 bg-surface text-text2"
+        >
+          <option value="marketCap_desc">시총↓</option>
+          <option value="changePct_desc">등락률↓</option>
+          <option value="volume_desc">거래량↓</option>
+          <option value="price_desc">가격↓</option>
+        </select>
       </div>
-      <div className="text-xs text-text3">{items.length}개 코인 · CoinGecko 실시간</div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-        {items.map(coin => (
-          <StockCard
-            key={coin.id}
-            item={coin}
-            coinUnit={coinUnit}
-            onClick={onCardClick}
-          />
+      <div className="section-card">
+        <div className="px-4 py-2.5 border-b border-[#F2F4F6] flex items-center justify-between">
+          <span className="text-[12px] text-text3">{items.length}개 코인</span>
+          <span className="text-[11px] text-green-500 font-semibold">● CoinGecko 실시간</span>
+        </div>
+        {items.map((item, i) => (
+          <StockRow key={item.id} item={item} rank={i + 1} coinUnit={coinUnit} onClick={onCardClick} />
         ))}
       </div>
     </div>

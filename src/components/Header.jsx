@@ -1,66 +1,47 @@
-// 헤더 컴포넌트 - 장 상태, 환율, 업데이트 시각
-
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
 
-function MarketStatusBadge({ label, status, name }) {
-  const colorMap = {
-    open:    'bg-green-100 text-green-700',
-    pre:     'bg-yellow-100 text-yellow-700',
-    after:   'bg-orange-100 text-orange-700',
-    closed:  'bg-gray-100 text-gray-500',
-  };
-  return (
-    <span className="flex items-center gap-1.5 text-xs">
-      <span className="font-medium text-text2">{name}</span>
-      <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${colorMap[status] ?? colorMap.closed}`}>
-        {label}
-      </span>
-    </span>
-  );
+function StatusDot({ status }) {
+  const color = status === 'open' ? 'bg-green-400' : status === 'pre' || status === 'after' ? 'bg-yellow-400' : 'bg-gray-300';
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${color}`} />;
 }
 
 export default function Header({ krwRate, lastUpdated, onRefresh, loading }) {
-  const krStatus = getKoreanMarketStatus();
-  const usStatus = getUsMarketStatus();
-
-  const updatedStr = lastUpdated
+  const kr = getKoreanMarketStatus();
+  const us = getUsMarketStatus();
+  const timeStr = lastUpdated
     ? new Date(lastUpdated).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : '—';
+    : '';
 
   return (
-    <header className="bg-surface border-b border-border sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-        {/* 로고 */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-lg font-bold text-text1 tracking-tight">📈 마켓</span>
-          <span className="text-xs text-text3 font-medium hidden sm:block">Market Dashboard</span>
-        </div>
+    <header className="bg-surface border-b border-[#F2F4F6] sticky top-0 z-40">
+      <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
+        <span className="font-bold text-[17px] tracking-tight text-text1">마켓</span>
 
-        {/* 장 상태 + 환율 */}
-        <div className="flex items-center gap-4 text-xs">
-          <MarketStatusBadge name="국장" status={krStatus.status} label={krStatus.label} />
-          <MarketStatusBadge name="미장" status={usStatus.status} label={usStatus.label} />
+        <div className="flex items-center gap-4 text-[12px] text-text2">
+          <span className="flex items-center gap-1">
+            <StatusDot status={kr.status} />
+            국장 <span className={kr.status === 'open' ? 'text-green-600' : 'text-text3'}>{kr.label}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <StatusDot status={us.status} />
+            미장 <span className={us.status === 'open' ? 'text-green-600' : 'text-text3'}>{us.label}</span>
+          </span>
           {krwRate && (
-            <span className="text-text2 hidden sm:block">
-              <span className="font-medium text-text1">₩{fmt(krwRate)}</span>
-              <span className="text-text3">/USD</span>
+            <span className="hidden sm:block">
+              <span className="font-semibold text-text1">₩{fmt(krwRate)}</span>
             </span>
           )}
+          {timeStr && <span className="text-text3 hidden sm:block">{timeStr}</span>}
         </div>
 
-        {/* 업데이트 + 새로고침 */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[11px] text-text3 hidden sm:block">{updatedStr}</span>
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
-            title="새로고침"
-          >
-            <span className={`text-sm ${loading ? 'animate-spin' : ''}`}>⟳</span>
-          </button>
-        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="text-text2 hover:text-text1 transition-colors disabled:opacity-40 text-base"
+        >
+          <span className={loading ? 'inline-block animate-spin' : ''}>↺</span>
+        </button>
       </div>
     </header>
   );
