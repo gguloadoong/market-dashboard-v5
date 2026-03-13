@@ -1,42 +1,60 @@
-// 주식 데이터: Yahoo Finance v7 quote (여러 프록시 시도)
+// 주식 데이터
+// 미국: Stooq.com (CORS OK) → Yahoo Finance v7 프록시 fallback → v8 chart fallback
+// 한국: Naver Finance 모바일 API via allorigins → Yahoo .KS 프록시 fallback
 
-const PROXIES = [
-  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-];
+const PROXY_BASE = 'https://api.allorigins.win/get?url=';
 
-async function fetchWithProxy(targetUrl) {
-  for (const makeProxy of PROXIES) {
-    try {
-      const res = await fetch(makeProxy(targetUrl), { signal: AbortSignal.timeout(6000) });
-      if (!res.ok) continue;
-      const json = await res.json();
-      // allorigins wraps in { contents: "..." }
-      const text = typeof json === 'string' ? json : json.contents ?? JSON.stringify(json);
-      return JSON.parse(text);
-    } catch { continue; }
-  }
-  throw new Error('모든 프록시 실패');
+async function proxyFetch(targetUrl) {
+  const res = await fetch(`${PROXY_BASE}${encodeURIComponent(targetUrl)}`, {
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const json = await res.json();
+  const text = json.contents ?? JSON.stringify(json);
+  return JSON.parse(text);
 }
 
-// ─── Yahoo Finance v7 quote (배치, 여러 심볼 한번에) ──────────
+// ─── Stooq.com (미국 주식, CORS 허용) ────────────────────────
+async function fetchStooq(symbols) {
+  const syms = symbols.map(s => `${s.toLowerCase()}.us`).join(',');
+  const url  = `https://stooq.com/q/l/?s=${syms}&f=sd2t2ohlcvn&h&e=json`;
+  const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`Stooq ${res.status}`);
+  const data = await res.json();
+  return (data.symbols || [])
+    .filter(s => s.Close && s.Close !== 'N/D' && parseFloat(s.Close) > 0)
+    .map(s => {
+      const close = parseFloat(s.Close);
+      const open  = parseFloat(s.Open) || close;
+      return {
+        symbol:    s.Symbol.split('.')[0].toUpperCase(),
+        price:     close,
+        // Stooq: 전일 종가 없음 → open 기준 근사치
+        change:    parseFloat((close - open).toFixed(2)),
+        changePct: parseFloat(((close - open) / open * 100).toFixed(2)),
+        volume:    parseInt(s.Volume) || 0,
+      };
+    });
+}
+
+// ─── Yahoo Finance v7 (배치) via allorigins ───────────────────
 async function fetchYahooQuoteBatch(symbols) {
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-  const data = await fetchWithProxy(url);
+  const url  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
+  const data = await proxyFetch(url);
   return data?.quoteResponse?.result ?? [];
 }
 
-// ─── Yahoo Finance v8 chart (단일 심볼, 스파크라인용) ─────────
+// ─── Yahoo Finance v8 chart (단일, fallback) ─────────────────
 async function fetchYahooChart(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
-  const data = await fetchWithProxy(url);
+  const url    = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
+  const data   = await proxyFetch(url);
   const result = data?.chart?.result?.[0];
-  if (!result) throw new Error(`No chart data: ${symbol}`);
+  if (!result) throw new Error(`No chart: ${symbol}`);
   const meta   = result.meta;
   const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-  const prev   = meta.previousClose ?? meta.chartPreviousClose;
+  const prev   = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
   return {
-    symbol: meta.symbol,
+    symbol:    meta.symbol?.split('.')[0],
     price:     meta.regularMarketPrice,
     change:    meta.regularMarketPrice - prev,
     changePct: ((meta.regularMarketPrice - prev) / prev) * 100,
@@ -47,37 +65,67 @@ async function fetchYahooChart(symbol) {
   };
 }
 
-// ─── 미국 주식 배치 fetch ─────────────────────────────────────
+// ─── 미국 주식 ─────────────────────────────────────────────────
 export async function fetchUsStocksBatch(symbols) {
+  // 1) Stooq (가장 빠르고 안정적)
+  try {
+    const data = await fetchStooq(symbols);
+    if (data.length >= symbols.length * 0.7) return data;
+  } catch {}
+
+  // 2) Yahoo v7 batch via proxy
   try {
     const results = await fetchYahooQuoteBatch(symbols);
-    return results.map(r => {
-      const prev = r.regularMarketPreviousClose ?? r.fiftyDayAverage;
-      return {
-        symbol:    r.symbol,
-        price:     r.regularMarketPrice,
-        change:    r.regularMarketChange,
-        changePct: r.regularMarketChangePercent,
-        volume:    r.regularMarketVolume,
-        marketCap: r.marketCap,
-        high52w:   r.fiftyTwoWeekHigh,
-        low52w:    r.fiftyTwoWeekLow,
-        sparkline: [],   // v7에는 스파크라인 없음, mock 유지
-      };
-    });
-  } catch {
-    // v7 실패 시 개별 v8 chart fetch
-    const results = await Promise.allSettled(symbols.map(fetchYahooChart));
-    return results.filter(r => r.status === 'fulfilled').map(r => r.value);
-  }
+    if (results.length > 0) return results.map(r => ({
+      symbol:    r.symbol,
+      price:     r.regularMarketPrice,
+      change:    r.regularMarketChange,
+      changePct: r.regularMarketChangePercent,
+      volume:    r.regularMarketVolume,
+      marketCap: r.marketCap,
+      high52w:   r.fiftyTwoWeekHigh,
+      low52w:    r.fiftyTwoWeekLow,
+    }));
+  } catch {}
+
+  // 3) Yahoo v8 개별 chart
+  const settled = await Promise.allSettled(symbols.map(fetchYahooChart));
+  return settled.filter(r => r.status === 'fulfilled').map(r => r.value);
 }
 
-// ─── 한국 주식 배치 fetch (.KS 붙여서) ───────────────────────
+// ─── Naver Finance 모바일 API (한국 주식) ────────────────────
+async function fetchNaverSingle(symbol) {
+  const url  = `https://m.stock.naver.com/api/stock/${symbol}/basic`;
+  const data = await proxyFetch(url);
+  const toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
+
+  const price     = toNum(data.closePrice);
+  const change    = toNum(data.compareToPreviousClosePrice);
+  const changePct = toNum(data.fluctuationsRatio);
+  const volume    = toNum(data.accumulatedTradingVolume);
+
+  if (!price) throw new Error(`${symbol}: no price`);
+  return { symbol, price, change, changePct, volume };
+}
+
+// ─── 한국 주식 배치 ────────────────────────────────────────────
 export async function fetchKoreanStocksBatch(stocks) {
-  const symbols = stocks.map(s => `${s.symbol}.KS`);
+  // 1) Naver Finance (가장 정확한 국내 주가)
   try {
+    const results = await Promise.allSettled(
+      stocks.map(s => fetchNaverSingle(s.symbol))
+    );
+    const valid = results
+      .filter(r => r.status === 'fulfilled' && r.value.price > 0)
+      .map(r => r.value);
+    if (valid.length >= stocks.length * 0.5) return valid;
+  } catch {}
+
+  // 2) Yahoo Finance .KS via proxy
+  try {
+    const symbols = stocks.map(s => `${s.symbol}.KS`);
     const results = await fetchYahooQuoteBatch(symbols);
-    return results.map(r => ({
+    if (results.length > 0) return results.map(r => ({
       symbol:    r.symbol.replace('.KS', ''),
       price:     r.regularMarketPrice,
       change:    r.regularMarketChange,
@@ -87,12 +135,12 @@ export async function fetchKoreanStocksBatch(stocks) {
       high52w:   r.fiftyTwoWeekHigh,
       low52w:    r.fiftyTwoWeekLow,
     }));
-  } catch {
-    return [];
-  }
+  } catch {}
+
+  return [];
 }
 
-// ─── 지수 ────────────────────────────────────────────────────
+// ─── 지수 ──────────────────────────────────────────────────────
 const INDEX_SYMBOLS = {
   'KOSPI':  '^KS11',
   'KOSDAQ': '^KQ11',
@@ -104,9 +152,11 @@ const INDEX_SYMBOLS = {
 
 export async function fetchIndices() {
   try {
-    const symbols = Object.values(INDEX_SYMBOLS);
-    const results = await fetchYahooQuoteBatch(symbols);
-    const symToId = Object.fromEntries(Object.entries(INDEX_SYMBOLS).map(([id, sym]) => [sym, id]));
+    const symbols  = Object.values(INDEX_SYMBOLS);
+    const results  = await fetchYahooQuoteBatch(symbols);
+    const symToId  = Object.fromEntries(
+      Object.entries(INDEX_SYMBOLS).map(([id, sym]) => [sym, id])
+    );
     return results.map(r => ({
       id:        symToId[r.symbol] ?? r.symbol,
       value:     r.regularMarketPrice,

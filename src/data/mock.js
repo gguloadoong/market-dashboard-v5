@@ -55,6 +55,27 @@ export const US_STOCKS_INITIAL = [
   { symbol:'AVGO',  name:'브로드컴',      nameEn:'Broadcom',   market:'us', sector:'반도체',    price:197.82, change:2.10,  changePct:1.07,  volume:25000000,  marketCap:0.93e12, high52w:251.88,  low52w:120.39 },
   { symbol:'JPM',   name:'JP모건',        nameEn:'JPMorgan',   market:'us', sector:'금융',      price:249.88, change:2.15,  changePct:0.87,  volume:9000000,   marketCap:0.72e12, high52w:280.25,  low52w:185.04 },
   { symbol:'BRK-B', name:'버크셔해서웨이', nameEn:'Berkshire', market:'us', sector:'금융',      price:522.14, change:-1.52, changePct:-0.29, volume:3500000,   marketCap:1.14e12, high52w:545.19,  low52w:358.09 },
+  // ─── 추가 종목 20개 ───────────────────────────────────────────
+  { symbol:'NFLX',  name:'넷플릭스',       nameEn:'Netflix',         market:'us', sector:'미디어',     price:990.03, change:12.5,  changePct:1.28,  volume:3800000,   marketCap:0.43e12, high52w:1065.00, low52w:527.21 },
+  { symbol:'AMD',   name:'AMD',            nameEn:'AMD',             market:'us', sector:'반도체',     price:109.54, change:3.21,  changePct:3.02,  volume:45000000,  marketCap:0.18e12, high52w:227.30,  low52w:94.22  },
+  { symbol:'INTC',  name:'인텔',           nameEn:'Intel',           market:'us', sector:'반도체',     price:21.37,  change:-0.42, changePct:-1.93, volume:52000000,  marketCap:0.09e12, high52w:36.20,   low52w:18.51  },
+  { symbol:'ORCL',  name:'오라클',         nameEn:'Oracle',          market:'us', sector:'소프트웨어', price:168.73, change:2.15,  changePct:1.29,  volume:8500000,   marketCap:0.47e12, high52w:198.31,  low52w:115.66 },
+  { symbol:'ADBE',  name:'어도비',         nameEn:'Adobe',           market:'us', sector:'소프트웨어', price:400.12, change:-3.82, changePct:-0.95, volume:4200000,   marketCap:0.18e12, high52w:634.00,  low52w:390.05 },
+  { symbol:'CRM',   name:'세일즈포스',     nameEn:'Salesforce',      market:'us', sector:'소프트웨어', price:290.45, change:4.10,  changePct:1.43,  volume:5100000,   marketCap:0.28e12, high52w:369.00,  low52w:212.00 },
+  { symbol:'QCOM',  name:'퀄컴',           nameEn:'Qualcomm',        market:'us', sector:'반도체',     price:158.82, change:2.05,  changePct:1.31,  volume:10000000,  marketCap:0.17e12, high52w:230.63,  low52w:130.20 },
+  { symbol:'TXN',   name:'텍사스 인스트루먼츠', nameEn:'Texas Instruments', market:'us', sector:'반도체', price:168.45, change:1.22, changePct:0.73, volume:5500000, marketCap:0.15e12, high52w:220.39, low52w:144.74 },
+  { symbol:'CSCO',  name:'시스코',         nameEn:'Cisco',           market:'us', sector:'네트워크',   price:60.15,  change:0.45,  changePct:0.75,  volume:14000000,  marketCap:0.24e12, high52w:64.52,   low52w:42.82  },
+  { symbol:'IBM',   name:'IBM',            nameEn:'IBM',             market:'us', sector:'IT서비스',   price:245.32, change:2.18,  changePct:0.90,  volume:4200000,   marketCap:0.23e12, high52w:264.28,  low52w:163.64 },
+  { symbol:'V',     name:'비자',           nameEn:'Visa',            market:'us', sector:'금융',       price:338.87, change:3.52,  changePct:1.05,  volume:5600000,   marketCap:0.69e12, high52w:365.49,  low52w:264.03 },
+  { symbol:'MA',    name:'마스터카드',     nameEn:'Mastercard',      market:'us', sector:'금융',       price:546.12, change:5.21,  changePct:0.96,  volume:2800000,   marketCap:0.52e12, high52w:571.10,  low52w:415.80 },
+  { symbol:'BAC',   name:'뱅크오브아메리카', nameEn:'Bank of America', market:'us', sector:'금융',     price:44.82,  change:0.38,  changePct:0.85,  volume:38000000,  marketCap:0.35e12, high52w:48.08,   low52w:31.70  },
+  { symbol:'WMT',   name:'월마트',         nameEn:'Walmart',         market:'us', sector:'유통',       price:96.82,  change:0.95,  changePct:0.99,  volume:8500000,   marketCap:0.78e12, high52w:105.30,  low52w:60.42  },
+  { symbol:'COST',  name:'코스트코',       nameEn:'Costco',          market:'us', sector:'유통',       price:978.14, change:8.45,  changePct:0.87,  volume:1800000,   marketCap:0.43e12, high52w:1078.23, low52w:700.50 },
+  { symbol:'HD',    name:'홈디포',         nameEn:'Home Depot',      market:'us', sector:'유통',       price:375.24, change:3.15,  changePct:0.85,  volume:3200000,   marketCap:0.37e12, high52w:439.37,  low52w:316.90 },
+  { symbol:'UNH',   name:'유나이티드헬스', nameEn:'UnitedHealth',    market:'us', sector:'헬스케어',   price:562.15, change:-4.22, changePct:-0.74, volume:2800000,   marketCap:0.52e12, high52w:630.73,  low52w:427.01 },
+  { symbol:'JNJ',   name:'존슨앤존슨',     nameEn:'Johnson & Johnson', market:'us', sector:'헬스케어', price:153.48, change:0.82, changePct:0.54, volume:7800000,   marketCap:0.37e12, high52w:168.00,  low52w:143.13 },
+  { symbol:'XOM',   name:'엑슨모빌',       nameEn:'ExxonMobil',      market:'us', sector:'에너지',     price:112.45, change:1.82,  changePct:1.65,  volume:14000000,  marketCap:0.49e12, high52w:126.34,  low52w:95.77  },
+  { symbol:'UBER',  name:'우버',           nameEn:'Uber',            market:'us', sector:'모빌리티',   price:72.15,  change:2.45,  changePct:3.51,  volume:18000000,  marketCap:0.15e12, high52w:87.00,   low52w:56.01  },
 ].map(s => ({ ...s, sparkline: genSparkline(s.price, 20, 0.015) }));
 
 // ─── 코인 초기값 (Upbit 2026-03-13 실제가, CoinGecko로 즉시 갱신됨) ─
@@ -96,6 +117,14 @@ export const ETF_DATA = [
   { symbol:'GLD',    name:'SPDR Gold',           market:'us', sector:'Commodity',category:'원자재', price:270.15, change:2.80, changePct:1.05,  volume:12000000, aum:75e9   },
   { symbol:'ARKK',   name:'ARK Innovation',      market:'us', sector:'Thematic', category:'테마',  price:54.32,  change:-0.95,changePct:-1.72, volume:18000000, aum:9e9    },
   { symbol:'SOXX',   name:'iShares Semi',        market:'us', sector:'Sector',  category:'섹터',   price:196.45, change:4.21, changePct:2.19,  volume:3200000,  aum:11e9   },
+  // ─── 추가 ETF 7개 ────────────────────────────────────────────
+  { symbol:'TQQQ',   name:'ProShares UltraPro QQQ',    market:'us', sector:'Leverage', category:'레버리지', price:58.32, change:1.85,  changePct:3.27,  volume:85000000, aum:22e9   },
+  { symbol:'SOXL',   name:'Direxion Semi Bull 3X',      market:'us', sector:'Leverage', category:'레버리지', price:21.45, change:1.12,  changePct:5.51,  volume:62000000, aum:9e9    },
+  { symbol:'SOXS',   name:'Direxion Semi Bear 3X',      market:'us', sector:'Inverse',  category:'인버스',   price:8.32,  change:-0.55, changePct:-6.20, volume:38000000, aum:1.5e9  },
+  { symbol:'TLT',    name:'iShares 20Y+ Treasury',      market:'us', sector:'Bond',     category:'채권',     price:86.45, change:0.45,  changePct:0.52,  volume:22000000, aum:40e9   },
+  { symbol:'373220', name:'KODEX 2차전지산업',           market:'kr', sector:'배터리',   category:'섹터',     price:12850, change:185,   changePct:1.46,  volume:8500000,  aum:2.1e12 },
+  { symbol:'091230', name:'TIGER 반도체',                market:'kr', sector:'반도체',   category:'섹터',     price:27650, change:455,   changePct:1.67,  volume:2100000,  aum:1.8e12 },
+  { symbol:'122630', name:'KODEX 레버리지',              market:'kr', sector:'레버리지', category:'레버리지', price:15420, change:-285,  changePct:-1.82, volume:28000000, aum:4.2e12 },
 ].map(e => ({ ...e, sparkline: genSparkline(e.price, 20, 0.008) }));
 
 // ─── 지수 초기값 ──────────────────────────────────────────────

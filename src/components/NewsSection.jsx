@@ -35,6 +35,9 @@ function NewsItem({ item }) {
           <span className="text-[11px] text-text3 flex-shrink-0">{item.timeAgo}</span>
         </div>
         <div className="text-[14px] font-medium text-text1 leading-snug line-clamp-2">{item.title}</div>
+        {item.description && (
+          <div className="text-[12px] text-text3 mt-1 line-clamp-2 leading-relaxed">{item.description}</div>
+        )}
       </div>
       {item.image && (
         <img
@@ -81,6 +84,12 @@ export default function NewsSection({ limit = 5, showFilter = false }) {
   }, []);
 
   useEffect(() => { load(category); }, [category, load]);
+
+  // 5분마다 뉴스 자동 갱신
+  useEffect(() => {
+    const id = setInterval(() => load(category), 300000);
+    return () => clearInterval(id);
+  }, [category, load]);
 
   const displayed = limit ? news.slice(0, limit) : news;
 

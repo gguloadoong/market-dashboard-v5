@@ -13,7 +13,7 @@ export default function SurgeBanner({ stocks = [], coins = [] }) {
         sub:   c.name,
         pct:   c.change24h ?? 0,
       })),
-    ].filter(i => Math.abs(i.pct) >= 0.5)
+    ].filter(i => i.pct >= 3)  // PRD 스펙: +3% 이상 급상승 종목만 표시
      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct))
      .slice(0, 20);
     return [...all, ...all]; // 루프용 복사

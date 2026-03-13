@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { fmtPrice, fmtPct, fmt, fmtLarge, getPct, arrow, barPos } from '../utils/format';
 import { fetchCandles } from '../api/chart';
+import { fetchAllNews } from '../api/news';
 
 const PERIODS = ['1주', '1달', '3달', '1년'];
 
@@ -284,6 +285,8 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
   const [period,  setPeriod]  = useState('1달');
   const [candles, setCandles] = useState([]);
   const [candleLoading, setCandleLoading] = useState(false);
+  const [modalNews, setModalNews]       = useState([]);
+  const [newsLoading, setNewsLoading]   = useState(false);
 
   const isKr   = item?.market === 'kr';
   const isCoin = !!item?.id;
@@ -318,6 +321,27 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
       });
   }, [item?.symbol ?? item?.id, period, tab]);
 
+  // 뉴스 탭 선택 시 관련 뉴스 로드
+  useEffect(() => {
+    if (tab !== '뉴스' || !item) return;
+    setNewsLoading(true);
+    fetchAllNews()
+      .then(all => {
+        const keywords = [item.name, item.symbol, item.nameEn]
+          .filter(Boolean)
+          .map(k => k.toLowerCase());
+        const filtered = all.filter(n =>
+          keywords.some(k =>
+            n.title.toLowerCase().includes(k) ||
+            (n.description || '').toLowerCase().includes(k)
+          )
+        );
+        setModalNews(filtered.length > 0 ? filtered : all.slice(0, 8));
+      })
+      .catch(() => setModalNews([]))
+      .finally(() => setNewsLoading(false));
+  }, [tab, item?.symbol, item?.id]);
+
   if (!item) return null;
 
   const pct    = getPct(item);
@@ -330,7 +354,7 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
     ? (coinUnit === 'krw' ? item.priceKrw : item.priceUsd)
     : item.price;
 
-  const TABS = isKr ? ['차트', '투자자동향', '기본정보'] : ['차트', '기본정보'];
+  const TABS = isKr ? ['차트', '투자자동향', '기본정보', '뉴스'] : ['차트', '기본정보', '뉴스'];
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -471,6 +495,67 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
                   <div className="text-[13px] font-semibold text-text1 tabular-nums">{row.value || '—'}</div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── 뉴스 탭 ── */}
+          {tab === '뉴스' && (
+            <div>
+              {newsLoading && (
+                <div className="space-y-0">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="flex gap-3 px-5 py-3.5 border-b border-[#F2F4F6]">
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-[#F2F4F6] rounded w-1/4 animate-pulse" />
+                        <div className="h-3.5 bg-[#F2F4F6] rounded animate-pulse" />
+                        <div className="h-3.5 bg-[#F2F4F6] rounded w-5/6 animate-pulse" />
+                      </div>
+                      <div className="w-14 h-14 bg-[#F2F4F6] rounded-xl flex-shrink-0 animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!newsLoading && modalNews.length === 0 && (
+                <div className="px-5 py-8 text-center text-[13px] text-text3">관련 뉴스가 없습니다.</div>
+              )}
+              {!newsLoading && modalNews.map((news, i) => {
+                const isBreaking = (Date.now() - new Date(news.pubDate)) < 3600000;
+                return (
+                  <a
+                    key={news.id || i}
+                    href={news.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-3 px-5 py-3.5 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors active:bg-[#F2F4F6]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {isBreaking && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                            style={{ background: '#FEF0F1', color: '#F04452' }}>
+                            🔴 속보
+                          </span>
+                        )}
+                        <span className="text-[11px] text-text3 truncate">{news.source}</span>
+                        <span className="text-[11px] text-text3">·</span>
+                        <span className="text-[11px] text-text3 flex-shrink-0">{news.timeAgo}</span>
+                      </div>
+                      <div className="text-[14px] font-medium text-text1 leading-snug line-clamp-2">{news.title}</div>
+                      {news.description && (
+                        <div className="text-[12px] text-text3 mt-1 line-clamp-2 leading-relaxed">{news.description}</div>
+                      )}
+                    </div>
+                    {news.image && (
+                      <img
+                        src={news.image}
+                        alt=""
+                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                        onError={e => { e.target.style.display = 'none'; }}
+                      />
+                    )}
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>

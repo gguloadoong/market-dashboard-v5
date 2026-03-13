@@ -11,7 +11,7 @@ export default function StockCard({ item, coinUnit = 'usd', onClick }) {
   const isSurge = Math.abs(pct) >= 5;
 
   const dirColor = isUp ? 'c-up' : isDown ? 'c-down' : 'c-neutral';
-  const badgeCls = isUp ? 'badge-up' : isDown ? 'badge-down' : 'badge-neutral';
+  const badgeCls = isUp ? 'badge-up' : isDown ? 'badge-down' : 'badge-flat';
 
   const volume = isCoin ? item.volume24h : item.volume;
   const mcap = isCoin ? item.marketCap : item.marketCap;

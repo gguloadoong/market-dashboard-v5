@@ -99,6 +99,35 @@
            transition-colors duration-100;
   }
   .news-row:not(:last-child) { border-bottom: 1px solid #F2F4F6; }
+
+  /* ── 종목 카드 ── */
+  .card {
+    @apply bg-white rounded-2xl cursor-pointer select-none transition-all duration-200;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .card-surge {
+    @apply rounded-2xl cursor-pointer select-none transition-all duration-200;
+    background: #FFF8F8;
+    border-left: 4px solid #D63031;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .card-surge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(214,48,49,0.15);
+  }
+
+  /* ── section-card (탭 내부 섹션) ── */
+  .section-card {
+    @apply bg-white rounded-2xl overflow-hidden;
+  }
+
+  /* ── 배지 추가 ── */
+  .badge-neutral { @apply bg-[#F2F4F6] text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
+  .badge-vol { @apply bg-[#FFF3E0] text-[#FF9500] rounded-full px-1.5 py-0.5 text-[9px] font-bold; }
 }
 
 @layer utilities {
