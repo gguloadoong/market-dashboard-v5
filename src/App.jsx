@@ -169,12 +169,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F2F4F6]">
-      {/* 급상승 배너 (항상 최상단, sticky) */}
-      <div className="sticky top-0 z-50">
+      {/* 급상승 배너 (sticky, z-30 — 차트 패널 z-150보다 낮게) */}
+      <div className="sticky top-0 z-30">
         <SurgeBanner stocks={allStocks} coins={coins} />
       </div>
 
-      {/* 헤더 (탭 내장, sticky) */}
+      {/* 헤더 (sticky, z-20) */}
       <Header
         krwRate={krwRate}
         lastUpdated={lastUpdated}

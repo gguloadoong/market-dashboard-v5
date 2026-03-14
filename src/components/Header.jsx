@@ -19,7 +19,7 @@ export default function Header({ krwRate, lastUpdated, onRefresh, loading, activ
     : null;
 
   return (
-    <header className="bg-white sticky top-0 z-40" style={{ borderBottom: '1px solid #E5E8EB' }}>
+    <header className="bg-white sticky top-0 z-20" style={{ borderBottom: '1px solid #E5E8EB' }}>
       <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
 
         {/* 좌: 로고 + 탭 */}

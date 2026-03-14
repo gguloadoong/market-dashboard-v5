@@ -275,20 +275,22 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
 
   return (
     <>
-      {/* 딤 오버레이 (클릭 시 닫기) */}
+      {/* 딤 오버레이 — z-[150] (sticky 헤더/배너 모두 위) */}
       <div
-        className="fixed inset-0 z-40 bg-black/20"
+        className="fixed inset-0 bg-black/30"
+        style={{ zIndex: 150 }}
         onClick={onClose}
       />
 
-      {/* 패널 */}
+      {/* 패널 — full-height, 헤더·배너 위로 슬라이드 */}
       <div
-        className="fixed top-[56px] right-0 z-50 bg-white shadow-2xl flex flex-col"
+        className="fixed top-0 right-0 bg-white shadow-2xl flex flex-col"
         style={{
-          width: 'min(600px, 45vw)',
-          height: 'calc(100vh - 56px)',
+          zIndex: 151,
+          width: 'min(620px, 48vw)',
+          height: '100vh',
           borderLeft: '1px solid #E5E8EB',
-          animation: 'slideInRight 0.25s cubic-bezier(0.4,0,0.2,1)',
+          animation: 'slideInRight 0.22s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
         {/* 헤더 */}
