@@ -13,7 +13,7 @@ import ChartSidePanel from './components/ChartSidePanel';
 import HomeDashboard from './components/HomeDashboard';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
-import { fetchCoins, fetchExchangeRate } from './api/coins';
+import { fetchCoins, fetchCoinsUpbitOnly, fetchExchangeRate } from './api/coins';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
 
 const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
@@ -47,7 +47,23 @@ export default function App() {
   const [selectedItem, setSelectedItem]   = useState(null);
   const loadingRef = useRef(false);
 
-  // ── 코인 갱신 (10초) ────────────────────────────────────────
+  // ── 코인 빠른 갱신 — Upbit만 (10초, 가격·등락률만 업데이트) ──
+  const refreshCoinsQuick = useCallback(async () => {
+    try {
+      const rate = await fetchExchangeRate().catch(() => krwRate);
+      setKrwRate(rate);
+      setCoins(prev => {
+        if (!prev.length) return prev;
+        // 비동기 업데이트: 완료 후 state 반영
+        fetchCoinsUpbitOnly(prev, rate)
+          .then(data => { if (data.length) setCoins(data); })
+          .catch(() => {});
+        return prev; // 즉시 이전 값 유지
+      });
+    } catch {}
+  }, [krwRate]);
+
+  // ── 코인 전체 갱신 — CoinGecko 포함 (60초, 시총·스파크라인 포함) ──
   const refreshCoins = useCallback(async () => {
     try {
       const rate = await fetchExchangeRate().catch(() => krwRate);
@@ -59,7 +75,7 @@ export default function App() {
           return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
         }));
       }
-    } catch (e) { console.warn('코인 갱신 실패:', e.message); }
+    } catch (e) { console.warn('코인 전체갱신 실패 (캐시 사용):', e.message); }
   }, [krwRate]);
 
   // ── 미장 갱신 (30초) ────────────────────────────────────────
@@ -119,10 +135,13 @@ export default function App() {
 
   // ── 초기 로드 + 폴링 인터벌 ─────────────────────────────────
   useEffect(() => { refreshAll(); }, [refreshAll]);
+  // 코인 가격·등락률: Upbit만 10초 (CoinGecko 레이트리밋 방지)
   useEffect(() => {
-    const id = setInterval(() => refreshCoins().then(() => setLastUpdated(Date.now())), 10000);
+    const id = setInterval(() => refreshCoinsQuick().then(() => setLastUpdated(Date.now())), 10000);
     return () => clearInterval(id);
-  }, [refreshCoins]);
+  }, [refreshCoinsQuick]);
+  // 코인 시총·스파크라인: CoinGecko 포함 60초
+  useEffect(() => { const id = setInterval(refreshCoins, 60000); return () => clearInterval(id); }, [refreshCoins]);
   useEffect(() => { const id = setInterval(refreshUsStocks,    30000); return () => clearInterval(id); }, [refreshUsStocks]);
   useEffect(() => { const id = setInterval(refreshKoreanStocks,30000); return () => clearInterval(id); }, [refreshKoreanStocks]);
   useEffect(() => { const id = setInterval(() => setKrStocks(p => simulateKorean(p)), 15000); return () => clearInterval(id); }, []);
