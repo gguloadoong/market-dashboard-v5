@@ -141,70 +141,84 @@ export async function fetchKoreanStocksBatch(stocks) {
 }
 
 // ─── 지수 ────────────────────────────────────────────────────
-// 국내: Naver Finance 모바일 API (KOSPI/KOSDAQ 전용, 가장 정확)
-// 해외: Yahoo Finance via 여러 프록시 순서대로 시도
+// 모든 지수: Yahoo Finance via 다중 프록시 동시 레이스 (KOSPI 포함)
+// KOSPI: ^KS11, KOSDAQ: ^KQ11 (Yahoo Finance 공식 티커)
 const toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
 
-async function fetchNaverIndex(code) {
-  const url = `https://m.stock.naver.com/api/index/${code}/basic`;
-  const data = await proxyFetch(url);
-  const val  = toNum(data.closePrice || data.indexNowValue);
-  if (!val) throw new Error(`${code} no value`);
-  return {
-    id:        code,
-    value:     val,
-    change:    toNum(data.compareToPreviousClosePrice || data.stockExchangeType?.compareToPreviousClosePrice),
-    changePct: toNum(data.fluctuationsRatio || data.stockExchangeType?.fluctuationsRatio),
-  };
-}
-
-// 여러 프록시로 Yahoo Finance 시도
-async function fetchYahooViaProxy(symbol, id) {
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`)}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`)}`,
+// rss2json/corsproxy 레이스 방식과 동일 — 두 프록시 동시 실행, 먼저 성공한 것 사용
+async function fetchYahooRace(symbol, id) {
+  const yUrls = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`,
   ];
-  for (const proxyUrl of proxies) {
-    try {
-      const res  = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const raw  = json.contents ? JSON.parse(json.contents) : json;
-      const meta = raw?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) continue;
-      const prev = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
-      return {
-        id,
-        value:     meta.regularMarketPrice,
-        change:    parseFloat((meta.regularMarketPrice - prev).toFixed(2)),
-        changePct: parseFloat(((meta.regularMarketPrice - prev) / prev * 100).toFixed(2)),
-      };
-    } catch {}
-  }
-  throw new Error(`${symbol} all proxies failed`);
+
+  const tryCorsproxy = async () => {
+    const res  = await fetch(
+      `https://corsproxy.io/?url=${encodeURIComponent(yUrls[0])}`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (!res.ok) throw new Error(`corsproxy ${res.status}`);
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) throw new Error('corsproxy no price');
+    return meta;
+  };
+
+  const tryAllorigins = async () => {
+    const res  = await fetch(
+      `https://api.allorigins.win/get?url=${encodeURIComponent(yUrls[1])}`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (!res.ok) throw new Error(`allorigins ${res.status}`);
+    const json = await res.json();
+    const raw  = JSON.parse(json.contents ?? '{}');
+    const meta = raw?.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) throw new Error('allorigins no price');
+    return meta;
+  };
+
+  // 동시 실행 — 먼저 성공한 것으로 결과 반환
+  return new Promise((resolve, reject) => {
+    let done = false;
+    let failed = 0;
+
+    [tryCorsproxy, tryAllorigins].forEach(fn => {
+      fn().then(meta => {
+        if (done) return;
+        done = true;
+        const prev = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
+        resolve({
+          id,
+          value:     parseFloat(meta.regularMarketPrice.toFixed(2)),
+          change:    parseFloat((meta.regularMarketPrice - prev).toFixed(2)),
+          changePct: parseFloat(((meta.regularMarketPrice - prev) / prev * 100).toFixed(2)),
+        });
+      }).catch(() => {
+        failed++;
+        if (failed === 2 && !done) {
+          done = true;
+          reject(new Error(`${symbol} 모든 프록시 실패`));
+        }
+      });
+    });
+  });
 }
 
-const US_INDEX_SYMBOLS = {
-  'SPX': '^GSPC',
-  'NDX': '^IXIC',
-  'DJI': '^DJI',
-  'DXY': 'DX-Y.NYB',
-};
+// 모든 지수 — Yahoo Finance 티커 매핑
+const ALL_INDICES = [
+  { id: 'KOSPI',  symbol: '^KS11'   },
+  { id: 'KOSDAQ', symbol: '^KQ11'   },
+  { id: 'SPX',    symbol: '^GSPC'   },
+  { id: 'NDX',    symbol: '^IXIC'   },
+  { id: 'DJI',    symbol: '^DJI'    },
+  { id: 'DXY',    symbol: 'DX-Y.NYB'},
+];
 
 export async function fetchIndices() {
-  // 국내 지수: Naver Finance (정확도 최우선)
-  const krIndices = await Promise.allSettled([
-    fetchNaverIndex('KOSPI'),
-    fetchNaverIndex('KOSDAQ'),
-  ]);
-
-  // 해외 지수: Yahoo Finance via proxy
-  const usIndices = await Promise.allSettled(
-    Object.entries(US_INDEX_SYMBOLS).map(([id, sym]) => fetchYahooViaProxy(sym, id))
+  const results = await Promise.allSettled(
+    ALL_INDICES.map(({ id, symbol }) => fetchYahooRace(symbol, id))
   );
-
-  return [
-    ...krIndices.filter(r => r.status === 'fulfilled').map(r => r.value),
-    ...usIndices.filter(r => r.status === 'fulfilled').map(r => r.value),
-  ];
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
 }
