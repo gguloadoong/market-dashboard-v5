@@ -49,11 +49,12 @@ function parseRssXml(xmlText, category, sourceName) {
   }).filter(Boolean);
 }
 
-// ─── 핵심 fetch — 3개 프록시 동시 실행, 첫 성공 반환 (최대 5초) ──
+// ─── 핵심 fetch — rss2json(1순위) + allorigins(2순위) 동시 레이스 ──
+// corsproxy.io 서비스 종료로 제거됨
 async function fetchRSS(rssUrl, category, sourceName) {
   const TIMEOUT = 5000;
 
-  // 1) rss2json — JSON으로 바로 파싱, 가장 빠름
+  // 1) rss2json.com — CORS-free JSON 변환, 가장 빠름
   const rss2jsonFn = async () => {
     const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
     const res  = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT) });
@@ -63,18 +64,7 @@ async function fetchRSS(rssUrl, category, sourceName) {
     return parseRssItems(data.items, category, sourceName);
   };
 
-  // 2) corsproxy — XML 파싱 필요
-  const corsFn = async () => {
-    const url = `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`;
-    const res  = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT) });
-    if (!res.ok) throw new Error(`corsproxy ${res.status}`);
-    const text = await res.text();
-    const items = parseRssXml(text, category, sourceName);
-    if (!items.length) throw new Error('corsproxy empty');
-    return items;
-  };
-
-  // 3) allorigins — 마지막 수단
+  // 2) allorigins — XML 원문 → 파싱
   const alloriginsFn = async () => {
     const url  = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
     const res  = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT) });
@@ -87,27 +77,18 @@ async function fetchRSS(rssUrl, category, sourceName) {
     return items;
   };
 
-  // rss2json + corsproxy 동시 실행 → 먼저 성공한 것 반환
+  // 두 방식 동시 실행 — 먼저 성공한 것 반환
   return new Promise(resolve => {
     let done = false;
-    let pending = 2;
+    let failed = 0;
 
-    const tryFallback = () => {
-      // 두 개 모두 실패하면 allorigins 시도
-      alloriginsFn().then(items => {
-        if (!done) { done = true; resolve(items); }
-      }).catch(() => {
-        if (!done) { done = true; resolve([]); }
-      });
-    };
-
-    [rss2jsonFn, corsFn].forEach(fn => {
+    [rss2jsonFn, alloriginsFn].forEach(fn => {
       fn().then(items => {
         if (!done && items.length > 0) { done = true; resolve(items); }
-        else { pending--; if (pending === 0 && !done) tryFallback(); }
+        else { failed++; if (failed === 2 && !done) { done = true; resolve([]); } }
       }).catch(() => {
-        pending--;
-        if (pending === 0 && !done) tryFallback();
+        failed++;
+        if (failed === 2 && !done) { done = true; resolve([]); }
       });
     });
   });

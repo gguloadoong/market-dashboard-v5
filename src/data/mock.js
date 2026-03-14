@@ -129,10 +129,10 @@ export const ETF_DATA = [
 
 // ─── 지수 초기값 ──────────────────────────────────────────────
 export const INDICES_INITIAL = [
-  { id:'KOSPI',  name:'코스피',   value:2643.12, change:18.52, changePct:0.71,  market:'kr' },
-  { id:'KOSDAQ', name:'코스닥',   value:775.18,  change:-3.25, changePct:-0.42, market:'kr' },
-  { id:'SPX',    name:'S&P 500', value:5614.56, change:38.25, changePct:0.69,  market:'us' },
-  { id:'NDX',    name:'NASDAQ',  value:19560.20,change:215.30,changePct:1.11,  market:'us' },
-  { id:'DJI',    name:'DOW',     value:41985.80,change:-85.20,changePct:-0.20, market:'us' },
-  { id:'DXY',    name:'USD Index',value:103.82,  change:-0.18, changePct:-0.17, market:'us' },
+  { id:'KOSPI',  name:'코스피',    value:5487.24,  change:-97.63,  changePct:-1.75, market:'kr' },
+  { id:'KOSDAQ', name:'코스닥',    value:1602.30,  change:-28.40,  changePct:-1.74, market:'kr' },
+  { id:'SPX',    name:'S&P 500',  value:6632.19,  change:-143.61, changePct:-2.12, market:'us' },
+  { id:'NDX',    name:'NASDAQ',   value:22105.36, change:-610.77, changePct:-2.69, market:'us' },
+  { id:'DJI',    name:'DOW',      value:44027.80, change:-890.20, changePct:-1.98, market:'us' },
+  { id:'DXY',    name:'USD Index',value:100.50,   change:0.76,    changePct:0.76,  market:'us' },
 ];

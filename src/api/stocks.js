@@ -145,44 +145,43 @@ export async function fetchKoreanStocksBatch(stocks) {
 // KOSPI: ^KS11, KOSDAQ: ^KQ11 (Yahoo Finance 공식 티커)
 const toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
 
-// rss2json/corsproxy 레이스 방식과 동일 — 두 프록시 동시 실행, 먼저 성공한 것 사용
+// allorigins 두 엔드포인트로 레이스 (corsproxy.io 서비스 종료로 제거)
 async function fetchYahooRace(symbol, id) {
-  const yUrls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`,
-  ];
+  const encoded = encodeURIComponent(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`
+  );
+  const encoded2 = encodeURIComponent(
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`
+  );
 
-  const tryCorsproxy = async () => {
-    const res  = await fetch(
-      `https://corsproxy.io/?url=${encodeURIComponent(yUrls[0])}`,
-      { signal: AbortSignal.timeout(7000) }
-    );
-    if (!res.ok) throw new Error(`corsproxy ${res.status}`);
-    const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
-    if (!meta?.regularMarketPrice) throw new Error('corsproxy no price');
-    return meta;
-  };
-
-  const tryAllorigins = async () => {
-    const res  = await fetch(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(yUrls[1])}`,
-      { signal: AbortSignal.timeout(7000) }
-    );
+  // allorigins /get — contents 필드에 JSON 문자열
+  const tryAlloriginsGet = async () => {
+    const res  = await fetch(`https://api.allorigins.win/get?url=${encoded}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`allorigins ${res.status}`);
     const json = await res.json();
-    const raw  = JSON.parse(json.contents ?? '{}');
+    if (!json.contents) throw new Error('allorigins empty');
+    const raw  = JSON.parse(json.contents);
     const meta = raw?.chart?.result?.[0]?.meta;
-    if (!meta?.regularMarketPrice) throw new Error('allorigins no price');
+    if (!meta?.regularMarketPrice) throw new Error('no price');
     return meta;
   };
 
-  // 동시 실행 — 먼저 성공한 것으로 결과 반환
+  // allorigins /raw — 직접 JSON 반환 (같은 서비스, 다른 엔드포인트)
+  const tryAlloriginsRaw = async () => {
+    const res  = await fetch(`https://api.allorigins.win/raw?url=${encoded2}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`allorigins-raw ${res.status}`);
+    const raw  = await res.json();
+    const meta = raw?.chart?.result?.[0]?.meta;
+    if (!meta?.regularMarketPrice) throw new Error('no price');
+    return meta;
+  };
+
+  // 두 엔드포인트 동시 실행 — 먼저 성공한 것 사용
   return new Promise((resolve, reject) => {
     let done = false;
     let failed = 0;
 
-    [tryCorsproxy, tryAllorigins].forEach(fn => {
+    [tryAlloriginsGet, tryAlloriginsRaw].forEach(fn => {
       fn().then(meta => {
         if (done) return;
         done = true;
