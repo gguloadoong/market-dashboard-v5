@@ -1,7 +1,9 @@
-// 뉴스 API — rss2json(1순위) → corsproxy(2순위) → allorigins(3순위) 폴백
+// 뉴스 API — Google News RSS(1순위, 안정적) + 국내 RSS(2순위) + CryptoCompare(코인 fallback)
 
 function timeAgo(dateInput) {
+  if (!dateInput) return '';
   const ms   = typeof dateInput === 'number' ? dateInput * 1000 : new Date(dateInput).getTime();
+  if (isNaN(ms)) return '';
   const diff = (Date.now() - ms) / 1000;
   if (diff < 60)    return `${Math.floor(diff)}초 전`;
   if (diff < 3600)  return `${Math.floor(diff / 60)}분 전`;
@@ -9,10 +11,10 @@ function timeAgo(dateInput) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
-// ─── 1순위: rss2json.com (무료, 인증불필요, 안정적) ─────────────
+// ─── 1순위: rss2json.com ─────────────────────────────────────
 async function fetchViaRss2json(rssUrl, category, sourceName) {
   const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
-  const res = await fetch(apiUrl, { signal: AbortSignal.timeout(10000) });
+  const res = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`rss2json ${res.status}`);
   const data = await res.json();
   if (data.status !== 'ok') throw new Error(`rss2json: ${data.message}`);
@@ -29,19 +31,19 @@ async function fetchViaRss2json(rssUrl, category, sourceName) {
   })).filter(i => i.title && i.link);
 }
 
-// ─── 2순위: corsproxy.io ────────────────────────────────────────
+// ─── 2순위: corsproxy.io ────────────────────────────────────
 async function fetchViaCorsproxy(rssUrl, category, sourceName) {
   const proxy = `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`;
-  const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+  const res   = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`corsproxy ${res.status}`);
   const text = await res.text();
   return parseRssXml(text, category, sourceName);
 }
 
-// ─── 3순위: allorigins.win ───────────────────────────────────────
+// ─── 3순위: allorigins.win ───────────────────────────────────
 async function fetchViaAllorigins(rssUrl, category, sourceName) {
   const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-  const res   = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
+  const res   = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`allorigins ${res.status}`);
   const json  = await res.json();
   const text  = json.contents ?? '';
@@ -49,7 +51,7 @@ async function fetchViaAllorigins(rssUrl, category, sourceName) {
   return parseRssXml(text, category, sourceName);
 }
 
-// ─── RSS XML 파서 ──────────────────────────────────────────────
+// ─── RSS XML 파서 ─────────────────────────────────────────────
 function parseRssXml(xmlText, category, sourceName) {
   const doc   = new DOMParser().parseFromString(xmlText, 'text/xml');
   const items = [...doc.querySelectorAll('item')];
@@ -75,7 +77,7 @@ function parseRssXml(xmlText, category, sourceName) {
   }).filter(Boolean);
 }
 
-// ─── 3단계 폴백으로 RSS 가져오기 ─────────────────────────────
+// ─── 3단계 폴백 ──────────────────────────────────────────────
 async function fetchRSS(rssUrl, category, sourceName) {
   const fetchers = [
     () => fetchViaRss2json(rssUrl, category, sourceName),
@@ -93,7 +95,7 @@ async function fetchRSS(rssUrl, category, sourceName) {
 
 // ─── CryptoCompare fallback (코인 뉴스용) ─────────────────────
 async function fetchCryptoCompareFallback() {
-  const url = 'https://min-api.cryptocompare.com/data/v2/news/?lang=KO&feeds=cointelegraph,coindesk,decrypt';
+  const url = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&feeds=cointelegraph,coindesk,decrypt&extraParams=market_dashboard';
   try {
     const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`CC ${res.status}`);
@@ -113,25 +115,49 @@ async function fetchCryptoCompareFallback() {
   } catch { return []; }
 }
 
-// ─── 뉴스 소스 목록 ───────────────────────────────────────────
+// ─── 뉴스 소스 목록 ──────────────────────────────────────────
+// Google News RSS를 1순위 (안정적, 한국어 지원, 프록시 통과율 높음)
 const FEEDS = {
   coin: [
+    {
+      url: 'https://news.google.com/rss/search?q=%EB%B9%84%ED%8A%B8%EC%BD%94%EC%9D%B8+%EC%BD%94%EC%9D%B8+%EA%B0%80%EC%83%81%ED%99%94%ED%8F%90&hl=ko&gl=KR&ceid=KR:ko',
+      source: '구글뉴스',
+    },
     { url: 'https://www.coindeskkorea.com/feed/',      source: '코인데스크코리아' },
     { url: 'https://www.blockmedia.co.kr/feed/',       source: '블록미디어' },
     { url: 'https://coinreaders.com/feed',             source: '코인리더스' },
   ],
   us: [
+    {
+      url: 'https://news.google.com/rss/search?q=%EB%AF%B8%EA%B5%AD%EC%A6%9D%EC%8B%9C+%EB%82%98%EC%8A%A4%EB%8B%A5+S%26P500&hl=ko&gl=KR&ceid=KR:ko',
+      source: '구글뉴스',
+    },
     { url: 'https://www.hankyung.com/feed/international', source: '한국경제' },
     { url: 'https://www.mk.co.kr/rss/40300001/',          source: '매일경제' },
     { url: 'https://biz.chosun.com/sitemap/rss/international.xml', source: '조선비즈' },
   ],
   kr: [
+    {
+      url: 'https://news.google.com/rss/search?q=%EC%BD%94%EC%8A%A4%ED%94%BC+%EC%BD%94%EC%8A%A4%EB%8B%A5+%EC%A6%9D%EC%8B%9C+%EC%A3%BC%EC%8B%9D&hl=ko&gl=KR&ceid=KR:ko',
+      source: '구글뉴스',
+    },
     { url: 'https://www.hankyung.com/feed/stock',             source: '한국경제' },
     { url: 'https://www.mk.co.kr/rss/30000001/',              source: '매일경제' },
     { url: 'https://biz.chosun.com/sitemap/rss/stocks.xml',   source: '조선비즈' },
     { url: 'https://www.sedaily.com/RSS/S0601',               source: '서울경제' },
   ],
 };
+
+// 중복 제목 제거
+function dedup(items) {
+  const seen = new Set();
+  return items.filter(i => {
+    const key = i.title.slice(0, 30);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 async function fetchCategory(category) {
   const results = await Promise.allSettled(
@@ -143,9 +169,9 @@ async function fetchCategory(category) {
 
   if (category === 'coin' && items.length < 3) {
     const fallback = await fetchCryptoCompareFallback();
-    return [...items, ...fallback].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    return dedup([...items, ...fallback]).sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
   }
-  return items.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  return dedup(items).sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 }
 
 export async function fetchAllNews() {

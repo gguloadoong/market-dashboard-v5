@@ -1,8 +1,41 @@
 // 종목 상세 차트 사이드 패널 — lightweight-charts 사용
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 import { fetchCandles } from '../api/chart';
 import { fetchAllNews } from '../api/news';
+
+// 로고 URL
+function getLogoUrl(item) {
+  if (item.image) return item.image;
+  if (item.market === 'us')
+    return `https://assets.parqet.com/logos/symbol/${item.symbol}?format=svg`;
+  if (item.market === 'kr')
+    return `https://file.alphasquare.co.kr/media/images/stock_logo/kr/${item.symbol}.png`;
+  return null;
+}
+const PALETTE = ['#3182F6','#F04452','#FF9500','#2AC769','#8B5CF6','#EC4899','#14B8A6','#F59E0B'];
+function colorFor(s = '') {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+  return PALETTE[Math.abs(h) % PALETTE.length];
+}
+function PanelLogo({ item }) {
+  const [err, setErr] = useState(false);
+  const url = getLogoUrl(item);
+  if (url && !err) {
+    return (
+      <img src={url} alt={item.symbol} onError={() => setErr(true)}
+        className="w-10 h-10 rounded-xl object-contain bg-white border border-[#F2F4F6] flex-shrink-0 p-1"
+      />
+    );
+  }
+  return (
+    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0"
+      style={{ background: colorFor(item.symbol) }}>
+      {(item.symbol || '?').slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
 
 const PERIODS = ['1W', '1M', '3M', '1Y'];
 const PERIOD_LABEL = { '1W': '1주', '1M': '1달', '3M': '3달', '1Y': '1년' };
@@ -260,30 +293,33 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
       >
         {/* 헤더 */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-[#F2F4F6]">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[20px] font-bold text-[#191F28]">{item.name}</span>
-                <span className="text-[12px] text-[#B0B8C1] bg-[#F2F4F6] px-2 py-0.5 rounded-full">{item.symbol}</span>
-                {item.sector && <span className="text-[11px] text-[#B0B8C1] bg-[#F2F4F6] px-2 py-0.5 rounded-full">{item.sector}</span>}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <PanelLogo item={item} />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[18px] font-bold text-[#191F28] truncate">{item.name}</span>
+                  <span className="text-[11px] font-bold text-[#8B95A1] font-mono bg-[#F2F4F6] px-2 py-0.5 rounded-full flex-shrink-0">{item.symbol}</span>
+                  {item.sector && <span className="text-[10px] text-[#B0B8C1] bg-[#F2F4F6] px-1.5 py-0.5 rounded-full flex-shrink-0">{item.sector}</span>}
+                </div>
+                <div className="flex items-baseline gap-2.5 mt-1">
+                  <span className="text-[24px] font-bold text-[#191F28] tabular-nums font-mono">
+                    {fmtKrwPrice(item, krwRate)}
+                  </span>
+                  <span className={`text-[15px] font-semibold tabular-nums font-mono ${isUp ? 'text-[#F04452]' : isDown ? 'text-[#1764ED]' : 'text-[#6B7684]'}`}>
+                    {isUp ? '▲' : isDown ? '▼' : '—'}{Math.abs(pct).toFixed(2)}%
+                  </span>
+                </div>
+                {item.market === 'us' && item.price && (
+                  <div className="text-[12px] text-[#B0B8C1] mt-0.5 font-mono">${fmt(item.price, 2)} USD</div>
+                )}
               </div>
-              <div className="flex items-baseline gap-3 mt-1.5">
-                <span className="text-[26px] font-bold text-[#191F28] tabular-nums font-mono">
-                  {fmtKrwPrice(item, krwRate)}
-                </span>
-                <span className={`text-[16px] font-semibold tabular-nums font-mono ${isUp ? 'text-[#F04452]' : isDown ? 'text-[#1764ED]' : 'text-[#6B7684]'}`}>
-                  {isUp ? '▲' : isDown ? '▼' : '—'} {Math.abs(pct).toFixed(2)}%
-                </span>
-              </div>
-              {item.market === 'us' && item.price && (
-                <div className="text-[13px] text-[#B0B8C1] mt-0.5">${fmt(item.price, 2)} USD</div>
-              )}
             </div>
             <button
               onClick={onClose}
-              className="text-[#B0B8C1] hover:text-[#191F28] text-xl p-1 mt-1 transition-colors"
+              className="text-[#B0B8C1] hover:text-[#191F28] flex-shrink-0 p-1.5 rounded-lg hover:bg-[#F2F4F6] transition-colors"
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
         </div>
