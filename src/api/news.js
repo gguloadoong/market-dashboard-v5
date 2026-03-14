@@ -148,6 +148,41 @@ const FEEDS = {
   ],
 };
 
+// ─── 금융 뉴스 필터 (비금융 기사 차단) ──────────────────────
+// 허용 키워드: 주식·코인·금융 관련 단어를 하나라도 포함해야 통과
+const FINANCE_KW = [
+  '주식','증시','코스피','코스닥','코인','비트코인','이더리움','솔라나','리플','암호화폐',
+  '가상화폐','나스닥','다우','s&p','s&p500','금리','환율','달러','원화','기준금리',
+  '주가','상장','ipo','공모','배당','실적','매출','영업이익','순이익','시가총액',
+  '외국인','기관','개인','etf','펀드','채권','파생','선물','옵션',
+  '삼성전자','sk하이닉스','naver','카카오','현대차','기아','lg',
+  'nvidia','apple','tesla','microsoft','google','amazon','meta',
+  'bitcoin','ethereum','crypto','defi','nft','blockchain','altcoin','web3',
+  'fed','fomc','연준','금통위','기재부','한국은행','거래소','kospi','kosdaq',
+  '증권','투자','자산','포트폴리오','수익률','변동성','급등','급락','랠리',
+];
+// 차단 키워드: 이 단어가 제목에 있으면 무조건 제거
+const BLOCK_KW = [
+  '야구','축구','농구','배구','골프','테니스','올림픽','월드컵','스포츠','선수','경기장',
+  '드라마','영화','아이돌','가수','배우','연예','오락','예능','뮤지컬','콘서트',
+  '날씨','태풍','지진','홍수','재난','미세먼지',
+  '요리','레시피','맛집','카페','식당','음식',
+  '패션','뷰티','화장품','다이어트','운동법',
+  '게임','만화','웹툰','소설','취미','여행','관광',
+  '수능','대입','교육','학교','대학','입시',
+  '정치','대통령','국회','의원','선거','정당',
+];
+
+function isFinancialNews(item, isGoogleNews = false) {
+  const text = ((item.title || '') + ' ' + (item.description || '')).toLowerCase();
+  // 차단 키워드가 있으면 무조건 제거
+  if (BLOCK_KW.some(k => text.includes(k))) return false;
+  // 구글뉴스는 포괄적이므로 금융 키워드 반드시 포함 요구
+  if (isGoogleNews) return FINANCE_KW.some(k => text.includes(k));
+  // 전문 금융 매체는 신뢰 (한경·매경·조선비즈·서울경제·코인데스크·블록미디어)
+  return true;
+}
+
 // 중복 제목 제거
 function dedup(items) {
   const seen = new Set();
@@ -159,13 +194,17 @@ function dedup(items) {
   });
 }
 
+const GOOGLE_NEWS_SOURCES = new Set(['구글뉴스']);
+
 async function fetchCategory(category) {
   const results = await Promise.allSettled(
     FEEDS[category].map(f => fetchRSS(f.url, category, f.source))
   );
+  // 소스별로 필터 적용: 구글뉴스는 금융 키워드 검증 필수
   const items = results
     .filter(r => r.status === 'fulfilled')
-    .flatMap(r => r.value);
+    .flatMap(r => r.value)
+    .filter(item => isFinancialNews(item, GOOGLE_NEWS_SOURCES.has(item.source)));
 
   if (category === 'coin' && items.length < 3) {
     const fallback = await fetchCryptoCompareFallback();

@@ -45,14 +45,18 @@ function fmtChangeAmt(item, krwRate) {
   return `${sign}${amt.toFixed(2)}`;
 }
 
-// ─── 로고 URL ────────────────────────────────────────────────
-function getLogoUrl(item) {
-  if (item.image) return item.image; // 코인: CoinGecko 이미지
-  if (item.market === 'us')
-    return `https://assets.parqet.com/logos/symbol/${item.symbol}?format=svg`;
-  if (item.market === 'kr')
-    return `https://file.alphasquare.co.kr/media/images/stock_logo/kr/${item.symbol}.png`;
-  return null;
+// ─── 로고 URL 후보 목록 (우선순위 순) ───────────────────────
+function getLogoUrls(item) {
+  if (item.image) return [item.image]; // 코인: CoinGecko 이미지
+  if (item.market === 'us') return [
+    `https://assets.parqet.com/logos/symbol/${item.symbol}?format=png`,
+    `https://static.toss.im/png-icons/securities/icn-sec-fill-${item.symbol}.png`,
+  ];
+  if (item.market === 'kr') return [
+    `https://static.toss.im/png-icons/securities/icn-sec-fill-${item.symbol}.png`,
+    `https://file.alphasquare.co.kr/media/images/stock_logo/kr/${item.symbol}.png`,
+  ];
+  return [];
 }
 
 // 심볼별 배경 색상 (로고 실패 시)
@@ -66,27 +70,29 @@ function colorFor(symbol = '') {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-// ─── 로고 아바타 ─────────────────────────────────────────────
-function LogoAvatar({ item }) {
-  const [err, setErr] = useState(false);
-  const url = getLogoUrl(item);
+// ─── 로고 아바타 (멀티-폴백) ─────────────────────────────────
+function LogoAvatar({ item, size = 32 }) {
+  const urls = getLogoUrls(item);
+  const [idx, setIdx] = useState(0);
   const label = (item.symbol || '?').slice(0, 2).toUpperCase();
   const bg = colorFor(item.symbol);
+  const px = size === 32 ? 'w-8 h-8' : 'w-10 h-10';
+  const pad = item.market === 'us' || item.market === 'kr' ? '3px' : '0';
 
-  if (url && !err) {
+  if (idx < urls.length) {
     return (
       <img
-        src={url}
+        src={urls[idx]}
         alt={item.symbol}
-        onError={() => setErr(true)}
-        className="w-8 h-8 rounded-full object-contain bg-white border border-[#F2F4F6] flex-shrink-0"
-        style={{ padding: item.market === 'us' || item.market === 'kr' ? '3px' : '0' }}
+        onError={() => setIdx(i => i + 1)}
+        className={`${px} rounded-full object-contain bg-white border border-[#F2F4F6] flex-shrink-0`}
+        style={{ padding: pad }}
       />
     );
   }
   return (
     <div
-      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 select-none"
+      className={`${px} rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 select-none`}
       style={{ background: bg }}
     >
       {label}

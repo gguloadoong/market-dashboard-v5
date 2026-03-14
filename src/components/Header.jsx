@@ -3,11 +3,12 @@ import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
 
 const TABS = [
+  { id: 'home', label: '🏠 홈' },
   { id: 'all',  label: '전체' },
-  { id: 'kr',   label: '국내주식' },
-  { id: 'us',   label: '해외주식' },
-  { id: 'coin', label: '코인' },
-  { id: 'etf',  label: 'ETF' },
+  { id: 'kr',   label: '🇰🇷 국내주식' },
+  { id: 'us',   label: '🇺🇸 해외주식' },
+  { id: 'coin', label: '🪙 코인' },
+  { id: 'etf',  label: '📊 ETF' },
 ];
 
 export default function Header({ krwRate, lastUpdated, onRefresh, loading, activeTab, onTabChange }) {

@@ -10,6 +10,7 @@ import MarketSummaryBar from './components/MarketSummaryBar';
 import WatchlistTable from './components/WatchlistTable';
 import BreakingNewsPanel from './components/BreakingNewsPanel';
 import ChartSidePanel from './components/ChartSidePanel';
+import HomeDashboard from './components/HomeDashboard';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
 import { fetchCoins, fetchExchangeRate } from './api/coins';
@@ -34,7 +35,7 @@ function simulateKorean(stocks) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab]         = useState('kr');
+  const [activeTab, setActiveTab]         = useState('home');
   const [coins, setCoins]                 = useState(COINS_INITIAL);
   const [usStocks, setUsStocks]           = useState(US_STOCKS_INITIAL);
   const [krStocks, setKrStocks]           = useState(KOREAN_STOCKS);
@@ -130,6 +131,7 @@ export default function App() {
   // ── 탭별 종목 데이터 ─────────────────────────────────────────
   const tabItems = useMemo(() => {
     switch (activeTab) {
+      case 'home': return [];
       case 'kr':   return krStocks;
       case 'us':   return usStocks;
       case 'coin': return coins;
@@ -166,30 +168,45 @@ export default function App() {
       {/* ── 2열 그리드 레이아웃 ────────────────────────────── */}
       <div
         className="max-w-[1440px] mx-auto"
-        style={{ display: 'grid', gridTemplateColumns: '1fr 360px' }}
+        style={{ display: 'grid', gridTemplateColumns: activeTab === 'home' ? '1fr' : '1fr 360px' }}
       >
-        {/* 좌: 마켓 서머리 + 워치리스트 */}
+        {/* 좌: 콘텐츠 영역 */}
         <div className="p-5 space-y-4 min-w-0 overflow-hidden">
-          <MarketSummaryBar
-            indices={indices}
-            krwRate={krwRate}
-            loading={loading && indices.every(i => !i.value)}
-          />
-          <WatchlistTable
-            items={tabItems}
-            type={activeTab}
-            krwRate={krwRate}
-            onRowClick={setSelectedItem}
-          />
+          {activeTab === 'home' ? (
+            <HomeDashboard
+              indices={indices}
+              krStocks={krStocks}
+              usStocks={usStocks}
+              coins={coins}
+              krwRate={krwRate}
+              onItemClick={setSelectedItem}
+            />
+          ) : (
+            <>
+              <MarketSummaryBar
+                indices={indices}
+                krwRate={krwRate}
+                loading={loading && indices.every(i => !i.value)}
+              />
+              <WatchlistTable
+                items={tabItems}
+                type={activeTab}
+                krwRate={krwRate}
+                onRowClick={setSelectedItem}
+              />
+            </>
+          )}
         </div>
 
-        {/* 우: 뉴스·속보 패널 (sticky 고정) */}
-        <div
-          className="self-start"
-          style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
-        >
-          <BreakingNewsPanel />
-        </div>
+        {/* 우: 뉴스·속보 패널 — 홈 탭에선 숨김 */}
+        {activeTab !== 'home' && (
+          <div
+            className="self-start"
+            style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
+          >
+            <BreakingNewsPanel />
+          </div>
+        )}
       </div>
 
       {/* 차트 사이드 패널 (오버레이) */}

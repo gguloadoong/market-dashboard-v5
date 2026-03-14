@@ -140,30 +140,71 @@ export async function fetchKoreanStocksBatch(stocks) {
   return [];
 }
 
-// ─── 지수 ──────────────────────────────────────────────────────
-const INDEX_SYMBOLS = {
-  'KOSPI':  '^KS11',
-  'KOSDAQ': '^KQ11',
-  'SPX':    '^GSPC',
-  'NDX':    '^IXIC',
-  'DJI':    '^DJI',
-  'DXY':    'DX-Y.NYB',
+// ─── 지수 ────────────────────────────────────────────────────
+// 국내: Naver Finance 모바일 API (KOSPI/KOSDAQ 전용, 가장 정확)
+// 해외: Yahoo Finance via 여러 프록시 순서대로 시도
+const toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
+
+async function fetchNaverIndex(code) {
+  const url = `https://m.stock.naver.com/api/index/${code}/basic`;
+  const data = await proxyFetch(url);
+  const val  = toNum(data.closePrice || data.indexNowValue);
+  if (!val) throw new Error(`${code} no value`);
+  return {
+    id:        code,
+    value:     val,
+    change:    toNum(data.compareToPreviousClosePrice || data.stockExchangeType?.compareToPreviousClosePrice),
+    changePct: toNum(data.fluctuationsRatio || data.stockExchangeType?.fluctuationsRatio),
+  };
+}
+
+// 여러 프록시로 Yahoo Finance 시도
+async function fetchYahooViaProxy(symbol, id) {
+  const proxies = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`)}`,
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res  = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const raw  = json.contents ? JSON.parse(json.contents) : json;
+      const meta = raw?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) continue;
+      const prev = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
+      return {
+        id,
+        value:     meta.regularMarketPrice,
+        change:    parseFloat((meta.regularMarketPrice - prev).toFixed(2)),
+        changePct: parseFloat(((meta.regularMarketPrice - prev) / prev * 100).toFixed(2)),
+      };
+    } catch {}
+  }
+  throw new Error(`${symbol} all proxies failed`);
+}
+
+const US_INDEX_SYMBOLS = {
+  'SPX': '^GSPC',
+  'NDX': '^IXIC',
+  'DJI': '^DJI',
+  'DXY': 'DX-Y.NYB',
 };
 
 export async function fetchIndices() {
-  try {
-    const symbols  = Object.values(INDEX_SYMBOLS);
-    const results  = await fetchYahooQuoteBatch(symbols);
-    const symToId  = Object.fromEntries(
-      Object.entries(INDEX_SYMBOLS).map(([id, sym]) => [sym, id])
-    );
-    return results.map(r => ({
-      id:        symToId[r.symbol] ?? r.symbol,
-      value:     r.regularMarketPrice,
-      change:    r.regularMarketChange,
-      changePct: r.regularMarketChangePercent,
-    })).filter(r => r.value);
-  } catch {
-    return [];
-  }
+  // 국내 지수: Naver Finance (정확도 최우선)
+  const krIndices = await Promise.allSettled([
+    fetchNaverIndex('KOSPI'),
+    fetchNaverIndex('KOSDAQ'),
+  ]);
+
+  // 해외 지수: Yahoo Finance via proxy
+  const usIndices = await Promise.allSettled(
+    Object.entries(US_INDEX_SYMBOLS).map(([id, sym]) => fetchYahooViaProxy(sym, id))
+  );
+
+  return [
+    ...krIndices.filter(r => r.status === 'fulfilled').map(r => r.value),
+    ...usIndices.filter(r => r.status === 'fulfilled').map(r => r.value),
+  ];
 }
