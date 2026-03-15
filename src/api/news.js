@@ -1,23 +1,21 @@
-// ─── 뉴스 API v2 ───────────────────────────────────────────────
+// ─── 뉴스 API v3 ───────────────────────────────────────────────
 // 설계 원칙:
-//   1. rss2json 호출을 카테고리당 1회로 제한 (Google News 검색 통합 쿼리)
-//   2. allorigins 의존 최소화 — 직접 CORS 허용 소스 우선
-//   3. Finnhub (미장) + CryptoCompare (코인) → CORS-free 전용 API
-//   4. localStorage 24시간 fallback — API 한도 초과 시 캐시 데이터 반환
-//   5. 카테고리별 독립 캐시 (staleTime 5분)
+//   1. 자체 Vercel Edge Function (/api/rss) → CORS 없음, 서버사이드 취득
+//   2. CryptoCompare (코인): CORS-free 직접 호출
+//   3. rss2json / allorigins 완전 제거 (불안정, 속도 느림)
+//   4. localStorage 캐시 (5분 신선, 24시간 fallback)
+//   5. React Query initialData 패턴으로 즉시 표시
 
-// ─── localStorage 캐시 헬퍼 ────────────────────────────────────
-const CACHE_TTL   = 5 * 60 * 1000;         // 5분 (신선 기간)
-const CACHE_STALE = 24 * 60 * 60 * 1000;  // 24시간 (stale fallback 허용)
+// ─── localStorage 캐시 ─────────────────────────────────────────
+const CACHE_TTL   = 5 * 60 * 1000;
+const CACHE_STALE = 24 * 60 * 60 * 1000;
 
 function cacheGet(key) {
   try {
     const raw = localStorage.getItem(`news_${key}`);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
-    // 5분 이내면 신선 데이터
-    if (Date.now() - ts < CACHE_TTL) return { data, fresh: true };
-    // 24시간 이내면 stale — API 실패 시 fallback 용도
+    if (Date.now() - ts < CACHE_TTL)   return { data, fresh: true };
     if (Date.now() - ts < CACHE_STALE) return { data, fresh: false };
     return null;
   } catch { return null; }
@@ -41,74 +39,59 @@ function timeAgo(dateInput) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
-// ─── RSS XML 파서 ─────────────────────────────────────────────
+// ─── RSS XML 파서 ──────────────────────────────────────────────
 function parseRssXml(xmlText, category, sourceName) {
-  const doc   = new DOMParser().parseFromString(xmlText, 'text/xml');
-  const items = [...doc.querySelectorAll('item')];
-  return items.slice(0, 20).map(el => {
-    const get = s => (el.querySelector(s)?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
-    const link  = get('link') || get('guid');
-    const title = get('title');
-    if (!title || !link) return null;
-    const pubDate = get('pubDate') || new Date().toISOString();
-    return {
-      id:          get('guid') || link,
-      title,
-      description: get('description').replace(/<[^>]+>/g, '').slice(0, 200),
-      link,
-      pubDate:     new Date(pubDate).toISOString(),
-      timeAgo:     timeAgo(pubDate),
-      source:      sourceName,
-      image:       el.querySelector('enclosure')?.getAttribute('url') || null,
-      category,
-    };
-  }).filter(Boolean);
+  try {
+    const doc   = new DOMParser().parseFromString(xmlText, 'text/xml');
+    const items = [...doc.querySelectorAll('item, entry')];
+    return items.slice(0, 20).map(el => {
+      const get  = s => (el.querySelector(s)?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+      const link = get('link') || get('guid') || el.querySelector('link')?.getAttribute('href') || '';
+      const title = get('title');
+      if (!title || !link) return null;
+      const pubDate = get('pubDate') || get('published') || get('updated') || new Date().toISOString();
+      return {
+        id:          get('guid') || link,
+        title,
+        description: get('description').replace(/<[^>]+>/g, '').slice(0, 200),
+        link,
+        pubDate:     new Date(pubDate).toISOString(),
+        timeAgo:     timeAgo(pubDate),
+        source:      sourceName,
+        image:       el.querySelector('enclosure')?.getAttribute('url') || null,
+        category,
+      };
+    }).filter(Boolean);
+  } catch { return []; }
 }
 
-// ─── rss2json 파서 ────────────────────────────────────────────
-function parseRssItems(items, category, sourceName) {
-  return items.map(item => ({
-    id:          item.guid || item.link,
-    title:       (item.title || '').replace(/<[^>]+>/g, '').trim(),
-    description: (item.description || item.content || '').replace(/<[^>]+>/g, '').slice(0, 200).trim(),
-    link:        item.link,
-    pubDate:     new Date(item.pubDate).toISOString(),
-    timeAgo:     timeAgo(item.pubDate),
-    source:      sourceName,
-    image:       item.thumbnail || item.enclosure?.link || null,
-    category,
-  })).filter(i => i.title && i.link);
-}
-
-// ─── rss2json 호출 (API 키 없이 60req/min) ────────────────────
-// 주의: 이 함수는 카테고리당 최대 1회 호출하도록 설계됨
-async function fetchViaRss2json(rssUrl, category, sourceName) {
-  const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
-  const res  = await fetch(url, { signal: AbortSignal.timeout(4000) });
-  if (!res.ok) throw new Error(`rss2json ${res.status}`);
-  const data = await res.json();
-  if (data.status !== 'ok' || !data.items?.length) throw new Error('rss2json empty');
-  return parseRssItems(data.items, category, sourceName);
-}
-
-// ─── allorigins (직접 RSS XML 파싱) ──────────────────────────
-// fallback 전용 — 가능하면 사용하지 않음
-async function fetchViaAllorigins(rssUrl, category, sourceName) {
-  const url  = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-  const res  = await fetch(url, { signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`allorigins ${res.status}`);
-  const json = await res.json();
-  const text = json.contents ?? '';
-  if (!text) throw new Error('allorigins empty');
+// ─── 자체 RSS 프록시 (/api/rss) ───────────────────────────────
+// Production: Vercel Edge Function이 서버사이드로 취득
+// Development: 같은 호출 (vercel dev 사용 시) 또는 직접 fetch 시도
+async function fetchViaProxy(rssUrl, category, sourceName) {
+  const proxyUrl = `/api/rss?url=${encodeURIComponent(rssUrl)}`;
+  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`proxy ${res.status}`);
+  const text = await res.text();
+  if (text.startsWith('{')) throw new Error('proxy returned JSON error');
   const items = parseRssXml(text, category, sourceName);
-  if (!items.length) throw new Error('allorigins no items');
+  if (!items.length) throw new Error('proxy no items');
   return items;
 }
 
-// ─── 단일 RSS 취득 (rss2json 우선, allorigins fallback) ───────
+// ─── 단일 RSS 취득 (자체 프록시 → 직접 시도 순) ──────────────
 async function fetchRSS(rssUrl, category, sourceName) {
-  try { return await fetchViaRss2json(rssUrl, category, sourceName); } catch {}
-  try { return await fetchViaAllorigins(rssUrl, category, sourceName); } catch {}
+  // 1순위: 자체 Vercel Edge Function 프록시
+  try { return await fetchViaProxy(rssUrl, category, sourceName); } catch {}
+  // 2순위: 직접 fetch (CORS 허용 소스만 성공)
+  try {
+    const res  = await fetch(rssUrl, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error('direct fetch failed');
+    const text = await res.text();
+    const items = parseRssXml(text, category, sourceName);
+    if (!items.length) throw new Error('direct fetch no items');
+    return items;
+  } catch {}
   return [];
 }
 
@@ -118,38 +101,23 @@ const FINANCE_KW = [
   '가상화폐','나스닥','다우','s&p','금리','환율','달러','원화','기준금리',
   '주가','상장','ipo','공모','배당','실적','매출','영업이익','순이익','시가총액',
   '외국인','기관','etf','펀드','채권','선물','옵션','삼성전자','sk하이닉스',
-  'naver','카카오','현대차','기아','nvidia','apple','tesla','microsoft',
   'bitcoin','ethereum','crypto','defi','blockchain','fed','fomc','연준',
   '금통위','한국은행','거래소','kospi','kosdaq','증권','투자','급등','급락',
-  '어닝','분기','가이던스','인플레','경기','침체','경기부양','무역','관세',
-  '수출','gdp','cpi','ppi','고용','실업','파산','인수합병','m&a',
-  '항셍','닛케이','상해','원자재','금','원유','wti','stock','market','rally',
+  '어닝','분기','인플레','경기','침체','무역','관세','수출','gdp','cpi',
   'earnings','revenue','profit','shares','nasdaq','sp500','dow',
+  '반도체','배터리','전기차','ai','인공지능','클라우드','데이터센터',
 ];
 
 const BLOCK_KW = [
-  // 스포츠
-  '야구','축구','농구','배구','골프','올림픽','월드컵','스포츠','선수','경기장',
-  '감독','코치','승리','패배','리그','챔피언십','우승','결승','시즌',
-  // 연예/문화
-  '드라마','영화','아이돌','가수','배우','연예','오락','예능','콘서트',
-  '앨범','노래','뮤직비디오','시청률','촬영',
-  // 날씨/재난
-  '날씨','태풍','지진','홍수','재난','미세먼지','폭설','폭우','황사',
-  // 음식/생활
-  '요리','레시피','맛집','카페','식당','음식','배달앱',
-  // 패션/뷰티
-  '패션','뷰티','화장품','다이어트','스킨케어',
-  // 교육
-  '수능','대입','입시','학원','시험',
-  // 정치 (투자 무관)
-  '선거','대통령','국회','의원','정당','외교','재판',
+  '야구','축구','농구','배구','골프','올림픽','월드컵','스포츠','선수',
+  '감독','코치','우승','결승','드라마','영화','아이돌','가수','배우','연예',
+  '예능','콘서트','앨범','시청률','날씨','태풍','지진','홍수','미세먼지',
+  '요리','레시피','맛집','카페','패션','뷰티','화장품','수능','대입','입시',
 ];
 
-// 금융 전문 소스 — 금융 키워드 없어도 통과
 const FINANCE_SOURCES = new Set([
   '코인데스크코리아','블록미디어','한국경제','매일경제','조선비즈',
-  'CoinTelegraph','CoinDesk','Decrypt','Finnhub',
+  'CoinTelegraph','CoinDesk','Decrypt','Bloomberg','Reuters',
 ]);
 
 function isFinancialNews(item) {
@@ -159,7 +127,6 @@ function isFinancialNews(item) {
   return FINANCE_KW.some(k => text.includes(k));
 }
 
-// ─── 중복 제거 ────────────────────────────────────────────────
 function dedup(items) {
   const seen = new Set();
   return items.filter(i => {
@@ -171,23 +138,24 @@ function dedup(items) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 카테고리별 전용 API (CORS-free, rss2json 쿼터 절약)
+// 카테고리별 뉴스 취득
 // ─────────────────────────────────────────────────────────────
 
-// [코인] CryptoCompare — 키 없이 사용 가능, CORS 허용
-// feeds: cointelegraph, coindesk, decrypt 영문 + blockmedia 한글 RSS 병행
+// [코인] CryptoCompare — CORS-free, 안정적, 키 불필요
 async function fetchCoinNews() {
   const cached = cacheGet('coin');
   if (cached?.fresh) return cached.data;
 
-  // 1순위: CryptoCompare (키 없음, CORS OK, 안정적)
+  // CryptoCompare 영문 코인 뉴스 (직접 호출, CORS OK)
   const ccItems = await (async () => {
     try {
-      const url  = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&feeds=cointelegraph,coindesk,decrypt&extraParams=MarketDashboard';
-      const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res  = await fetch(
+        'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&feeds=cointelegraph,coindesk,decrypt&extraParams=MarketDashboard',
+        { signal: AbortSignal.timeout(6000) }
+      );
       if (!res.ok) throw new Error(`CC ${res.status}`);
       const data = await res.json();
-      if (data.Type !== 100) throw new Error('CC error');
+      if (data.Type !== 100 || !data.Data?.length) throw new Error('CC error');
       return data.Data.slice(0, 20).map(a => ({
         id:          String(a.id),
         title:       a.title,
@@ -202,12 +170,10 @@ async function fetchCoinNews() {
     } catch { return []; }
   })();
 
-  // 2순위: 한국 코인 RSS — Google News 단일 통합 쿼리로 rss2json 1회만 호출
-  // (블록미디어 직접 RSS는 CORS 이슈로 rss2json을 통해야 함)
+  // Google News 코인 RSS — 자체 프록시로 취득
   const krCoinItems = await fetchRSS(
-    'https://news.google.com/rss/search?q=%EB%B9%84%ED%8A%B8%EC%BD%94%EC%9D%B8+%EC%9D%B4%EB%8D%94%EB%A6%AC%EC%9B%80+%EC%BD%94%EC%9D%B8+%EC%95%94%ED%98%B8%ED%99%94%ED%8F%90&hl=ko&gl=KR&ceid=KR:ko',
-    'coin',
-    '구글뉴스',
+    'https://news.google.com/rss/search?q=%EB%B9%84%ED%8A%B8%EC%BD%94%EC%9D%B8+%EC%9D%B4%EB%8D%94%EB%A6%AC%EC%9B%80+%EC%BD%94%EC%9D%B8&hl=ko&gl=KR&ceid=KR:ko',
+    'coin', '구글뉴스',
   );
 
   const items = dedup([...ccItems, ...krCoinItems.filter(isFinancialNews)])
@@ -215,26 +181,27 @@ async function fetchCoinNews() {
     .slice(0, 30);
 
   if (items.length > 0) cacheSet('coin', items);
-  else if (cached?.data) return cached.data;  // stale fallback
+  else if (cached?.data) return cached.data;
   return items;
 }
 
-// [미장] Finnhub (무료, CORS-free) + Google News 1회
-// Finnhub 무료: 60req/min → 5분 캐시 활용 시 전혀 문제 없음
+// [미장] Google News (자체 프록시) + Finnhub (키 있을 때)
 async function fetchUsNews() {
   const cached = cacheGet('us');
   if (cached?.fresh) return cached.data;
 
   const finnhubKey = import.meta.env.VITE_FINNHUB_API_KEY || '';
 
-  // 1순위: Finnhub (키 있으면 사용, CORS OK)
+  // Finnhub 직접 API (CORS OK, 키 있을 때)
   const finnhubItems = finnhubKey ? await (async () => {
     try {
-      const url  = `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`;
-      const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res  = await fetch(
+        `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
       if (!res.ok) throw new Error(`Finnhub ${res.status}`);
       const data = await res.json();
-      return (Array.isArray(data) ? data : []).slice(0, 20).map(a => ({
+      return (Array.isArray(data) ? data : []).slice(0, 15).map(a => ({
         id:          String(a.id),
         title:       a.headline,
         description: (a.summary || '').slice(0, 200),
@@ -248,11 +215,10 @@ async function fetchUsNews() {
     } catch { return []; }
   })() : [];
 
-  // 2순위: Google News 통합 쿼리 1회 (rss2json 쿼터 1회 소비)
+  // Google News 미국 증시 RSS
   const googleItems = await fetchRSS(
     'https://news.google.com/rss/search?q=%EB%AF%B8%EA%B5%AD%EC%A6%9D%EC%8B%9C+%EB%82%98%EC%8A%A4%EB%8B%A5+S%26P500+%EC%97%B0%EC%A4%80&hl=ko&gl=KR&ceid=KR:ko',
-    'us',
-    '구글뉴스',
+    'us', '구글뉴스',
   );
 
   const items = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews)])
@@ -264,17 +230,14 @@ async function fetchUsNews() {
   return items;
 }
 
-// [국장] Google News 통합 쿼리 1회 — allorigins 의존 제거로 속도 개선
-// 한경/매경 allorigins는 4-7초 소요라 제거, Google News로 통합
+// [국장] Google News (자체 프록시)
 async function fetchKrNews() {
   const cached = cacheGet('kr');
   if (cached?.fresh) return cached.data;
 
-  // Google News 통합 쿼리 — rss2json 1회 (가장 빠름)
   const googleItems = await fetchRSS(
-    'https://news.google.com/rss/search?q=%EC%BD%94%EC%8A%A4%ED%94%BC+%EC%BD%94%EC%8A%A4%EB%8B%A5+%EC%A6%9D%EC%8B%9C+%EC%A3%BC%EC%8B%9D+%EC%97%85%EC%A2%85+%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&hl=ko&gl=KR&ceid=KR:ko',
-    'kr',
-    '구글뉴스',
+    'https://news.google.com/rss/search?q=%EC%BD%94%EC%8A%A4%ED%94%BC+%EC%BD%94%EC%8A%A4%EB%8B%A5+%EC%A6%9D%EC%8B%9C+%EC%A3%BC%EC%8B%9D+%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&hl=ko&gl=KR&ceid=KR:ko',
+    'kr', '구글뉴스',
   );
 
   const items = dedup(googleItems.filter(isFinancialNews))
@@ -286,22 +249,18 @@ async function fetchKrNews() {
   return items;
 }
 
-// ─── Promise 디덥 — 중복 호출 완전 차단 ─────────────────────
-// 핵심 P0 수정: 5개 컴포넌트가 동시에 fetchAllNews()를 호출해도
-// 실제 API 요청은 단 1번만 나가고, 나머지는 같은 Promise를 공유함
+// ─── Promise 디덥 — 중복 호출 차단 ───────────────────────────
 const _pending = { all: null, coin: null, us: null, kr: null };
 
 function withDedup(key, fetchFn) {
   const cached = cacheGet(key);
   if (cached?.fresh) return Promise.resolve(cached.data);
   if (_pending[key]) return _pending[key];
-  _pending[key] = fetchFn()
-    .finally(() => { _pending[key] = null; });
+  _pending[key] = fetchFn().finally(() => { _pending[key] = null; });
   return _pending[key];
 }
 
-// ─── public API ───────────────────────────────────────────────
-
+// ─── Public API ───────────────────────────────────────────────
 export function fetchNewsByCategory(category) {
   switch (category) {
     case 'coin': return withDedup('coin', fetchCoinNews);
@@ -315,7 +274,6 @@ export function fetchAllNews() {
   return withDedup('all', async () => {
     const cachedAll = cacheGet('all');
 
-    // 3개 카테고리 병렬 실행 (각각 내부 캐시 활용)
     const [coinRes, usRes, krRes] = await Promise.allSettled([
       fetchCoinNews(),
       fetchUsNews(),
@@ -332,21 +290,18 @@ export function fetchAllNews() {
       if (cachedAll?.data) return cachedAll.data;
       throw new Error('뉴스 없음');
     }
-
     cacheSet('all', all);
     return all;
   });
 }
 
-// 수동 새로고침 시 캐시 무효화
 export function invalidateNewsCache() {
   ['all','coin','us','kr'].forEach(k => {
     try { localStorage.removeItem(`news_${k}`); } catch {}
   });
 }
 
-// React Query initialData용 — 동기 로컬스토리지 즉시 반환 (stale 포함)
-// 앱 첫 로드 시 캐시 데이터를 즉각 표시하고 백그라운드 갱신
+// React Query initialData용 — 동기 로컬스토리지 읽기 (stale 포함 즉시 반환)
 export function getInitialNewsData(key = 'all') {
   return cacheGet(key)?.data ?? undefined;
 }

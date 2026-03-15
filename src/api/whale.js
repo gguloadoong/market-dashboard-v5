@@ -135,7 +135,7 @@ function fmtKrw(n) {
 function connectWs() {
   if (destroyed || !whaleSymbols || !whaleHandler) return;
 
-  const THRESHOLD_KRW = 100_000_000; // 1억 원 (BTC 1개 기준)
+  const THRESHOLD_KRW = 50_000_000;  // 5000만 원 (ETH 10개 수준)
   const HIGH_KRW      = 500_000_000; // 5억 원
   const markets = whaleSymbols.map(s => `KRW-${s}`);
 
@@ -166,7 +166,12 @@ function connectWs() {
         const price    = data.trade_price ?? 0;
         const volume   = data.trade_volume ?? 0;
         const tradeAmt = price * volume;
-        if (tradeAmt < THRESHOLD_KRW) return;
+
+        // 임계값 미만도 수신 카운터용으로 콜백 (이벤트 없이)
+        if (tradeAmt < THRESHOLD_KRW) {
+          whaleHandler?.({ _tick: true });
+          return;
+        }
 
         const symbol = (data.code || '').replace('KRW-', '');
         const side   = data.ask_bid === 'ASK' ? '매도' : '매수';

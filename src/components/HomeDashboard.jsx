@@ -221,7 +221,7 @@ export default function HomeDashboard({
 }) {
   const [selectedSector, setSelectedSector] = useState(null);
 
-  const { data: allNewsData = [], isLoading: newsLoading } = useAllNewsQuery();
+  const { data: allNewsData = [], isLoading: newsLoading, isError: newsError } = useAllNewsQuery();
   const news = allNewsData.slice(0, 8);
 
   // 급등 TOP5
@@ -379,9 +379,14 @@ export default function HomeDashboard({
             <div>
               {news.map(n => <NewsListItem key={n.id} item={n} />)}
             </div>
+          ) : newsError ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2">
+              <span className="text-[13px] text-[#B0B8C1]">뉴스를 불러올 수 없습니다</span>
+              <span className="text-[11px] text-[#C9CDD2]">잠시 후 자동으로 재시도됩니다</span>
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-40 text-[13px] text-[#B0B8C1]">
-              뉴스를 불러오는 중...
+            <div className="flex items-center justify-center h-32 text-[13px] text-[#B0B8C1]">
+              뉴스 없음
             </div>
           )}
         </div>
