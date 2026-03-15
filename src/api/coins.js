@@ -5,6 +5,9 @@ const UPBIT_MARKETS = [
   'KRW-BTC','KRW-ETH','KRW-SOL','KRW-XRP','KRW-ADA','KRW-DOGE',
   'KRW-AVAX','KRW-SHIB','KRW-DOT','KRW-LINK','KRW-UNI','KRW-NEAR',
   'KRW-APT','KRW-ARB','KRW-SUI','KRW-OP','KRW-PEPE','KRW-XLM',
+  // 추가 코인 (업비트 상장)
+  'KRW-TON','KRW-ATOM','KRW-FIL','KRW-ICP','KRW-HBAR',
+  'KRW-ETC','KRW-SAND','KRW-MANA','KRW-INJ','KRW-SEI',
 ];
 
 // Upbit 심볼 → CoinGecko ID 매핑
@@ -14,6 +17,10 @@ const UPBIT_TO_CG = {
   'DOT':'polkadot','LINK':'chainlink','UNI':'uniswap','NEAR':'near',
   'APT':'aptos','ARB':'arbitrum','SUI':'sui','OP':'optimism',
   'PEPE':'pepe','XLM':'stellar',
+  // 추가 코인
+  'TON':'the-open-network','ATOM':'cosmos','FIL':'filecoin',
+  'ICP':'internet-computer','HBAR':'hedera-hashgraph','ETC':'ethereum-classic',
+  'SAND':'the-sandbox','MANA':'decentraland','INJ':'injective-protocol','SEI':'sei-network',
   // CoinGecko-only (업비트 미상장)
   'BNB':'binancecoin','LTC':'litecoin',
 };
