@@ -1,8 +1,9 @@
 // 홈 대시보드 — 시장 전체 한눈에 보기
 // 레이아웃: 지수 미니바 → 2열(급등/급락 | 뉴스) → 2열(코인 | 섹터)
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import Sparkline from './Sparkline';
-import { fetchAllNews } from '../api/news';
+import { useAllNewsQuery } from '../hooks/useNewsQuery';
+import WhalePanel from './WhalePanel';
 
 function fmt(n, d = 0) {
   if (n == null || isNaN(n)) return '—';
@@ -218,16 +219,10 @@ export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [],
   krwRate = 1466, onItemClick,
 }) {
-  const [news, setNews] = useState([]);
-  const [newsLoading, setNewsLoading] = useState(true);
   const [selectedSector, setSelectedSector] = useState(null);
 
-  useEffect(() => {
-    fetchAllNews()
-      .then(all => setNews(all.slice(0, 8)))
-      .catch(() => setNews([]))
-      .finally(() => setNewsLoading(false));
-  }, []);
+  const { data: allNewsData = [], isLoading: newsLoading } = useAllNewsQuery();
+  const news = allNewsData.slice(0, 8);
 
   // 급등 TOP5
   const topGainers = useMemo(() => {
@@ -438,6 +433,9 @@ export default function HomeDashboard({
           </div>
         )}
       </div>
+
+      {/* ── 고래 알림 ── */}
+      <WhalePanel />
     </div>
   );
 }

@@ -23,6 +23,7 @@ class ChartErrorBoundary extends Component {
 }
 import { fetchCandles } from '../api/chart';
 import { fetchAllNews } from '../api/news';
+import InvestorFlow from './InvestorFlow';
 
 // 로고 URL
 function getLogoUrl(item) {
@@ -359,6 +360,9 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
               ))}
             </div>
           </div>
+
+          {/* 투자자 동향 — 국내 종목만 */}
+          {item.market === 'kr' && <InvestorFlow symbol={item.symbol} />}
 
           {/* 관련 뉴스 */}
           {news.length > 0 && (
