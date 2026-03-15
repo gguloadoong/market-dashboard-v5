@@ -54,7 +54,7 @@ export default async function handler(request) {
         'User-Agent': 'Mozilla/5.0 (compatible; MarketBot/1.0; +https://market-dashboard-v2.vercel.app)',
         'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: (() => { const c = new AbortController(); setTimeout(() => c.abort(), 8000); return c.signal; })(),
     });
 
     if (!upstream.ok) {
