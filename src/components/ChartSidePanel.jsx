@@ -1,6 +1,26 @@
 // 종목 상세 차트 사이드 패널 — lightweight-charts 사용
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+
+// 차트 크래시 격리 — 흰 화면 방지
+class ChartErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(err) { console.warn('[ChartPanel] 렌더 오류:', err.message); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-[300px] flex flex-col items-center justify-center bg-[#FAFBFC] rounded-xl gap-2">
+          <span className="text-[22px]">📉</span>
+          <span className="text-[13px] text-[#B0B8C1]">차트를 불러올 수 없습니다</span>
+          <button onClick={() => this.setState({ hasError: false })}
+            className="text-[12px] text-[#3182F6] mt-1">다시 시도</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { fetchCandles } from '../api/chart';
 import { fetchAllNews } from '../api/news';
 
@@ -73,105 +93,65 @@ function timeAgo(date) {
 
 // ─── 차트 컴포넌트 ──────────────────────────────────────────
 function LightweightChart({ candles, loading, type }) {
-  const containerRef    = useRef(null);
-  const chartRef        = useRef(null);
-  const candleSeriesRef = useRef(null);
-  const volumeSeriesRef = useRef(null);
+  const containerRef = useRef(null);
+  const chartRef     = useRef(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const el = containerRef.current;
+    if (!el || !candles || candles.length === 0) return;
 
     // 기존 차트 제거
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-    }
+    if (chartRef.current) { try { chartRef.current.remove(); } catch {} chartRef.current = null; }
 
-    if (!candles || candles.length === 0) return;
+    // clientWidth=0 방지: ResizeObserver로 실제 렌더 후 초기화
+    let chart = null;
+    const init = (width) => {
+      if (chartRef.current || width < 10) return;
+      try {
+        chart = createChart(el, {
+          layout: { background: { type: ColorType.Solid, color: '#FFFFFF' }, textColor: '#B0B8C1', fontSize: 11 },
+          grid:   { vertLines: { color: '#F2F4F6' }, horzLines: { color: '#F2F4F6' } },
+          crosshair: { mode: CrosshairMode.Normal },
+          rightPriceScale: { borderColor: '#E5E8EB' },
+          timeScale: { borderColor: '#E5E8EB', timeVisible: false },
+          width,
+          height: 300,
+        });
+        chartRef.current = chart;
 
-    // 차트 생성
-    const chart = createChart(containerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#FFFFFF' },
-        textColor: '#B0B8C1',
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: '#F2F4F6' },
-        horzLines: { color: '#F2F4F6' },
-      },
-      crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#E5E8EB' },
-      timeScale: {
-        borderColor: '#E5E8EB',
-        timeVisible: false,
-      },
-      width:  containerRef.current.clientWidth,
-      height: 300,
-    });
-    chartRef.current = chart;
+        if (type === 'candle') {
+          const s = chart.addCandlestickSeries({ upColor:'#F04452', downColor:'#1764ED', borderVisible:false, wickUpColor:'#F04452', wickDownColor:'#1764ED' });
+          s.setData(candles);
+        } else {
+          const up = candles.length > 1 && candles[candles.length-1].close >= candles[0].close;
+          const col = up ? '#F04452' : '#1764ED';
+          chart.addLineSeries({ color: col, lineWidth: 2 }).setData(candles.map(c => ({ time: c.time, value: c.close })));
+          chart.addAreaSeries({ topColor: col+'22', bottomColor: col+'00', lineColor:'transparent', lineWidth:0 })
+               .setData(candles.map(c => ({ time: c.time, value: c.close })));
+        }
 
-    // 가격 시리즈
-    if (type === 'candle') {
-      const candleSeries = chart.addCandlestickSeries({
-        upColor:       '#F04452',
-        downColor:     '#1764ED',
-        borderVisible: false,
-        wickUpColor:   '#F04452',
-        wickDownColor: '#1764ED',
-      });
-      candleSeries.setData(candles);
-      candleSeriesRef.current = candleSeries;
-    } else {
-      const isOverallUp = candles.length > 1 && candles[candles.length - 1].close >= candles[0].close;
-      const lineColor   = isOverallUp ? '#F04452' : '#1764ED';
-      const lineSeries  = chart.addLineSeries({
-        color:       lineColor,
-        lineWidth:   2,
-        crosshairMarkerVisible: true,
-      });
-      lineSeries.setData(candles.map(c => ({ time: c.time, value: c.close })));
-      // 면적 그라디언트
-      const areaSeries = chart.addAreaSeries({
-        topColor:    lineColor + '22',
-        bottomColor: lineColor + '00',
-        lineColor:   'transparent',
-        lineWidth:   0,
-      });
-      areaSeries.setData(candles.map(c => ({ time: c.time, value: c.close })));
-    }
-
-    // 볼륨 시리즈
-    if (candles[0]?.volume != null) {
-      const volumeSeries = chart.addHistogramSeries({
-        color: '#E5E8EB',
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'volume',
-      });
-      chart.priceScale('volume').applyOptions({
-        scaleMargins: { top: 0.85, bottom: 0 },
-      });
-      volumeSeries.setData(candles.map(c => ({
-        time:  c.time,
-        value: c.volume ?? 0,
-        color: (c.close ?? 0) >= (c.open ?? 0) ? '#F0445222' : '#1764ED22',
-      })));
-      volumeSeriesRef.current = volumeSeries;
-    }
-
-    chart.timeScale().fitContent();
-
-    // 리사이즈 대응
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
-      }
+        if (candles[0]?.volume != null) {
+          const vs = chart.addHistogramSeries({ color:'#E5E8EB', priceFormat:{type:'volume'}, priceScaleId:'volume' });
+          chart.priceScale('volume').applyOptions({ scaleMargins:{ top:0.85, bottom:0 } });
+          vs.setData(candles.map(c => ({ time:c.time, value:c.volume??0, color:(c.close??0)>=(c.open??0)?'#F0445222':'#1764ED22' })));
+        }
+        chart.timeScale().fitContent();
+      } catch(e) { console.warn('[LightweightChart] 초기화 실패:', e.message); }
     };
-    window.addEventListener('resize', handleResize);
+
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (chartRef.current) { try { chartRef.current.applyOptions({ width: w }); } catch {} }
+      else { init(w); }
+    });
+    ro.observe(el);
+
+    // 즉시 시도 (이미 width 있을 경우)
+    init(el.clientWidth);
+
     return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-      chartRef.current = null;
+      ro.disconnect();
+      if (chartRef.current) { try { chartRef.current.remove(); } catch {} chartRef.current = null; }
     };
   }, [candles, type]);
 
@@ -358,9 +338,11 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
             </div>
           </div>
 
-          {/* 차트 */}
+          {/* 차트 — ErrorBoundary로 크래시 격리 */}
           <div className="px-4 pb-2">
-            <LightweightChart candles={candles} loading={chartLoading} type={chartType} />
+            <ChartErrorBoundary>
+              <LightweightChart candles={candles} loading={chartLoading} type={chartType} />
+            </ChartErrorBoundary>
           </div>
 
           {/* 종목 정보 그리드 */}
