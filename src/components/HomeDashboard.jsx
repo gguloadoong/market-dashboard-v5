@@ -2,8 +2,6 @@
 // 레이아웃: 지수 미니바 → 2열(급등/급락 | 뉴스) → 2열(코인 | 섹터)
 import { useState, useMemo } from 'react';
 import Sparkline from './Sparkline';
-import { useAllNewsQuery } from '../hooks/useNewsQuery';
-import WhalePanel from './WhalePanel';
 
 function fmt(n, d = 0) {
   if (n == null || isNaN(n)) return '—';
@@ -183,46 +181,12 @@ function SectorBar({ sector, pct, stocks, isSelected, onClick, onStockClick, krw
   );
 }
 
-// ─── 뉴스 리스트 아이템 (세로형) ─────────────────────────────
-const CAT_STYLE = {
-  coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
-  us:   { bg: '#EDF4FF', color: '#3182F6', label: 'US'   },
-  kr:   { bg: '#FFF0F0', color: '#F04452', label: 'KR'   },
-};
-
-function NewsListItem({ item }) {
-  const isBreaking = (Date.now() - new Date(item.pubDate)) < 3600000;
-  const cat = CAT_STYLE[item.category] || { bg: '#F2F4F6', color: '#8B95A1', label: 'NEWS' };
-
-  return (
-    <a href={item.link} target="_blank" rel="noopener noreferrer"
-      className="flex items-start gap-3 px-4 py-3 border-b border-[#F2F4F6] last:border-0 hover:bg-[#FAFBFC] transition-colors"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-          {isBreaking && (
-            <span className="text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] px-1.5 py-0.5 rounded-full flex-shrink-0">🔴 속보</span>
-          )}
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-            style={{ background: cat.bg, color: cat.color }}>{cat.label}</span>
-          <span className="text-[11px] text-[#B0B8C1] truncate">{item.source}</span>
-          <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
-        </div>
-        <div className="text-[13px] font-semibold text-[#191F28] leading-snug line-clamp-2">{item.title}</div>
-      </div>
-    </a>
-  );
-}
-
 // ─── 메인 홈 대시보드 ─────────────────────────────────────────
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [],
   krwRate = 1466, onItemClick,
 }) {
   const [selectedSector, setSelectedSector] = useState(null);
-
-  const { data: allNewsData = [], isLoading: newsLoading, isError: newsError } = useAllNewsQuery();
-  const news = allNewsData.slice(0, 8);
 
   // 급등 TOP5
   const topGainers = useMemo(() => {
@@ -272,8 +236,8 @@ export default function HomeDashboard({
       .slice(0, 10);
   }, [krStocks, usStocks]);
 
-  // 주요 코인 TOP6
-  const topCoins = useMemo(() => coins.slice(0, 6), [coins]);
+  // 주요 코인 TOP8
+  const topCoins = useMemo(() => coins.slice(0, 8), [coins]);
 
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 
@@ -301,94 +265,55 @@ export default function HomeDashboard({
         }
       </div>
 
-      {/* ── 메인 2열: 급등급락 | 뉴스 ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-3">
-        {/* 급등/급락 (좌측) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* 급등 TOP5 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[15px]">🔥</span>
-              <span className="text-[14px] font-bold text-[#191F28]">급등 TOP 5</span>
-              <span className="text-[11px] text-[#B0B8C1] ml-1">전체 기준</span>
-            </div>
-            <div className="space-y-0.5">
-              {topGainers.length > 0
-                ? topGainers.map((item, i) => (
-                    <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
-                  ))
-                : Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-full bg-[#F2F4F6] animate-pulse" />
-                      <div className="flex-1 space-y-1">
-                        <div className="h-3 bg-[#F2F4F6] rounded w-24 animate-pulse" />
-                        <div className="h-2.5 bg-[#F2F4F6] rounded w-12 animate-pulse" />
-                      </div>
-                    </div>
-                  ))
-              }
-            </div>
+      {/* ── 메인 2열: 급등 | 급락 ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* 급등 TOP5 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[15px]">🔥</span>
+            <span className="text-[14px] font-bold text-[#191F28]">급등 TOP 5</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-1">전체 기준</span>
           </div>
-
-          {/* 급락 TOP5 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[15px]">🧊</span>
-              <span className="text-[14px] font-bold text-[#191F28]">급락 TOP 5</span>
-            </div>
-            <div className="space-y-0.5">
-              {topLosers.length > 0
-                ? topLosers.map((item, i) => (
-                    <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
-                  ))
-                : Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-full bg-[#F2F4F6] animate-pulse" />
-                      <div className="flex-1 space-y-1">
-                        <div className="h-3 bg-[#F2F4F6] rounded w-24 animate-pulse" />
-                        <div className="h-2.5 bg-[#F2F4F6] rounded w-12 animate-pulse" />
-                      </div>
+          <div className="space-y-0.5">
+            {topGainers.length > 0
+              ? topGainers.map((item, i) => (
+                  <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
+                ))
+              : Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-7 h-7 rounded-full bg-[#F2F4F6] animate-pulse" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 bg-[#F2F4F6] rounded w-24 animate-pulse" />
+                      <div className="h-2.5 bg-[#F2F4F6] rounded w-12 animate-pulse" />
                     </div>
-                  ))
-              }
-            </div>
+                  </div>
+                ))
+            }
           </div>
         </div>
 
-        {/* 주요 뉴스 (우측 — fold 위에서 바로 보임) */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
-            <span className="text-[15px]">📰</span>
-            <span className="text-[14px] font-bold text-[#191F28]">주요 뉴스</span>
-            <span className="text-[11px] text-[#B0B8C1] ml-auto">투자 관련 뉴스</span>
+        {/* 급락 TOP5 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[15px]">🧊</span>
+            <span className="text-[14px] font-bold text-[#191F28]">급락 TOP 5</span>
           </div>
-          {newsLoading ? (
-            <div className="space-y-0">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="px-4 py-3 border-b border-[#F2F4F6] last:border-0">
-                  <div className="flex gap-2 mb-1.5">
-                    <div className="h-4 bg-[#F2F4F6] rounded w-12 animate-pulse" />
-                    <div className="h-4 bg-[#F2F4F6] rounded w-24 animate-pulse" />
+          <div className="space-y-0.5">
+            {topLosers.length > 0
+              ? topLosers.map((item, i) => (
+                  <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
+                ))
+              : Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-7 h-7 rounded-full bg-[#F2F4F6] animate-pulse" />
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 bg-[#F2F4F6] rounded w-24 animate-pulse" />
+                      <div className="h-2.5 bg-[#F2F4F6] rounded w-12 animate-pulse" />
+                    </div>
                   </div>
-                  <div className="h-3 bg-[#F2F4F6] rounded w-full animate-pulse mb-1" />
-                  <div className="h-3 bg-[#F2F4F6] rounded w-3/4 animate-pulse" />
-                </div>
-              ))}
-            </div>
-          ) : news.length > 0 ? (
-            <div>
-              {news.map(n => <NewsListItem key={n.id} item={n} />)}
-            </div>
-          ) : newsError ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-2">
-              <span className="text-[13px] text-[#B0B8C1]">뉴스를 불러올 수 없습니다</span>
-              <span className="text-[11px] text-[#C9CDD2]">잠시 후 자동으로 재시도됩니다</span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-32 text-[13px] text-[#B0B8C1]">
-              뉴스 없음
-            </div>
-          )}
+                ))
+            }
+          </div>
         </div>
       </div>
 
@@ -401,12 +326,12 @@ export default function HomeDashboard({
             <span className="text-[14px] font-bold text-[#191F28]">코인 시세</span>
             <span className="text-[11px] text-[#B0B8C1] ml-auto font-mono">Upbit 기준</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {topCoins.length > 0
               ? topCoins.map(c => (
                   <CoinCard key={c.id} coin={c} krwRate={krwRate} onClick={onItemClick} />
                 ))
-              : Array.from({ length: 6 }).map((_, i) => (
+              : Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-[#F8F9FA] rounded-xl h-16 animate-pulse" />
                 ))
             }
@@ -439,8 +364,6 @@ export default function HomeDashboard({
         )}
       </div>
 
-      {/* ── 고래 알림 ── */}
-      <WhalePanel />
     </div>
   );
 }

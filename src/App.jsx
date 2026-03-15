@@ -187,7 +187,7 @@ export default function App() {
       {/* ── 2열 그리드 레이아웃 ────────────────────────────── */}
       <div
         className="max-w-[1440px] mx-auto"
-        style={{ display: 'grid', gridTemplateColumns: activeTab === 'home' ? '1fr' : '1fr 360px' }}
+        style={{ display: 'grid', gridTemplateColumns: '1fr 360px' }}
       >
         {/* 좌: 콘텐츠 영역 */}
         <div className="p-5 space-y-4 min-w-0 overflow-hidden">
@@ -217,15 +217,13 @@ export default function App() {
           )}
         </div>
 
-        {/* 우: 뉴스·속보 패널 — 홈 탭에선 숨김 */}
-        {activeTab !== 'home' && (
-          <div
-            className="self-start"
-            style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
-          >
-            <BreakingNewsPanel />
-          </div>
-        )}
+        {/* 우: 뉴스·속보 패널 — 항상 표시 */}
+        <div
+          className="self-start"
+          style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
+        >
+          <BreakingNewsPanel />
+        </div>
       </div>
 
       {/* 차트 사이드 패널 (오버레이) */}

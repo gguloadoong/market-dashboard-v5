@@ -79,19 +79,24 @@ async function fetchViaProxy(rssUrl, category, sourceName) {
   return items;
 }
 
-// ─── 단일 RSS 취득 (자체 프록시 → 직접 시도 순) ──────────────
+// ─── corsproxy.io 경유 취득 ────────────────────────────────────
+async function fetchViaCorsproxy(rssUrl, category, sourceName) {
+  const url = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
+  const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
+  if (!res.ok) throw new Error(`corsproxy ${res.status}`);
+  const text = await res.text();
+  if (!text.trim().startsWith('<')) throw new Error('corsproxy not xml');
+  const items = parseRssXml(text, category, sourceName);
+  if (!items.length) throw new Error('corsproxy no items');
+  return items;
+}
+
+// ─── 단일 RSS 취득 (자체 프록시 → corsproxy.io 순) ───────────
 async function fetchRSS(rssUrl, category, sourceName) {
   // 1순위: 자체 Vercel Edge Function 프록시
   try { return await fetchViaProxy(rssUrl, category, sourceName); } catch {}
-  // 2순위: 직접 fetch (CORS 허용 소스만 성공)
-  try {
-    const res  = await fetch(rssUrl, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error('direct fetch failed');
-    const text = await res.text();
-    const items = parseRssXml(text, category, sourceName);
-    if (!items.length) throw new Error('direct fetch no items');
-    return items;
-  } catch {}
+  // 2순위: corsproxy.io fallback
+  try { return await fetchViaCorsproxy(rssUrl, category, sourceName); } catch {}
   return [];
 }
 
