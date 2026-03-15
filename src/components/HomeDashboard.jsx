@@ -1,6 +1,5 @@
 // 홈 대시보드 — 시장 전체 한눈에 보기
-// PM 기획: 트레이더가 앱 열자마자 오늘 시장을 파악할 수 있는 지휘 센터
-// 디자이너: 숫자 중심, 카드형 레이아웃, 섹터 히트맵, 빠른 코인 시세
+// 레이아웃: 지수 미니바 → 2열(급등/급락 | 뉴스) → 2열(코인 | 섹터)
 import { useState, useEffect, useMemo } from 'react';
 import Sparkline from './Sparkline';
 import { fetchAllNews } from '../api/news';
@@ -18,34 +17,27 @@ function fmtLarge(n) {
   return String(Math.round(n));
 }
 
-// ─── 지수 히어로 카드 ─────────────────────────────────────────
-function IndexHeroCard({ idx }) {
+// ─── 지수 미니 칩 (가로 스크롤 바) ───────────────────────────
+function IndexMiniChip({ idx }) {
   const isUp   = (idx.changePct ?? 0) > 0;
   const isDown = (idx.changePct ?? 0) < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
   const flag   = { KOSPI: '🇰🇷', KOSDAQ: '🇰🇷', SPX: '🇺🇸', NDX: '🇺🇸', DJI: '🇺🇸', DXY: '🌐' }[idx.id] || '';
 
   return (
-    <div className={`bg-white rounded-2xl px-5 py-4 flex flex-col gap-1 border-t-[3px] shadow-sm transition-transform hover:-translate-y-0.5`}
-      style={{ borderTopColor: color }}
-    >
-      <div className="flex items-center gap-1.5">
-        <span className="text-[14px]">{flag}</span>
-        <span className="text-[12px] font-semibold text-[#8B95A1]">{idx.name}</span>
-      </div>
-      <div className="flex items-baseline gap-2.5 mt-0.5">
-        <span className="text-[22px] font-bold text-[#191F28] tabular-nums font-mono">
-          {fmt(idx.value, idx.id === 'DXY' ? 2 : 2)}
-        </span>
-        <span className="text-[14px] font-bold tabular-nums font-mono" style={{ color }}>
-          {isUp ? '▲' : isDown ? '▼' : '—'}{Math.abs(idx.changePct ?? 0).toFixed(2)}%
-        </span>
-      </div>
-      {idx.change != null && (
-        <div className="text-[12px] tabular-nums font-mono" style={{ color }}>
-          {isUp ? '+' : ''}{fmt(idx.change, 2)}
+    <div className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 flex items-center gap-2.5 border border-[#F2F4F6] shadow-sm">
+      <span className="text-[13px]">{flag}</span>
+      <div>
+        <div className="text-[10px] text-[#8B95A1] font-semibold leading-none mb-0.5">{idx.name}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[14px] font-bold text-[#191F28] tabular-nums font-mono">
+            {fmt(idx.value, 2)}
+          </span>
+          <span className="text-[11px] font-bold tabular-nums font-mono" style={{ color }}>
+            {isUp ? '▲' : isDown ? '▼' : '—'}{Math.abs(idx.changePct ?? 0).toFixed(2)}%
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -57,10 +49,9 @@ function MoverRow({ item, rank, krwRate, onClick }) {
   const isDown = pct < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
 
-  // 로고 URL들
   const logoUrls = item.image ? [item.image]
-    : item.market === 'us' ? [`https://assets.parqet.com/logos/symbol/${item.symbol}?format=png`, `https://static.toss.im/png-icons/securities/icn-sec-fill-${item.symbol}.png`]
-    : item.market === 'kr' ? [`https://static.toss.im/png-icons/securities/icn-sec-fill-${item.symbol}.png`]
+    : item.market === 'us' ? [`https://assets.parqet.com/logos/symbol/${item.symbol}?format=png`]
+    : item.market === 'kr' ? [`https://file.alphasquare.co.kr/media/images/stock_logo/kr/${item.symbol}.png`]
     : [];
   const [logoIdx, setLogoIdx] = useState(0);
   const PALETTE = ['#3182F6','#F04452','#FF9500','#2AC769','#8B5CF6','#EC4899','#14B8A6','#F59E0B'];
@@ -75,7 +66,7 @@ function MoverRow({ item, rank, krwRate, onClick }) {
   return (
     <div
       onClick={() => onClick?.(item)}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F7F8FA] cursor-pointer transition-colors group"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F7F8FA] cursor-pointer transition-colors"
     >
       <span className="text-[12px] text-[#C9CDD2] w-4 text-center tabular-nums flex-shrink-0">{rank}</span>
       {logoIdx < logoUrls.length ? (
@@ -138,8 +129,8 @@ function CoinCard({ coin, krwRate, onClick }) {
   );
 }
 
-// ─── 섹터 퍼포먼스 ───────────────────────────────────────────
-function SectorBar({ sector, pct }) {
+// ─── 섹터 퍼포먼스 (클릭 → 관련 종목 펼침) ──────────────────
+function SectorBar({ sector, pct, stocks, isSelected, onClick, onStockClick, krwRate }) {
   const isUp   = pct > 0;
   const isDown = pct < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
@@ -147,44 +138,77 @@ function SectorBar({ sector, pct }) {
   const width  = Math.min(Math.abs(pct) * 8, 100);
 
   return (
-    <div className="flex items-center gap-2.5 py-1">
-      <span className="text-[12px] text-[#6B7684] w-20 flex-shrink-0">{sector}</span>
-      <div className="flex-1 h-1.5 bg-[#F2F4F6] rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${width}%`, background: color }} />
+    <div>
+      <div
+        className="flex items-center gap-2.5 py-1.5 cursor-pointer hover:bg-[#FAFBFC] rounded-lg px-1 -mx-1 transition-colors"
+        onClick={onClick}
+      >
+        <span className="text-[12px] text-[#6B7684] w-20 flex-shrink-0">{sector}</span>
+        <div className="flex-1 h-1.5 bg-[#F2F4F6] rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${width}%`, background: color }} />
+        </div>
+        <span className="text-[12px] font-bold tabular-nums w-14 text-right" style={{ color }}>
+          {isUp ? '+' : ''}{pct.toFixed(2)}%
+        </span>
+        <span className="text-[10px] text-[#B0B8C1] w-3">{isSelected ? '▲' : '▼'}</span>
       </div>
-      <span className="text-[12px] font-bold tabular-nums w-14 text-right" style={{ color }}>
-        {isUp ? '+' : ''}{pct.toFixed(2)}%
-      </span>
+      {/* 관련 종목 펼침 */}
+      {isSelected && stocks.length > 0 && (
+        <div className="ml-2 mb-1 border-l-2 border-[#F2F4F6] pl-3 space-y-0.5">
+          {stocks.slice(0, 5).map(s => {
+            const sPct = s.changePct ?? 0;
+            const sUp = sPct > 0;
+            const sColor = sUp ? '#F04452' : sPct < 0 ? '#1764ED' : '#8B95A1';
+            return (
+              <div
+                key={s.symbol}
+                onClick={() => onStockClick?.(s)}
+                className="flex items-center justify-between py-1 px-2 rounded-lg hover:bg-[#F7F8FA] cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[12px] font-semibold text-[#191F28] truncate">{s.name}</span>
+                  <span className="text-[10px] text-[#B0B8C1] font-mono flex-shrink-0">{s.symbol}</span>
+                </div>
+                <span className="text-[11px] font-bold tabular-nums font-mono flex-shrink-0" style={{ color: sColor }}>
+                  {sUp ? '▲' : '▼'}{Math.abs(sPct).toFixed(2)}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── 뉴스 카드 ────────────────────────────────────────────────
+// ─── 뉴스 리스트 아이템 (세로형) ─────────────────────────────
 const CAT_STYLE = {
   coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
   us:   { bg: '#EDF4FF', color: '#3182F6', label: 'US'   },
   kr:   { bg: '#FFF0F0', color: '#F04452', label: 'KR'   },
 };
 
-function NewsCard({ item }) {
+function NewsListItem({ item }) {
   const isBreaking = (Date.now() - new Date(item.pubDate)) < 3600000;
   const cat = CAT_STYLE[item.category] || { bg: '#F2F4F6', color: '#8B95A1', label: 'NEWS' };
 
   return (
     <a href={item.link} target="_blank" rel="noopener noreferrer"
-      className="bg-white rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-all hover:-translate-y-0.5 border border-[#F2F4F6] cursor-pointer min-w-0"
+      className="flex items-start gap-3 px-4 py-3 border-b border-[#F2F4F6] last:border-0 hover:bg-[#FAFBFC] transition-colors"
     >
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {isBreaking && (
-          <span className="text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] px-1.5 py-0.5 rounded-full flex-shrink-0">🔴 속보</span>
-        )}
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: cat.bg, color: cat.color }}>{cat.label}</span>
-        <span className="text-[11px] text-[#B0B8C1] truncate">{item.source}</span>
-        <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+          {isBreaking && (
+            <span className="text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] px-1.5 py-0.5 rounded-full flex-shrink-0">🔴 속보</span>
+          )}
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{ background: cat.bg, color: cat.color }}>{cat.label}</span>
+          <span className="text-[11px] text-[#B0B8C1] truncate">{item.source}</span>
+          <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
+        </div>
+        <div className="text-[13px] font-semibold text-[#191F28] leading-snug line-clamp-2">{item.title}</div>
       </div>
-      <div className="text-[13px] font-semibold text-[#191F28] leading-snug line-clamp-3">{item.title}</div>
     </a>
   );
 }
@@ -196,22 +220,18 @@ export default function HomeDashboard({
 }) {
   const [news, setNews] = useState([]);
   const [newsLoading, setNewsLoading] = useState(true);
+  const [selectedSector, setSelectedSector] = useState(null);
 
   useEffect(() => {
     fetchAllNews()
-      .then(all => setNews(all.slice(0, 6)))
+      .then(all => setNews(all.slice(0, 8)))
       .catch(() => setNews([]))
       .finally(() => setNewsLoading(false));
   }, []);
 
-  // 급등 TOP5 (전체 종목 통합)
+  // 급등 TOP5
   const topGainers = useMemo(() => {
-    const all = [
-      ...krStocks,
-      ...usStocks,
-      ...coins,
-    ];
-    return all
+    return [...krStocks, ...usStocks, ...coins]
       .filter(i => {
         const p = i.id ? (i.change24h ?? 0) : (i.changePct ?? 0);
         return p > 0;
@@ -226,8 +246,7 @@ export default function HomeDashboard({
 
   // 급락 TOP5
   const topLosers = useMemo(() => {
-    const all = [...krStocks, ...usStocks, ...coins];
-    return all
+    return [...krStocks, ...usStocks, ...coins]
       .filter(i => {
         const p = i.id ? (i.change24h ?? 0) : (i.changePct ?? 0);
         return p < 0;
@@ -240,30 +259,32 @@ export default function HomeDashboard({
       .slice(0, 5);
   }, [krStocks, usStocks, coins]);
 
-  // 섹터 평균 등락률
+  // 섹터 평균 등락률 + 관련 종목 포함
   const sectorPerf = useMemo(() => {
     const map = {};
     [...krStocks, ...usStocks].forEach(s => {
       if (!s.sector) return;
       if (!map[s.sector]) map[s.sector] = [];
-      map[s.sector].push(s.changePct ?? 0);
+      map[s.sector].push(s);
     });
     return Object.entries(map)
-      .map(([sector, vals]) => ({ sector, pct: vals.reduce((a, b) => a + b, 0) / vals.length }))
+      .map(([sector, stocks]) => ({
+        sector,
+        pct: stocks.reduce((a, s) => a + (s.changePct ?? 0), 0) / stocks.length,
+        stocks: stocks.sort((a, b) => Math.abs(b.changePct ?? 0) - Math.abs(a.changePct ?? 0)),
+      }))
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 10);
   }, [krStocks, usStocks]);
 
   // 주요 코인 TOP6
-  const topCoins = useMemo(() =>
-    coins.slice(0, 6),
-  [coins]);
+  const topCoins = useMemo(() => coins.slice(0, 6), [coins]);
 
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 
   return (
-    <div className="space-y-4">
-      {/* ── 오늘 날짜 + 마켓 상태 ── */}
+    <div className="space-y-3">
+      {/* ── 상단 헤더 ── */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[18px] font-bold text-[#191F28]">마켓 오버뷰</h2>
@@ -275,40 +296,31 @@ export default function HomeDashboard({
         </div>
       </div>
 
-      {/* ── 지수 카드 그리드 ── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      {/* ── 지수 미니바 (가로 스크롤) ── */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {indices.length > 0
-          ? indices.slice(0, 4).map(idx => <IndexHeroCard key={idx.id} idx={idx} />)
-          : [1,2,3,4].map(i => (
-            <div key={i} className="bg-white rounded-2xl px-5 py-4 space-y-2 shadow-sm">
-              <div className="h-3 bg-[#F2F4F6] rounded w-16 animate-pulse" />
-              <div className="h-7 bg-[#F2F4F6] rounded w-24 animate-pulse" />
-            </div>
+          ? indices.map(idx => <IndexMiniChip key={idx.id} idx={idx} />)
+          : [1,2,3,4,5,6].map(i => (
+            <div key={i} className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 w-36 h-12 animate-pulse border border-[#F2F4F6]" />
           ))
         }
       </div>
 
-      {/* ── 메인 2열 ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {/* 급등/급락 */}
-        <div className="space-y-3">
+      {/* ── 메인 2열: 급등급락 | 뉴스 ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-3">
+        {/* 급등/급락 (좌측) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* 급등 TOP5 */}
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-[15px]">🔥</span>
               <span className="text-[14px] font-bold text-[#191F28]">급등 TOP 5</span>
-              <span className="text-[11px] text-[#B0B8C1] ml-1">전체 종목 기준</span>
+              <span className="text-[11px] text-[#B0B8C1] ml-1">전체 기준</span>
             </div>
             <div className="space-y-0.5">
               {topGainers.length > 0
                 ? topGainers.map((item, i) => (
-                    <MoverRow
-                      key={item.id || item.symbol}
-                      item={item}
-                      rank={i + 1}
-                      krwRate={krwRate}
-                      onClick={onItemClick}
-                    />
+                    <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
                   ))
                 : Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 px-3 py-2.5">
@@ -332,13 +344,7 @@ export default function HomeDashboard({
             <div className="space-y-0.5">
               {topLosers.length > 0
                 ? topLosers.map((item, i) => (
-                    <MoverRow
-                      key={item.id || item.symbol}
-                      item={item}
-                      rank={i + 1}
-                      krwRate={krwRate}
-                      onClick={onItemClick}
-                    />
+                    <MoverRow key={item.id || item.symbol} item={item} rank={i + 1} krwRate={krwRate} onClick={onItemClick} />
                   ))
                 : Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 px-3 py-2.5">
@@ -354,59 +360,81 @@ export default function HomeDashboard({
           </div>
         </div>
 
-        {/* 코인 + 섹터 */}
-        <div className="space-y-3">
-          {/* 코인 그리드 */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[15px]">🪙</span>
-              <span className="text-[14px] font-bold text-[#191F28]">코인 시세</span>
-              <span className="text-[11px] text-[#B0B8C1] ml-auto font-mono">Upbit 기준</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {topCoins.length > 0
-                ? topCoins.map(c => (
-                    <CoinCard key={c.id} coin={c} krwRate={krwRate} onClick={onItemClick} />
-                  ))
-                : Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="bg-[#F8F9FA] rounded-xl h-16 animate-pulse" />
-                  ))
-              }
-            </div>
+        {/* 주요 뉴스 (우측 — fold 위에서 바로 보임) */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
+            <span className="text-[15px]">📰</span>
+            <span className="text-[14px] font-bold text-[#191F28]">주요 뉴스</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">투자 관련 뉴스</span>
           </div>
-
-          {/* 섹터 퍼포먼스 */}
-          {sectorPerf.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-[15px]">🏭</span>
-                <span className="text-[14px] font-bold text-[#191F28]">섹터 퍼포먼스</span>
-              </div>
-              <div className="space-y-0.5">
-                {sectorPerf.map(s => (
-                  <SectorBar key={s.sector} sector={s.sector} pct={s.pct} />
-                ))}
-              </div>
+          {newsLoading ? (
+            <div className="space-y-0">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="px-4 py-3 border-b border-[#F2F4F6] last:border-0">
+                  <div className="flex gap-2 mb-1.5">
+                    <div className="h-4 bg-[#F2F4F6] rounded w-12 animate-pulse" />
+                    <div className="h-4 bg-[#F2F4F6] rounded w-24 animate-pulse" />
+                  </div>
+                  <div className="h-3 bg-[#F2F4F6] rounded w-full animate-pulse mb-1" />
+                  <div className="h-3 bg-[#F2F4F6] rounded w-3/4 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : news.length > 0 ? (
+            <div>
+              {news.map(n => <NewsListItem key={n.id} item={n} />)}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40 text-[13px] text-[#B0B8C1]">
+              뉴스를 불러오는 중...
             </div>
           )}
         </div>
       </div>
 
-      {/* ── 주요 뉴스 ── */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-[15px]">📰</span>
-          <span className="text-[14px] font-bold text-[#191F28]">주요 뉴스</span>
-        </div>
-        {newsLoading ? (
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 h-28 animate-pulse" />
-            ))}
+      {/* ── 하단 2열: 코인 | 섹터 ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {/* 코인 그리드 */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[15px]">🪙</span>
+            <span className="text-[14px] font-bold text-[#191F28]">코인 시세</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto font-mono">Upbit 기준</span>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-            {news.map(n => <NewsCard key={n.id} item={n} />)}
+          <div className="grid grid-cols-2 gap-2">
+            {topCoins.length > 0
+              ? topCoins.map(c => (
+                  <CoinCard key={c.id} coin={c} krwRate={krwRate} onClick={onItemClick} />
+                ))
+              : Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-[#F8F9FA] rounded-xl h-16 animate-pulse" />
+                ))
+            }
+          </div>
+        </div>
+
+        {/* 섹터 퍼포먼스 (클릭 → 관련 종목) */}
+        {sectorPerf.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[15px]">🏭</span>
+              <span className="text-[14px] font-bold text-[#191F28]">섹터 퍼포먼스</span>
+              <span className="text-[11px] text-[#B0B8C1] ml-auto">클릭 시 종목 보기</span>
+            </div>
+            <div className="space-y-0">
+              {sectorPerf.map(s => (
+                <SectorBar
+                  key={s.sector}
+                  sector={s.sector}
+                  pct={s.pct}
+                  stocks={s.stocks}
+                  isSelected={selectedSector === s.sector}
+                  onClick={() => setSelectedSector(prev => prev === s.sector ? null : s.sector)}
+                  onStockClick={onItemClick}
+                  krwRate={krwRate}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
