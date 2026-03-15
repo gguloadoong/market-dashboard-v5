@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { fetchAllNews, fetchNewsByCategory } from '../api/news';
+// 뉴스 섹션 — React Query 훅으로 중복 호출 차단
+import { useState } from 'react';
+import { useAllNewsQuery, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 
 const CATEGORY_LABELS = { all: '전체', coin: '코인', us: '미장', kr: '국장' };
 const CATEGORY_COLORS = {
@@ -64,34 +65,27 @@ function SkeletonItem() {
   );
 }
 
-export default function NewsSection({ limit = 5, showFilter = false }) {
-  const [news,     setNews]     = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [category, setCategory] = useState('all');
-  const [error,    setError]    = useState(null);
-
-  const load = useCallback(async (cat) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = cat === 'all' ? await fetchAllNews() : await fetchNewsByCategory(cat);
-      setNews(data);
-    } catch {
-      setError('뉴스를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(category); }, [category, load]);
-
-  // 5분마다 뉴스 자동 갱신
-  useEffect(() => {
-    const id = setInterval(() => load(category), 300000);
-    return () => clearInterval(id);
-  }, [category, load]);
-
+function NewsContent({ category, limit }) {
+  const allQuery = useAllNewsQuery();
+  const catQuery = useCategoryNewsQuery(category !== 'all' ? category : null);
+  const { data: news = [], isLoading, isError, refetch } = category === 'all' ? allQuery : catQuery;
   const displayed = limit ? news.slice(0, limit) : news;
+
+  if (isLoading) return <>{Array.from({ length: limit || 5 }).map((_, i) => <SkeletonItem key={i} />)}</>;
+  if (isError) return (
+    <div className="px-5 py-8 text-center">
+      <div className="text-[13px] text-text3 mb-3">뉴스를 불러오지 못했습니다.</div>
+      <button onClick={() => refetch()} className="text-[13px] text-primary font-medium">다시 시도</button>
+    </div>
+  );
+  if (!displayed.length) return (
+    <div className="px-5 py-8 text-center text-[13px] text-text3">뉴스가 없습니다.</div>
+  );
+  return <>{displayed.map(item => <NewsItem key={item.id} item={item} />)}</>;
+}
+
+export default function NewsSection({ limit = 5, showFilter = false }) {
+  const [category, setCategory] = useState('all');
 
   return (
     <div>
@@ -108,28 +102,7 @@ export default function NewsSection({ limit = 5, showFilter = false }) {
           ))}
         </div>
       )}
-
-      {loading && Array.from({ length: limit || 5 }).map((_, i) => <SkeletonItem key={i} />)}
-
-      {!loading && error && (
-        <div className="px-5 py-8 text-center">
-          <div className="text-[13px] text-text3 mb-3">{error}</div>
-          <button
-            onClick={() => load(category)}
-            className="text-[13px] text-primary font-medium"
-          >
-            다시 시도
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && displayed.length === 0 && (
-        <div className="px-5 py-8 text-center text-[13px] text-text3">뉴스가 없습니다.</div>
-      )}
-
-      {!loading && !error && displayed.map(item => (
-        <NewsItem key={item.id} item={item} />
-      ))}
+      <NewsContent category={category} limit={limit} />
     </div>
   );
 }

@@ -301,40 +301,61 @@ async function fetchKrNews() {
   return items;
 }
 
+// ─── Promise 디덥 — 중복 호출 완전 차단 ─────────────────────
+// 핵심 P0 수정: 5개 컴포넌트가 동시에 fetchAllNews()를 호출해도
+// 실제 API 요청은 단 1번만 나가고, 나머지는 같은 Promise를 공유함
+const _pending = { all: null, coin: null, us: null, kr: null };
+
+function withDedup(key, fetchFn) {
+  const cached = cacheGet(key);
+  if (cached?.fresh) return Promise.resolve(cached.data);
+  if (_pending[key]) return _pending[key];
+  _pending[key] = fetchFn()
+    .finally(() => { _pending[key] = null; });
+  return _pending[key];
+}
+
 // ─── public API ───────────────────────────────────────────────
 
-export async function fetchNewsByCategory(category) {
+export function fetchNewsByCategory(category) {
   switch (category) {
-    case 'coin': return fetchCoinNews();
-    case 'us':   return fetchUsNews();
-    case 'kr':   return fetchKrNews();
+    case 'coin': return withDedup('coin', fetchCoinNews);
+    case 'us':   return withDedup('us',   fetchUsNews);
+    case 'kr':   return withDedup('kr',   fetchKrNews);
     default:     return fetchAllNews();
   }
 }
 
-export async function fetchAllNews() {
-  const cachedAll = cacheGet('all');
-  if (cachedAll?.fresh) return cachedAll.data;
+export function fetchAllNews() {
+  return withDedup('all', async () => {
+    const cachedAll = cacheGet('all');
 
-  // 3개 카테고리 병렬 실행 (각각 내부 캐시 활용)
-  const [coinRes, usRes, krRes] = await Promise.allSettled([
-    fetchCoinNews(),
-    fetchUsNews(),
-    fetchKrNews(),
-  ]);
+    // 3개 카테고리 병렬 실행 (각각 내부 캐시 활용)
+    const [coinRes, usRes, krRes] = await Promise.allSettled([
+      fetchCoinNews(),
+      fetchUsNews(),
+      fetchKrNews(),
+    ]);
 
-  const all = [
-    ...(coinRes.status === 'fulfilled' ? coinRes.value : []),
-    ...(usRes.status   === 'fulfilled' ? usRes.value   : []),
-    ...(krRes.status   === 'fulfilled' ? krRes.value   : []),
-  ].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    const all = [
+      ...(coinRes.status === 'fulfilled' ? coinRes.value : []),
+      ...(usRes.status   === 'fulfilled' ? usRes.value   : []),
+      ...(krRes.status   === 'fulfilled' ? krRes.value   : []),
+    ].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
-  if (!all.length) {
-    // 전체 캐시 stale fallback
-    if (cachedAll?.data) return cachedAll.data;
-    throw new Error('뉴스 없음');
-  }
+    if (!all.length) {
+      if (cachedAll?.data) return cachedAll.data;
+      throw new Error('뉴스 없음');
+    }
 
-  cacheSet('all', all);
-  return all;
+    cacheSet('all', all);
+    return all;
+  });
+}
+
+// 수동 새로고침 시 캐시 무효화
+export function invalidateNewsCache() {
+  ['all','coin','us','kr'].forEach(k => {
+    try { localStorage.removeItem(`news_${k}`); } catch {}
+  });
 }

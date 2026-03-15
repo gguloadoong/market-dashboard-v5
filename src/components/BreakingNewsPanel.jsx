@@ -1,13 +1,13 @@
-// 우측 고정 뉴스·속보 패널
-import { useState, useEffect, useCallback } from 'react';
-import { fetchAllNews, fetchNewsByCategory } from '../api/news';
+// 우측 고정 뉴스·속보 패널 — React Query로 중복 호출 차단
+import { useState } from 'react';
+import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 
 const TABS = [
   { id: 'breaking', label: '🔴 속보' },
-  { id: 'all',  label: '전체' },
-  { id: 'kr',   label: '국내' },
-  { id: 'us',   label: '해외' },
-  { id: 'coin', label: '코인' },
+  { id: 'all',      label: '전체'   },
+  { id: 'kr',       label: '국내'   },
+  { id: 'us',       label: '해외'   },
+  { id: 'coin',     label: '코인'   },
 ];
 
 const CAT_COLOR = {
@@ -59,42 +59,24 @@ function SkeletonItem() {
   );
 }
 
+// 탭별 뉴스 훅 선택
+function useTabNews(activeTab) {
+  // 'breaking'/'all' → 전체 뉴스 (자동갱신 포함)
+  const allQuery  = useNewsAutoRefetch();
+  // 카테고리 탭 → 해당 카테고리만
+  const catQuery  = useCategoryNewsQuery(
+    ['kr','us','coin'].includes(activeTab) ? activeTab : null
+  );
+
+  if (['kr','us','coin'].includes(activeTab)) return catQuery;
+  return allQuery;
+}
+
 export default function BreakingNewsPanel() {
   const [activeTab, setActiveTab] = useState('breaking');
-  const [news,      setNews]      = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
+  const { data: rawNews = [], isLoading, isError, refetch } = useTabNews(activeTab);
 
-  const load = useCallback(async (tab) => {
-    setLoading(true);
-    setError(null);
-    try {
-      let data;
-      if (tab === 'breaking' || tab === 'all') {
-        data = await fetchAllNews();
-      } else {
-        data = await fetchNewsByCategory(tab);
-      }
-      // 속보 탭은 최신 20개만
-      if (tab === 'breaking') {
-        data = data.slice(0, 20);
-      }
-      setNews(data);
-    } catch (e) {
-      setError('뉴스를 불러오지 못했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // 탭 변경 시 로드
-  useEffect(() => { load(activeTab); }, [activeTab, load]);
-
-  // 5분마다 자동 갱신
-  useEffect(() => {
-    const id = setInterval(() => load(activeTab), 300000);
-    return () => clearInterval(id);
-  }, [activeTab, load]);
+  const news = activeTab === 'breaking' ? rawNews.slice(0, 20) : rawNews;
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#E5E8EB]">
@@ -120,35 +102,32 @@ export default function BreakingNewsPanel() {
       {/* 갱신 상태 */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[#F2F4F6]">
         <span className="w-1.5 h-1.5 rounded-full bg-[#2AC769] animate-pulse" />
-        <span className="text-[11px] text-[#B0B8C1]">실시간 · 5분 자동갱신</span>
-        {!loading && (
+        <span className="text-[11px] text-[#B0B8C1]">투자 뉴스 · 5분 갱신</span>
+        {!isLoading && (
           <span className="text-[11px] text-[#B0B8C1] ml-auto">{news.length}건</span>
         )}
       </div>
 
       {/* 뉴스 목록 */}
       <div className="flex-1 overflow-y-auto">
-        {loading && Array.from({ length: 8 }).map((_, i) => <SkeletonItem key={i} />)}
+        {isLoading && Array.from({ length: 8 }).map((_, i) => <SkeletonItem key={i} />)}
 
-        {!loading && error && (
+        {!isLoading && isError && (
           <div className="px-4 py-8 text-center">
-            <div className="text-[13px] text-[#B0B8C1] mb-3">{error}</div>
-            <button
-              onClick={() => load(activeTab)}
-              className="text-[13px] text-[#3182F6] font-medium"
-            >
+            <div className="text-[13px] text-[#B0B8C1] mb-3">뉴스를 불러오지 못했습니다.</div>
+            <button onClick={() => refetch()} className="text-[13px] text-[#3182F6] font-medium">
               다시 시도
             </button>
           </div>
         )}
 
-        {!loading && !error && news.length === 0 && (
+        {!isLoading && !isError && news.length === 0 && (
           <div className="px-4 py-8 text-center text-[13px] text-[#B0B8C1]">
             뉴스가 없습니다.
           </div>
         )}
 
-        {!loading && !error && news.map(item => (
+        {!isLoading && !isError && news.map(item => (
           <NewsItem key={item.id} item={item} />
         ))}
       </div>
