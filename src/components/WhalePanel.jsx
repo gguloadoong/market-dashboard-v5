@@ -1,6 +1,6 @@
 // 고래 알림 패널 — Upbit WebSocket 실시간 대량 체결 감지
-// 5억원 이상 단일 체결 → 고래 의심 알림
-import { useState, useEffect, useRef } from 'react';
+// 1억원 이상 단일 체결 → 고래 의심 알림, 5억원+ → HIGH
+import { useState, useEffect } from 'react';
 import { subscribeUpbitWhaleTrades, unsubscribeUpbitWhaleTrades } from '../api/whale';
 
 const MAX_EVENTS = 20;
@@ -58,30 +58,21 @@ const WATCH_SYMBOLS = [
 export default function WhalePanel({ isVisible = true }) {
   const [events,    setEvents]    = useState([]);
   const [connected, setConnected] = useState(false);
-  const [error,     setError]     = useState(false);
-  const eventsRef = useRef(events);
-  eventsRef.current = events;
 
   useEffect(() => {
     if (!isVisible) return;
 
-    setError(false);
-    // 약간 지연 후 연결 (앱 로드 시 부하 분산)
-    const t = setTimeout(() => {
-      try {
-        subscribeUpbitWhaleTrades(WATCH_SYMBOLS, (evt) => {
-          setConnected(true);
-          setEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
-        });
-        // 연결 확인 (3초 후 소켓이 살아있으면 connected)
-        setTimeout(() => setConnected(true), 3000);
-      } catch {
-        setError(true);
+    setConnected(false);
+    subscribeUpbitWhaleTrades(WATCH_SYMBOLS, (evt) => {
+      if (evt._connected) {
+        setConnected(true);
+        return;
       }
-    }, 1500);
+      setConnected(true);
+      setEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
+    });
 
     return () => {
-      clearTimeout(t);
       unsubscribeUpbitWhaleTrades();
       setConnected(false);
     };
@@ -103,25 +94,22 @@ export default function WhalePanel({ isVisible = true }) {
 
       {/* 이벤트 목록 */}
       <div className="max-h-[280px] overflow-y-auto">
-        {error && (
-          <div className="px-4 py-6 text-center text-[12px] text-[#B0B8C1]">
-            WebSocket 연결 실패. 새로고침해주세요.
-          </div>
-        )}
-        {!error && events.length === 0 && (
+        {events.length === 0 && (
           <div className="px-4 py-6 text-center">
-            <div className="text-[13px] text-[#B0B8C1] mb-1">5억원 이상 단일 체결 감지 중...</div>
+            <div className="text-[13px] text-[#B0B8C1] mb-1">
+              {connected ? '1억원 이상 단일 체결 감지 중...' : 'Upbit 연결 중...'}
+            </div>
             <div className="text-[11px] text-[#C9CDD2]">대량 매매 발생 시 즉시 표시됩니다</div>
           </div>
         )}
-        {!error && events.map((evt, i) => (
+        {events.map((evt, i) => (
           <EventRow key={`${evt.symbol}-${evt.timestamp}-${i}`} event={evt} />
         ))}
       </div>
 
       {/* 안내 */}
       <div className="px-4 py-2 border-t border-[#F2F4F6] bg-[#FAFBFC]">
-        <span className="text-[10px] text-[#C9CDD2]">Upbit 5억원+ 단일 체결 기준 · 거래소 입금은 매도 압력 신호</span>
+        <span className="text-[10px] text-[#C9CDD2]">Upbit 1억원+ 단일 체결 기준 · 5억원+ 시 HIGH 표시</span>
       </div>
     </div>
   );

@@ -1,7 +1,11 @@
-// 뉴스 React Query 훅 — 전역 캐시로 중복 호출 차단
-// staleTime 5분: 탭 전환, 리렌더, 윈도우 포커스에도 API 재호출 없음
+// 뉴스 React Query 훅 — 전역 캐시 + 즉시 표시 패턴
+// initialData: 로컬스토리지 캐시를 즉시 표시 → "불러오는중" 제거
+// initialDataUpdatedAt: React Query가 staleTime 기준으로 백그라운드 갱신 여부 판단
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchAllNews, fetchNewsByCategory, invalidateNewsCache } from '../api/news';
+import {
+  fetchAllNews, fetchNewsByCategory, invalidateNewsCache,
+  getInitialNewsData, getInitialNewsTimestamp,
+} from '../api/news';
 
 export const newsKeys = {
   all:      ['news', 'all'],
@@ -9,43 +13,49 @@ export const newsKeys = {
 };
 
 const NEWS_OPTIONS = {
-  staleTime:           5 * 60 * 1000,  // 5분 신선
-  gcTime:              15 * 60 * 1000, // 15분 후 메모리 정리
-  retry:               2,
-  retryDelay:          1500,
-  refetchOnWindowFocus: false,          // 탭 전환 시 재요청 방지
+  staleTime:            5 * 60 * 1000,  // 5분 신선
+  gcTime:               15 * 60 * 1000, // 15분 후 메모리 정리
+  retry:                1,
+  retryDelay:           2000,
+  refetchOnWindowFocus: false,
 };
 
-// 전체 뉴스 — 어디서 써도 1개의 캐시 공유
+// 전체 뉴스 — 로컬스토리지 캐시가 있으면 즉시 표시
 export function useAllNewsQuery() {
   return useQuery({
-    queryKey: newsKeys.all,
-    queryFn:  fetchAllNews,
+    queryKey:             newsKeys.all,
+    queryFn:              fetchAllNews,
+    initialData:          () => getInitialNewsData('all'),
+    initialDataUpdatedAt: () => getInitialNewsTimestamp('all'),
     ...NEWS_OPTIONS,
   });
 }
 
-// 카테고리별 뉴스 (뉴스 섹션 필터 탭용)
+// 카테고리별 뉴스
 export function useCategoryNewsQuery(category) {
   return useQuery({
-    queryKey: newsKeys.category(category),
-    queryFn:  () => fetchNewsByCategory(category),
+    queryKey:             newsKeys.category(category),
+    queryFn:              () => fetchNewsByCategory(category),
+    initialData:          () => getInitialNewsData(category),
+    initialDataUpdatedAt: () => getInitialNewsTimestamp(category),
     ...NEWS_OPTIONS,
     enabled: !!category,
   });
 }
 
-// 자동 갱신 포함 (5분 interval — BreakingNewsPanel용)
+// 자동 갱신 포함 (BreakingNewsPanel용)
 export function useNewsAutoRefetch() {
   return useQuery({
-    queryKey:        newsKeys.all,
-    queryFn:         fetchAllNews,
+    queryKey:             newsKeys.all,
+    queryFn:              fetchAllNews,
+    initialData:          () => getInitialNewsData('all'),
+    initialDataUpdatedAt: () => getInitialNewsTimestamp('all'),
     ...NEWS_OPTIONS,
     refetchInterval: 5 * 60 * 1000,
   });
 }
 
-// 수동 새로고침 훅
+// 수동 새로고침
 export function useNewsRefresh() {
   const qc = useQueryClient();
   return () => {

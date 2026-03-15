@@ -84,7 +84,7 @@ function parseRssItems(items, category, sourceName) {
 // 주의: 이 함수는 카테고리당 최대 1회 호출하도록 설계됨
 async function fetchViaRss2json(rssUrl, category, sourceName) {
   const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
-  const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
+  const res  = await fetch(url, { signal: AbortSignal.timeout(4000) });
   if (!res.ok) throw new Error(`rss2json ${res.status}`);
   const data = await res.json();
   if (data.status !== 'ok' || !data.items?.length) throw new Error('rss2json empty');
@@ -95,7 +95,7 @@ async function fetchViaRss2json(rssUrl, category, sourceName) {
 // fallback 전용 — 가능하면 사용하지 않음
 async function fetchViaAllorigins(rssUrl, category, sourceName) {
   const url  = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-  const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
+  const res  = await fetch(url, { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`allorigins ${res.status}`);
   const json = await res.json();
   const text = json.contents ?? '';
@@ -264,35 +264,20 @@ async function fetchUsNews() {
   return items;
 }
 
-// [국장] Google News 통합 쿼리 1회 + 한경/매경 RSS 순차 호출
-// 핵심 전략: rss2json 호출을 기존 4회 → 1회로 줄임
-// (한경/매경은 CORS 문제 없으면 직접, 아니면 allorigins fallback)
+// [국장] Google News 통합 쿼리 1회 — allorigins 의존 제거로 속도 개선
+// 한경/매경 allorigins는 4-7초 소요라 제거, Google News로 통합
 async function fetchKrNews() {
   const cached = cacheGet('kr');
   if (cached?.fresh) return cached.data;
 
-  // Google News 통합 쿼리 — rss2json 1회
+  // Google News 통합 쿼리 — rss2json 1회 (가장 빠름)
   const googleItems = await fetchRSS(
     'https://news.google.com/rss/search?q=%EC%BD%94%EC%8A%A4%ED%94%BC+%EC%BD%94%EC%8A%A4%EB%8B%A5+%EC%A6%9D%EC%8B%9C+%EC%A3%BC%EC%8B%9D+%EC%97%85%EC%A2%85+%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&hl=ko&gl=KR&ceid=KR:ko',
     'kr',
     '구글뉴스',
   );
 
-  // 한국경제 직접 RSS — allorigins로 호출 (rss2json 대신)
-  // 국장은 CryptoCompare 같은 전용 API가 없어 RSS 불가피
-  // 단, 카테고리당 최대 2개 RSS 소스만 허용
-  const [hankyungItems, mkItems] = await Promise.allSettled([
-    fetchViaAllorigins('https://www.hankyung.com/feed/stock', 'kr', '한국경제'),
-    fetchViaAllorigins('https://www.mk.co.kr/rss/30000001/', 'kr', '매일경제'),
-  ]);
-
-  const all = [
-    ...googleItems,
-    ...(hankyungItems.status === 'fulfilled' ? hankyungItems.value : []),
-    ...(mkItems.status       === 'fulfilled' ? mkItems.value       : []),
-  ];
-
-  const items = dedup(all.filter(isFinancialNews))
+  const items = dedup(googleItems.filter(isFinancialNews))
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 30);
 
@@ -358,4 +343,18 @@ export function invalidateNewsCache() {
   ['all','coin','us','kr'].forEach(k => {
     try { localStorage.removeItem(`news_${k}`); } catch {}
   });
+}
+
+// React Query initialData용 — 동기 로컬스토리지 즉시 반환 (stale 포함)
+// 앱 첫 로드 시 캐시 데이터를 즉각 표시하고 백그라운드 갱신
+export function getInitialNewsData(key = 'all') {
+  return cacheGet(key)?.data ?? undefined;
+}
+
+export function getInitialNewsTimestamp(key = 'all') {
+  try {
+    const raw = localStorage.getItem(`news_${key}`);
+    if (!raw) return 0;
+    return JSON.parse(raw).ts ?? 0;
+  } catch { return 0; }
 }

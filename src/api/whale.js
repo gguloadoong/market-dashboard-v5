@@ -118,93 +118,102 @@ export function resetWhaleSnapshot() {
 // 단일 체결 기준 억 단위 이상 → 고래 의심
 // ─────────────────────────────────────────────────────────────
 
-let whaleWs      = null;
-let whaleHandler = null;
+let whaleWs        = null;
+let whaleHandler   = null;
+let whaleSymbols   = null;
+let reconnectTimer = null;
+let destroyed      = false;
 
-/**
- * subscribeUpbitWhaleTrades(symbols, onEvent)
- *
- * @param {string[]} symbols  - ['BTC','ETH','XRP']
- * @param {Function} onEvent  - ({ symbol, type: 'whale_trade', price, volume, tradeAmt, message })
- *
- * 단일 체결에서 tradeAmt = price × volume (원화)
- * 임계값: 5억 원 이상 단일 체결 → 고래 의심
- */
-export function subscribeUpbitWhaleTrades(symbols, onEvent) {
-  // 기존 연결 해제
-  if (whaleWs) {
-    whaleWs.close();
-    whaleWs = null;
-  }
+// 원화 금액 포맷
+function fmtKrw(n) {
+  if (n >= 1e12) return `${(n / 1e12).toFixed(1)}조`;
+  if (n >= 1e8)  return `${(n / 1e8).toFixed(1)}억`;
+  if (n >= 1e4)  return `${(n / 1e4).toFixed(0)}만`;
+  return n.toLocaleString('ko-KR');
+}
 
-  const THRESHOLD_KRW = 500_000_000; // 5억 원
-  const markets = symbols.map(s => `KRW-${s}`);
+function connectWs() {
+  if (destroyed || !whaleSymbols || !whaleHandler) return;
+
+  const THRESHOLD_KRW = 100_000_000; // 1억 원 (BTC 1개 기준)
+  const HIGH_KRW      = 500_000_000; // 5억 원
+  const markets = whaleSymbols.map(s => `KRW-${s}`);
 
   try {
-    whaleWs = new WebSocket('wss://api.upbit.com/websocket/v1');
-    whaleHandler = onEvent;
+    const ws = new WebSocket('wss://api.upbit.com/websocket/v1');
+    whaleWs = ws;
 
-    whaleWs.onopen = () => {
-      // Upbit WebSocket 구독 요청 형식
-      const payload = JSON.stringify([
-        { ticket: 'whale-alert' },
-        { type: 'trade', codes: markets, isOnlyRealtime: true },
+    ws.onopen = () => {
+      ws.send(JSON.stringify([
+        { ticket: `whale-${Date.now()}` },
+        { type: 'trade', codes: markets },
         { format: 'DEFAULT' },
-      ]);
-      whaleWs.send(payload);
+      ]));
+      // 연결 성공 콜백 (연결 상태 알림용 특수 이벤트)
+      whaleHandler?.({ _connected: true });
     };
 
-    whaleWs.onmessage = async (evt) => {
-      // Upbit은 ArrayBuffer 또는 Blob으로 전송
+    ws.onmessage = async (evt) => {
       let text;
-      if (evt.data instanceof Blob) {
-        text = await evt.data.text();
-      } else if (evt.data instanceof ArrayBuffer) {
-        text = new TextDecoder().decode(evt.data);
-      } else {
-        text = evt.data;
-      }
+      if (evt.data instanceof Blob)        text = await evt.data.text();
+      else if (evt.data instanceof ArrayBuffer) text = new TextDecoder().decode(evt.data);
+      else text = evt.data;
 
       try {
         const data = JSON.parse(text);
         if (data.type !== 'trade') return;
 
-        const price    = data.trade_price;
-        const volume   = data.trade_volume;
+        const price    = data.trade_price ?? 0;
+        const volume   = data.trade_volume ?? 0;
         const tradeAmt = price * volume;
-
         if (tradeAmt < THRESHOLD_KRW) return;
 
-        const symbol  = (data.code || '').replace('KRW-', '');
-        const side    = data.ask_bid === 'ASK' ? '매도' : '매수';
-        const amtStr  = tradeAmt >= 1_000_000_000
-          ? `${(tradeAmt / 1_000_000_000).toFixed(1)}십억`
-          : `${(tradeAmt / 100_000_000).toFixed(1)}억`;
+        const symbol = (data.code || '').replace('KRW-', '');
+        const side   = data.ask_bid === 'ASK' ? '매도' : '매수';
 
         whaleHandler?.({
           symbol,
-          type:     'whale_trade',
-          severity: tradeAmt >= 2_000_000_000 ? 'high' : 'medium',
+          type:      'whale_trade',
+          severity:  tradeAmt >= HIGH_KRW ? 'high' : 'medium',
           price,
           volume,
           tradeAmt,
           side,
-          message:  `🐋 ${symbol} 고래 ${side} ${amtStr}원 (${volume.toFixed(4)})`,
+          message:   `${symbol} ${side} ${fmtKrw(tradeAmt)}원 (${volume % 1 === 0 ? volume : volume.toFixed(4)})`,
           timestamp: Date.now(),
         });
       } catch {}
     };
 
-    whaleWs.onerror = (err) => {
-      console.warn('[whale-ws] 오류:', err.message);
-    };
+    ws.onerror = () => {};
 
-    whaleWs.onclose = () => {
+    ws.onclose = () => {
       whaleWs = null;
+      if (!destroyed) {
+        // 5초 후 자동 재연결
+        reconnectTimer = setTimeout(connectWs, 5000);
+      }
     };
-  } catch (err) {
-    console.warn('[whale-ws] WebSocket 연결 실패:', err.message);
+  } catch {
+    if (!destroyed) reconnectTimer = setTimeout(connectWs, 5000);
   }
+}
+
+/**
+ * subscribeUpbitWhaleTrades(symbols, onEvent)
+ * @param {string[]} symbols - ['BTC','ETH',...]
+ * @param {Function} onEvent - 이벤트 수신 콜백
+ *   onEvent({ _connected: true }) → 연결 성공 알림
+ *   onEvent({ symbol, type, severity, tradeAmt, side, message, timestamp })
+ */
+export function subscribeUpbitWhaleTrades(symbols, onEvent) {
+  destroyed      = false;
+  whaleSymbols   = symbols;
+  whaleHandler   = onEvent;
+
+  if (whaleWs) { try { whaleWs.close(); } catch {} whaleWs = null; }
+  clearTimeout(reconnectTimer);
+  connectWs();
 }
 
 /**
@@ -212,9 +221,9 @@ export function subscribeUpbitWhaleTrades(symbols, onEvent) {
  * WebSocket 연결 해제 — 컴포넌트 언마운트 시 호출
  */
 export function unsubscribeUpbitWhaleTrades() {
-  if (whaleWs) {
-    whaleWs.close();
-    whaleWs     = null;
-    whaleHandler = null;
-  }
+  destroyed    = true;
+  whaleHandler = null;
+  whaleSymbols = null;
+  clearTimeout(reconnectTimer);
+  if (whaleWs) { try { whaleWs.close(); } catch {} whaleWs = null; }
 }
