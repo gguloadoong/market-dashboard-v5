@@ -11,6 +11,7 @@ import {
   startWhaleAlertPolling,
   stopWhaleAlertPolling,
 } from '../api/whale';
+import { pushWhaleEvent } from '../state/whaleBus';
 
 const MAX_EVENTS = 30;
 
@@ -92,8 +93,9 @@ export default function WhalePanel({ isVisible = true }) {
   const [btcConnected, setBtcConnected] = useState(false);
   const [msgCount,     setMsgCount]     = useState(0); // WS 수신 전체 체결 수
 
-  // 이벤트 추가 헬퍼 (MAX_EVENTS 제한)
+  // 이벤트 추가 헬퍼 (MAX_EVENTS 제한 + 버스 발행)
   const addEvent = (evt) => {
+    pushWhaleEvent(evt);
     setEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
   };
 

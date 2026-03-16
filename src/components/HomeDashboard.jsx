@@ -1,12 +1,78 @@
 // 홈 대시보드 — 3블록 구조
 // BLOCK 1: 시장 요약 (공포/탐욕 + 지수 미니칩)
 // BLOCK 2: 지금 핫한 것 (전 시장 통합 무버 TOP 8)
-// BLOCK 3: 속보 뉴스 (최신 5건)
+// BLOCK 3: 핫한 종목 인사이트 (무버 종목 + 관련 뉴스 연결, 매칭 없으면 숨김)
 
 import { useState, useMemo, memo } from 'react';
 import Sparkline from './Sparkline';
 import MarketSummaryCards from './MarketSummaryCards';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
+
+// ─── 종목 키워드 매핑 테이블 ──────────────────────────────────
+// 코인: 영문 풀네임 + 티커 매핑
+const COIN_KEYWORDS = {
+  BTC:  ['bitcoin', 'btc'],
+  ETH:  ['ethereum', 'eth', 'ether'],
+  XRP:  ['ripple', 'xrp'],
+  SOL:  ['solana', 'sol'],
+  ADA:  ['cardano', 'ada'],
+  DOGE: ['dogecoin', 'doge'],
+  BNB:  ['binance', 'bnb'],
+  AVAX: ['avalanche', 'avax'],
+  DOT:  ['polkadot'],
+  LINK: ['chainlink'],
+  PEPE: ['pepe'],
+  SUI:  ['sui'],
+  APT:  ['aptos'],
+  NEAR: ['near protocol', 'near'],
+  ATOM: ['cosmos', 'atom'],
+  TON:  ['toncoin', 'ton'],
+  UNI:  ['uniswap'],
+  OP:   ['optimism'],
+  ARB:  ['arbitrum'],
+  INJ:  ['injective'],
+};
+// 국장: 한국어 종목명 → 영문 검색 키워드
+const KR_EN_KEYWORDS = {
+  '삼성전자': ['samsung'],
+  'SK하이닉스': ['sk hynix', 'hynix'],
+  'LG에너지솔루션': ['lg energy'],
+  '현대차': ['hyundai'],
+  '카카오': ['kakao'],
+  '네이버': ['naver'],
+  '셀트리온': ['celltrion'],
+  'POSCO홀딩스': ['posco'],
+  'LG화학': ['lg chem'],
+  '기아': ['kia'],
+  '현대모비스': ['mobis'],
+  'KB금융': ['kb financial', 'kb'],
+  '신한지주': ['shinhan'],
+};
+
+// 종목 → 검색 키워드 배열 반환
+function buildKeywords(item) {
+  const sym  = (item.symbol || '').toLowerCase();
+  const name = (item.name   || '').toLowerCase();
+  const keys = new Set([sym, name].filter(k => k.length >= 2));
+
+  if (item._market === 'COIN') {
+    (COIN_KEYWORDS[item.symbol?.toUpperCase()] || []).forEach(k => keys.add(k));
+  }
+  if (item._market === 'KR') {
+    (KR_EN_KEYWORDS[item.name] || []).forEach(k => keys.add(k));
+  }
+  // US 주식: 심볼 자체로 충분 (AAPL, TSLA, NVDA 등은 뉴스에 그대로 등장)
+  return [...keys];
+}
+
+// 무버 → 관련 뉴스 1건 반환 (없으면 null)
+function findRelatedNews(mover, allNews) {
+  const kws = buildKeywords(mover);
+  return allNews.find(n => {
+    const text = `${n.title} ${n.summary || ''}`.toLowerCase();
+    return kws.some(kw => text.includes(kw));
+  }) || null;
+}
 
 // 숫자 포맷 유틸
 function fmt(n, d = 0) {
@@ -131,41 +197,44 @@ const MoverRow = memo(function MoverRow({ item, rank, krwRate, onClick }) {
   );
 });
 
-// ─── BLOCK 3: 뉴스 아이템 ─────────────────────────────────────
-const CAT_COLOR = {
-  coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
-  us:   { bg: '#EDF4FF', color: '#3182F6', label: 'US'   },
-  kr:   { bg: '#FFF0F0', color: '#F04452', label: 'KR'   },
-};
-
-const NewsRow = memo(function NewsRow({ item }) {
-  const isBreaking = (Date.now() - new Date(item.pubDate)) < 3600000;
-  const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
+// ─── BLOCK 3: 핫한 종목 인사이트 아이템 ─────────────────────
+// 급등락 종목 + 관련 뉴스 1건을 함께 보여줌 ("왜 올랐는지" 맥락)
+const InsightRow = memo(function InsightRow({ mover, news, krwRate, onMoverClick }) {
+  const pct    = mover._market === 'COIN' ? (mover.change24h ?? 0) : (mover.changePct ?? 0);
+  const isUp   = pct > 0;
+  const isDown = pct < 0;
+  const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
+  const badge  = MARKET_BADGE[mover._market] || { bg: '#F2F4F6', color: '#8B95A1' };
 
   return (
     <a
-      href={item.link}
+      href={news.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="block px-4 py-3 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors cursor-pointer last:border-b-0"
+      className="block px-4 py-3 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors last:border-b-0"
     >
+      {/* 종목 정보 행 */}
       <div className="flex items-center gap-1.5 mb-1.5">
-        {isBreaking && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] flex-shrink-0">
-            🔴 속보
-          </span>
-        )}
-        <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0"
-          style={{ background: cat.bg, color: cat.color }}
+        <button
+          onClick={e => { e.preventDefault(); onMoverClick?.(mover); }}
+          className="flex items-center gap-1 hover:opacity-75"
         >
-          {cat.label}
+          <span className="text-[12px] font-bold text-[#191F28]">{mover.name}</span>
+          <span className="text-[11px] font-bold font-mono tabular-nums" style={{ color }}>
+            {isUp ? '▲' : isDown ? '▼' : '—'}{Math.abs(pct).toFixed(2)}%
+          </span>
+        </button>
+        <span
+          className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0"
+          style={{ background: badge.bg, color: badge.color }}
+        >
+          {mover._market}
         </span>
-        <span className="text-[11px] text-[#B0B8C1] truncate">{item.source}</span>
-        <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
+        <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{news.timeAgo}</span>
       </div>
-      <div className="text-[13px] font-medium text-[#191F28] leading-snug line-clamp-2">
-        {item.title}
+      {/* 관련 뉴스 제목 */}
+      <div className="text-[12px] text-[#4E5968] leading-snug line-clamp-2">
+        {news.title}
       </div>
     </a>
   );
@@ -189,15 +258,16 @@ function SkeletonRow({ count = 5 }) {
   ));
 }
 
-function SkeletonNews({ count = 5 }) {
+function SkeletonInsight({ count = 4 }) {
   return Array.from({ length: count }).map((_, i) => (
     <div key={i} className="px-4 py-3 border-b border-[#F2F4F6] space-y-2">
-      <div className="flex gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <div className="h-3 bg-[#F2F4F6] rounded w-20 animate-pulse" />
         <div className="h-3 bg-[#F2F4F6] rounded w-10 animate-pulse" />
-        <div className="h-3 bg-[#F2F4F6] rounded w-16 animate-pulse" />
+        <div className="h-3 bg-[#F2F4F6] rounded w-6 animate-pulse" />
       </div>
-      <div className="h-3.5 bg-[#F2F4F6] rounded animate-pulse" />
-      <div className="h-3.5 bg-[#F2F4F6] rounded w-4/5 animate-pulse" />
+      <div className="h-3 bg-[#F2F4F6] rounded animate-pulse" />
+      <div className="h-3 bg-[#F2F4F6] rounded w-4/5 animate-pulse" />
     </div>
   ));
 }
@@ -207,9 +277,8 @@ export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [],
   krwRate = 1466, onItemClick,
 }) {
-  // 뉴스 훅 (상위 5건만 표시)
+  // 전체 뉴스 (BLOCK 3 인사이트 매칭용)
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
-  const topNews = useMemo(() => allNews.slice(0, 5), [allNews]);
 
   // ── BLOCK 2: 전 시장 통합 TOP 8 무버 ──────────────────────
   // 국장, 미장, 코인을 단일 배열로 합쳐 |등락률| 기준 내림차순
@@ -226,6 +295,16 @@ export default function HomeDashboard({
       .sort((a, b) => b._pct - a._pct)
       .slice(0, 8);
   }, [krStocks, usStocks, coins]);
+
+  // ── BLOCK 3: 무버 종목과 관련 뉴스 매칭 (insights) ───────────
+  // 각 무버에 관련 뉴스 1건 연결 — 매칭 없는 무버는 제외
+  const insights = useMemo(() => {
+    if (!allNews.length || !topMovers.length) return [];
+    return topMovers
+      .map(mover => ({ mover, news: findRelatedNews(mover, allNews) }))
+      .filter(({ news }) => news !== null)
+      .slice(0, 5); // 최대 5건
+  }, [topMovers, allNews]);
 
   const today = new Date().toLocaleDateString('ko-KR', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
@@ -299,30 +378,31 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 3: 속보 뉴스 (최신 5건)                  */}
+      {/* BLOCK 3: 핫한 종목 인사이트                    */}
+      {/* 급등락 무버 종목 + 관련 뉴스 연결 표시          */}
+      {/* 매칭 뉴스 없으면 섹션 자체 숨김                */}
       {/* ═══════════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-        <div className="flex items-center gap-2 px-4 py-3.5 border-b border-[#F2F4F6]">
-          <span className="text-[15px]">📰</span>
-          <span className="text-[14px] font-bold text-[#191F28]">속보 뉴스</span>
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2AC769] animate-pulse" />
-            <span className="text-[11px] text-[#B0B8C1]">5분 갱신</span>
+      {(newsLoading || insights.length > 0) && (
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex items-center gap-2 px-4 py-3.5 border-b border-[#F2F4F6]">
+            <span className="text-[15px]">💡</span>
+            <span className="text-[14px] font-bold text-[#191F28]">핫한 종목 인사이트</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">급등종목 관련 뉴스</span>
           </div>
+
+          {newsLoading && <SkeletonInsight count={4} />}
+
+          {!newsLoading && insights.map(({ mover, news }) => (
+            <InsightRow
+              key={`${mover._market}-${mover.id || mover.symbol}`}
+              mover={mover}
+              news={news}
+              krwRate={krwRate}
+              onMoverClick={onItemClick}
+            />
+          ))}
         </div>
-
-        {newsLoading && <SkeletonNews count={5} />}
-
-        {!newsLoading && topNews.length === 0 && (
-          <div className="px-4 py-8 text-center text-[13px] text-[#B0B8C1]">
-            뉴스를 불러오는 중입니다...
-          </div>
-        )}
-
-        {!newsLoading && topNews.map(item => (
-          <NewsRow key={item.id} item={item} />
-        ))}
-      </div>
+      )}
     </div>
   );
 }

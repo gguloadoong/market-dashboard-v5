@@ -1,7 +1,8 @@
 // 우측 고정 뉴스·속보 패널 — React Query로 중복 호출 차단
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 import WhalePanel from './WhalePanel';
+import { subscribeLatestWhale } from '../state/whaleBus';
 
 const TABS = [
   { id: 'all',   label: '🔴 속보' },
@@ -74,9 +75,25 @@ function useTabNews(activeTab) {
   return allQuery;
 }
 
+// 금액 포맷 (고래 핀용)
+function fmtAmt(n) {
+  if (!n) return '—';
+  if (n >= 1e12) return `${(n/1e12).toFixed(1)}조`;
+  if (n >= 1e8)  return `${(n/1e8).toFixed(1)}억`;
+  if (n >= 1e4)  return `${(n/1e4).toFixed(0)}만`;
+  return n.toLocaleString('ko-KR');
+}
+
 export default function BreakingNewsPanel() {
   const [activeTab, setActiveTab] = useState('all');
   const { data: rawNews = [], isLoading, isError, refetch } = useTabNews(activeTab);
+  // 고래 미리보기 핀 — WhalePanel이 이벤트 발행 시 자동 업데이트
+  const [latestWhale, setLatestWhale] = useState(null);
+
+  useEffect(() => {
+    const unsub = subscribeLatestWhale(setLatestWhale);
+    return unsub;
+  }, []);
 
   const news = activeTab === 'all' ? rawNews.slice(0, 20) : rawNews;
 
@@ -100,6 +117,25 @@ export default function BreakingNewsPanel() {
           ))}
         </div>
       </div>
+
+      {/* 고래 미리보기 핀 — 최신 고래 이벤트 상시 표시 */}
+      {latestWhale && activeTab !== 'whale' && (
+        <button
+          onClick={() => setActiveTab('whale')}
+          className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[#FFFBF0] border-b border-[#FFE5A0] hover:bg-[#FFF8E0] transition-colors text-left w-full"
+        >
+          <span className="text-[12px]">🐋</span>
+          <div className="flex-1 min-w-0">
+            <span className="text-[11px] font-bold text-[#CC8800]">
+              {latestWhale.symbol} {latestWhale.side} ₩{fmtAmt(latestWhale.tradeAmt)}
+            </span>
+            {latestWhale.severity === 'high' && (
+              <span className="ml-1 text-[9px] font-bold text-[#F04452] bg-[#FFF0F1] px-1 py-0.5 rounded">🔥HIGH</span>
+            )}
+          </div>
+          <span className="text-[10px] text-[#B0B8C1] flex-shrink-0">고래 탭 →</span>
+        </button>
+      )}
 
       {/* 갱신 상태 */}
       <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b border-[#F2F4F6]">
