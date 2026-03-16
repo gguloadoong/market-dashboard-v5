@@ -40,6 +40,17 @@ function timeAgo(dateInput) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
+// ─── 뉴스 제목에서 언론사명 중복 제거 (출처는 source 필드에 이미 있음) ──────
+function cleanTitle(title, sourceName) {
+  return title
+    .replace(/\s*\|.*$/, '')                   // "제목 | Reuters" → "제목"
+    .replace(/\s*-\s*[A-Z][a-zA-Z\s]+$/, '')  // "제목 - Reuters" 끝부분
+    .replace(/^\[.*?\]\s*/, '')                 // "[Reuters] 제목" → "제목"
+    .replace(new RegExp(`^${sourceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[-–:]\\s*`, 'i'), '')
+    .replace(/^(UPDATE \d+-|CORRECTED-|EXCLUSIVE-|ANALYSIS-|BREAKINGVIEWS-|REFILE-)/i, '')
+    .trim();
+}
+
 // ─── RSS XML 파서 ──────────────────────────────────────────────
 function parseRssXml(xmlText, category, sourceName) {
   try {
@@ -48,7 +59,7 @@ function parseRssXml(xmlText, category, sourceName) {
     return items.slice(0, 20).map(el => {
       const get  = s => (el.querySelector(s)?.textContent || '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
       const link = get('link') || get('guid') || el.querySelector('link')?.getAttribute('href') || '';
-      const title = get('title');
+      const title = cleanTitle(get('title'), sourceName);
       if (!title || !link) return null;
       const pubDate = get('pubDate') || get('published') || get('updated') || new Date().toISOString();
       return {
@@ -262,7 +273,7 @@ async function fetchUsNews() {
       const data = await res.json();
       return (Array.isArray(data) ? data : []).slice(0, 15).map(a => ({
         id:          String(a.id),
-        title:       a.headline,
+        title:       cleanTitle(a.headline, a.source || 'Finnhub'),
         description: (a.summary || '').slice(0, 200),
         link:        a.url,
         pubDate:     new Date(a.datetime * 1000).toISOString(),
@@ -283,9 +294,12 @@ async function fetchUsNews() {
   // 거시경제 RSS 소스 (Reuters, MarketWatch, Investing.com 등)
   const macroItems = await fetchMacroNews();
 
-  const items = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews), ...macroItems])
+  const rawItems = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews), ...macroItems])
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 40);
+
+  // 영어 제목 → 한국어 번역 (Google Translate 비공식 무료 API)
+  const items = await translateTitles(rawItems);
 
   if (items.length > 0) cacheSet('us', items);
   else if (cached?.data) return cached.data;
@@ -309,6 +323,45 @@ async function fetchKrNews() {
   if (items.length > 0) cacheSet('kr', items);
   else if (cached?.data) return cached.data;
   return items;
+}
+
+// ─── 영어 제목을 한국어로 번역 (Google Translate 비공식 엔드포인트) ──────
+// 캐시키가 같으면 재번역하지 않음
+async function translateTitles(items) {
+  const toTranslate = items.filter(item => {
+    // 이미 한국어이거나 카테고리가 미장이 아닌 경우 스킵
+    const hasKorean = /[가-힣]/.test(item.title);
+    return !hasKorean && item.category === 'us';
+  });
+
+  if (!toTranslate.length) return items;
+
+  const translated = await Promise.allSettled(
+    toTranslate.map(async item => {
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(item.title.slice(0, 300))}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const koTitle = data?.[0]?.map(r => r?.[0]).filter(Boolean).join('') || null;
+        return koTitle;
+      } catch { return null; }
+    })
+  );
+
+  const transMap = {};
+  toTranslate.forEach((item, i) => {
+    const result = translated[i];
+    if (result.status === 'fulfilled' && result.value) {
+      transMap[item.id] = result.value;
+    }
+  });
+
+  return items.map(item => ({
+    ...item,
+    title: transMap[item.id] || item.title,
+    titleOrig: transMap[item.id] ? item.title : undefined, // 원문 보관
+  }));
 }
 
 // ─── Promise 디덥 + stale-while-revalidate ────────────────────

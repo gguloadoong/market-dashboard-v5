@@ -410,24 +410,7 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 1: 시장 요약                              */}
-      {/* ═══════════════════════════════════════════════ */}
-
-      {/* 공포탐욕 + BTC 도미넌스 + 김치프리미엄 */}
-      <MarketSummaryCards coins={coins} krwRate={krwRate} />
-
-      {/* 지수 미니바 (가로 스크롤) */}
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {indices.length > 0
-          ? indices.map(idx => <IndexMiniChip key={idx.id} idx={idx} />)
-          : [1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 w-36 h-12 animate-pulse border border-[#F2F4F6]" />
-          ))
-        }
-      </div>
-
-      {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 2: 급등 TOP 5 + 급락 TOP 5 분리 섹션    */}
+      {/* BLOCK 1: 급등 TOP 10 + 급락 TOP 10 (메인)      */}
       {/* ═══════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* 급등 섹션 */}
@@ -482,7 +465,7 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 3: 핫한 종목 인사이트                    */}
+      {/* BLOCK 2: 핫한 종목 인사이트                    */}
       {/* 급등락 무버 종목 + 관련 뉴스 연결 표시          */}
       {/* 매칭 뉴스 없으면 섹션 자체 숨김                */}
       {/* ═══════════════════════════════════════════════ */}
@@ -507,6 +490,32 @@ export default function HomeDashboard({
           ))}
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/* BLOCK 3: 시장 지수                             */}
+      {/* ═══════════════════════════════════════════════ */}
+
+      {/* 시장 지수 헤더 */}
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] font-bold text-[#8B95A1]">시장 지수</span>
+      </div>
+
+      {/* 지수 미니바 (가로 스크롤) */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {indices.length > 0
+          ? indices.map(idx => <IndexMiniChip key={idx.id} idx={idx} />)
+          : [1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 w-36 h-12 animate-pulse border border-[#F2F4F6]" />
+          ))
+        }
+      </div>
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/* BLOCK 4: 시장 요약 (보조 지표)                 */}
+      {/* ═══════════════════════════════════════════════ */}
+
+      {/* 공포탐욕 + BTC 도미넌스 + 김치프리미엄 */}
+      <MarketSummaryCards coins={coins} krwRate={krwRate} />
     </div>
   );
 }

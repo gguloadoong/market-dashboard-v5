@@ -26,6 +26,30 @@ function timeStr(ts) {
   return new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+// 고래 이벤트 의미를 설명하는 한 줄 인사이트 텍스트 반환
+function getWhaleInsight(event) {
+  const amt = event.tradeAmt || 0;
+  const side = event.side;
+  const isOnchain = event.chain === 'bitcoin' || event.source === 'whale-alert';
+
+  if (isOnchain) {
+    if (amt >= 5e9) return '거래소 대규모 입금 — 매도 압력 가능성';
+    if (amt >= 1e9) return '고래 자산 이동 — 방향성 주시';
+    return '대형 지갑 자산 이동 감지';
+  }
+  if (side === '매수') {
+    if (amt >= 5e8) return '기관/대형 투자자 대량 매수 — 단기 급등 주의';
+    if (amt >= 1e8) return '세력 유입 의심 — 모멘텀 확인 필요';
+    return '대량 단일 체결 — 방향성 주시';
+  }
+  if (side === '매도') {
+    if (amt >= 5e8) return '대규모 매도 출현 — 하락 압력 주의';
+    if (amt >= 1e8) return '고래 차익실현 가능성 — 추격매수 주의';
+    return '대량 단일 체결 — 방향성 주시';
+  }
+  return '대량 거래 감지';
+}
+
 function EventRow({ event }) {
   const isHigh = event.severity === 'high';
 
@@ -76,6 +100,10 @@ function EventRow({ event }) {
         {event.label && event.label !== '온체인 이동' && (
           <div className="text-[10px] text-[#B0B8C1] mt-0.5 truncate">{event.label}</div>
         )}
+        {/* 이벤트 의미 인사이트 */}
+        <div className="text-[10px] text-[#8B95A1] mt-0.5 italic">
+          {getWhaleInsight(event)}
+        </div>
       </div>
     </div>
   );

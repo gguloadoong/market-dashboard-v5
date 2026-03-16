@@ -54,25 +54,39 @@ export async function fetchCoinCandles(coinId, days = 14) {
   return cleanCandles(candles);
 }
 
-// ─── Yahoo Finance v8 차트 (주식 캔들) ───────────────────────
-export async function fetchStockCandles(symbol, range = '1mo') {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}`;
-  const data = await fetchWithProxy(url);
+// ─── Yahoo Finance 차트 데이터 파싱 공통 함수 ────────────────
+function parseYahooChart(data) {
   const result = data?.chart?.result?.[0];
-  if (!result) throw new Error(`No chart data: ${symbol}`);
-
+  if (!result) throw new Error('No chart data');
   const timestamps = result.timestamp ?? [];
   const quotes = result.indicators?.quote?.[0] ?? {};
   const { open = [], high = [], low = [], close = [] } = quotes;
-
   const candles = timestamps.map((ts, i) => ({
     time:  new Date(ts * 1000).toISOString().split('T')[0],
-    open:  open[i],
-    high:  high[i],
-    low:   low[i],
-    close: close[i],
+    open:  open[i], high: high[i], low: low[i], close: close[i],
   }));
   return cleanCandles(candles);
+}
+
+// ─── Yahoo Finance v8 차트 (주식 캔들) ───────────────────────
+export async function fetchStockCandles(symbol, range = '1mo') {
+  // 1순위: Vercel 프록시 (production)
+  try {
+    const res = await fetch(`/api/chart-proxy?symbol=${encodeURIComponent(symbol)}&range=${range}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.chart?.result?.[0]) {
+        return parseYahooChart(data);
+      }
+    }
+  } catch {}
+
+  // 2순위: allorigins fallback
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}`;
+  const data = await fetchWithProxy(url);
+  return parseYahooChart(data);
 }
 
 // ─── 기간 → Yahoo range 변환 ─────────────────────────────────
