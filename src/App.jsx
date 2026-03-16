@@ -15,6 +15,7 @@ import HomeDashboard from './components/HomeDashboard';
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
 import { fetchCoins, fetchCoinsUpbitOnly, fetchExchangeRate } from './api/coins';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
+import { getKoreanMarketStatus, getUsMarketStatus } from './utils/marketHours';
 
 const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
 
@@ -144,7 +145,16 @@ export default function App() {
   useEffect(() => { const id = setInterval(refreshCoins, 60000); return () => clearInterval(id); }, [refreshCoins]);
   useEffect(() => { const id = setInterval(refreshUsStocks,    30000); return () => clearInterval(id); }, [refreshUsStocks]);
   useEffect(() => { const id = setInterval(refreshKoreanStocks,30000); return () => clearInterval(id); }, [refreshKoreanStocks]);
-  useEffect(() => { const id = setInterval(() => setKrStocks(p => simulateKorean(p)), 15000); return () => clearInterval(id); }, []);
+  // 국장 시뮬레이션: 장 외 시간에만 실행 (장 중에는 실제 API 데이터 사용)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const { status } = getKoreanMarketStatus();
+      if (status !== 'open') {
+        setKrStocks(p => simulateKorean(p));
+      }
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => { const id = setInterval(refreshIndices,     60000); return () => clearInterval(id); }, [refreshIndices]);
 
   // ── 탭별 종목 데이터 (all 탭 제거, home은 HomeDashboard가 담당) ───

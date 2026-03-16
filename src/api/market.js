@@ -23,14 +23,16 @@ export async function fetchFearGreed() {
       'Extreme Greed': '극도 탐욕',
     };
     _fgCache = {
-      value:   parseInt(item.value, 10),
-      labelEn: item.value_classification,
-      labelKo: KO_LABEL[item.value_classification] ?? item.value_classification,
+      value:      parseInt(item.value, 10),
+      labelEn:    item.value_classification,
+      labelKo:    KO_LABEL[item.value_classification] ?? item.value_classification,
+      isFallback: false,
     };
     _fgTs = Date.now();
     return _fgCache;
   } catch {
-    return _fgCache ?? { value: 50, labelEn: 'Neutral', labelKo: '중립' };
+    // 실패 시 캐시 우선, 없으면 기본값 반환 (isFallback 플래그로 UI에서 구분 가능)
+    return _fgCache ?? { value: 50, labelEn: 'Neutral', labelKo: '중립', isFallback: true };
   }
 }
 
@@ -48,7 +50,8 @@ export async function fetchBtcDominance() {
     _domTs     = Date.now();
     return _domCache;
   } catch {
-    return _domCache;
+    // 실패 시 캐시 우선, 없으면 0 반환 (null 반환 시 .toFixed() 런타임 에러 방지)
+    return _domCache ?? 0;
   }
 }
 

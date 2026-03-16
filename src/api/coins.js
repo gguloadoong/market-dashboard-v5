@@ -8,6 +8,8 @@ const UPBIT_MARKETS = [
   // 추가 코인 (업비트 상장)
   'KRW-TON','KRW-ATOM','KRW-FIL','KRW-ICP','KRW-HBAR',
   'KRW-ETC','KRW-SAND','KRW-MANA','KRW-INJ','KRW-SEI',
+  // LTC, BNB 실시간 연결 추가 (업비트 상장)
+  'KRW-LTC','KRW-BNB',
 ];
 
 // Upbit 심볼 → CoinGecko ID 매핑
@@ -21,8 +23,8 @@ const UPBIT_TO_CG = {
   'TON':'the-open-network','ATOM':'cosmos','FIL':'filecoin',
   'ICP':'internet-computer','HBAR':'hedera-hashgraph','ETC':'ethereum-classic',
   'SAND':'the-sandbox','MANA':'decentraland','INJ':'injective-protocol','SEI':'sei-network',
-  // CoinGecko-only (업비트 미상장)
-  'BNB':'binancecoin','LTC':'litecoin',
+  // 업비트 상장 (LTC, BNB 실시간 연결 추가)
+  'LTC':'litecoin','BNB':'binancecoin',
 };
 
 // CoinGecko ID → Upbit 심볼
@@ -72,7 +74,28 @@ export async function fetchCoinGecko() {
 // CoinGecko 캐시 — 마지막 성공한 데이터 보존
 let cgCache = [];
 
-// ─── 환율: Binance(1순위) → Upbit+CoinGecko(2순위) ─────────────
+// ─── 환율: Binance(1순위) → Upbit+CoinGecko(2순위) → localStorage 캐시(3순위) → 하드코딩(최후) ─
+const RATE_CACHE_KEY = 'market_krw_rate';
+const RATE_FALLBACK  = 1466;
+
+// 환율을 localStorage에 저장 (성공 시 호출)
+function saveRateCache(rate) {
+  try {
+    localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rate, ts: Date.now() }));
+  } catch {}
+}
+
+// localStorage에서 24시간 내 캐시된 환율 읽기
+function loadRateCache() {
+  try {
+    const cached = localStorage.getItem(RATE_CACHE_KEY);
+    if (!cached) return null;
+    const { rate, ts } = JSON.parse(cached);
+    if (Date.now() - ts < 24 * 60 * 60 * 1000) return rate; // 24시간 이내
+  } catch {}
+  return null;
+}
+
 export async function fetchExchangeRate() {
   // 1순위: Binance BTCUSDT + Upbit BTCKRW
   try {
@@ -83,7 +106,11 @@ export async function fetchExchangeRate() {
     const [upbitData, binanceData] = await Promise.all([upbitRes.json(), binanceRes.json()]);
     const btcKrw = upbitData[0]?.trade_price;
     const btcUsd = parseFloat(binanceData?.price);
-    if (btcKrw && btcUsd) return Math.round(btcKrw / btcUsd);
+    if (btcKrw && btcUsd) {
+      const rate = Math.round(btcKrw / btcUsd);
+      saveRateCache(rate); // 성공 시 localStorage에 저장
+      return rate;
+    }
   } catch {}
 
   // 2순위: Upbit + CoinGecko (기존 방식)
@@ -94,10 +121,19 @@ export async function fetchExchangeRate() {
     const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
     const cgData = await cgRes.json();
     const btcUsd = cgData?.bitcoin?.usd;
-    if (btcKrw && btcUsd) return Math.round(btcKrw / btcUsd);
+    if (btcKrw && btcUsd) {
+      const rate = Math.round(btcKrw / btcUsd);
+      saveRateCache(rate); // 성공 시 localStorage에 저장
+      return rate;
+    }
   } catch {}
 
-  return 1466;
+  // 3순위: localStorage 캐시 (24시간 이내 저장값) — 실제 환율과 크게 차이 안 남
+  const cachedRate = loadRateCache();
+  if (cachedRate) return cachedRate;
+
+  // 최후 fallback: 하드코딩 기본값
+  return RATE_FALLBACK;
 }
 
 // ─── Upbit만으로 빠른 가격 갱신 (10초 폴링용) ─────────────────

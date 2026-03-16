@@ -39,6 +39,9 @@ export default function MarketSummaryCards({ coins = [], krwRate = 1466 }) {
   const fgStyle = fearGreed ? fgColor(fearGreed.value) : null;
   const kimchiColor = kimchi === null ? '#8B95A1' : kimchi > 0 ? '#F04452' : '#1764ED';
   const domColor = '#FF9500';
+  // isFallback이면 흐리게 표시 (실제 데이터 아님을 시각적으로 구분)
+  const fgOpacity  = fearGreed?.isFallback  ? 0.45 : 1;
+  const domOpacity = (dominance === 0 && dominance !== null) ? 0.45 : 1;
 
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -46,7 +49,7 @@ export default function MarketSummaryCards({ coins = [], krwRate = 1466 }) {
       <div className="bg-white rounded-xl px-3 py-2.5 border border-[#F2F4F6] shadow-sm">
         <div className="text-[10px] text-[#8B95A1] font-semibold mb-0.5">공포 & 탐욕</div>
         {fearGreed ? (
-          <>
+          <div style={{ opacity: fgOpacity }}>
             <div className="flex items-baseline gap-1.5">
               <span className="text-[20px] font-bold tabular-nums font-mono" style={{ color: fgStyle.color }}>
                 {fearGreed.value}
@@ -59,7 +62,7 @@ export default function MarketSummaryCards({ coins = [], krwRate = 1466 }) {
               </span>
             </div>
             <GaugeBar value={fearGreed.value} color={fgStyle.color} />
-          </>
+          </div>
         ) : (
           <div className="h-7 bg-[#F2F4F6] rounded animate-pulse mt-1" />
         )}
@@ -69,15 +72,16 @@ export default function MarketSummaryCards({ coins = [], krwRate = 1466 }) {
       <div className="bg-white rounded-xl px-3 py-2.5 border border-[#F2F4F6] shadow-sm">
         <div className="text-[10px] text-[#8B95A1] font-semibold mb-0.5">BTC 도미넌스</div>
         {dominance !== null ? (
-          <>
+          <div style={{ opacity: domOpacity }}>
             <div className="flex items-baseline gap-1">
               <span className="text-[20px] font-bold tabular-nums font-mono" style={{ color: domColor }}>
-                {dominance.toFixed(1)}
+                {/* dominance가 0이면 fallback — '—' 표시, 유효값이면 toFixed(1) */}
+                {dominance != null && dominance > 0 ? dominance.toFixed(1) : '—'}
               </span>
               <span className="text-[12px] text-[#8B95A1] font-bold">%</span>
             </div>
             <GaugeBar value={dominance} color={domColor} />
-          </>
+          </div>
         ) : (
           <div className="h-7 bg-[#F2F4F6] rounded animate-pulse mt-1" />
         )}
