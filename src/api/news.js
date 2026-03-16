@@ -126,6 +126,7 @@ const BLOCK_KW = [
 const FINANCE_SOURCES = new Set([
   '코인데스크코리아','블록미디어','한국경제','매일경제','조선비즈',
   'CoinTelegraph','CoinDesk','Decrypt','Bloomberg','Reuters',
+  'Reuters Markets','MarketWatch','Investing.com','Finnhub',
 ]);
 
 function isFinancialNews(item) {
@@ -193,7 +194,57 @@ async function fetchCoinNews() {
   return items;
 }
 
-// [미장] Google News (자체 프록시) + Finnhub (키 있을 때)
+// ─── allorigins 경유 RSS 취득 (거시경제 소스용) ──────────────
+async function fetchViaAllorigins(rssUrl, category, sourceName) {
+  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+  if (!res.ok) throw new Error(`allorigins ${res.status}`);
+  const json = await res.json();
+  const text = json.contents || '';
+  if (!text.trim().startsWith('<')) throw new Error('allorigins not xml');
+  const items = parseRssXml(text, category, sourceName);
+  if (!items.length) throw new Error('allorigins no items');
+  return items;
+}
+
+// 거시경제 RSS 소스 목록 (allorigins 경유)
+const MACRO_RSS_SOURCES = [
+  {
+    url: 'https://feeds.reuters.com/reuters/businessNews',
+    category: 'us',
+    source: 'Reuters',
+  },
+  {
+    url: 'https://feeds.reuters.com/reuters/financialNews',
+    category: 'us',
+    source: 'Reuters Markets',
+  },
+  {
+    url: 'https://www.investing.com/rss/market_overview.rss',
+    category: 'us',
+    source: 'Investing.com',
+  },
+  {
+    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',
+    category: 'us',
+    source: 'MarketWatch',
+  },
+];
+
+// 거시경제 소스 통합 취득 — 각 소스 개별 try/catch, 하나 실패해도 나머지 표시
+async function fetchMacroNews() {
+  const results = await Promise.allSettled(
+    MACRO_RSS_SOURCES.map(({ url, category, source }) =>
+      // 1순위: 자체 프록시, 2순위: allorigins
+      fetchRSS(url, category, source)
+        .then(items => items.length ? items : fetchViaAllorigins(url, category, source))
+        .catch(() => fetchViaAllorigins(url, category, source).catch(() => []))
+    )
+  );
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+}
+
+// [미장] Google News (자체 프록시) + Finnhub (키 있을 때) + 거시경제 RSS
 async function fetchUsNews() {
   const cached = cacheGet('us');
   if (cached?.fresh) return cached.data;
@@ -229,9 +280,12 @@ async function fetchUsNews() {
     'us', '구글뉴스',
   );
 
-  const items = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews)])
+  // 거시경제 RSS 소스 (Reuters, MarketWatch, Investing.com 등)
+  const macroItems = await fetchMacroNews();
+
+  const items = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews), ...macroItems])
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
-    .slice(0, 30);
+    .slice(0, 40);
 
   if (items.length > 0) cacheSet('us', items);
   else if (cached?.data) return cached.data;

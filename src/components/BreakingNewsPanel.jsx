@@ -5,9 +5,9 @@ import WhalePanel from './WhalePanel';
 import { subscribeLatestWhale } from '../state/whaleBus';
 
 const TABS = [
-  { id: 'all',   label: '🔴 속보' },
+  { id: 'all',   label: '전체'    },
   { id: 'kr',    label: '국내'    },
-  { id: 'us',    label: '해외'    },
+  { id: 'us',    label: '미장'    },
   { id: 'coin',  label: '코인'    },
   { id: 'whale', label: '🐋 고래' },
 ];
@@ -63,7 +63,7 @@ function SkeletonItem() {
 
 // 탭별 뉴스 훅 선택
 function useTabNews(activeTab) {
-  // 'breaking'/'all' → 전체 뉴스 (자동갱신 포함)
+  // 'all' → 전체 뉴스 (자동갱신 포함)
   const allQuery  = useNewsAutoRefetch();
   // 카테고리 탭 → 해당 카테고리만
   const catQuery  = useCategoryNewsQuery(
@@ -73,6 +73,17 @@ function useTabNews(activeTab) {
   if (activeTab === 'whale') return { data: [], isLoading: false, isError: false, refetch: () => {} };
   if (['kr','us','coin'].includes(activeTab)) return catQuery;
   return allQuery;
+}
+
+// 1시간 이내 속보를 상단에 핀 — 속보 내에서도 최신순, 일반 뉴스도 최신순
+function sortWithBreakingFirst(items) {
+  const now = Date.now();
+  const ONE_HOUR = 3600000;
+  const breaking = items.filter(i => (now - new Date(i.pubDate)) < ONE_HOUR)
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  const normal = items.filter(i => (now - new Date(i.pubDate)) >= ONE_HOUR)
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  return [...breaking, ...normal];
 }
 
 // 금액 포맷 (고래 핀용)
@@ -95,7 +106,8 @@ export default function BreakingNewsPanel() {
     return unsub;
   }, []);
 
-  const news = activeTab === 'all' ? rawNews.slice(0, 20) : rawNews;
+  // 전체/카테고리 탭 모두 1시간 이내 속보를 상단에 핀
+  const news = sortWithBreakingFirst(activeTab === 'all' ? rawNews.slice(0, 30) : rawNews);
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#E5E8EB]">

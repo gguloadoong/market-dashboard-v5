@@ -112,6 +112,15 @@ const IndexMiniChip = memo(function IndexMiniChip({ idx }) {
   );
 });
 
+// ─── 코인 대응 ETF 매핑 ────────────────────────────────────
+const COIN_ETF_MAP = {
+  BTC:  ['IBIT', 'FBTC'],
+  ETH:  ['ETHA', 'FETH'],
+  SOL:  ['SOLT'],
+  BNB:  [],
+  XRP:  [],
+};
+
 // ─── BLOCK 2: 통합 무버 행 (시장 구분 뱃지 포함) ─────────────
 // 뱃지 색상: 국내(KR)=빨강, 해외(US)=파랑, 코인(COIN)=주황
 const MARKET_BADGE = {
@@ -182,6 +191,12 @@ const MoverRow = memo(function MoverRow({ item, rank, krwRate, onClick }) {
           >
             {item._market}
           </span>
+          {/* 코인 대응 ETF 배지 */}
+          {item._market === 'COIN' && COIN_ETF_MAP[item.symbol?.toUpperCase()]?.length > 0 && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1 py-0.5 rounded bg-[#E8F0FE] text-[#1764ED]">
+              ETF: {COIN_ETF_MAP[item.symbol.toUpperCase()][0]}
+            </span>
+          )}
         </div>
         <div className="text-[10px] font-bold text-[#8B95A1] font-mono">{item.symbol}</div>
       </div>
@@ -280,21 +295,30 @@ export default function HomeDashboard({
   // 전체 뉴스 (BLOCK 3 인사이트 매칭용)
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
 
-  // ── BLOCK 2: 전 시장 통합 TOP 8 무버 ──────────────────────
-  // 국장, 미장, 코인을 단일 배열로 합쳐 |등락률| 기준 내림차순
-  const topMovers = useMemo(() => {
-    const krItems  = krStocks.map(s => ({ ...s, _market: 'KR',   _pct: Math.abs(s.changePct ?? 0) }));
-    const usItems  = usStocks.map(s => ({ ...s, _market: 'US',   _pct: Math.abs(s.changePct ?? 0) }));
-    const coinItems = coins.map(c => ({
-      ...c,
-      _market: 'COIN',
-      _pct: Math.abs(c.change24h ?? 0),
-    }));
+  // ── BLOCK 2: 전 시장 통합 급등/급락 분리 ────────────────────
+  // 국장, 미장, 코인을 단일 배열로 합친 뒤 급등 TOP 5 / 급락 TOP 5 분리
+  const { gainers, losers } = useMemo(() => {
+    const krItems   = krStocks.map(s => ({ ...s, _market: 'KR',   _pct: s.changePct ?? 0 }));
+    const usItems   = usStocks.map(s => ({ ...s, _market: 'US',   _pct: s.changePct ?? 0 }));
+    const coinItems = coins.map(c => ({ ...c, _market: 'COIN', _pct: c.change24h ?? 0 }));
 
-    return [...krItems, ...usItems, ...coinItems]
+    const all = [...krItems, ...usItems, ...coinItems];
+
+    const gainers = all
+      .filter(i => i._pct > 0)
       .sort((a, b) => b._pct - a._pct)
-      .slice(0, 8);
+      .slice(0, 5);
+
+    const losers = all
+      .filter(i => i._pct < 0)
+      .sort((a, b) => a._pct - b._pct) // 가장 낮은 값(가장 많이 하락)이 앞으로
+      .slice(0, 5);
+
+    return { gainers, losers };
   }, [krStocks, usStocks, coins]);
+
+  // BLOCK 3 insights용 — 급등/급락 합친 배열
+  const topMovers = useMemo(() => [...gainers, ...losers], [gainers, losers]);
 
   // ── BLOCK 3: 무버 종목과 관련 뉴스 매칭 (insights) ───────────
   // 각 무버에 관련 뉴스 1건 연결 — 매칭 없는 무버는 제외
@@ -344,37 +368,56 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 2: 지금 핫한 것 — 통합 무버 TOP 8        */}
+      {/* BLOCK 2: 급등 TOP 5 + 급락 TOP 5 분리 섹션    */}
       {/* ═══════════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-[15px]">🔥</span>
-          <span className="text-[14px] font-bold text-[#191F28]">전 시장 급등락 TOP 8</span>
-          <span className="text-[11px] text-[#B0B8C1] ml-auto">국내·해외·코인 통합</span>
-        </div>
-
-        {/* 모바일 1열 / 태블릿 이상 2열 그리드 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
-          {hasData
-            ? topMovers.map((item, i) => (
-                <MoverRow
-                  key={`${item._market}-${item.id || item.symbol}`}
-                  item={item}
-                  rank={i + 1}
-                  krwRate={krwRate}
-                  onClick={onItemClick}
-                />
-              ))
-            : <div className="col-span-2"><SkeletonRow count={8} /></div>
-          }
-        </div>
-
-        {/* 데이터 있는데 8개 미만인 경우 안내 */}
-        {hasData && topMovers.length === 0 && (
-          <div className="text-center py-6 text-[13px] text-[#B0B8C1]">
-            시세 데이터를 불러오는 중입니다...
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* 급등 섹션 */}
+        <div className="rounded-2xl p-4 shadow-sm" style={{ background: '#FFFAFA' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[14px] font-bold text-[#F04452]">🔴 급등 TOP 5</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">국내·해외·코인</span>
           </div>
-        )}
+
+          {!hasData && <SkeletonRow count={5} />}
+
+          {hasData && gainers.length === 0 && (
+            <div className="text-center py-6 text-[13px] text-[#B0B8C1]">해당 종목 없음</div>
+          )}
+
+          {hasData && gainers.map((item, i) => (
+            <MoverRow
+              key={`gainer-${item._market}-${item.id || item.symbol}`}
+              item={item}
+              rank={i + 1}
+              krwRate={krwRate}
+              onClick={onItemClick}
+            />
+          ))}
+        </div>
+
+        {/* 급락 섹션 */}
+        <div className="rounded-2xl p-4 shadow-sm" style={{ background: '#F4F8FF' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[14px] font-bold text-[#1764ED]">🔵 급락 TOP 5</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">국내·해외·코인</span>
+          </div>
+
+          {!hasData && <SkeletonRow count={5} />}
+
+          {hasData && losers.length === 0 && (
+            <div className="text-center py-6 text-[13px] text-[#B0B8C1]">해당 종목 없음</div>
+          )}
+
+          {hasData && losers.map((item, i) => (
+            <MoverRow
+              key={`loser-${item._market}-${item.id || item.symbol}`}
+              item={item}
+              rank={i + 1}
+              krwRate={krwRate}
+              onClick={onItemClick}
+            />
+          ))}
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
