@@ -147,7 +147,7 @@ export default function App() {
   useEffect(() => { const id = setInterval(() => setKrStocks(p => simulateKorean(p)), 15000); return () => clearInterval(id); }, []);
   useEffect(() => { const id = setInterval(refreshIndices,     60000); return () => clearInterval(id); }, [refreshIndices]);
 
-  // ── 탭별 종목 데이터 ─────────────────────────────────────────
+  // ── 탭별 종목 데이터 (all 탭 제거, home은 HomeDashboard가 담당) ───
   const tabItems = useMemo(() => {
     switch (activeTab) {
       case 'home': return [];
@@ -155,13 +155,7 @@ export default function App() {
       case 'us':   return usStocks;
       case 'coin': return coins;
       case 'etf':  return etfs.map(e => ({ ...e, marketCap: e.aum }));
-      case 'all':
-      default:
-        return [
-          ...krStocks,
-          ...usStocks,
-          ...coins.map(c => ({ ...c, changePct: c.change24h })),
-        ];
+      default:     return krStocks;
     }
   }, [activeTab, krStocks, usStocks, coins, etfs]);
 
@@ -184,11 +178,8 @@ export default function App() {
         onTabChange={setActiveTab}
       />
 
-      {/* ── 2열 그리드 레이아웃 ────────────────────────────── */}
-      <div
-        className="max-w-[1440px] mx-auto"
-        style={{ display: 'grid', gridTemplateColumns: '1fr 360px' }}
-      >
+      {/* ── 반응형 그리드 레이아웃: 모바일 1열 / 데스크탑 2열 ─── */}
+      <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* 좌: 콘텐츠 영역 */}
         <div className="p-5 space-y-4 min-w-0 overflow-hidden">
           {activeTab === 'home' ? (
@@ -217,9 +208,9 @@ export default function App() {
           )}
         </div>
 
-        {/* 우: 뉴스·속보 패널 — 항상 표시 */}
+        {/* 우: 뉴스·속보 패널 — 모바일에서 숨김, 데스크탑에서 표시 */}
         <div
-          className="self-start"
+          className="hidden lg:block self-start"
           style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
         >
           <BreakingNewsPanel />

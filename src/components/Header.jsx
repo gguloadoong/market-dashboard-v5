@@ -2,11 +2,11 @@
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
 
+// B안: '전체' 탭 제거, 홈 탭이 전체 통합 역할
 const TABS = [
-  { id: 'home', label: '🏠 홈' },
-  { id: 'all',  label: '전체' },
-  { id: 'kr',   label: '🇰🇷 국내주식' },
-  { id: 'us',   label: '🇺🇸 해외주식' },
+  { id: 'home', label: '🔥 지금 핫한 것' },
+  { id: 'kr',   label: '🇰🇷 국내' },
+  { id: 'us',   label: '🇺🇸 해외' },
   { id: 'coin', label: '🪙 코인' },
   { id: 'etf',  label: '📊 ETF' },
 ];
@@ -27,12 +27,13 @@ export default function Header({ krwRate, lastUpdated, onRefresh, loading, activ
           <span className="text-[20px] font-bold text-[#191F28] tracking-tight flex-shrink-0">
             마켓대시보드
           </span>
-          <nav className="flex items-center gap-1">
+          {/* 탭 — 모바일에서 가로 스크롤 지원 */}
+          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`px-4 py-2 rounded-lg text-[14px] font-medium transition-colors ${
+                className={`flex-shrink-0 px-4 py-2 rounded-lg text-[14px] font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'bg-[#191F28] text-white'
                     : 'text-[#6B7684] hover:bg-[#F2F4F6] hover:text-[#191F28]'
@@ -44,8 +45,8 @@ export default function Header({ krwRate, lastUpdated, onRefresh, loading, activ
           </nav>
         </div>
 
-        {/* 우: 장 상태 + 환율 + 시각 + 새로고침 */}
-        <div className="flex items-center gap-4">
+        {/* 우: 장 상태 + 환율 + 시각 + 새로고침 — 모바일에서 숨김 */}
+        <div className="hidden md:flex items-center gap-4">
           {/* 장 운영 상태 */}
           <div className="flex items-center gap-3 text-[13px]">
             <span className="flex items-center gap-1.5">
