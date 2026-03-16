@@ -172,7 +172,7 @@ export default function App() {
   const allStocks = [...krStocks, ...usStocks];
 
   return (
-    <div className="min-h-screen bg-[#F2F4F6]">
+    <div className="min-h-screen bg-[#F8F9FA]">
       {/* 급상승 배너 (sticky, z-30 — 차트 패널 z-150보다 낮게) */}
       <div className="sticky top-0 z-30">
         <SurgeBanner stocks={allStocks} coins={coins} />

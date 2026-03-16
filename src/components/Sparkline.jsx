@@ -18,7 +18,8 @@ export default function Sparkline({ data = [], width = 80, height = 32, positive
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
 
-  const color = positive === true ? '#FF4136' : positive === false ? '#1A73E8' : '#8B95A1';
+  // 디자인 시스템 색상: 상승 #F04452 (빨강), 하락 #1764ED (파랑)
+  const color = positive === true ? '#F04452' : positive === false ? '#1764ED' : '#8B95A1';
   const polyline = pts.join(' ');
 
   // 영역 채우기용 path

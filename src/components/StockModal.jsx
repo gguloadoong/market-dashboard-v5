@@ -90,7 +90,7 @@ function CandleChart({ candles, loading }) {
           <text key={i}
             x={toX(i)} y={H - 4}
             textAnchor="middle"
-            fontSize={9} fill="#B0B8C1"
+            fontSize={10} fill="#B0B8C1"
           >{c.time}</text>
         ))}
       </svg>
@@ -252,7 +252,7 @@ function FlowChart({ flows }) {
           {/* X labels */}
           <div className="flex gap-0.5 mt-1">
             {flows.map((f, i) => (
-              <div key={i} style={{ flex: 1 }} className="text-center text-[8px] text-text3">
+              <div key={i} style={{ flex: 1 }} className="text-center text-[10px] text-text3">
                 {i % 4 === 0 ? f.date : ''}
               </div>
             ))}

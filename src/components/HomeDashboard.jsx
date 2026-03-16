@@ -241,7 +241,7 @@ const MoverRow = memo(function MoverRow({ item, rank, krwRate, onClick, dataMap 
                   className="flex items-center gap-1 px-2 py-1 rounded-lg border border-[#E5E8EB] bg-white hover:border-[#B0B8C1] transition-colors"
                 >
                   {isEtf && (
-                    <span className="text-[8px] font-bold text-[#3182F6] bg-[#EDF4FF] px-0.5 rounded">ETF</span>
+                    <span className="text-[10px] font-bold text-[#3182F6] bg-[#EDF4FF] px-0.5 rounded">ETF</span>
                   )}
                   <span className="text-[11px] font-bold text-[#191F28] font-mono">{ticker}</span>
                   {relPct != null && (

@@ -129,7 +129,7 @@
 
   /* ── 배지 추가 ── */
   .badge-neutral { @apply bg-[#F2F4F6] text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
-  .badge-vol { @apply bg-[#FFF3E0] text-[#FF9500] rounded-full px-1.5 py-0.5 text-[9px] font-bold; }
+  .badge-vol { @apply bg-[#FFF3E0] text-[#FF9500] rounded-full px-1.5 py-0.5 text-[10px] font-bold; }
 }
 
 @layer utilities {

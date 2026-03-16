@@ -20,7 +20,9 @@ const CAT_COLOR = {
 };
 
 function NewsItem({ item }) {
-  const isBreaking = (Date.now() - new Date(item.pubDate)) < 3600000;
+  // pubDate null/undefined 방어: 유효하지 않은 날짜는 속보 아님으로 처리
+  const pubMs = item.pubDate ? new Date(item.pubDate).getTime() : 0;
+  const isBreaking = pubMs > 0 && (Date.now() - pubMs) < 3600000;
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
   // 뉴스 제목에서 투자 시그널 태그 추출
   const signals = extractNewsSignals(item.title);
@@ -91,10 +93,15 @@ function useTabNews(activeTab) {
 function sortWithBreakingFirst(items) {
   const now = Date.now();
   const ONE_HOUR = 3600000;
-  const breaking = items.filter(i => (now - new Date(i.pubDate)) < ONE_HOUR)
-    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-  const normal = items.filter(i => (now - new Date(i.pubDate)) >= ONE_HOUR)
-    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+  // pubDate null/undefined 방어: 유효하지 않은 날짜는 일반 뉴스로 분류
+  const getMs = (i) => {
+    const ms = i.pubDate ? new Date(i.pubDate).getTime() : 0;
+    return isNaN(ms) ? 0 : ms;
+  };
+  const breaking = items.filter(i => { const ms = getMs(i); return ms > 0 && (now - ms) < ONE_HOUR; })
+    .sort((a, b) => getMs(b) - getMs(a));
+  const normal = items.filter(i => { const ms = getMs(i); return ms === 0 || (now - ms) >= ONE_HOUR; })
+    .sort((a, b) => getMs(b) - getMs(a));
   return [...breaking, ...normal];
 }
 
@@ -170,7 +177,7 @@ export default function BreakingNewsPanel() {
               {tab.label}
               {/* 고래 탭 읽지 않은 배지 */}
               {tab.id === 'whale' && unreadWhale > 0 && activeTab !== 'whale' && (
-                <span className="ml-1 inline-flex items-center justify-center bg-[#F04452] text-white text-[8px] rounded-full px-1 min-w-[14px] h-[14px]">
+                <span className="ml-1 inline-flex items-center justify-center bg-[#F04452] text-white text-[10px] rounded-full px-1 min-w-[14px] h-[14px]">
                   {unreadWhale > 99 ? '99+' : unreadWhale}
                 </span>
               )}
