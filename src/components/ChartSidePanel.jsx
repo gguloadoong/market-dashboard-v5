@@ -1,5 +1,5 @@
 // 종목 상세 차트 사이드 패널 — lightweight-charts 사용
-import { useState, useEffect, useRef, Component } from 'react';
+import { useState, useEffect, useRef, useMemo, Component } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 
 // 차트 크래시 격리 — 흰 화면 방지
@@ -24,6 +24,7 @@ class ChartErrorBoundary extends Component {
 import { fetchCandles } from '../api/chart';
 import { useStockNews } from '../hooks/useNewsQuery';
 import InvestorFlow from './InvestorFlow';
+import { findRelatedItems } from '../data/relatedAssets';
 
 // 로고 URL
 function getLogoUrl(item) {
@@ -174,7 +175,7 @@ function LightweightChart({ candles, loading, type }) {
 }
 
 // ─── 메인 패널 ──────────────────────────────────────────────
-export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
+export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelatedClick, allData = {} }) {
   const [period,  setPeriod]  = useState('1M');
   const [candles, setCandles] = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
@@ -182,6 +183,18 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
 
   // 종목 키워드 기반 관련 뉴스 — React Query 캐시 활용
   const relatedNews = useStockNews(item?.symbol || item?.id, item?.name || item?.nameEn);
+
+  // 연관 종목 — relatedAssets 매핑 기반, allData에서 현재 가격 조회
+  const relatedItems = useMemo(() => {
+    if (!item) return [];
+    const { krStocks = [], usStocks = [], coins = [] } = allData;
+    const dataMap = {};
+    for (const s of krStocks) { dataMap[s.symbol] = s; if (s.name) dataMap[s.name] = s; }
+    for (const s of usStocks) dataMap[s.symbol] = s;
+    for (const c of coins)    dataMap[c.symbol?.toUpperCase()] = c;
+    const key = item.name || item.symbol;
+    return findRelatedItems(key, dataMap);
+  }, [item?.symbol, item?.name, allData]);
 
   const pct    = item ? getPct(item) : 0;
   const isUp   = pct > 0;
@@ -351,6 +364,64 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose }) {
 
           {/* 투자자 동향 — 국내 종목만 */}
           {item.market === 'kr' && <InvestorFlow symbol={item.symbol} />}
+
+          {/* 연관 종목 — ETF, 동일 섹터, 상관 자산 */}
+          {relatedItems.length > 0 && (
+            <div className="border-t border-[#F2F4F6] mt-2 pt-4 px-5 mb-2">
+              <div className="text-[11px] font-semibold text-[#B0B8C1] uppercase tracking-wide mb-3">
+                연관 종목
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {relatedItems.map(({ ticker, item: rel, isEtf }) => {
+                  const relPct = rel ? (rel.change24h ?? rel.changePct ?? 0) : null;
+                  const relColor = relPct == null ? '#B0B8C1'
+                    : relPct > 0 ? '#F04452'
+                    : relPct < 0 ? '#1764ED'
+                    : '#8B95A1';
+                  const relPrice = rel
+                    ? rel.priceKrw
+                      ? `₩${fmt(Math.round(rel.priceKrw))}`
+                      : rel.price
+                      ? `₩${fmt(Math.round((rel.price ?? 0) * (rel.market === 'us' ? krwRate : 1)))}`
+                      : null
+                    : null;
+
+                  return (
+                    <button
+                      key={ticker}
+                      onClick={() => rel && onRelatedClick?.(rel)}
+                      disabled={!rel}
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-left ${
+                        rel
+                          ? 'border-[#E5E8EB] hover:border-[#B0B8C1] hover:shadow-sm cursor-pointer bg-white'
+                          : 'border-[#F2F4F6] bg-[#FAFBFC] cursor-default opacity-60'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          {isEtf && (
+                            <span className="text-[8px] font-bold text-[#3182F6] bg-[#EDF4FF] px-1 rounded">ETF</span>
+                          )}
+                          <span className="text-[12px] font-bold text-[#191F28] font-mono">{ticker}</span>
+                        </div>
+                        {relPrice && (
+                          <div className="text-[10px] text-[#8B95A1] font-mono tabular-nums">{relPrice}</div>
+                        )}
+                        {!rel && (
+                          <div className="text-[10px] text-[#C9CDD2]">미추적</div>
+                        )}
+                      </div>
+                      {relPct != null && (
+                        <span className="text-[12px] font-bold tabular-nums font-mono" style={{ color: relColor }}>
+                          {relPct > 0 ? '▲' : relPct < 0 ? '▼' : ''}{Math.abs(relPct).toFixed(2)}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 관련 뉴스 — useStockNews 훅으로 React Query 캐시 활용 */}
           {relatedNews.length > 0 && (

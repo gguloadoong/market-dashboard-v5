@@ -233,6 +233,8 @@ export default function App() {
           item={selectedItem}
           krwRate={krwRate}
           onClose={() => setSelectedItem(null)}
+          onRelatedClick={setSelectedItem}
+          allData={{ krStocks, usStocks, coins }}
         />
       )}
     </div>
