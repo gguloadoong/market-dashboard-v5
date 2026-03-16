@@ -135,8 +135,8 @@ function fmtKrw(n) {
 function connectWs() {
   if (destroyed || !whaleSymbols || !whaleHandler) return;
 
-  const THRESHOLD_KRW = 50_000_000;  // 5000만 원 (ETH 10개 수준)
-  const HIGH_KRW      = 500_000_000; // 5억 원
+  const THRESHOLD_KRW = 20_000_000;  // 2000만 원 (BTC 0.2개 수준)
+  const HIGH_KRW      = 100_000_000; // 1억 원
   const markets = whaleSymbols.map(s => `KRW-${s}`);
 
   try {
@@ -231,4 +231,126 @@ export function unsubscribeUpbitWhaleTrades() {
   whaleSymbols = null;
   clearTimeout(reconnectTimer);
   if (whaleWs) { try { whaleWs.close(); } catch {} whaleWs = null; }
+}
+
+// ─── Layer 2: Blockchain.com WebSocket — BTC 온체인 대형 이동 ──────────────
+const BTC_WS_URL = 'wss://ws.blockchain.info/inv';
+const BTC_WHALE_THRESHOLD = 10; // 10 BTC+ (약 10억원)
+let btcWs = null;
+let btcDestroyed = false;
+
+/**
+ * subscribeBtcWhales(callback)
+ * Blockchain.com 미확인 트랜잭션 스트림에서 10 BTC 이상 이동 감지
+ * @param {Function} callback - 이벤트 수신 콜백
+ */
+export function subscribeBtcWhales(callback) {
+  btcDestroyed = false;
+  connectBtcWs(callback);
+}
+
+function connectBtcWs(callback) {
+  if (btcDestroyed) return;
+  try {
+    btcWs = new WebSocket(BTC_WS_URL);
+    btcWs.onopen = () => {
+      btcWs.send(JSON.stringify({ op: 'unconfirmed_sub' }));
+      callback({ _connected: true, chain: 'BTC' });
+    };
+    btcWs.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.op !== 'utx' || !msg.x) return;
+        const tx = msg.x;
+        // outputs 합산 (satoshi → BTC)
+        const totalBtc = (tx.out || []).reduce((s, o) => s + (o.value || 0), 0) / 1e8;
+        if (totalBtc < BTC_WHALE_THRESHOLD) return;
+        // 전역 BTC 가격 활용 (WhalePanel에서 window.__btcKrwRate__ 설정)
+        const amtKrw = totalBtc * (window.__btcKrwRate__ || 100_000_000);
+        callback({
+          id:        tx.hash?.slice(0, 8) + '-btc',
+          symbol:    'BTC',
+          chain:     'bitcoin',
+          side:      '온체인',
+          tradeAmt:  Math.round(amtKrw),
+          volume:    parseFloat(totalBtc.toFixed(4)),
+          severity:  totalBtc >= 50 ? 'high' : 'normal',
+          timestamp: tx.time ? tx.time * 1000 : Date.now(),
+          txHash:    tx.hash,
+          label:     '온체인 이동',
+        });
+      } catch { /* 파싱 오류 무시 */ }
+    };
+    btcWs.onclose = () => {
+      if (!btcDestroyed) setTimeout(() => connectBtcWs(callback), 5000);
+    };
+    btcWs.onerror = (e) => console.warn('[BTC WS]', e.type);
+  } catch (e) {
+    console.warn('[BTC WS] connect error', e);
+    if (!btcDestroyed) setTimeout(() => connectBtcWs(callback), 10000);
+  }
+}
+
+/**
+ * unsubscribeBtcWhales()
+ * BTC 온체인 WebSocket 연결 해제
+ */
+export function unsubscribeBtcWhales() {
+  btcDestroyed = true;
+  if (btcWs) { btcWs.close(); btcWs = null; }
+}
+
+// ─── Layer 3: Whale Alert v1 REST 폴링 (60초 간격) ──────────────────────────
+let waTxIds = new Set(); // 중복 방지
+let waTimer = null;
+let waDestroyed = false;
+
+/**
+ * startWhaleAlertPolling(callback)
+ * Vercel 프록시(/api/whale-proxy)를 통해 Whale Alert v1 REST API 폴링
+ * @param {Function} callback - 이벤트 수신 콜백
+ */
+export function startWhaleAlertPolling(callback) {
+  waDestroyed = false;
+  pollWhaleAlert(callback);
+  waTimer = setInterval(() => pollWhaleAlert(callback), 60_000);
+}
+
+async function pollWhaleAlert(callback) {
+  if (waDestroyed) return;
+  try {
+    const res = await fetch('/api/whale-proxy', { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return;
+    const { transactions = [] } = await res.json();
+    for (const tx of transactions) {
+      if (waTxIds.has(tx.id)) continue;
+      waTxIds.add(tx.id);
+      // Set 크기가 너무 커지면 오래된 항목 제거
+      if (waTxIds.size > 200) waTxIds = new Set([...waTxIds].slice(-100));
+      const from = tx.from?.owner || tx.from?.owner_type || 'unknown';
+      const to   = tx.to?.owner   || tx.to?.owner_type   || 'unknown';
+      callback({
+        id:        `wa-${tx.id}`,
+        symbol:    tx.symbol?.toUpperCase() || '?',
+        chain:     tx.blockchain,
+        side:      '온체인',
+        tradeAmt:  Math.round((tx.amount_usd || 0) * 1300), // USD→KRW 근사
+        volume:    tx.amount,
+        severity:  tx.amount_usd >= 10_000_000 ? 'high' : 'normal',
+        timestamp: (tx.timestamp || 0) * 1000,
+        txHash:    tx.hash,
+        label:     `${from} → ${to}`,
+        source:    'whale-alert',
+      });
+    }
+  } catch { /* 실패 시 다음 폴링에 재시도 */ }
+}
+
+/**
+ * stopWhaleAlertPolling()
+ * Whale Alert 폴링 중단
+ */
+export function stopWhaleAlertPolling() {
+  waDestroyed = true;
+  if (waTimer) { clearInterval(waTimer); waTimer = null; }
 }
