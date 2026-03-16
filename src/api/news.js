@@ -205,101 +205,49 @@ async function fetchCoinNews() {
   return items;
 }
 
-// ─── allorigins 경유 RSS 취득 (거시경제 소스용) ──────────────
-async function fetchViaAllorigins(rssUrl, category, sourceName) {
-  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`allorigins ${res.status}`);
-  const json = await res.json();
-  const text = json.contents || '';
-  if (!text.trim().startsWith('<')) throw new Error('allorigins not xml');
-  const items = parseRssXml(text, category, sourceName);
-  if (!items.length) throw new Error('allorigins no items');
-  return items;
-}
-
-// 거시경제 RSS 소스 목록 (allorigins 경유)
-const MACRO_RSS_SOURCES = [
+// ─── 미장·거시경제 한국어 구글뉴스 쿼리 ─────────────────────
+// 영어 RSS 소스(Reuters/MarketWatch 등) 대신 한국어 구글뉴스 사용
+// → 번역 없이 한국어 기사로 미국 시장 + 유가/금리/지정학 커버
+const KR_US_NEWS_QUERIES = [
   {
-    url: 'https://feeds.reuters.com/reuters/businessNews',
-    category: 'us',
-    source: 'Reuters',
+    // 미국 증시 전반 (나스닥, 다우, S&P, 빅테크)
+    url: 'https://news.google.com/rss/search?q=%EB%AF%B8%EA%B5%AD%EC%A6%9D%EC%8B%9C+%EB%82%98%EC%8A%A4%EB%8B%A5+%EB%8B%A4%EC%9A%B0%EC%A1%B4%EC%8A%A4+%EB%B9%85%ED%85%8C%ED%81%AC&hl=ko&gl=KR&ceid=KR:ko',
+    source: '구글뉴스',
   },
   {
-    url: 'https://feeds.reuters.com/reuters/financialNews',
-    category: 'us',
-    source: 'Reuters Markets',
+    // 연준·금리·달러·인플레이션
+    url: 'https://news.google.com/rss/search?q=%EC%97%B0%EC%A4%80+%EA%B8%88%EB%A6%AC+%EC%9D%B8%ED%94%8C%EB%A0%88%EC%9D%B4%EC%85%98+%EB%8B%AC%EB%9F%AC+Fed&hl=ko&gl=KR&ceid=KR:ko',
+    source: '구글뉴스',
   },
   {
-    url: 'https://www.investing.com/rss/market_overview.rss',
-    category: 'us',
-    source: 'Investing.com',
+    // 유가·원유·에너지·OPEC
+    url: 'https://news.google.com/rss/search?q=%EC%9C%A0%EA%B0%80+%EC%9B%90%EC%9C%A0+OPEC+%EC%97%90%EB%84%88%EC%A7%80+%EC%9C%A0%EC%A0%84&hl=ko&gl=KR&ceid=KR:ko',
+    source: '구글뉴스',
   },
   {
-    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',
-    category: 'us',
-    source: 'MarketWatch',
+    // 무역전쟁·관세·미중갈등·지정학·전쟁
+    url: 'https://news.google.com/rss/search?q=%EA%B4%80%EC%84%B8+%EB%AC%B4%EC%97%AD%EC%A0%84%EC%9F%81+%EB%AF%B8%EC%A4%91%EA%B0%88%EB%93%B1+%EC%A7%80%EC%A0%95%ED%95%99+%EC%A0%84%EC%9F%81&hl=ko&gl=KR&ceid=KR:ko',
+    source: '구글뉴스',
   },
 ];
 
-// 거시경제 소스 통합 취득 — 각 소스 개별 try/catch, 하나 실패해도 나머지 표시
-async function fetchMacroNews() {
-  const results = await Promise.allSettled(
-    MACRO_RSS_SOURCES.map(({ url, category, source }) =>
-      // 1순위: 자체 프록시, 2순위: allorigins
-      fetchRSS(url, category, source)
-        .then(items => items.length ? items : fetchViaAllorigins(url, category, source))
-        .catch(() => fetchViaAllorigins(url, category, source).catch(() => []))
-    )
-  );
-  return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-}
-
-// [미장] Google News (자체 프록시) + Finnhub (키 있을 때) + 거시경제 RSS
+// [미장] 한국어 구글뉴스 멀티쿼리 — 미증시 + 연준/금리 + 유가 + 지정학
+// 영어 RSS 완전 제거 → 번역 없이 한국어 기사로 직접 커버
 async function fetchUsNews() {
   const cached = cacheGet('us');
   if (cached?.fresh) return cached.data;
 
-  const finnhubKey = import.meta.env.VITE_FINNHUB_API_KEY || '';
-
-  // Finnhub 직접 API (CORS OK, 키 있을 때)
-  const finnhubItems = finnhubKey ? await (async () => {
-    try {
-      const res  = await fetch(
-        `https://finnhub.io/api/v1/news?category=general&token=${finnhubKey}`,
-        { signal: AbortSignal.timeout(5000) }
-      );
-      if (!res.ok) throw new Error(`Finnhub ${res.status}`);
-      const data = await res.json();
-      return (Array.isArray(data) ? data : []).slice(0, 15).map(a => ({
-        id:          String(a.id),
-        title:       cleanTitle(a.headline, a.source || 'Finnhub'),
-        description: (a.summary || '').slice(0, 200),
-        link:        a.url,
-        pubDate:     new Date(a.datetime * 1000).toISOString(),
-        timeAgo:     timeAgo(a.datetime),
-        source:      a.source || 'Finnhub',
-        image:       a.image || null,
-        category:    'us',
-      })).filter(i => i.title && i.link);
-    } catch { return []; }
-  })() : [];
-
-  // Google News 미국 증시 RSS
-  const googleItems = await fetchRSS(
-    'https://news.google.com/rss/search?q=%EB%AF%B8%EA%B5%AD%EC%A6%9D%EC%8B%9C+%EB%82%98%EC%8A%A4%EB%8B%A5+S%26P500+%EC%97%B0%EC%A4%80&hl=ko&gl=KR&ceid=KR:ko',
-    'us', '구글뉴스',
+  // 4개 쿼리 병렬 취득 (개별 실패해도 나머지 표시)
+  const results = await Promise.allSettled(
+    KR_US_NEWS_QUERIES.map(({ url, source }) =>
+      fetchRSS(url, 'us', source)
+    )
   );
+  const allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-  // 거시경제 RSS 소스 (Reuters, MarketWatch, Investing.com 등)
-  const macroItems = await fetchMacroNews();
-
-  const rawItems = dedup([...finnhubItems, ...googleItems.filter(isFinancialNews), ...macroItems])
+  const items = dedup(allItems.filter(isFinancialNews))
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 40);
-
-  // 영어 제목 → 한국어 번역 (Google Translate 비공식 무료 API)
-  const items = await translateTitles(rawItems);
 
   if (items.length > 0) cacheSet('us', items);
   else if (cached?.data) return cached.data;
@@ -323,45 +271,6 @@ async function fetchKrNews() {
   if (items.length > 0) cacheSet('kr', items);
   else if (cached?.data) return cached.data;
   return items;
-}
-
-// ─── 영어 제목을 한국어로 번역 (Google Translate 비공식 엔드포인트) ──────
-// 캐시키가 같으면 재번역하지 않음
-async function translateTitles(items) {
-  const toTranslate = items.filter(item => {
-    // 이미 한국어이거나 카테고리가 미장이 아닌 경우 스킵
-    const hasKorean = /[가-힣]/.test(item.title);
-    return !hasKorean && item.category === 'us';
-  });
-
-  if (!toTranslate.length) return items;
-
-  const translated = await Promise.allSettled(
-    toTranslate.map(async item => {
-      try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(item.title.slice(0, 300))}`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const koTitle = data?.[0]?.map(r => r?.[0]).filter(Boolean).join('') || null;
-        return koTitle;
-      } catch { return null; }
-    })
-  );
-
-  const transMap = {};
-  toTranslate.forEach((item, i) => {
-    const result = translated[i];
-    if (result.status === 'fulfilled' && result.value) {
-      transMap[item.id] = result.value;
-    }
-  });
-
-  return items.map(item => ({
-    ...item,
-    title: transMap[item.id] || item.title,
-    titleOrig: transMap[item.id] ? item.title : undefined, // 원문 보관
-  }));
 }
 
 // ─── Promise 디덥 + stale-while-revalidate ────────────────────
