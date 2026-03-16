@@ -25,7 +25,7 @@ export default function Header({ krwRate, lastUpdated, onRefresh, loading, activ
         {/* 좌: 로고 + 탭 */}
         <div className="flex items-center gap-6">
           <span className="text-[20px] font-bold text-[#191F28] tracking-tight flex-shrink-0">
-            마켓대시보드
+            마켓레이더
           </span>
           {/* 탭 — 모바일에서 가로 스크롤 지원 */}
           <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">

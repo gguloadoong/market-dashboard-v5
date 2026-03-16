@@ -28,6 +28,10 @@ function timeStr(ts) {
 
 // 고래 이벤트 의미를 설명하는 한 줄 인사이트 텍스트 반환
 function getWhaleInsight(event) {
+  // 새 필드(whale.js 세분화) 있으면 우선 사용
+  if (event.insight) return event.insight;
+
+  // 기존 로직 fallback
   const amt = event.tradeAmt || 0;
   const side = event.side;
   const isOnchain = event.chain === 'bitcoin' || event.source === 'whale-alert';

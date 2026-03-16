@@ -175,6 +175,8 @@ function connectWs() {
 
         const symbol = (data.code || '').replace('KRW-', '');
         const side   = data.ask_bid === 'ASK' ? '매도' : '매수';
+        // 매수/매도별 signal + insight 부여
+        const { signal, insight } = getUpbitInsight(side, tradeAmt);
 
         whaleHandler?.({
           symbol,
@@ -184,6 +186,8 @@ function connectWs() {
           volume,
           tradeAmt,
           side,
+          signal,
+          insight,
           message:   `${symbol} ${side} ${fmtKrw(tradeAmt)}원 (${volume % 1 === 0 ? volume : volume.toFixed(4)})`,
           timestamp: Date.now(),
         });
@@ -316,6 +320,18 @@ export function startWhaleAlertPolling(callback) {
   waTimer = setInterval(() => pollWhaleAlert(callback), 60_000);
 }
 
+// Upbit 대량 체결 이벤트에 signal + insight 부여
+function getUpbitInsight(side, tradeAmt) {
+  if (side === '매수') {
+    if (tradeAmt >= 5e8) return { signal: 'bullish', insight: '기관/세력 대량 매수 — 단기 상방 압력' };
+    if (tradeAmt >= 1e8) return { signal: 'bullish', insight: '대량 매수 체결 — 모멘텀 확인 필요' };
+    return { signal: 'bullish', insight: '고래 단일 체결 감지' };
+  }
+  if (tradeAmt >= 5e8) return { signal: 'bearish', insight: '대규모 차익실현 — 하락 압력 주의' };
+  if (tradeAmt >= 1e8) return { signal: 'bearish', insight: '고래 매도 출현 — 추격매수 주의' };
+  return { signal: 'bearish', insight: '고래 단일 체결 감지' };
+}
+
 async function pollWhaleAlert(callback) {
   if (waDestroyed) return;
   try {
@@ -327,20 +343,60 @@ async function pollWhaleAlert(callback) {
       waTxIds.add(tx.id);
       // Set 크기가 너무 커지면 오래된 항목 제거
       if (waTxIds.size > 200) waTxIds = new Set([...waTxIds].slice(-100));
-      const from = tx.from?.owner || tx.from?.owner_type || 'unknown';
-      const to   = tx.to?.owner   || tx.to?.owner_type   || 'unknown';
+
+      // from/to owner_type 기반 이동 분류
+      const fromType = tx.from?.owner_type ?? 'unknown';
+      const toType   = tx.to?.owner_type   ?? 'unknown';
+      const fromName = tx.from?.owner ?? fromType;
+      const toName   = tx.to?.owner   ?? toType;
+
+      const fromIsExchange = fromType === 'exchange';
+      const toIsExchange   = toType   === 'exchange';
+
+      let movementType, signal, insight, label;
+
+      if (!fromIsExchange && toIsExchange) {
+        movementType = 'exchange_deposit';
+        signal       = 'bearish';
+        insight      = `${toName} 입금 — 매도 압력 주의`;
+        label        = `${fromName} → ${toName} (거래소)`;
+      } else if (fromIsExchange && !toIsExchange) {
+        movementType = 'exchange_withdrawal';
+        signal       = 'bullish';
+        insight      = `${fromName} 출금 — HODLing 신호`;
+        label        = `${fromName} (거래소) → ${toName}`;
+      } else if (fromIsExchange && toIsExchange) {
+        movementType = 'exchange_to_exchange';
+        signal       = 'neutral';
+        insight      = '거래소 간 이동 — 차익거래 또는 유동성 재배치';
+        label        = `${fromName} → ${toName}`;
+      } else {
+        movementType = 'wallet_to_wallet';
+        signal       = 'neutral';
+        insight      = 'OTC 거래 또는 자산 분산 이동';
+        label        = '지갑 → 지갑';
+      }
+
       callback({
-        id:        `wa-${tx.id}`,
-        symbol:    tx.symbol?.toUpperCase() || '?',
-        chain:     tx.blockchain,
-        side:      '온체인',
-        tradeAmt:  Math.round((tx.amount_usd || 0) * 1300), // USD→KRW 근사
-        volume:    tx.amount,
-        severity:  tx.amount_usd >= 10_000_000 ? 'high' : 'normal',
-        timestamp: (tx.timestamp || 0) * 1000,
-        txHash:    tx.hash,
-        label:     `${from} → ${to}`,
-        source:    'whale-alert',
+        id:           `wa-${tx.id}`,
+        symbol:       tx.symbol?.toUpperCase() || '?',
+        chain:        tx.blockchain,
+        side:         '온체인',
+        tradeAmt:     Math.round((tx.amount_usd || 0) * 1300), // USD→KRW 근사
+        volume:       tx.amount,
+        severity:     tx.amount_usd >= 10_000_000 ? 'high' : 'normal',
+        timestamp:    (tx.timestamp || 0) * 1000,
+        txHash:       tx.hash,
+        label,
+        source:       'whale-alert',
+        // 세분화 필드
+        movementType,
+        signal,
+        insight,
+        fromOwner:    fromName,
+        toOwner:      toName,
+        fromType,
+        toType,
       });
     }
   } catch { /* 실패 시 다음 폴링에 재시도 */ }

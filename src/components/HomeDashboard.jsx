@@ -1,10 +1,10 @@
-// 홈 대시보드 — 3블록 구조
-// BLOCK 1: 시장 요약 (공포/탐욕 + 지수 미니칩)
-// BLOCK 2: 지금 핫한 것 (전 시장 통합 무버 TOP 8)
-// BLOCK 3: 핫한 종목 인사이트 (무버 종목 + 관련 뉴스 연결, 매칭 없으면 숨김)
+// 홈 대시보드 — 레이아웃 순서
+// ① 시장 맥락 바 (지수)
+// ② 급등/급락 TOP10 + 탭 필터 [전체|KR|US|COIN]
+// ③ 핫한 종목 인사이트 (뉴스 매칭)
+// ④ 코인 요약 카드 (공포탐욕+도미넌스+김프) — 접기/펼치기
 
 import { useState, useMemo, memo } from 'react';
-import Sparkline from './Sparkline';
 import MarketSummaryCards from './MarketSummaryCards';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
 import { findRelatedItems, RELATED_ASSETS } from '../data/relatedAssets';
@@ -334,6 +334,14 @@ function SkeletonInsight({ count = 4 }) {
   ));
 }
 
+// ─── 급등/급락 탭 필터 버튼 ───────────────────────────────────
+const MOVER_FILTERS = [
+  { id: 'all',  label: '전체' },
+  { id: 'KR',   label: 'KR'   },
+  { id: 'US',   label: 'US'   },
+  { id: 'COIN', label: 'COIN' },
+];
+
 // ─── 메인 홈 대시보드 ─────────────────────────────────────────
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [],
@@ -342,20 +350,23 @@ export default function HomeDashboard({
   // 전체 뉴스 (BLOCK 3 인사이트 매칭용)
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
 
+  // 급등/급락 탭 필터 state
+  const [moverFilter, setMoverFilter] = useState('all');
+
+  // 코인 요약 카드 접기/펼치기
+  const [coinCardOpen, setCoinCardOpen] = useState(true);
+
   // ── 전체 시장 데이터 맵 (연관 종목 조회용) ────────────────────
-  // symbol → item 빠른 검색을 위한 Map
   const dataMap = useMemo(() => {
     const map = {};
     for (const s of krStocks)  map[s.symbol] = s;
     for (const s of usStocks)  map[s.symbol] = s;
     for (const c of coins)     map[c.symbol?.toUpperCase()] = c;
-    // 한글 종목명으로도 검색 가능
     for (const s of krStocks)  if (s.name) map[s.name] = s;
     return map;
   }, [krStocks, usStocks, coins]);
 
-  // ── BLOCK 2: 전 시장 통합 급등/급락 분리 ────────────────────
-  // 국장, 미장, 코인을 단일 배열로 합친 뒤 급등 TOP 10 / 급락 TOP 10 분리
+  // ── 전 시장 통합 급등/급락 분리 ────────────────────────────
   const { gainers, losers } = useMemo(() => {
     const krItems   = krStocks.map(s => ({ ...s, _market: 'KR',   _pct: s.changePct ?? 0 }));
     const usItems   = usStocks.map(s => ({ ...s, _market: 'US',   _pct: s.changePct ?? 0 }));
@@ -376,17 +387,26 @@ export default function HomeDashboard({
     return { gainers, losers };
   }, [krStocks, usStocks, coins]);
 
+  // 탭 필터 적용 — 'all'이면 전체, 아니면 해당 _market만
+  const filteredGainers = useMemo(
+    () => moverFilter === 'all' ? gainers : gainers.filter(i => i._market === moverFilter),
+    [gainers, moverFilter]
+  );
+  const filteredLosers = useMemo(
+    () => moverFilter === 'all' ? losers : losers.filter(i => i._market === moverFilter),
+    [losers, moverFilter]
+  );
+
   // BLOCK 3 insights용 — 급등/급락 합친 배열
   const topMovers = useMemo(() => [...gainers, ...losers], [gainers, losers]);
 
   // ── BLOCK 3: 무버 종목과 관련 뉴스 매칭 (insights) ───────────
-  // 각 무버에 관련 뉴스 1건 연결 — 매칭 없는 무버는 제외
   const insights = useMemo(() => {
     if (!allNews.length || !topMovers.length) return [];
     return topMovers
       .map(mover => ({ mover, news: findRelatedNews(mover, allNews) }))
       .filter(({ news }) => news !== null)
-      .slice(0, 5); // 최대 5건
+      .slice(0, 5);
   }, [topMovers, allNews]);
 
   const today = new Date().toLocaleDateString('ko-KR', {
@@ -410,23 +430,57 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 1: 급등 TOP 10 + 급락 TOP 10 (메인)      */}
+      {/* ① 시장 맥락 바 (지수 미니바) — 최상단 배치    */}
       {/* ═══════════════════════════════════════════════ */}
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="text-[13px] font-bold text-[#8B95A1]">시장 지수</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {indices.length > 0
+          ? indices.map(idx => <IndexMiniChip key={idx.id} idx={idx} />)
+          : [1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 w-36 h-12 animate-pulse border border-[#F2F4F6]" />
+          ))
+        }
+      </div>
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/* ② 급등/급락 TOP10 + 탭 필터 [전체|KR|US|COIN] */}
+      {/* ═══════════════════════════════════════════════ */}
+      {/* 필터 탭 버튼 */}
+      <div className="flex items-center gap-1.5">
+        {MOVER_FILTERS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => setMoverFilter(f.id)}
+            className={`text-[10px] px-2 py-1 rounded-md font-semibold transition-colors ${
+              moverFilter === f.id
+                ? 'bg-[#191F28] text-white'
+                : 'bg-[#F2F4F6] text-[#6B7684] hover:bg-[#E5E8EB]'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* 급등 섹션 */}
         <div className="rounded-2xl p-4 shadow-sm" style={{ background: '#FFFAFA' }}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[14px] font-bold text-[#F04452]">🔴 급등 TOP 10</span>
-            <span className="text-[11px] text-[#B0B8C1] ml-auto">국내·해외·코인</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">
+              {moverFilter === 'all' ? '국내·해외·코인' : moverFilter}
+            </span>
           </div>
 
           {!hasData && <SkeletonRow count={5} />}
 
-          {hasData && gainers.length === 0 && (
+          {hasData && filteredGainers.length === 0 && (
             <div className="text-center py-6 text-[13px] text-[#B0B8C1]">해당 종목 없음</div>
           )}
 
-          {hasData && gainers.map((item, i) => (
+          {hasData && filteredGainers.map((item, i) => (
             <MoverRow
               key={`gainer-${item._market}-${item.id || item.symbol}`}
               item={item}
@@ -442,16 +496,18 @@ export default function HomeDashboard({
         <div className="rounded-2xl p-4 shadow-sm" style={{ background: '#F4F8FF' }}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[14px] font-bold text-[#1764ED]">🔵 급락 TOP 10</span>
-            <span className="text-[11px] text-[#B0B8C1] ml-auto">국내·해외·코인</span>
+            <span className="text-[11px] text-[#B0B8C1] ml-auto">
+              {moverFilter === 'all' ? '국내·해외·코인' : moverFilter}
+            </span>
           </div>
 
           {!hasData && <SkeletonRow count={5} />}
 
-          {hasData && losers.length === 0 && (
+          {hasData && filteredLosers.length === 0 && (
             <div className="text-center py-6 text-[13px] text-[#B0B8C1]">해당 종목 없음</div>
           )}
 
-          {hasData && losers.map((item, i) => (
+          {hasData && filteredLosers.map((item, i) => (
             <MoverRow
               key={`loser-${item._market}-${item.id || item.symbol}`}
               item={item}
@@ -465,9 +521,7 @@ export default function HomeDashboard({
       </div>
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 2: 핫한 종목 인사이트                    */}
-      {/* 급등락 무버 종목 + 관련 뉴스 연결 표시          */}
-      {/* 매칭 뉴스 없으면 섹션 자체 숨김                */}
+      {/* ③ 핫한 종목 인사이트                           */}
       {/* ═══════════════════════════════════════════════ */}
       {(newsLoading || insights.length > 0) && (
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
@@ -492,30 +546,25 @@ export default function HomeDashboard({
       )}
 
       {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 3: 시장 지수                             */}
+      {/* ④ 코인 요약 카드 — 접기/펼치기 토글            */}
       {/* ═══════════════════════════════════════════════ */}
-
-      {/* 시장 지수 헤더 */}
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-bold text-[#8B95A1]">시장 지수</span>
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+        {/* 헤더 + 토글 버튼 */}
+        <button
+          onClick={() => setCoinCardOpen(prev => !prev)}
+          className="w-full flex items-center gap-2 px-4 py-3.5 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors"
+        >
+          <span className="text-[15px]">🪙</span>
+          <span className="text-[14px] font-bold text-[#191F28]">코인 시장 요약</span>
+          <span className="text-[11px] text-[#B0B8C1] ml-auto mr-1">공포탐욕 · 도미넌스 · 김프</span>
+          <span className="text-[12px] text-[#8B95A1]">{coinCardOpen ? '▲' : '▼'}</span>
+        </button>
+        {coinCardOpen && (
+          <div className="p-4">
+            <MarketSummaryCards coins={coins} krwRate={krwRate} />
+          </div>
+        )}
       </div>
-
-      {/* 지수 미니바 (가로 스크롤) */}
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {indices.length > 0
-          ? indices.map(idx => <IndexMiniChip key={idx.id} idx={idx} />)
-          : [1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="flex-shrink-0 bg-white rounded-xl px-3 py-2.5 w-36 h-12 animate-pulse border border-[#F2F4F6]" />
-          ))
-        }
-      </div>
-
-      {/* ═══════════════════════════════════════════════ */}
-      {/* BLOCK 4: 시장 요약 (보조 지표)                 */}
-      {/* ═══════════════════════════════════════════════ */}
-
-      {/* 공포탐욕 + BTC 도미넌스 + 김치프리미엄 */}
-      <MarketSummaryCards coins={coins} krwRate={krwRate} />
     </div>
   );
 }

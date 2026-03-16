@@ -1,6 +1,6 @@
 // 종목 상세 차트 사이드 패널 — lightweight-charts 사용
 import { useState, useEffect, useRef, useMemo, Component } from 'react';
-import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 
 // 차트 크래시 격리 — 흰 화면 방지
 class ChartErrorBoundary extends Component {
@@ -122,18 +122,19 @@ function LightweightChart({ candles, loading, type }) {
         chartRef.current = chart;
 
         if (type === 'candle') {
-          const s = chart.addCandlestickSeries({ upColor:'#F04452', downColor:'#1764ED', borderVisible:false, wickUpColor:'#F04452', wickDownColor:'#1764ED' });
+          // lightweight-charts v5 API: addSeries(SeriesType, options)
+          const s = chart.addSeries(CandlestickSeries, { upColor:'#F04452', downColor:'#1764ED', borderVisible:false, wickUpColor:'#F04452', wickDownColor:'#1764ED' });
           s.setData(candles);
         } else {
           const up = candles.length > 1 && candles[candles.length-1].close >= candles[0].close;
           const col = up ? '#F04452' : '#1764ED';
-          chart.addLineSeries({ color: col, lineWidth: 2 }).setData(candles.map(c => ({ time: c.time, value: c.close })));
-          chart.addAreaSeries({ topColor: col+'22', bottomColor: col+'00', lineColor:'transparent', lineWidth:0 })
+          chart.addSeries(LineSeries, { color: col, lineWidth: 2 }).setData(candles.map(c => ({ time: c.time, value: c.close })));
+          chart.addSeries(AreaSeries, { topColor: col+'22', bottomColor: col+'00', lineColor:'transparent', lineWidth:0 })
                .setData(candles.map(c => ({ time: c.time, value: c.close })));
         }
 
         if (candles[0]?.volume != null) {
-          const vs = chart.addHistogramSeries({ color:'#E5E8EB', priceFormat:{type:'volume'}, priceScaleId:'volume' });
+          const vs = chart.addSeries(HistogramSeries, { color:'#E5E8EB', priceFormat:{type:'volume'}, priceScaleId:'volume' });
           chart.priceScale('volume').applyOptions({ scaleMargins:{ top:0.85, bottom:0 } });
           vs.setData(candles.map(c => ({ time:c.time, value:c.volume??0, color:(c.close??0)>=(c.open??0)?'#F0445222':'#1764ED22' })));
         }
