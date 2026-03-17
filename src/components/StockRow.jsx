@@ -39,22 +39,25 @@ export default function StockRow({ item, rank, coinUnit = 'usd', onClick }) {
       {/* 스파크라인 */}
       <Sparkline data={item.sparkline} width={52} height={22} positive={isUp ? true : isDown ? false : undefined} />
 
-      {/* 가격 */}
-      <div className="text-right flex-shrink-0">
-        <div className="text-[15px] font-semibold text-text1 tabular-nums leading-tight">
+      {/* 현재가 */}
+      <div className="flex-shrink-0 w-[88px] text-right">
+        <div className="text-[14px] font-semibold text-text1 tabular-nums leading-tight truncate">
           {fmtPrice(item, coinUnit)}
         </div>
-        <div className={`text-[12px] tabular-nums mt-0.5 font-medium ${isUp ? 'text-up' : isDown ? 'text-down' : 'text-text2'}`}>
+      </div>
+
+      {/* 등락률 */}
+      <div className="flex-shrink-0 w-[60px] text-right">
+        <div className={`text-[13px] tabular-nums font-semibold ${isUp ? 'text-up' : isDown ? 'text-down' : 'text-text2'}`}>
           {isUp ? '+' : ''}{pct?.toFixed(2)}%
         </div>
       </div>
 
       {/* 거래량 */}
-      <div className="flex-shrink-0 w-[68px] text-right">
+      <div className="flex-shrink-0 w-[64px] text-right">
         <div className="text-[11px] text-text3 tabular-nums">
           {fmtLarge(isCoin ? item.volume24h : item.volume) || '—'}
         </div>
-        <div className="text-[10px] text-text3/60">거래량</div>
       </div>
     </div>
   );
