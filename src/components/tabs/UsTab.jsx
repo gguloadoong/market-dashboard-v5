@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import StockRow from '../StockRow';
 
-const SECTORS = ['테크', '반도체', '금융', '소비재', '전기차'];
+const SECTORS = ['테크', '반도체', '금융', '헬스케어', '소비재', '에너지', '소재', '산업', '유틸리티', '통신', '미디어', '소프트웨어', '전기차', '방산', '유통', '핀테크', 'AI/소프트웨어'];
 
 export default function UsTab({ stocks = [], onCardClick }) {
   const [sector, setSector] = useState(null);
@@ -21,7 +21,7 @@ export default function UsTab({ stocks = [], onCardClick }) {
   }, [stocks, sector, search, sortKey, sortDir]);
 
   return (
-    <div className="space-y-3 pb-8">
+    <div className="space-y-3 pb-8 overscroll-none">
       <div className="section-card px-4 py-3 flex items-center gap-3">
         <input
           value={search} onChange={e => setSearch(e.target.value)}
@@ -48,6 +48,14 @@ export default function UsTab({ stocks = [], onCardClick }) {
       </div>
       <div className="section-card">
         <div className="px-4 py-2.5 border-b border-[#F2F4F6] text-[12px] text-text3">{items.length}개 종목</div>
+        {/* 컬럼 헤더 */}
+        <div className="flex items-center px-4 py-2 border-b border-[#F2F4F6] bg-[#FAFBFC]">
+          <span className="text-[11px] text-text3 w-4 flex-shrink-0" />
+          <span className="flex-1 text-[11px] text-text3">종목</span>
+          <span className="w-[52px] text-[11px] text-text3 text-center">추세</span>
+          <span className="w-[80px] text-[11px] text-text3 text-right">현재가(USD)</span>
+          <span className="w-[68px] text-[11px] text-text3 text-right">거래량</span>
+        </div>
         {items.map((item, i) => (
           <StockRow key={item.symbol} item={item} rank={i + 1} onClick={onCardClick} />
         ))}

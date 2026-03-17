@@ -49,9 +49,12 @@ export default function StockRow({ item, rank, coinUnit = 'usd', onClick }) {
         </div>
       </div>
 
-      {/* 등락 배지 */}
-      <div className={`flex-shrink-0 min-w-[60px] text-right ${isUp ? 'badge-up' : isDown ? 'badge-down' : 'badge-flat'}`}>
-        {isUp ? '▲' : isDown ? '▼' : '—'} {Math.abs(pct).toFixed(2)}%
+      {/* 거래량 */}
+      <div className="flex-shrink-0 w-[68px] text-right">
+        <div className="text-[11px] text-text3 tabular-nums">
+          {fmtLarge(isCoin ? item.volume24h : item.volume) || '—'}
+        </div>
+        <div className="text-[10px] text-text3/60">거래량</div>
       </div>
     </div>
   );
