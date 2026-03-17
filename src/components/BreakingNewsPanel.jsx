@@ -46,7 +46,6 @@ function NewsItem({ item }) {
         >
           {cat.label}
         </span>
-        <span className="text-[11px] text-[#B0B8C1] truncate">{item.source}</span>
         <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
       </div>
       {/* 시그널 태그 — 제목 위에 표시 */}

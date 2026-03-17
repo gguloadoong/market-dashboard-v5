@@ -193,8 +193,9 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
     for (const s of krStocks) { dataMap[s.symbol] = s; if (s.name) dataMap[s.name] = s; }
     for (const s of usStocks) dataMap[s.symbol] = s;
     for (const c of coins)    dataMap[c.symbol?.toUpperCase()] = c;
-    const key = item.name || item.symbol;
-    return findRelatedItems(key, dataMap);
+    // RELATED_ASSETS 키는 대문자 심볼 (BTC, NVDA, 005930 등) 기준
+    const sym = item.symbol?.toUpperCase() || item.id?.toUpperCase() || '';
+    return findRelatedItems(sym, dataMap);
   }, [item?.symbol, item?.name, allData]);
 
   const pct    = item ? getPct(item) : 0;
