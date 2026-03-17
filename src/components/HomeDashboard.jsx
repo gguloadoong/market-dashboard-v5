@@ -359,6 +359,57 @@ function SkeletonInsightCard({ count = 3 }) {
   ));
 }
 
+// ─── 인사이트 mock 데이터 (뉴스-무버 매칭 실패 시 fallback) ─
+const MOCK_INSIGHTS = [
+  {
+    id: 'mock-btc',
+    moverName: 'BTC', moverMarket: 'COIN', moverPct: null,
+    title: '비트코인, 글로벌 기관 매수세 유입 속 강세 지속',
+    timeAgo: '',
+    link: 'https://coindesk.com',
+    isMock: true,
+  },
+  {
+    id: 'mock-nvda',
+    moverName: 'NVDA', moverMarket: 'US', moverPct: null,
+    title: 'NVDA, AI 데이터센터 수요 급증으로 실적 전망 상향 — 반도체 섹터 동반 강세',
+    timeAgo: '',
+    link: 'https://finance.yahoo.com',
+    isMock: true,
+  },
+  {
+    id: 'mock-samsung',
+    moverName: '삼성전자', moverMarket: 'KR', moverPct: null,
+    title: '삼성전자 HBM4 납품 기대감에 외국인 순매수 3일 연속 유입',
+    timeAgo: '',
+    link: 'https://news.naver.com',
+    isMock: true,
+  },
+];
+
+// mock 인사이트 카드 (데이터 미확보 시 표시)
+const MockInsightCard = memo(function MockInsightCard({ mock }) {
+  const badgePalette = { COIN: { bg: '#FFF4E6', color: '#FF9500' }, US: { bg: '#EDF4FF', color: '#3182F6' }, KR: { bg: '#FFF0F0', color: '#F04452' } };
+  const badge = badgePalette[mock.moverMarket] || { bg: '#F2F4F6', color: '#8B95A1' };
+  return (
+    <a
+      href={mock.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl border border-[#F2F4F6] p-3 hover:opacity-90 transition-opacity bg-[#FAFBFC]"
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[12px] font-bold text-[#191F28]">{mock.moverName}</span>
+        <span className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0" style={{ background: badge.bg, color: badge.color }}>
+          {mock.moverMarket}
+        </span>
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#8B95A1] flex-shrink-0">예시</span>
+      </div>
+      <div className="text-[12px] text-[#4E5968] leading-snug line-clamp-2">{mock.title}</div>
+    </a>
+  );
+});
+
 // ─── 급등/급락 탭 필터 버튼 ─────────────────────────────────
 const MOVER_FILTERS = [
   { id: 'all',  label: '전체' },
@@ -441,27 +492,34 @@ export default function HomeDashboard({
         </div>
       </div>
 
-      {/* ① 인사이트 카드 — 최상단 배치 */}
-      {(newsLoading || insights.length > 0) && (
-        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
-            <span className="text-[14px]">💡</span>
-            <span className="text-[14px] font-bold text-[#191F28]">인사이트</span>
-            <span className="text-[11px] text-[#B0B8C1] ml-auto">급등종목 관련 뉴스</span>
-          </div>
-          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {newsLoading && <SkeletonInsightCard count={4} />}
-            {!newsLoading && insights.map(({ mover, news }) => (
-              <InsightCard
-                key={`insight-${mover._market}-${mover.id || mover.symbol}`}
-                mover={mover}
-                news={news}
-                onMoverClick={onItemClick}
-              />
-            ))}
-          </div>
+      {/* ① 인사이트 카드 — 최상단 배치 (항상 표시: 로딩/실데이터/mock) */}
+      <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
+          <span className="text-[14px]">💡</span>
+          <span className="text-[14px] font-bold text-[#191F28]">인사이트</span>
+          {!newsLoading && insights.length === 0 && (
+            <span className="text-[10px] text-[#B0B8C1] bg-[#F2F4F6] px-1.5 py-0.5 rounded ml-1">뉴스 로드 중</span>
+          )}
+          <span className="text-[11px] text-[#B0B8C1] ml-auto">급등종목 관련 뉴스</span>
         </div>
-      )}
+        <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* 로딩 중: 스켈레톤 */}
+          {newsLoading && <SkeletonInsightCard count={4} />}
+          {/* 실제 인사이트 */}
+          {!newsLoading && insights.map(({ mover, news }) => (
+            <InsightCard
+              key={`insight-${mover._market}-${mover.id || mover.symbol}`}
+              mover={mover}
+              news={news}
+              onMoverClick={onItemClick}
+            />
+          ))}
+          {/* 뉴스 매칭 없을 때 mock 카드 표시 (데이터 로딩 전까지) */}
+          {!newsLoading && insights.length === 0 && MOCK_INSIGHTS.map(mock => (
+            <MockInsightCard key={mock.id} mock={mock} />
+          ))}
+        </div>
+      </div>
 
       {/* ② 시장 맥락 바 (지수 미니칩) */}
       <div className="flex items-center gap-2">
