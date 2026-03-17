@@ -2,8 +2,77 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { fmtPrice, fmtPct, fmt, fmtLarge, getPct, arrow, barPos } from '../utils/format';
 import { fetchCandles } from '../api/chart';
 import { fetchAllNews } from '../api/news';
+import { getRelatedAssets, MARKET_FLAG } from '../data/relatedAssets';
 
 const PERIODS = ['1주', '1달', '3달', '1년'];
+
+// ─── 종목별 한국어 키워드 매핑 ────────────────────────────────
+const KR_KEYWORD_MAP = {
+  // 코인
+  BTC:    ['비트코인', '비트', 'BTC'],
+  ETH:    ['이더리움', '이더', 'ETH'],
+  SOL:    ['솔라나', 'SOL'],
+  XRP:    ['리플', 'XRP'],
+  BNB:    ['바이낸스코인', 'BNB'],
+  DOGE:   ['도지코인', '도지', 'DOGE'],
+  ADA:    ['카르다노', 'ADA'],
+  AVAX:   ['아발란체', 'AVAX'],
+  LINK:   ['체인링크', 'LINK'],
+  DOT:    ['폴카닷', 'DOT'],
+  MATIC:  ['폴리곤', 'MATIC'],
+  SHIB:   ['시바이누', 'SHIB'],
+  ARB:    ['아비트럼', 'ARB'],
+  OP:     ['옵티미즘', 'OP'],
+  ATOM:   ['코스모스', 'ATOM'],
+  APT:    ['앱토스', 'APT'],
+  // 미국 주식
+  NVDA:   ['엔비디아', 'NVIDIA', 'NVDA'],
+  AAPL:   ['애플', 'Apple', 'AAPL'],
+  TSLA:   ['테슬라', 'Tesla', 'TSLA'],
+  MSFT:   ['마이크로소프트', 'Microsoft', 'MSFT'],
+  GOOGL:  ['구글', '알파벳', 'Google', 'Alphabet'],
+  AMZN:   ['아마존', 'Amazon', 'AMZN'],
+  META:   ['메타', '페이스북', 'Meta', 'Facebook'],
+  AMD:    ['AMD', '에이엠디'],
+  TSM:    ['TSMC', '대만반도체'],
+  COIN:   ['코인베이스', 'Coinbase'],
+  MSTR:   ['마이크로스트래티지', 'MicroStrategy'],
+  INTC:   ['인텔', 'Intel', 'INTC'],
+  NFLX:   ['넷플릭스', 'Netflix', 'NFLX'],
+  QCOM:   ['퀄컴', 'Qualcomm', 'QCOM'],
+  AVGO:   ['브로드컴', 'Broadcom', 'AVGO'],
+  // 국내 주식
+  '005930': ['삼성전자', '삼성'],
+  '000660': ['SK하이닉스', '하이닉스'],
+  '035420': ['네이버', 'NAVER'],
+  '035720': ['카카오'],
+  '207940': ['삼성바이오로직스'],
+  '068270': ['셀트리온'],
+  '005380': ['현대차', '현대자동차'],
+  '000270': ['기아'],
+  '373220': ['LG에너지솔루션', 'LG엔솔'],
+  '006400': ['삼성SDI'],
+  '051910': ['LG화학'],
+  '247540': ['에코프로비엠', '에코프로'],
+};
+
+// 섹터별 뉴스 키워드
+const SECTOR_KEYWORDS = {
+  '반도체':   ['반도체', 'HBM', 'AI칩', '파운드리'],
+  '배터리':   ['배터리', '전기차', 'EV', '리튬'],
+  '바이오':   ['바이오', '신약', '임상'],
+  '플랫폼':   ['플랫폼', 'AI', '인터넷'],
+  '빅테크':   ['AI', '인공지능', '빅테크', '클라우드'],
+  '테크':     ['AI', '인공지능', '반도체', '클라우드'],
+  '금융':     ['금리', '은행', '증권'],
+  'EV':       ['전기차', 'EV', '자동차', '배터리'],
+  '자동차':   ['자동차', '전기차', 'EV'],
+  '2차전지소재': ['배터리', '양극재', '전기차', 'EV'],
+  '화학':     ['화학', '배터리', '소재'],
+  '밈코인':   ['밈코인', '도지', 'DOGE', 'SHIB'],
+  '레이어2':  ['레이어2', '이더리움', 'ETH'],
+  'DeFi':     ['디파이', 'DeFi', '이더리움'],
+};
 
 // ─── SVG 캔들차트 ──────────────────────────────────────────────
 function CandleChart({ candles, loading }) {
@@ -55,7 +124,7 @@ function CandleChart({ candles, loading }) {
   return (
     <div ref={containerRef} className="w-full">
       <svg viewBox={`0 0 ${width} ${H}`} width="100%" height={H} style={{ display: 'block' }}>
-        {/* Grid lines */}
+        {/* 격자선 */}
         {[0.25, 0.5, 0.75].map(f => (
           <line key={f}
             x1={PAD.left} y1={PAD.top + innerH * f}
@@ -64,7 +133,7 @@ function CandleChart({ candles, loading }) {
           />
         ))}
 
-        {/* Candles */}
+        {/* 캔들 */}
         {candles.map((c, i) => {
           const x    = toX(i);
           const isUp = (c.close ?? 0) >= (c.open ?? 0);
@@ -80,17 +149,17 @@ function CandleChart({ candles, loading }) {
             <g key={i}>
               <line x1={x} y1={yHigh} x2={x} y2={yLow} stroke={col} strokeWidth={0.9} />
               <rect x={x - bodyW / 2} y={bodyY} width={bodyW} height={bodyH}
-                fill={isUp ? col : col} rx={0.5} />
+                fill={col} rx={0.5} />
             </g>
           );
         })}
 
-        {/* X-axis labels */}
+        {/* X축 레이블 */}
         {candles.map((c, i) => i % labelStep === 0 && (
           <text key={i}
             x={toX(i)} y={H - 4}
             textAnchor="middle"
-            fontSize={9} fill="#B0B8C1"
+            fontSize={10} fill="#B0B8C1"
           >{c.time}</text>
         ))}
       </svg>
@@ -196,7 +265,7 @@ function FlowChart({ flows }) {
 
   return (
     <div className="space-y-0">
-      {/* Legend */}
+      {/* 범례 */}
       <div className="flex gap-3 px-4 py-2 text-[11px]">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#3182F6]" />외국인</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#00B493]" />기관</span>
@@ -204,13 +273,13 @@ function FlowChart({ flows }) {
       </div>
       <div className="overflow-x-auto no-scrollbar">
         <div style={{ minWidth: `${flows.length * 28}px` }} className="px-2">
-          {/* Bar area */}
+          {/* 바 영역 */}
           <div className="flex items-end gap-0.5" style={{ height: 120 }}>
             {flows.map((f, i) => {
               const toH = v => Math.max(2, (Math.abs(v) / maxAbs) * 56);
               return (
                 <div key={i} className="flex flex-col items-center gap-0" style={{ flex: 1 }}>
-                  {/* Upper (positive) */}
+                  {/* 상단 (양수) */}
                   <div className="flex items-end gap-px" style={{ height: 60 }}>
                     {[
                       { v: f.foreign,       col: '#3182F6' },
@@ -226,9 +295,9 @@ function FlowChart({ flows }) {
                       }} />
                     ))}
                   </div>
-                  {/* Center line */}
+                  {/* 중앙선 */}
                   <div style={{ width: '100%', height: 1, background: '#E5E8EB' }} />
-                  {/* Lower (negative) */}
+                  {/* 하단 (음수) */}
                   <div className="flex items-start gap-px" style={{ height: 60 }}>
                     {[
                       { v: f.foreign,       col: '#3182F6' },
@@ -249,10 +318,10 @@ function FlowChart({ flows }) {
               );
             })}
           </div>
-          {/* X labels */}
+          {/* X 레이블 */}
           <div className="flex gap-0.5 mt-1">
             {flows.map((f, i) => (
-              <div key={i} style={{ flex: 1 }} className="text-center text-[8px] text-text3">
+              <div key={i} style={{ flex: 1 }} className="text-center text-[10px] text-text3">
                 {i % 4 === 0 ? f.date : ''}
               </div>
             ))}
@@ -279,8 +348,176 @@ function FlowChart({ flows }) {
   );
 }
 
+// ─── 연관종목 그룹 헤더 레이블 ────────────────────────────────
+const TYPE_LABEL = {
+  etf:    'ETF',
+  stock:  '관련 주식',
+  coin:   '관련 코인',
+  sector: '동일 섹터',
+  index:  '관련 지수',
+};
+
+// ─── 연관종목 탭 컴포넌트 ─────────────────────────────────────
+function RelatedTab({ item, onRelatedClick }) {
+  const sym = item?.symbol || item?.id || '';
+  // 심볼 대문자 우선, 한글명도 시도
+  const related = useMemo(() => {
+    const r = getRelatedAssets(sym.toUpperCase()) || getRelatedAssets(sym);
+    if (r.length) return r;
+    // 국장 종목코드 조회 시도
+    return getRelatedAssets(sym);
+  }, [sym]);
+
+  if (!related.length) {
+    return (
+      <div className="px-5 py-10 text-center text-[13px] text-text3">
+        연관종목 데이터 없음
+      </div>
+    );
+  }
+
+  // 타입별 그룹화
+  const groups = related.reduce((acc, r) => {
+    const key = r.type;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(r);
+    return acc;
+  }, {});
+
+  // 표시 순서: etf → stock → coin → sector → index
+  const ORDER = ['etf', 'stock', 'coin', 'sector', 'index'];
+
+  return (
+    <div className="py-2">
+      {ORDER.filter(t => groups[t]?.length).map(type => (
+        <div key={type} className="mb-1">
+          {/* 그룹 헤더 */}
+          <div className="px-5 py-2">
+            <span className="text-[11px] font-bold text-text3 uppercase tracking-wide">
+              {TYPE_LABEL[type] || type}
+            </span>
+          </div>
+          {/* 종목 목록 */}
+          {groups[type].map((r, i) => {
+            const flag = MARKET_FLAG[r.market] || '';
+            return (
+              <div
+                key={i}
+                className="flex items-center justify-between px-5 py-3 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] active:bg-[#F2F4F6] transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[15px] flex-shrink-0">{flag}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[14px] font-semibold text-text1">{r.symbol}</span>
+                    </div>
+                    <div className="text-[12px] text-text3 truncate mt-0.5">{r.reason}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onRelatedClick && onRelatedClick(r.symbol, r.market)}
+                  className="flex-shrink-0 ml-3 text-[12px] text-[#3182F6] font-medium px-2.5 py-1 rounded-lg hover:bg-[#EEF4FF] active:bg-[#D9EAFF] transition-colors"
+                >
+                  상세보기 →
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── 기본정보 탭 컴포넌트 ─────────────────────────────────────
+function InfoTab({ item, isCoin, coinUnit }) {
+  const rows = [];
+
+  if (isCoin) {
+    // 코인 전용 정보
+    rows.push(
+      { label: '24h 거래량',    value: fmtLarge(item.volume24h) },
+      { label: '시가총액',      value: fmtLarge(item.marketCap) },
+      item.priceKrw && { label: 'KRW 환산', value: `₩${fmt(Math.round(item.priceKrw))}` },
+      { label: '24h 고가',      value: item.high24h ? `$${Number(item.high24h).toFixed(2)}` : '—' },
+      { label: '24h 저가',      value: item.low24h  ? `$${Number(item.low24h).toFixed(2)}`  : '—' },
+      item.circulatingSupply != null && {
+        label: '유통 공급량',
+        value: fmtLarge(item.circulatingSupply),
+      },
+      item.totalSupply != null && {
+        label: '총 공급량',
+        value: fmtLarge(item.totalSupply),
+      },
+      item.maxSupply != null && {
+        label: '최대 공급량',
+        value: fmtLarge(item.maxSupply),
+      },
+      item.marketCapRank != null && {
+        label: '코인 순위',
+        value: `#${item.marketCapRank}`,
+      },
+      item.volume24hKrw != null && {
+        label: '24h 거래대금',
+        value: `₩${fmtLarge(item.volume24hKrw)}`,
+      },
+      item.priceChange1h != null && {
+        label: '1시간 등락',
+        value: `${item.priceChange1h > 0 ? '+' : ''}${Number(item.priceChange1h).toFixed(2)}%`,
+      },
+    );
+  } else {
+    // 주식 공통 정보
+    rows.push(
+      { label: '거래량',        value: fmtLarge(item.volume) },
+      { label: '시가총액',      value: fmtLarge(item.marketCap) },
+      { label: '52주 고가',     value: item.high52w ? fmtPrice({ ...item, price: item.high52w }, coinUnit) : '—' },
+      { label: '52주 저가',     value: item.low52w  ? fmtPrice({ ...item, price: item.low52w  }, coinUnit) : '—' },
+      item.open != null && {
+        label: '시가',
+        value: fmtPrice({ ...item, price: item.open }, coinUnit),
+      },
+      item.prevClose != null && {
+        label: '전일 종가',
+        value: fmtPrice({ ...item, price: item.prevClose }, coinUnit),
+      },
+      item.per != null && {
+        label: 'PER',
+        value: `${Number(item.per).toFixed(1)}x`,
+      },
+      item.pbr != null && {
+        label: 'PBR',
+        value: `${Number(item.pbr).toFixed(2)}x`,
+      },
+      item.dividendYield != null && {
+        label: '배당률',
+        value: `${Number(item.dividendYield).toFixed(2)}%`,
+      },
+      item.tradeValue != null && {
+        label: '거래대금',
+        value: fmtLarge(item.tradeValue),
+      },
+      item.sector && { label: '섹터',   value: item.sector },
+      item.nameEn && { label: '영문명', value: item.nameEn },
+    );
+  }
+
+  const validRows = rows.filter(Boolean);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 px-4 py-4">
+      {validRows.map(row => (
+        <div key={row.label} className="bg-[#F7F8FA] rounded-xl px-3 py-2.5">
+          <div className="text-[11px] text-text3 mb-0.5">{row.label}</div>
+          <div className="text-[13px] font-semibold text-text1 tabular-nums">{row.value || '—'}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── 메인 모달 ────────────────────────────────────────────────
-export default function StockModal({ item, coinUnit = 'usd', onClose }) {
+export default function StockModal({ item, coinUnit = 'usd', onClose, onRelatedClick }) {
   const [tab,     setTab]     = useState('차트');
   const [period,  setPeriod]  = useState('1달');
   const [candles, setCandles] = useState([]);
@@ -293,12 +530,23 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
   const flows  = useMemo(() => isKr && item ? genInvestorFlow(item.symbol, 20) : [], [item?.symbol, isKr]);
   const analysis = useMemo(() => analyzeFlow(flows), [flows]);
 
+  // 탭 목록: KR = [차트, 투자자동향, 연관종목, 기본정보, 뉴스]
+  //          US/코인 = [차트, 연관종목, 기본정보, 뉴스]
+  const TABS = isKr
+    ? ['차트', '투자자동향', '연관종목', '기본정보', '뉴스']
+    : ['차트', '연관종목', '기본정보', '뉴스'];
+
   useEffect(() => {
     const onKey = e => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, [onClose]);
+
+  // 아이템 변경 시 탭 초기화
+  useEffect(() => {
+    setTab('차트');
+  }, [item?.symbol, item?.id]);
 
   useEffect(() => {
     if (!item || tab !== '차트') return;
@@ -321,22 +569,46 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
       });
   }, [item?.symbol ?? item?.id, period, tab]);
 
-  // 뉴스 탭 선택 시 관련 뉴스 로드
+  // 뉴스 탭 선택 시 관련 뉴스 로드 (개선된 키워드 매칭)
   useEffect(() => {
     if (tab !== '뉴스' || !item) return;
     setNewsLoading(true);
     fetchAllNews()
       .then(all => {
-        const keywords = [item.name, item.symbol, item.nameEn]
-          .filter(Boolean)
-          .map(k => k.toLowerCase());
+        const sym = item.symbol || item.id || '';
+        // 한국어 키워드 매핑 조회 (대문자, 원본 둘 다 시도)
+        const extraKeywords = KR_KEYWORD_MAP[sym.toUpperCase()] || KR_KEYWORD_MAP[sym] || [];
+        // 전체 키워드 집합 (중복 제거, 소문자 정규화)
+        const allKeywords = [...new Set([
+          item.name,
+          item.symbol,
+          item.nameEn,
+          item.id,
+          ...extraKeywords,
+        ].filter(Boolean).map(k => k.toLowerCase()))];
+
         const filtered = all.filter(n =>
-          keywords.some(k =>
+          allKeywords.some(k =>
             n.title.toLowerCase().includes(k) ||
             (n.description || '').toLowerCase().includes(k)
           )
         );
-        setModalNews(filtered.length > 0 ? filtered : all.slice(0, 8));
+
+        if (filtered.length === 0) {
+          // 섹터 키워드로 재시도
+          const secKws = SECTOR_KEYWORDS[item.sector] || [];
+          if (secKws.length > 0) {
+            const sectorFiltered = all.filter(n =>
+              secKws.some(k => n.title.toLowerCase().includes(k.toLowerCase()))
+            );
+            setModalNews(sectorFiltered.slice(0, 6));
+          } else {
+            // 완전히 매칭 없으면 빈 배열 (무관련 뉴스 노출 안 함)
+            setModalNews([]);
+          }
+        } else {
+          setModalNews(filtered.slice(0, 15));
+        }
       })
       .catch(() => setModalNews([]))
       .finally(() => setNewsLoading(false));
@@ -354,8 +626,6 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
     ? (coinUnit === 'krw' ? item.priceKrw : item.priceUsd)
     : item.price;
 
-  const TABS = isKr ? ['차트', '투자자동향', '기본정보', '뉴스'] : ['차트', '기본정보', '뉴스'];
-
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-panel">
@@ -370,7 +640,7 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
             <div className="flex items-center gap-2">
               <span className="font-bold text-[19px] text-text1">{item.name}</span>
               <span className="text-[11px] text-text3 bg-[#F2F4F6] px-2 py-0.5 rounded-full">
-                {isCoin ? item.symbol : item.symbol}
+                {item.symbol}
               </span>
               {item.sector && (
                 <span className="text-[11px] text-text3 bg-[#F2F4F6] px-2 py-0.5 rounded-full">{item.sector}</span>
@@ -389,12 +659,12 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
         </div>
 
         {/* 탭 */}
-        <div className="flex border-b border-[#F2F4F6] px-5">
+        <div className="flex border-b border-[#F2F4F6] px-5 overflow-x-auto no-scrollbar">
           {TABS.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`pb-2.5 mr-5 text-[13px] font-medium border-b-2 transition-colors ${
+              className={`pb-2.5 mr-4 text-[13px] font-medium border-b-2 transition-colors flex-shrink-0 ${
                 tab === t
                   ? 'border-[#191F28] text-text1'
                   : 'border-transparent text-text3 hover:text-text2'
@@ -476,26 +746,14 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
             </div>
           )}
 
+          {/* ── 연관종목 탭 ── */}
+          {tab === '연관종목' && (
+            <RelatedTab item={item} onRelatedClick={onRelatedClick} />
+          )}
+
           {/* ── 기본정보 탭 ── */}
           {tab === '기본정보' && (
-            <div className="grid grid-cols-2 gap-2 px-4 py-4">
-              {[
-                { label: '거래량',   value: fmtLarge(isCoin ? item.volume24h : item.volume) },
-                { label: '시가총액', value: fmtLarge(item.marketCap) },
-                isCoin && item.priceKrw && { label: 'KRW 환산', value: `₩${fmt(Math.round(item.priceKrw))}` },
-                isCoin && { label: '24h 고가', value: item.high24h ? `$${Number(item.high24h).toFixed(2)}` : '—' },
-                isCoin && { label: '24h 저가', value: item.low24h  ? `$${Number(item.low24h).toFixed(2)}`  : '—' },
-                !isCoin && { label: '52주 고가', value: item.high52w ? fmtPrice({ ...item, price: item.high52w }, coinUnit) : '—' },
-                !isCoin && { label: '52주 저가', value: item.low52w  ? fmtPrice({ ...item, price: item.low52w  }, coinUnit) : '—' },
-                item.sector && { label: '섹터', value: item.sector },
-                item.nameEn && { label: '영문명', value: item.nameEn },
-              ].filter(Boolean).map(row => (
-                <div key={row.label} className="bg-[#F7F8FA] rounded-xl px-3 py-2.5">
-                  <div className="text-[11px] text-text3 mb-0.5">{row.label}</div>
-                  <div className="text-[13px] font-semibold text-text1 tabular-nums">{row.value || '—'}</div>
-                </div>
-              ))}
-            </div>
+            <InfoTab item={item} isCoin={isCoin} coinUnit={coinUnit} />
           )}
 
           {/* ── 뉴스 탭 ── */}
@@ -516,7 +774,11 @@ export default function StockModal({ item, coinUnit = 'usd', onClose }) {
                 </div>
               )}
               {!newsLoading && modalNews.length === 0 && (
-                <div className="px-5 py-8 text-center text-[13px] text-text3">관련 뉴스가 없습니다.</div>
+                <div className="px-5 py-10 text-center">
+                  <div className="text-[32px] mb-3">📭</div>
+                  <div className="text-[14px] font-medium text-text2 mb-1">관련 뉴스가 없습니다</div>
+                  <div className="text-[12px] text-text3">현재 이 종목과 관련된 최신 뉴스를 찾을 수 없습니다.</div>
+                </div>
               )}
               {!newsLoading && modalNews.map((news, i) => {
                 const isBreaking = (Date.now() - new Date(news.pubDate)) < 3600000;

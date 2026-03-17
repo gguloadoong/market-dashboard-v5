@@ -401,7 +401,7 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
                       <div>
                         <div className="flex items-center gap-1 mb-0.5">
                           {isEtf && (
-                            <span className="text-[8px] font-bold text-[#3182F6] bg-[#EDF4FF] px-1 rounded">ETF</span>
+                            <span className="text-[10px] font-bold text-[#3182F6] bg-[#EDF4FF] px-1 rounded">ETF</span>
                           )}
                           <span className="text-[12px] font-bold text-[#191F28] font-mono">{ticker}</span>
                         </div>

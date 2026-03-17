@@ -114,6 +114,45 @@ export const KOREAN_STOCKS = [
   { symbol:'352820', name:'하이브',         market:'kr', sector:'엔터',     price:185000, change:2500,  changePct:1.37,  volume:145000,   marketCap:7.8e12, high52w:280000,  low52w:148000 },
   { symbol:'196170', name:'알테오젠',       market:'kr', sector:'바이오',   price:185000, change:3500,  changePct:1.93,  volume:285000,   marketCap:9e12,   high52w:320000,  low52w:120000 },
   { symbol:'141080', name:'리가켐바이오',   market:'kr', sector:'바이오',   price:68000,  change:1200,  changePct:1.80,  volume:185000,   marketCap:2.8e12, high52w:108000,  low52w:52000  },
+  // ─── KOSPI 200 추가 종목 ──────────────────────────────────────
+  // 반도체·전자
+  { symbol:'373220', name:'LG에너지솔루션', market:'kr', sector:'배터리',  price:315000, change:4000,  changePct:1.28,  volume:450000,   marketCap:73e12,  high52w:460000,  low52w:285000 },
+  { symbol:'267260', name:'HD현대일렉트릭', market:'kr', sector:'전기',    price:285000, change:5000,  changePct:1.79,  volume:185000,   marketCap:6.2e12, high52w:365000,  low52w:185000 },
+  { symbol:'022100', name:'포스코DX',       market:'kr', sector:'IT서비스',price:38000,  change:700,   changePct:1.88,  volume:520000,   marketCap:4.2e12, high52w:72000,   low52w:30000  },
+  { symbol:'042660', name:'한화오션',       market:'kr', sector:'조선',    price:36500,  change:850,   changePct:2.38,  volume:2800000,  marketCap:8.5e12, high52w:52000,   low52w:25000  },
+  { symbol:'298050', name:'효성첨단소재',   market:'kr', sector:'소재',    price:185000, change:2500,  changePct:1.37,  volume:28000,    marketCap:1.3e12, high52w:245000,  low52w:155000 },
+  { symbol:'010060', name:'OCI홀딩스',      market:'kr', sector:'화학',    price:52000,  change:-800,  changePct:-1.52, volume:95000,    marketCap:1.4e12, high52w:88000,   low52w:45000  },
+  // 철강·소재
+  { symbol:'004020', name:'현대제철',       market:'kr', sector:'철강',    price:24500,  change:-350,  changePct:-1.41, volume:1200000,  marketCap:4.9e12, high52w:35500,   low52w:21000  },
+  { symbol:'001120', name:'LX홀딩스',       market:'kr', sector:'지주',    price:11500,  change:100,   changePct:0.88,  volume:185000,   marketCap:0.6e12, high52w:15500,   low52w:9800   },
+  { symbol:'010950', name:'S-Oil',          market:'kr', sector:'에너지',  price:52000,  change:-1200, changePct:-2.26, volume:280000,   marketCap:6.1e12, high52w:82000,   low52w:48000  },
+  { symbol:'078930', name:'GS',             market:'kr', sector:'지주',    price:38500,  change:350,   changePct:0.92,  volume:280000,   marketCap:4.0e12, high52w:52000,   low52w:32500  },
+  // 화학·에너지
+  { symbol:'006650', name:'대한유화',       market:'kr', sector:'화학',    price:98500,  change:-1500, changePct:-1.50, volume:18000,    marketCap:0.5e12, high52w:145000,  low52w:82000  },
+  { symbol:'103140', name:'풍산',           market:'kr', sector:'소재',    price:38000,  change:800,   changePct:2.15,  volume:185000,   marketCap:1.2e12, high52w:52000,   low52w:28000  },
+  { symbol:'008770', name:'호텔신라',       market:'kr', sector:'여행',    price:52000,  change:-800,  changePct:-1.52, volume:145000,   marketCap:1.8e12, high52w:72000,   low52w:44000  },
+  { symbol:'271560', name:'오리온홀딩스',   market:'kr', sector:'식품',    price:16500,  change:200,   changePct:1.23,  volume:52000,    marketCap:0.7e12, high52w:22000,   low52w:13500  },
+  // 헬스케어·바이오
+  { symbol:'326030', name:'SK바이오팜',     market:'kr', sector:'바이오',  price:78000,  change:1500,  changePct:1.96,  volume:185000,   marketCap:5.5e12, high52w:115000,  low52w:62000  },
+  { symbol:'272210', name:'한화시스템',     market:'kr', sector:'방산',    price:22500,  change:500,   changePct:2.27,  volume:1500000,  marketCap:3.2e12, high52w:30000,   low52w:16500  },
+  { symbol:'000120', name:'CJ대한통운',     market:'kr', sector:'물류',    price:85000,  change:-1000, changePct:-1.16, volume:52000,    marketCap:2.2e12, high52w:115000,  low52w:72000  },
+  { symbol:'005940', name:'NH투자증권',     market:'kr', sector:'금융',    price:12500,  change:150,   changePct:1.21,  volume:850000,   marketCap:2.9e12, high52w:14500,   low52w:10200  },
+  { symbol:'032640', name:'LG유플러스',     market:'kr', sector:'통신',    price:9800,   change:80,    changePct:0.82,  volume:1500000,  marketCap:4.2e12, high52w:12500,   low52w:8500   },
+  { symbol:'138040', name:'메리츠금융지주', market:'kr', sector:'금융',    price:98000,  change:1500,  changePct:1.55,  volume:285000,   marketCap:13e12,  high52w:118000,  low52w:72000  },
+  // KOSDAQ 추가 종목
+  { symbol:'247540', name:'에코프로비엠',   market:'kr', sector:'2차전지', price:98500,  change:1500,  changePct:1.55,  volume:450000,   marketCap:8.5e12, high52w:340000,  low52w:85000  },
+  { symbol:'357780', name:'솔브레인홀딩스', market:'kr', sector:'반도체',  price:45000,  change:600,   changePct:1.35,  volume:28000,    marketCap:0.7e12, high52w:62000,   low52w:35000  },
+  { symbol:'950130', name:'엑스페릭스',     market:'kr', sector:'반도체',  price:8500,   change:150,   changePct:1.80,  volume:185000,   marketCap:0.5e12, high52w:14000,   low52w:6500   },
+  { symbol:'028300', name:'HLB',            market:'kr', sector:'바이오',  price:52000,  change:1200,  changePct:2.36,  volume:1200000,  marketCap:4.5e12, high52w:92000,   low52w:38000  },
+  { symbol:'214150', name:'클래시스',       market:'kr', sector:'의료기기',price:38500,  change:650,   changePct:1.72,  volume:185000,   marketCap:2.8e12, high52w:52000,   low52w:28000  },
+  { symbol:'145020', name:'휴젤',           market:'kr', sector:'바이오',  price:185000, change:3500,  changePct:1.93,  volume:52000,    marketCap:2.5e12, high52w:250000,  low52w:148000 },
+  { symbol:'039030', name:'이오테크닉스',   market:'kr', sector:'반도체',  price:85000,  change:1500,  changePct:1.80,  volume:68000,    marketCap:1.5e12, high52w:135000,  low52w:68000  },
+  { symbol:'403870', name:'HPSP',           market:'kr', sector:'반도체',  price:52000,  change:1200,  changePct:2.36,  volume:185000,   marketCap:2.2e12, high52w:82000,   low52w:38000  },
+  { symbol:'402340', name:'SK스퀘어',       market:'kr', sector:'지주',    price:62000,  change:1000,  changePct:1.64,  volume:450000,   marketCap:7.8e12, high52w:82000,   low52w:48000  },
+  { symbol:'016360', name:'삼성증권',       market:'kr', sector:'금융',    price:42000,  change:600,   changePct:1.45,  volume:450000,   marketCap:4.1e12, high52w:52000,   low52w:33000  },
+  { symbol:'030000', name:'제일기획',       market:'kr', sector:'광고',    price:18500,  change:200,   changePct:1.09,  volume:185000,   marketCap:2.2e12, high52w:22000,   low52w:14500  },
+  { symbol:'007310', name:'오뚜기',         market:'kr', sector:'식품',    price:385000, change:-5000, changePct:-1.28, volume:8500,     marketCap:1.0e12, high52w:498000,  low52w:330000 },
+  { symbol:'009240', name:'한샘',           market:'kr', sector:'가구',    price:52000,  change:800,   changePct:1.56,  volume:52000,    marketCap:1.0e12, high52w:72000,   low52w:40000  },
 ].map(s => ({ ...s, sparkline: genSparkline(s.price, 20, 0.012) }));
 
 // ─── 미국 주식 (Yahoo Finance로 실시간 갱신) ─────────────────
@@ -232,6 +271,76 @@ export const US_STOCKS_INITIAL = [
   // ─── 신규 추가: REITs ────────────────────────────────────────
   { symbol:'AMT',   name:'아메리칸타워',  nameEn:'American Tower',   market:'us', sector:'리츠',       price:185.45, change:1.85,  changePct:1.01,  volume:2500000,   marketCap:0.086e12, high52w:229.38, low52w:168.52 },
   { symbol:'CCI',   name:'크라운캐슬',    nameEn:'Crown Castle',     market:'us', sector:'리츠',       price:98.45,  change:0.85,  changePct:0.87,  volume:3200000,   marketCap:0.042e12, high52w:122.08, low52w:87.11  },
+  // ─── S&P 500 추가 종목 ───────────────────────────────────────
+  // 테크
+  { symbol:'ACN',   name:'액센츄어',      nameEn:'Accenture',        market:'us', sector:'IT서비스',   price:298.45, change:3.15,  changePct:1.07,  volume:2800000,   marketCap:0.19e12,  high52w:378.92, low52w:274.56 },
+  { symbol:'NOW',   name:'서비스나우',    nameEn:'ServiceNow',       market:'us', sector:'소프트웨어',  price:892.45, change:12.85, changePct:1.46,  volume:1200000,   marketCap:0.18e12,  high52w:1198.09,low52w:660.00 },
+  { symbol:'INTU',  name:'인튜이트',      nameEn:'Intuit',           market:'us', sector:'소프트웨어',  price:572.45, change:7.85,  changePct:1.39,  volume:1800000,   marketCap:0.16e12,  high52w:723.39, low52w:530.26 },
+  { symbol:'ANET',  name:'아리스타네트웍스',nameEn:'Arista Networks', market:'us', sector:'네트워크',   price:92.45,  change:1.52,  changePct:1.67,  volume:3500000,   marketCap:0.058e12, high52w:130.93, low52w:71.24  },
+  { symbol:'FTNT',  name:'포티넷',        nameEn:'Fortinet',         market:'us', sector:'사이버보안',  price:94.45,  change:1.25,  changePct:1.34,  volume:5500000,   marketCap:0.072e12, high52w:107.58, low52w:55.09  },
+  { symbol:'WDAY',  name:'워크데이',      nameEn:'Workday',          market:'us', sector:'소프트웨어',  price:235.45, change:3.52,  changePct:1.52,  volume:2500000,   marketCap:0.048e12, high52w:313.29, low52w:198.53 },
+  { symbol:'TEAM',  name:'아틀라시안',    nameEn:'Atlassian',        market:'us', sector:'소프트웨어',  price:218.45, change:3.15,  changePct:1.46,  volume:2200000,   marketCap:0.056e12, high52w:282.41, low52w:148.05 },
+  { symbol:'DDOG',  name:'데이터독',      nameEn:'Datadog',          market:'us', sector:'소프트웨어',  price:118.45, change:2.15,  changePct:1.85,  volume:4200000,   marketCap:0.038e12, high52w:182.80, low52w:89.63  },
+  { symbol:'NET',   name:'클라우드플레어',nameEn:'Cloudflare',        market:'us', sector:'보안',        price:98.45,  change:1.85,  changePct:1.91,  volume:5500000,   marketCap:0.031e12, high52w:147.23, low52w:57.20  },
+  { symbol:'MDB',   name:'몽고DB',        nameEn:'MongoDB',          market:'us', sector:'소프트웨어',  price:218.45, change:4.52,  changePct:2.11,  volume:2800000,   marketCap:0.015e12, high52w:509.62, low52w:185.32 },
+  { symbol:'TWLO',  name:'트윌리오',      nameEn:'Twilio',           market:'us', sector:'소프트웨어',  price:78.45,  change:1.52,  changePct:1.97,  volume:3500000,   marketCap:0.014e12, high52w:124.50, low52w:52.00  },
+  // 금융
+  { symbol:'SCHW',  name:'찰스슈왑',      nameEn:'Charles Schwab',   market:'us', sector:'금융',       price:72.45,  change:0.95,  changePct:1.33,  volume:9500000,   marketCap:0.13e12,  high52w:85.68,  low52w:56.50  },
+  { symbol:'ICE',   name:'인터콘티넨탈',  nameEn:'ICE',              market:'us', sector:'금융',       price:155.45, change:1.85,  changePct:1.21,  volume:3500000,   marketCap:0.089e12, high52w:173.73, low52w:123.79 },
+  { symbol:'CME',   name:'CME그룹',       nameEn:'CME Group',        market:'us', sector:'금융',       price:218.45, change:2.15,  changePct:0.99,  volume:1800000,   marketCap:0.079e12, high52w:241.01, low52w:187.46 },
+  { symbol:'CB',    name:'처브',          nameEn:'Chubb',            market:'us', sector:'보험',       price:272.45, change:2.85,  changePct:1.06,  volume:2500000,   marketCap:0.11e12,  high52w:294.48, low52w:212.81 },
+  { symbol:'MMC',   name:'마쉬앤맥레넌',  nameEn:'Marsh McLennan',   market:'us', sector:'금융',       price:218.45, change:2.52,  changePct:1.17,  volume:1800000,   marketCap:0.11e12,  high52w:242.45, low52w:182.00 },
+  { symbol:'AON',   name:'에이온',        nameEn:'Aon',              market:'us', sector:'금융',       price:348.45, change:3.85,  changePct:1.12,  volume:1200000,   marketCap:0.070e12, high52w:395.97, low52w:290.00 },
+  // 헬스케어 추가
+  { symbol:'ISRG',  name:'인튜이티브서지컬',nameEn:'Intuitive Surgical',market:'us', sector:'의료기기', price:498.45, change:6.85,  changePct:1.39,  volume:1500000,   marketCap:0.18e12,  high52w:602.91, low52w:350.04 },
+  { symbol:'ELV',   name:'엘러밴스헬스',  nameEn:'Elevance Health',  market:'us', sector:'헬스케어',   price:388.45, change:-4.52, changePct:-1.15, volume:1800000,   marketCap:0.091e12, high52w:601.41, low52w:372.75 },
+  { symbol:'HCA',   name:'HCA헬스케어',   nameEn:'HCA Healthcare',   market:'us', sector:'헬스케어',   price:355.45, change:3.85,  changePct:1.09,  volume:1500000,   marketCap:0.088e12, high52w:421.04, low52w:279.47 },
+  { symbol:'CVS',   name:'CVS헬스',       nameEn:'CVS Health',       market:'us', sector:'헬스케어',   price:58.45,  change:0.52,  changePct:0.90,  volume:9500000,   marketCap:0.073e12, high52w:82.81,  low52w:52.00  },
+  { symbol:'ZTS',   name:'조에티스',      nameEn:'Zoetis',           market:'us', sector:'헬스케어',   price:158.45, change:1.85,  changePct:1.18,  volume:2500000,   marketCap:0.073e12, high52w:195.25, low52w:147.96 },
+  { symbol:'REGN',  name:'리제네론',      nameEn:'Regeneron',        market:'us', sector:'바이오',     price:698.45, change:8.85,  changePct:1.28,  volume:1200000,   marketCap:0.073e12, high52w:1210.98,low52w:649.72 },
+  { symbol:'VRTX',  name:'버텍스파마',    nameEn:'Vertex Pharma',    market:'us', sector:'바이오',     price:448.45, change:5.52,  changePct:1.25,  volume:1200000,   marketCap:0.116e12, high52w:519.65, low52w:361.90 },
+  // 소비재 추가
+  { symbol:'LOW',   name:'로우스',        nameEn:"Lowe's",           market:'us', sector:'유통',       price:228.45, change:2.52,  changePct:1.11,  volume:3500000,   marketCap:0.13e12,  high52w:280.24, low52w:211.72 },
+  { symbol:'TJX',   name:'TJX컴퍼니',     nameEn:'TJX Companies',    market:'us', sector:'유통',       price:118.45, change:1.25,  changePct:1.07,  volume:5500000,   marketCap:0.14e12,  high52w:128.91, low52w:89.63  },
+  { symbol:'BKNG',  name:'부킹홀딩스',    nameEn:'Booking Holdings', market:'us', sector:'여행',       price:4482.45,change:52.85, changePct:1.19,  volume:550000,    marketCap:0.11e12,  high52w:5235.26,low52w:3319.91},
+  { symbol:'ABNB',  name:'에어비앤비',    nameEn:'Airbnb',           market:'us', sector:'여행',       price:138.45, change:2.15,  changePct:1.58,  volume:5500000,   marketCap:0.088e12, high52w:170.10, low52w:110.88 },
+  { symbol:'MAR',   name:'메리어트',      nameEn:'Marriott',         market:'us', sector:'여행',       price:248.45, change:2.85,  changePct:1.16,  volume:1800000,   marketCap:0.071e12, high52w:294.30, low52w:214.07 },
+  { symbol:'HLT',   name:'힐튼',          nameEn:'Hilton',           market:'us', sector:'여행',       price:228.45, change:2.52,  changePct:1.12,  volume:2200000,   marketCap:0.068e12, high52w:274.55, low52w:183.85 },
+  { symbol:'CMG',   name:'치폴레',        nameEn:'Chipotle',         market:'us', sector:'외식',       price:52.45,  change:0.85,  changePct:1.65,  volume:4500000,   marketCap:0.045e12, high52w:69.26,  low52w:50.40  },
+  { symbol:'YUM',   name:'얌브랜즈',      nameEn:'Yum! Brands',      market:'us', sector:'외식',       price:138.45, change:1.52,  changePct:1.11,  volume:2200000,   marketCap:0.038e12, high52w:148.39, low52w:119.26 },
+  // 에너지·소재
+  { symbol:'EOG',   name:'EOG리소시스',   nameEn:'EOG Resources',    market:'us', sector:'에너지',     price:122.45, change:1.52,  changePct:1.26,  volume:3500000,   marketCap:0.073e12, high52w:142.26, low52w:103.35 },
+  { symbol:'PSX',   name:'필립스66',      nameEn:'Phillips 66',      market:'us', sector:'에너지',     price:118.45, change:1.52,  changePct:1.30,  volume:3200000,   marketCap:0.053e12, high52w:175.76, low52w:113.03 },
+  { symbol:'VLO',   name:'발레로에너지',  nameEn:'Valero Energy',    market:'us', sector:'에너지',     price:142.45, change:1.85,  changePct:1.31,  volume:3200000,   marketCap:0.059e12, high52w:192.00, low52w:124.96 },
+  { symbol:'FCX',   name:'프리포트맥모란',nameEn:'Freeport-McMoRan',  market:'us', sector:'소재',       price:38.45,  change:0.85,  changePct:2.26,  volume:18000000,  marketCap:0.055e12, high52w:55.62,  low52w:33.13  },
+  { symbol:'NEM',   name:'뉴몬트',        nameEn:'Newmont',          market:'us', sector:'소재',       price:42.45,  change:0.95,  changePct:2.29,  volume:9500000,   marketCap:0.051e12, high52w:58.47,  low52w:31.15  },
+  { symbol:'LIN',   name:'린데',          nameEn:'Linde',            market:'us', sector:'소재',       price:448.45, change:4.85,  changePct:1.09,  volume:1800000,   marketCap:0.22e12,  high52w:498.11, low52w:385.79 },
+  { symbol:'APD',   name:'에어프로덕츠',  nameEn:'Air Products',     market:'us', sector:'소재',       price:268.45, change:2.85,  changePct:1.07,  volume:1500000,   marketCap:0.060e12, high52w:337.96, low52w:247.97 },
+  // 산업
+  { symbol:'RTX',   name:'RTX',           nameEn:'RTX Corporation',  market:'us', sector:'방산',       price:128.45, change:1.52,  changePct:1.20,  volume:4500000,   marketCap:0.17e12,  high52w:137.61, low52w:95.59  },
+  { symbol:'LMT',   name:'록히드마틴',    nameEn:'Lockheed Martin',  market:'us', sector:'방산',       price:468.45, change:5.52,  changePct:1.19,  volume:1200000,   marketCap:0.11e12,  high52w:612.05, low52w:427.79 },
+  { symbol:'NOC',   name:'노스롭그루먼',  nameEn:'Northrop Grumman', market:'us', sector:'방산',       price:448.45, change:4.85,  changePct:1.09,  volume:750000,    marketCap:0.066e12, high52w:527.99, low52w:421.44 },
+  { symbol:'GD',    name:'제너럴다이나믹스',nameEn:'General Dynamics', market:'us', sector:'방산',     price:248.45, change:2.85,  changePct:1.16,  volume:1200000,   marketCap:0.068e12, high52w:316.84, low52w:229.10 },
+  { symbol:'MMM',   name:'3M',            nameEn:'3M Company',       market:'us', sector:'산업',       price:148.45, change:1.52,  changePct:1.03,  volume:3500000,   marketCap:0.082e12, high52w:159.93, low52w:91.71  },
+  { symbol:'ITW',   name:'일리노이툴웍스',nameEn:'Illinois Tool Works',market:'us', sector:'산업',     price:248.45, change:2.52,  changePct:1.02,  volume:1500000,   marketCap:0.078e12, high52w:275.00, low52w:209.51 },
+  { symbol:'EMR',   name:'에머슨일렉트릭',nameEn:'Emerson Electric',  market:'us', sector:'산업',       price:118.45, change:1.52,  changePct:1.30,  volume:3200000,   marketCap:0.069e12, high52w:134.89, low52w:91.97  },
+  { symbol:'PH',    name:'파커해니핀',    nameEn:'Parker Hannifin',  market:'us', sector:'산업',       price:688.45, change:7.85,  changePct:1.15,  volume:750000,    marketCap:0.089e12, high52w:772.98, low52w:464.27 },
+  // 유틸리티
+  { symbol:'NEE',   name:'넥스테라에너지',nameEn:'NextEra Energy',    market:'us', sector:'유틸리티',   price:68.45,  change:0.55,  changePct:0.81,  volume:9500000,   marketCap:0.14e12,  high52w:85.27,  low52w:57.79  },
+  { symbol:'DUK',   name:'듀크에너지',    nameEn:'Duke Energy',      market:'us', sector:'유틸리티',   price:108.45, change:0.85,  changePct:0.79,  volume:3500000,   marketCap:0.083e12, high52w:118.26, low52w:91.55  },
+  { symbol:'SO',    name:'서던컴퍼니',    nameEn:'Southern Company',  market:'us', sector:'유틸리티',   price:88.45,  change:0.65,  changePct:0.74,  volume:4500000,   marketCap:0.096e12, high52w:95.44,  low52w:66.10  },
+  { symbol:'AEP',   name:'아메리칸일렉트릭파워',nameEn:'AEP',         market:'us', sector:'유틸리티',   price:98.45,  change:0.75,  changePct:0.77,  volume:3200000,   marketCap:0.051e12, high52w:107.15, low52w:82.37  },
+  { symbol:'D',     name:'도미니온에너지',nameEn:'Dominion Energy',   market:'us', sector:'유틸리티',   price:52.45,  change:0.35,  changePct:0.67,  volume:5500000,   marketCap:0.044e12, high52w:59.56,  low52w:43.89  },
+  // AI/반도체 추가
+  { symbol:'MRVL',  name:'마벨테크놀로지',nameEn:'Marvell Technology',market:'us', sector:'반도체',     price:62.45,  change:1.85,  changePct:3.05,  volume:18000000,  marketCap:0.054e12, high52w:119.45, low52w:53.28  },
+  { symbol:'ON',    name:'온세미컨덕터',  nameEn:'ON Semiconductor',  market:'us', sector:'반도체',     price:42.45,  change:0.95,  changePct:2.29,  volume:12000000,  marketCap:0.019e12, high52w:88.00,  low52w:38.35  },
+  { symbol:'STM',   name:'ST마이크로일렉트로닉스',nameEn:'STMicro',   market:'us', sector:'반도체',     price:22.45,  change:0.45,  changePct:2.04,  volume:5500000,   marketCap:0.020e12, high52w:50.90,  low52w:19.47  },
+  { symbol:'WOLF',  name:'울프스피드',    nameEn:'Wolfspeed',        market:'us', sector:'반도체',      price:5.45,   change:0.25,  changePct:4.81,  volume:12000000,  marketCap:0.001e12, high52w:23.47,  low52w:3.01   },
+  // 소셜미디어·인터넷
+  { symbol:'PINS',  name:'핀터레스트',    nameEn:'Pinterest',        market:'us', sector:'소셜미디어',  price:28.45,  change:0.52,  changePct:1.86,  volume:9500000,   marketCap:0.020e12, high52w:41.54,  low52w:22.18  },
+  { symbol:'SNAP',  name:'스냅',          nameEn:'Snap',             market:'us', sector:'소셜미디어',  price:8.45,   change:0.25,  changePct:3.05,  volume:35000000,  marketCap:0.014e12, high52w:17.53,  low52w:8.20   },
+  { symbol:'MTCH',  name:'매치그룹',      nameEn:'Match Group',      market:'us', sector:'인터넷',     price:28.45,  change:0.52,  changePct:1.86,  volume:5500000,   marketCap:0.008e12, high52w:39.23,  low52w:26.11  },
+  { symbol:'IAC',   name:'IAC',           nameEn:'IAC',              market:'us', sector:'인터넷',     price:38.45,  change:0.85,  changePct:2.26,  volume:3200000,   marketCap:0.004e12, high52w:58.98,  low52w:34.00  },
 ].map(s => ({ ...s, sparkline: genSparkline(s.price, 20, 0.015) }));
 
 // ─── 코인 초기값 (Upbit 2026-03-13 실제가, CoinGecko로 즉시 갱신됨) ─

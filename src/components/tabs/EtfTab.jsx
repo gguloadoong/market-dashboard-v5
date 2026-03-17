@@ -20,11 +20,11 @@ export default function EtfTab({ etfs = [], onCardClick }) {
     });
   }, [etfs, category, search, sortKey, sortDir]);
 
-  // ETF는 aum → marketCap, volume 그대로
-  const toRow = e => ({ ...e, marketCap: e.aum });
+  // ETF는 aum → marketCap 및 volume 자리에 aum 표시
+  const toRow = e => ({ ...e, marketCap: e.aum, volume: e.aum });
 
   return (
-    <div className="space-y-3 pb-8">
+    <div className="space-y-3 pb-8 overscroll-none">
       <div className="section-card px-4 py-3 flex items-center gap-3">
         <input
           value={search} onChange={e => setSearch(e.target.value)}
@@ -50,6 +50,14 @@ export default function EtfTab({ etfs = [], onCardClick }) {
       </div>
       <div className="section-card">
         <div className="px-4 py-2.5 border-b border-[#F2F4F6] text-[12px] text-text3">{items.length}개 ETF</div>
+        {/* 컬럼 헤더 */}
+        <div className="flex items-center px-4 py-2 border-b border-[#F2F4F6] bg-[#FAFBFC]">
+          <span className="text-[11px] text-text3 w-4 flex-shrink-0" />
+          <span className="flex-1 text-[11px] text-text3">종목</span>
+          <span className="w-[52px] text-[11px] text-text3 text-center">추세</span>
+          <span className="w-[80px] text-[11px] text-text3 text-right">현재가</span>
+          <span className="w-[68px] text-[11px] text-text3 text-right">AUM</span>
+        </div>
         {items.map((item, i) => (
           <StockRow key={item.symbol} item={toRow(item)} rank={i + 1} onClick={onCardClick} />
         ))}

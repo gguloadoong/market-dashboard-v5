@@ -15,23 +15,31 @@ async function proxyFetch(targetUrl) {
 }
 
 // ─── Stooq.com (미국 주식, CORS 허용) ────────────────────────
+// Stooq JSON 배치 API는 최신 1 row만 반환한다.
+// 전일 종가를 얻으려면 각 심볼에 대해 CSV 2일치를 별도 요청해야 하나,
+// 배치 처리 성능을 위해 Prev_Close 필드(f=...p 포함) 방식을 사용한다.
+// f 파라미터: s=심볼, d2=날짜, t2=시각, o=시가, h=고가, l=저가, c=현재가, v=거래량, n=이름, p=전일종가
 async function fetchStooq(symbols) {
   const syms = symbols.map(s => `${s.toLowerCase()}.us`).join(',');
-  const url  = `https://stooq.com/q/l/?s=${syms}&f=sd2t2ohlcvn&h&e=json`;
+  // f=sd2t2ohlcvnp: p 필드로 전일 종가(Prev_Close) 포함
+  const url  = `https://stooq.com/q/l/?s=${syms}&f=sd2t2ohlcvnp&h&e=json`;
   const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) throw new Error(`Stooq ${res.status}`);
   const data = await res.json();
   return (data.symbols || [])
     .filter(s => s.Close && s.Close !== 'N/D' && parseFloat(s.Close) > 0)
     .map(s => {
-      const close = parseFloat(s.Close);
-      const open  = parseFloat(s.Open) || close;
+      const close     = parseFloat(s.Close);
+      // Prev_Close(p 필드)가 있으면 전일 종가 사용, 없으면 Open으로 근사
+      const prevClose = parseFloat(s.Prev_Close || s.Open) || close;
       return {
         symbol:    s.Symbol.split('.')[0].toUpperCase(),
         price:     close,
-        // Stooq: 전일 종가 없음 → open 기준 근사치
-        change:    parseFloat((close - open).toFixed(2)),
-        changePct: parseFloat(((close - open) / open * 100).toFixed(2)),
+        // 전일 종가 대비 등락 (Prev_Close 필드 활용)
+        change:    parseFloat((close - prevClose).toFixed(2)),
+        changePct: prevClose > 0
+          ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2))
+          : 0,
         volume:    parseInt(s.Volume) || 0,
       };
     });
