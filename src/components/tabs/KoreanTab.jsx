@@ -54,7 +54,7 @@ export default function KoreanTab({ stocks = [], onCardClick }) {
       <div className="section-card">
         <div className="px-4 py-2.5 border-b border-[#F2F4F6] text-[12px] text-text3">{items.length}개 종목</div>
         {/* 컬럼 헤더 */}
-        <div className="flex items-center px-4 py-2 border-b border-[#F2F4F6] bg-[#FAFBFC]">
+        <div className="flex items-center gap-3 px-5 py-2 border-b border-[#F2F4F6] bg-[#FAFBFC]">
           <span className="text-[11px] text-text3 w-4 flex-shrink-0" />
           <span className="flex-1 text-[11px] text-text3">종목</span>
           <span className="w-[52px] text-[11px] text-text3 text-center">추세</span>
