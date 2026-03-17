@@ -16,8 +16,10 @@ import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INIT
 import { fetchCoins, fetchCoinsUpbitOnly, fetchExchangeRate } from './api/coins';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
 import { getKoreanMarketStatus, getUsMarketStatus } from './utils/marketHours';
+import { subscribeCoinPrices, unsubscribeCoinPrices } from './api/coinWs';
 
-const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
+const US_SYMBOLS   = US_STOCKS_INITIAL.map(s => s.symbol);
+const COIN_SYMBOLS = COINS_INITIAL.map(c => c.symbol);
 
 // 장 외 시간에도 국장 데이터 소폭 변동 시뮬레이션
 function simulateKorean(stocks) {
@@ -46,7 +48,8 @@ export default function App() {
   const [lastUpdated, setLastUpdated]     = useState(null);
   const [loading, setLoading]             = useState(false);
   const [selectedItem, setSelectedItem]   = useState(null);
-  const loadingRef = useRef(false);
+  const loadingRef  = useRef(false);
+  const krwRateRef  = useRef(1466); // WS 핸들러에서 클로저 없이 최신 환율 참조
 
   // ── 코인 빠른 갱신 — Upbit만 (10초, 가격·등락률만 업데이트) ──
   const refreshCoinsQuick = useCallback(async () => {
@@ -157,6 +160,32 @@ export default function App() {
   }, []);
   useEffect(() => { const id = setInterval(refreshIndices,     60000); return () => clearInterval(id); }, [refreshIndices]);
 
+  // 환율 변경 시 ref 동기화 (WS 핸들러에서 클로저 없이 사용)
+  useEffect(() => { krwRateRef.current = krwRate; }, [krwRate]);
+
+  // ── Upbit WebSocket 코인 가격 실시간 스트림 ─────────────────────
+  // 폴링(10초)과 병행 — WS가 연결되면 <1초 단위 가격 갱신, 끊기면 자동 재연결
+  useEffect(() => {
+    subscribeCoinPrices(COIN_SYMBOLS, (tick) => {
+      if (tick._connected) return; // 연결 이벤트 무시
+      setCoins(prev => {
+        const rate = krwRateRef.current;
+        const idx  = prev.findIndex(c => c.symbol === tick.symbol);
+        if (idx === -1) return prev;
+        const updated = [...prev];
+        updated[idx] = {
+          ...updated[idx],
+          priceKrw:    tick.priceKrw,
+          priceUsd:    tick.priceKrw / rate,
+          change24h:   tick.change24h,
+          priceSource: 'upbit-ws',
+        };
+        return updated;
+      });
+    });
+    return () => unsubscribeCoinPrices();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── 탭별 종목 데이터 (all 탭 제거, home은 HomeDashboard가 담당) ───
   const tabItems = useMemo(() => {
     switch (activeTab) {
@@ -169,16 +198,22 @@ export default function App() {
     }
   }, [activeTab, krStocks, usStocks, coins, etfs]);
 
-  const allStocks = [...krStocks, ...usStocks];
+  const allStocks = useMemo(() => [...krStocks, ...usStocks], [krStocks, usStocks]);
+
+  // ChartSidePanel에 전달하는 데이터 맵 — 인라인 객체 생성 방지 (WS 틱마다 relatedItems 재계산 차단)
+  const allData = useMemo(
+    () => ({ krStocks, usStocks, coins, etfs }),
+    [krStocks, usStocks, coins, etfs]
+  );
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      {/* 급상승 배너 (sticky, z-30 — 차트 패널 z-150보다 낮게) */}
-      <div className="sticky top-0 z-30">
+      {/* 급상승 배너 (sticky, z-20 — Header와 동일 레이어, DOM 순서상 Header가 위) */}
+      <div className="sticky top-0 z-20">
         <SurgeBanner stocks={allStocks} coins={coins} onClick={setSelectedItem} />
       </div>
 
-      {/* 헤더 (sticky, z-20) */}
+      {/* 헤더 (sticky, z-20 — DOM 순서상 SurgeBanner 위에 쌓임) */}
       <Header
         krwRate={krwRate}
         lastUpdated={lastUpdated}
@@ -194,7 +229,7 @@ export default function App() {
       {/* ── 반응형 그리드 레이아웃: 모바일 1열 / 데스크탑 2열 ─── */}
       <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         {/* 좌: 콘텐츠 영역 */}
-        <div className="p-5 space-y-4 min-w-0 overflow-hidden">
+        <div className={`min-w-0 overflow-hidden ${activeTab === 'news' ? '' : 'p-5 space-y-4'}`}>
           {activeTab === 'home' ? (
             <HomeDashboard
               indices={indices}
@@ -204,6 +239,11 @@ export default function App() {
               krwRate={krwRate}
               onItemClick={setSelectedItem}
             />
+          ) : activeTab === 'news' ? (
+            // 모바일 뉴스 탭 — 데스크탑 우측 패널과 동일한 컴포넌트, 모바일 전용
+            <div className="lg:hidden h-[calc(100vh-112px)]">
+              <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} />
+            </div>
           ) : (
             <>
               <MarketSummaryBar
@@ -217,6 +257,7 @@ export default function App() {
                 type={activeTab}
                 krwRate={krwRate}
                 onRowClick={setSelectedItem}
+                loading={loading}
               />
             </>
           )}
@@ -227,7 +268,7 @@ export default function App() {
           className="hidden lg:block self-start"
           style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}
         >
-          <BreakingNewsPanel />
+          <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} />
         </div>
       </div>
 
@@ -238,7 +279,7 @@ export default function App() {
           krwRate={krwRate}
           onClose={() => setSelectedItem(null)}
           onRelatedClick={setSelectedItem}
-          allData={{ krStocks, usStocks, coins, etfs }}
+          allData={allData}
         />
       )}
     </div>

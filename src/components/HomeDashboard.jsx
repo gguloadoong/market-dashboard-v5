@@ -111,7 +111,7 @@ function getAvatarBg(symbol) {
 }
 
 // ─── SECTION 1: 급등 스포트라이트 카드 ───────────────────────
-const SurgeCard = memo(function SurgeCard({ item, krwRate, onClick }) {
+const SurgeCard = memo(function SurgeCard({ item, krwRate, onClick, relatedNews }) {
   const pct   = getPct(item);
   const isUp  = pct > 0;
   const isDown = pct < 0;
@@ -195,6 +195,18 @@ const SurgeCard = memo(function SurgeCard({ item, krwRate, onClick }) {
         <div className="mt-1">
           <Sparkline data={sparkData} width={120} height={28} positive={isUp ? true : isDown ? false : undefined} />
         </div>
+
+        {/* 급등 이유 뉴스 컨텍스트 한 줄 */}
+        {relatedNews && (
+          <div
+            className="mt-2 pt-2 border-t"
+            style={{ borderColor: isHot ? (isUp ? '#FFD6D9' : '#C8DCFF') : '#F2F4F6' }}
+          >
+            <p className="text-[10px] text-[#6B7684] leading-tight line-clamp-2 break-keep">
+              {relatedNews.title}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -477,7 +489,9 @@ export default function HomeDashboard({
 }) {
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
   const [surgeMarket, setSurgeMarket] = useState('all');
-  const [coinCardOpen, setCoinCardOpen] = useState(true);
+  // 모바일에서 홈 화면이 너무 길어지지 않도록 코인 요약 카드 기본 접힘
+  // (데스크탑도 동일 — 필요 시 펼치기)
+  const [coinCardOpen, setCoinCardOpen] = useState(false);
 
   // 마켓 태그 추가된 종목 리스트
   const krItems   = useMemo(() => krStocks.map(s => ({ ...s, _market: 'KR'   })), [krStocks]);
@@ -508,6 +522,16 @@ export default function HomeDashboard({
 
   // 급등 종목 존재 여부 (3% 이상)
   const hasHotItems = useMemo(() => allItems.some(i => getPct(i) >= 3), [allItems]);
+
+  // 급등 카드용 뉴스 컨텍스트 맵 (symbol → 관련 뉴스 1건)
+  const surgeNewsMap = useMemo(() => {
+    if (!allNews.length || !surgeItems.length) return {};
+    return surgeItems.reduce((acc, item) => {
+      const news = findRelatedNews(item, allNews);
+      if (news) acc[item.symbol] = news;
+      return acc;
+    }, {});
+  }, [surgeItems, allNews]);
 
   // ─── SECTION 3: 각 시장별 HOT TOP5 ────────────────────────
   const krHot = useMemo(
@@ -598,6 +622,7 @@ export default function HomeDashboard({
                   item={item}
                   krwRate={krwRate}
                   onClick={onItemClick}
+                  relatedNews={surgeNewsMap[item.symbol] || null}
                 />
               ))
           }
