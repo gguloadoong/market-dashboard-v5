@@ -58,8 +58,9 @@ export default function KoreanTab({ stocks = [], onCardClick }) {
           <span className="text-[11px] text-text3 w-4 flex-shrink-0" />
           <span className="flex-1 text-[11px] text-text3">종목</span>
           <span className="w-[52px] text-[11px] text-text3 text-center">추세</span>
-          <span className="w-[80px] text-[11px] text-text3 text-right">현재가</span>
-          <span className="w-[68px] text-[11px] text-text3 text-right">거래량</span>
+          <span className="w-[88px] text-[11px] text-text3 text-right">현재가</span>
+          <span className="w-[60px] text-[11px] text-text3 text-right">등락률</span>
+          <span className="w-[64px] text-[11px] text-text3 text-right">거래량</span>
         </div>
         {items.map((item, i) => (
           <StockRow key={item.symbol} item={item} rank={i + 1} onClick={onCardClick} />
