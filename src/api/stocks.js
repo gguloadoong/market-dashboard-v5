@@ -246,10 +246,20 @@ export async function fetchKoreanStocksBatch(stocks) {
   return [];
 }
 
-// ─── ETF 전용 배치 (Stooq 커버리지 낮아 Yahoo 직접 사용) ──────
-// 레버리지·코인 ETF(TSLL, CONL, ETHU, BITX 등)는 Stooq에 없음
+// ─── ETF 전용 배치 (Vercel 프록시 경유 → Yahoo CORS·레이트리밋 해소) ──────
+// 레버리지·코인 ETF(TSLL, CONL, ETHU, BITX 등) 포함 전체 커버리지
 export async function fetchEtfPricesBatch(symbols) {
-  // 1) Yahoo v7 batch — ETF는 Yahoo 커버리지 우수
+  // 1) Vercel 프록시 (api/etf-prices.js) — 서버사이드 Yahoo 호출
+  try {
+    const res = await fetch(`/api/etf-prices?symbols=${symbols.join(',')}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results?.length > 0) return data.results;
+    }
+  } catch {}
+  // 2) 직접 Yahoo v7 fallback (프록시 실패 시)
   try {
     const results = await fetchYahooQuoteBatch(symbols);
     if (results.length > 0) return results.map(r => ({
@@ -260,7 +270,7 @@ export async function fetchEtfPricesBatch(symbols) {
       volume:    r.regularMarketVolume,
     })).filter(r => r.price > 0);
   } catch {}
-  // 2) Yahoo v8 개별 chart fallback
+  // 3) Yahoo v8 개별 chart fallback
   const settled = await Promise.allSettled(symbols.map(fetchYahooChart));
   return settled.filter(r => r.status === 'fulfilled').map(r => r.value);
 }

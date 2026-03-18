@@ -7,6 +7,19 @@ import { matchesKeywords } from '../../utils/newsAlias';
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const PRICE_THRESHOLD = 1.5; // 이 미만이면 "아직 미반응"
 
+// 국내(09:00~15:30 KST) 또는 미국(23:30~익일 06:00 KST) 장이 열려 있는지 확인
+// 장외 시간에는 모든 종목이 미반응 조건 충족 → 신호 의미 없음
+function isAnyMarketOpen() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const day = now.getDay(); // 0=일, 1=월 ... 6=토
+  const hm  = now.getHours() * 100 + now.getMinutes();
+  if (day === 0) return false;                   // 일요일 전일 휴장
+  if (day === 6) return hm < 600;               // 토요일: 미국 금요일 장 마감 전(06:00)까지만
+  const krOpen = hm >= 900  && hm < 1530;       // 국장 09:00~15:30
+  const usOpen = hm >= 2330 || hm < 600;        // 미장 23:30~익일 06:00
+  return krOpen || usOpen;
+}
+
 function EarlySignalCard({ mover, news, krwRate, onItemClick }) {
   const pct = getPct(mover);
   const isCoin = !!mover.id;
@@ -109,7 +122,7 @@ export default function EarlySignalSection({ allItems, recentNews, krwRate, onIt
     return results;
   }, [allItems, recentNews]);
 
-  if (!earlySignals.length) return null;
+  if (!earlySignals.length || !isAnyMarketOpen()) return null;
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
