@@ -246,6 +246,25 @@ export async function fetchKoreanStocksBatch(stocks) {
   return [];
 }
 
+// ─── ETF 전용 배치 (Stooq 커버리지 낮아 Yahoo 직접 사용) ──────
+// 레버리지·코인 ETF(TSLL, CONL, ETHU, BITX 등)는 Stooq에 없음
+export async function fetchEtfPricesBatch(symbols) {
+  // 1) Yahoo v7 batch — ETF는 Yahoo 커버리지 우수
+  try {
+    const results = await fetchYahooQuoteBatch(symbols);
+    if (results.length > 0) return results.map(r => ({
+      symbol:    r.symbol,
+      price:     r.regularMarketPrice,
+      change:    r.regularMarketChange,
+      changePct: r.regularMarketChangePercent,
+      volume:    r.regularMarketVolume,
+    })).filter(r => r.price > 0);
+  } catch {}
+  // 2) Yahoo v8 개별 chart fallback
+  const settled = await Promise.allSettled(symbols.map(fetchYahooChart));
+  return settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+}
+
 // ─── 지수 ────────────────────────────────────────────────────
 // 모든 지수: Yahoo Finance via 다중 프록시 동시 레이스 (KOSPI 포함)
 // KOSPI: ^KS11, KOSDAQ: ^KQ11 (Yahoo Finance 공식 티커)

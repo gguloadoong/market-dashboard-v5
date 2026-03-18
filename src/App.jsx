@@ -15,7 +15,7 @@ import GlobalSearch from './components/GlobalSearch';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
 import { fetchCoins, fetchCoinsUpbitOnly, fetchExchangeRate, fetchUpbitAllSymbols } from './api/coins';
-import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices } from './api/stocks';
+import { fetchUsStocksBatch, fetchKoreanStocksBatch, fetchIndices, fetchEtfPricesBatch } from './api/stocks';
 import { subscribeCoinPrices, unsubscribeCoinPrices } from './api/coinWs';
 import { requestNotificationPermission, checkAndAlertBatch, getNotificationPermission, setAlertWatchlistIds } from './utils/priceAlert';
 import { setWhaleKrwRate, setWhaleBtcKrwPrice } from './api/whale';
@@ -129,7 +129,7 @@ export default function App() {
   const refreshEtfs = useCallback(async () => {
     const [krResult, usResult] = await Promise.allSettled([
       KR_ETFS.length > 0 ? fetchKoreanStocksBatch(KR_ETFS) : Promise.resolve([]),
-      US_ETF_SYMBOLS.length > 0 ? fetchUsStocksBatch(US_ETF_SYMBOLS) : Promise.resolve([]),
+      US_ETF_SYMBOLS.length > 0 ? fetchEtfPricesBatch(US_ETF_SYMBOLS) : Promise.resolve([]),
     ]);
     const krFresh = krResult.status === 'fulfilled' ? krResult.value : [];
     const usFresh = usResult.status === 'fulfilled' ? usResult.value : [];

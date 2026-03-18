@@ -441,6 +441,9 @@ export const ETF_DATA = [
   { symbol:'373220', name:'KODEX 2차전지산업',           market:'kr', sector:'배터리',   category:'섹터',     price:12850, change:0,   changePct:0,  volume:8500000,  aum:2.1e12 },
   { symbol:'091230', name:'TIGER 반도체',                market:'kr', sector:'반도체',   category:'섹터',     price:27650, change:0,   changePct:0,  volume:2100000,  aum:1.8e12 },
   { symbol:'122630', name:'KODEX 레버리지',              market:'kr', sector:'레버리지', category:'레버리지', price:15420, change:0,  changePct:0, volume:28000000, aum:4.2e12 },
+  // ─── 테슬라/종목 레버리지 ETF ────────────────────────────────
+  { symbol:'TSLL',  name:'Direxion Daily TSLA Bull 2X', market:'us', sector:'Leverage', category:'레버리지', price:12.45, change:0, changePct:0, volume:35000000, aum:1.8e9  },
+  { symbol:'CONL',  name:'GraniteShares 2x Long COIN', market:'us', sector:'Leverage', category:'레버리지', price:18.45, change:0, changePct:0, volume:8000000,  aum:0.4e9  },
   // ─── BTC 레버리지/인버스 ETF ─────────────────────────────────
   { symbol:'BITX',  name:'2x Bitcoin Strategy ETF',    market:'us', sector:'BTC ETF',  category:'코인ETF', price:45.45,  change:0, changePct:0, volume:8500000,  aum:1.2e9  },
   { symbol:'BITU',  name:'ProShares Ultra Bitcoin',    market:'us', sector:'BTC ETF',  category:'코인ETF', price:55.45,  change:0, changePct:0, volume:5500000,  aum:0.8e9  },
