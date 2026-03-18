@@ -273,13 +273,15 @@ export async function fetchEtfPricesBatch(symbols) {
   // 2) 직접 Yahoo v7 fallback (프록시 실패 시)
   try {
     const results = await fetchYahooQuoteBatch(symbols);
-    if (results.length > 0) return results.map(r => ({
-      symbol:    r.symbol,
-      price:     r.regularMarketPrice,
-      change:    r.regularMarketChange,
-      changePct: r.regularMarketChangePercent,
-      volume:    r.regularMarketVolume,
-    })).filter(r => r.price > 0);
+    if (results.length > 0) return results.map(r => {
+      const price     = r.regularMarketPrice;
+      const change    = r.regularMarketChange ?? 0;
+      const prevClose = price - change;
+      const changePct = r.regularMarketChangePercent != null
+        ? r.regularMarketChangePercent
+        : (change !== 0 && prevClose > 0 ? parseFloat((change / prevClose * 100).toFixed(2)) : 0);
+      return { symbol: r.symbol, price, change: parseFloat(change.toFixed(2)), changePct: parseFloat(changePct.toFixed(2)), volume: r.regularMarketVolume ?? 0 };
+    }).filter(r => r.price > 0);
   } catch {}
   // 3) Yahoo v8 개별 chart fallback
   const settled = await Promise.allSettled(symbols.map(fetchYahooChart));

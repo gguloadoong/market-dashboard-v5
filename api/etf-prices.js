@@ -35,11 +35,21 @@ export default async function handler(req) {
       const quotes = data?.quoteResponse?.result ?? [];
       for (const q of quotes) {
         if (q.regularMarketPrice > 0) {
+          const price     = q.regularMarketPrice;
+          const change    = q.regularMarketChange ?? 0;
+          // Yahoo가 소형 ETF에서 regularMarketChangePercent를 null로 반환하는 경우
+          // change/prevClose로 직접 계산 (prevClose = price - change)
+          const prevClose = price - change;
+          const changePct = q.regularMarketChangePercent != null
+            ? q.regularMarketChangePercent
+            : (change !== 0 && prevClose > 0
+                ? parseFloat((change / prevClose * 100).toFixed(2))
+                : 0);
           results.push({
             symbol:    q.symbol,
-            price:     q.regularMarketPrice,
-            change:    q.regularMarketChange ?? 0,
-            changePct: q.regularMarketChangePercent ?? 0,
+            price,
+            change:    parseFloat(change.toFixed(2)),
+            changePct: parseFloat(changePct.toFixed(2)),
             volume:    q.regularMarketVolume ?? 0,
           });
         }
@@ -68,11 +78,12 @@ export default async function handler(req) {
       const prev   = meta.previousClose ?? meta.chartPreviousClose
         ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
         ?? meta.regularMarketPrice;
+      const price = meta.regularMarketPrice;
       return {
         symbol,
-        price:     meta.regularMarketPrice,
-        change:    meta.regularMarketPrice - prev,
-        changePct: ((meta.regularMarketPrice - prev) / prev) * 100,
+        price,
+        change:    parseFloat((price - prev).toFixed(2)),
+        changePct: parseFloat(((price - prev) / prev * 100).toFixed(2)),
         volume:    meta.regularMarketVolume ?? 0,
       };
     })
