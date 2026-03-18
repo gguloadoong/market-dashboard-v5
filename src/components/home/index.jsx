@@ -18,16 +18,22 @@ import DexHotSection from './DexHotSection';
 import CoinListingSection from './CoinListingSection';
 
 export default function HomeDashboard({
-  indices = [], krStocks = [], usStocks = [], coins = [],
+  indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
   krwRate = 1466, onItemClick,
 }) {
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
   const { watchlist, toggle, isWatched } = useWatchlist();
   const [surgeMarket, setSurgeMarket] = useState('all');
 
-  // 마켓 태그 추가된 종목 리스트
-  const krItems   = useMemo(() => krStocks.map(s => ({ ...s, _market: 'KR'   })), [krStocks]);
-  const usItems   = useMemo(() => usStocks.map(s => ({ ...s, _market: 'US'   })), [usStocks]);
+  // 마켓 태그 추가된 종목 리스트 (ETF 포함)
+  const krItems   = useMemo(() => [
+    ...krStocks.map(s => ({ ...s, _market: 'KR' })),
+    ...etfs.filter(e => e.market === 'kr').map(e => ({ ...e, _market: 'KR', _isEtf: true })),
+  ], [krStocks, etfs]);
+  const usItems   = useMemo(() => [
+    ...usStocks.map(s => ({ ...s, _market: 'US' })),
+    ...etfs.filter(e => e.market === 'us').map(e => ({ ...e, _market: 'US', _isEtf: true })),
+  ], [usStocks, etfs]);
   const coinItems = useMemo(() => coins.map(c   => ({ ...c, _market: 'COIN' })), [coins]);
   const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
 
@@ -138,7 +144,7 @@ export default function HomeDashboard({
     return cards;
   }, [watchedItems, recentNews]);
 
-  const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0;
+  const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
   const today = new Date().toLocaleDateString('ko-KR', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',

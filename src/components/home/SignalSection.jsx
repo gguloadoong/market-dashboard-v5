@@ -1,7 +1,7 @@
 // 핵심 시그널 섹션 — "왜 지금 이 종목이 움직이는가"
 // 가장 상단에 배치 — 매수 결정 직전 5분을 위한 핵심 정보
 import { useMemo } from 'react';
-import { getPct, fmt } from './utils';
+import { getPct, fmt, findRelatedNews } from './utils';
 
 // 시그널 카드 1개 — 종목 + 등락률 + 뉴스 이유
 function SignalCard({ mover, news, krwRate, onItemClick }) {
@@ -99,17 +99,11 @@ export default function SignalSection({ allItems, recentNews, krwRate, onItemCli
 
     if (!movers.length) return [];
 
-    // 뉴스 매칭
+    // 뉴스 매칭 — newsAlias 기반 단어경계 매칭 사용 (거짓 양성 방지)
     const results = [];
     for (const mover of movers) {
       if (results.length >= 3) break;
-      const newsMatch = recentNews.find(n => {
-        const text = (n.title + ' ' + (n.description || '')).toLowerCase();
-        const name = (mover.name || '').toLowerCase();
-        const sym  = (mover.symbol || mover.id || '').toLowerCase();
-        // 종목명/심볼 직접 포함 여부 (단순 체크, newsAlias와 별개로 빠른 필터)
-        return name.length >= 2 && text.includes(name) || (sym.length >= 2 && !/^\d{6}$/.test(sym) && text.includes(sym));
-      });
+      const newsMatch = findRelatedNews(mover, recentNews);
       results.push({ mover, news: newsMatch || null });
     }
 

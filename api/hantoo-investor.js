@@ -9,12 +9,8 @@ import { getHantooToken, HANTOO_BASE } from './_hantoo-token.js';
 
 // 오늘 날짜 YYYYMMDD 문자열 (서울 시간 기준)
 function todayStr() {
-  return new Date().toLocaleDateString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year:  'numeric',
-    month: '2-digit',
-    day:   '2-digit',
-  }).replace(/\. /g, '').replace('.', '');
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default async function handler(req, res) {

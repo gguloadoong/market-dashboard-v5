@@ -1,7 +1,8 @@
 // 선행 신호 섹션 — 뉴스 발생 2시간 이내 + 주가 변화 < 1.5% = "아직 반응 안 한 종목"
 // 매수 기회 포착: 뉴스가 나왔지만 주가가 아직 움직이지 않은 종목
 import { useMemo } from 'react';
-import { getPct, fmt } from './utils';
+import { getPct, fmt, buildKeywords } from './utils';
+import { matchesKeywords } from '../../utils/newsAlias';
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const PRICE_THRESHOLD = 1.5; // 이 미만이면 "아직 미반응"
@@ -43,7 +44,7 @@ function EarlySignalCard({ mover, news, krwRate, onItemClick }) {
         <div className="min-w-0">
           <div className="text-[13px] font-bold text-[#191F28] truncate">{mover.name}</div>
           <div className="text-[11px] text-[#8B95A1] truncate leading-tight mt-0.5">
-            {news.title.length > 50 ? news.title.slice(0, 48) + '…' : news.title}
+            {(news.title?.length ?? 0) > 50 ? news.title.slice(0, 48) + '…' : (news.title ?? '')}
           </div>
         </div>
       </div>
@@ -73,9 +74,9 @@ export default function EarlySignalSection({ allItems, recentNews, krwRate, onIt
   const earlySignals = useMemo(() => {
     if (!allItems.length || !recentNews.length) return [];
 
-    // 2시간 이내 뉴스만
+    // 2시간 이내 뉴스만 (title 없는 항목 제외)
     const freshNews = recentNews.filter(n => {
-      if (!n.pubDate) return false;
+      if (!n.pubDate || !n.title) return false;
       try { return Date.now() - new Date(n.pubDate).getTime() < TWO_HOURS_MS; }
       catch { return false; }
     });
@@ -86,7 +87,7 @@ export default function EarlySignalSection({ allItems, recentNews, krwRate, onIt
 
     for (const news of freshNews) {
       if (results.length >= 5) break;
-      const titleLower = news.title.toLowerCase();
+      const newsText = (news.title ?? '') + ' ' + (news.description || '');
 
       for (const item of allItems) {
         if (seenSymbols.has(item.id || item.symbol)) continue;
@@ -95,13 +96,9 @@ export default function EarlySignalSection({ allItems, recentNews, krwRate, onIt
         // 주가 변화가 threshold 미만인 종목만 (아직 미반응)
         if (pct >= PRICE_THRESHOLD) continue;
 
-        const name = (item.name || '').toLowerCase();
-        const sym  = (item.symbol || item.id || '').toLowerCase();
-        // 종목명이 뉴스 제목에 포함되는지 확인
-        const nameMatch = name.length >= 2 && titleLower.includes(name);
-        const symMatch  = sym.length >= 2 && !/^\d{6}$/.test(sym) && titleLower.includes(sym);
-
-        if (!nameMatch && !symMatch) continue;
+        // newsAlias 기반 단어경계 매칭 (거짓 양성 방지)
+        const keywords = buildKeywords(item);
+        if (!keywords.length || !matchesKeywords(newsText, keywords)) continue;
 
         seenSymbols.add(item.id || item.symbol);
         results.push({ mover: item, news });

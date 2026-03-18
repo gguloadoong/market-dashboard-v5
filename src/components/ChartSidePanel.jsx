@@ -24,7 +24,6 @@ class ChartErrorBoundary extends Component {
 import { fetchCandles, PERIOD_CONFIG } from '../api/chart';
 import { fetchInvestorDataSafe, fetchInvestorTrendSafe, formatNetAmt } from '../api/investor';
 import { useStockNews, useStockDirectNews } from '../hooks/useNewsQuery';
-import InvestorFlow from './InvestorFlow';
 import { findRelatedItems } from '../data/relatedAssets';
 
 // ─── 로고 URL ────────────────────────────────────────────────

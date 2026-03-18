@@ -10,7 +10,7 @@ import MarketSummaryBar from './components/MarketSummaryBar';
 import WatchlistTable from './components/WatchlistTable';
 import BreakingNewsPanel from './components/BreakingNewsPanel';
 import ChartSidePanel from './components/ChartSidePanel';
-import HomeDashboard from './components/HomeDashboard';
+import HomeDashboard from './components/home';
 import GlobalSearch from './components/GlobalSearch';
 
 import { KOREAN_STOCKS, US_STOCKS_INITIAL, COINS_INITIAL, ETF_DATA, INDICES_INITIAL } from './data/mock';
@@ -122,21 +122,26 @@ export default function App() {
     }
   }, []);
 
-  // ── ETF 실시간 갱신 (60초) ──────────────────────────────────
-  const ETF_SYMBOLS = useMemo(() => ETF_DATA.map(e => e.symbol), []);
+  // ── ETF 실시간 갱신 (60초) — KR/US 분리 처리 ────────────────
+  const KR_ETFS = useMemo(() => ETF_DATA.filter(e => e.market === 'kr'), []);
+  const US_ETF_SYMBOLS = useMemo(() => ETF_DATA.filter(e => e.market === 'us').map(e => e.symbol), []);
 
   const refreshEtfs = useCallback(async () => {
-    try {
-      const fresh = await fetchUsStocksBatch(ETF_SYMBOLS);
-      if (fresh.length > 0) {
-        setEtfs(prev => prev.map(etf => {
-          const f = fresh.find(s => s.symbol === etf.symbol);
-          if (!f) return etf;
-          return { ...etf, price: f.price, change: f.change, changePct: f.changePct };
-        }));
-      }
-    } catch {}
-  }, [ETF_SYMBOLS]);
+    const [krResult, usResult] = await Promise.allSettled([
+      KR_ETFS.length > 0 ? fetchKoreanStocksBatch(KR_ETFS) : Promise.resolve([]),
+      US_ETF_SYMBOLS.length > 0 ? fetchUsStocksBatch(US_ETF_SYMBOLS) : Promise.resolve([]),
+    ]);
+    const krFresh = krResult.status === 'fulfilled' ? krResult.value : [];
+    const usFresh = usResult.status === 'fulfilled' ? usResult.value : [];
+    const allFresh = [...krFresh, ...usFresh];
+    if (allFresh.length > 0) {
+      setEtfs(prev => prev.map(etf => {
+        const f = allFresh.find(s => s.symbol === etf.symbol);
+        if (!f) return etf;
+        return { ...etf, price: f.price, change: f.change, changePct: f.changePct };
+      }));
+    }
+  }, [KR_ETFS, US_ETF_SYMBOLS]);
 
   // ── 국장 갱신 (30초) ────────────────────────────────────────
   const refreshKoreanStocks = useCallback(async () => {
@@ -393,6 +398,7 @@ export default function App() {
               krStocks={krStocks}
               usStocks={usStocks}
               coins={coins}
+              etfs={etfs}
               krwRate={krwRate}
               onItemClick={setSelectedItem}
             />

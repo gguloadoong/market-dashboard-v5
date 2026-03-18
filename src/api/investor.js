@@ -122,7 +122,7 @@ export async function fetchInvestorData(symbol) {
   const frgnAmt  = toNum(data.frgnNetAmt   ?? data.frgSumAmt    ?? 0);
   const instAmt  = toNum(data.instNetAmt   ?? data.instSumAmt   ?? 0);
   const indvVol  = toNum(data.indvTrdvol   ?? data.indvNetVol   ?? 0);
-  const frgnVol  = toNum(data.frgnTrdvol   ?? data.frgNetVol    ?? 0);
+  const frgnVol  = toNum(data.frgnTrdvol   ?? data.frgTrdvol   ?? data.frgnNetVol ?? data.frgNetVol ?? 0);
   const instVol  = toNum(data.instTrdvol   ?? data.instNetVol   ?? 0);
 
   // 매수 주체 판별 — 외인+기관 vs 개인

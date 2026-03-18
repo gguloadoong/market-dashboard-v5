@@ -18,6 +18,7 @@ export default function TopNewsSection({ allNews = [] }) {
         try { return Date.now() - new Date(n.pubDate).getTime() < cutoff; }
         catch { return false; }
       })
+      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
       .slice(0, 5);
   }, [allNews]);
 
