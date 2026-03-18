@@ -493,6 +493,35 @@ export function fetchAllNews() {
   });
 }
 
+// ─── 종목별 직접 구글뉴스 검색 ────────────────────────────────
+// 전체 뉴스 캐시 키워드 매칭이 0건일 때 fallback으로 직접 검색
+// 소형주·코인도 종목명 그대로 구글뉴스 검색
+export async function fetchStockDirectNews(name, market) {
+  if (!name) return [];
+  const cacheKey = `stockdirect_${name.slice(0, 30).replace(/\s/g, '_')}`;
+  const cached = cacheGet(cacheKey);
+  if (cached?.fresh) return cached.data;
+
+  const q = encodeURIComponent(name);
+  let url;
+  if (market === 'KR') {
+    url = `https://news.google.com/rss/search?q=${q}&hl=ko&gl=KR&ceid=KR:ko`;
+  } else if (market === 'COIN') {
+    url = `https://news.google.com/rss/search?q=${q}+코인+암호화폐&hl=ko&gl=KR&ceid=KR:ko`;
+  } else {
+    url = `https://news.google.com/rss/search?q=${q}+stock&hl=en&gl=US&ceid=US:en`;
+  }
+
+  const cat   = market === 'KR' ? 'kr' : market === 'COIN' ? 'coin' : 'us';
+  const items = await fetchRSS(url, cat, '구글뉴스');
+  const result = dedup(items.filter(isRecentNews))
+    .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+    .slice(0, 8);
+
+  if (result.length > 0) cacheSet(cacheKey, result);
+  return result;
+}
+
 export function invalidateNewsCache() {
   ['all','coin','us','kr'].forEach(k => {
     try { localStorage.removeItem(`news_${k}`); } catch {}

@@ -66,7 +66,22 @@ export function useNewsRefresh() {
   };
 }
 
+import { fetchStockDirectNews } from '../api/news';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
+
+// 종목별 직접 구글뉴스 검색 훅 — useStockNews 결과 0건일 때 fallback
+export function useStockDirectNews(symbol, name, market, enabled = true) {
+  return useQuery({
+    queryKey:             ['stock-direct', symbol, name],
+    queryFn:              () => fetchStockDirectNews(name, market),
+    staleTime:            5 * 60 * 1000,
+    gcTime:               15 * 60 * 1000,
+    retry:                1,
+    retryDelay:           2000,
+    refetchOnWindowFocus: false,
+    enabled:              !!name && !!enabled,
+  });
+}
 
 // 종목 키워드 기반 뉴스 필터 훅 — ChartSidePanel에서 사용
 // market prop 없으면 symbol/name 패턴으로 자동 추정

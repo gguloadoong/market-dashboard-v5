@@ -22,8 +22,8 @@ class ChartErrorBoundary extends Component {
   }
 }
 import { fetchCandles, PERIOD_CONFIG } from '../api/chart';
-import { fetchInvestorDataSafe } from '../api/investor';
-import { useStockNews } from '../hooks/useNewsQuery';
+import { fetchInvestorDataSafe, fetchInvestorTrendSafe, formatNetAmt } from '../api/investor';
+import { useStockNews, useStockDirectNews } from '../hooks/useNewsQuery';
 import InvestorFlow from './InvestorFlow';
 import { findRelatedItems } from '../data/relatedAssets';
 
@@ -411,43 +411,143 @@ function MetricsGrid({ item, krwRate }) {
   );
 }
 
-// ─── 강화된 투자자 동향 섹션 (국내주식 전용) ──────────────────────
+// ─── 투자자 행별 색상 ──────────────────────────────────────────
+const INV_ROWS = [
+  { key: 'foreign',     label: '외인', posColor: '#F04452', negColor: '#1764ED' },
+  { key: 'institution', label: '기관', posColor: '#F04452', negColor: '#1764ED' },
+  { key: 'individual',  label: '개인', posColor: '#F04452', negColor: '#1764ED' },
+];
+
+// ─── 강화된 투자자 동향 섹션 (국내주식 전용) — 오늘 + 5일 경향성 ──
 function InvestorFlowEnhanced({ symbol }) {
-  const [data, setData]       = useState(null);
+  const [data,    setData]    = useState(null);
+  const [trend,   setTrend]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tab,     setTab]     = useState('today'); // 'today' | 'trend'
 
   useEffect(() => {
     if (!symbol || !/^\d{6}$/.test(symbol)) { setLoading(false); return; }
     setLoading(true);
-    // InvestorFlow와 같은 API 사용 — 정적 import로 공유
-    fetchInvestorDataSafe(symbol).then(setData).finally(() => setLoading(false));
+    Promise.all([
+      fetchInvestorDataSafe(symbol),
+      fetchInvestorTrendSafe(symbol, 5),
+    ]).then(([d, t]) => {
+      setData(d);
+      setTrend(Array.isArray(t) ? t : []);
+    }).finally(() => setLoading(false));
   }, [symbol]);
 
   if (!symbol || !/^\d{6}$/.test(symbol)) return null;
 
   const insight = genInvestorInsight(data);
 
-  return (
-    <div className="mx-5 mb-4">
-      {/* 인사이트 배너 — 데이터 있을 때만 */}
-      {!loading && insight && (
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2"
-          style={{ background: insight.color + '11' }}
-        >
-          <span
-            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-            style={{ background: insight.color + '22', color: insight.color }}
-          >
-            {insight.badge}
-          </span>
-          <span className="text-[12px] font-medium" style={{ color: insight.color }}>
-            {insight.text}
-          </span>
+  if (loading) {
+    return (
+      <div className="mx-5 mb-4 border border-[#F2F4F6] rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#F2F4F6]">
+          <div className="h-3 bg-[#F2F4F6] rounded w-24 animate-pulse" />
         </div>
+        {[1,2,3].map(i => (
+          <div key={i} className="px-4 py-2.5 flex items-center gap-3">
+            <div className="h-3 bg-[#F2F4F6] rounded w-8 animate-pulse" />
+            <div className="flex-1 h-1.5 bg-[#F2F4F6] rounded-full animate-pulse" />
+            <div className="h-3 bg-[#F2F4F6] rounded w-14 animate-pulse" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // 게이지 바 너비 계산
+  const vals = INV_ROWS.map(r => Math.abs(data[r.key]?.netAmt ?? 0));
+  const maxVal = Math.max(...vals, 1);
+  const bars = vals.map(v => (v / maxVal) * 100);
+
+  return (
+    <div className="mx-5 mb-4 border border-[#F2F4F6] rounded-xl overflow-hidden">
+      {/* 헤더 + 탭 */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#F2F4F6] bg-[#FAFBFC]">
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-bold text-[#191F28]">👥 투자자 동향</span>
+          {insight && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: insight.color + '22', color: insight.color }}>
+              {insight.badge}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-1">
+          {['today', 'trend'].map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                tab === t ? 'bg-[#3182F6] text-white' : 'text-[#B0B8C1] hover:text-[#4E5968]'
+              }`}>
+              {t === 'today' ? '오늘' : '5일'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'today' ? (
+        /* 오늘 외인/기관/개인 게이지 */
+        <div className="divide-y divide-[#F2F4F6]">
+          {INV_ROWS.map((row, i) => {
+            const inv   = data[row.key];
+            const net   = inv?.netAmt ?? 0;
+            const color = net > 0 ? row.posColor : net < 0 ? row.negColor : '#B0B8C1';
+            return (
+              <div key={row.key} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="text-[12px] text-[#6B7684] w-8 flex-shrink-0 font-medium">{row.label}</span>
+                <div className="flex-1 h-1.5 bg-[#F2F4F6] rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${bars[i]}%`, background: color }} />
+                </div>
+                <span className="text-[12px] font-bold tabular-nums font-mono w-16 text-right flex-shrink-0"
+                  style={{ color }}>
+                  {inv?.netAmtFormatted ?? '—'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* 5일 경향성 테이블 */
+        trend.length === 0 ? (
+          <div className="px-4 py-4 text-center text-[12px] text-[#B0B8C1]">경향성 데이터 없음</div>
+        ) : (
+          <div>
+            {/* 테이블 헤더 */}
+            <div className="flex items-center px-4 py-1.5 bg-[#FAFBFC] border-b border-[#F2F4F6]">
+              <span className="text-[10px] text-[#B0B8C1] w-16 flex-shrink-0">날짜</span>
+              <span className="text-[10px] text-[#B0B8C1] flex-1 text-center">외인</span>
+              <span className="text-[10px] text-[#B0B8C1] flex-1 text-center">기관</span>
+              <span className="text-[10px] text-[#B0B8C1] flex-1 text-center">개인</span>
+            </div>
+            {trend.map((row, i) => {
+              const fColor = row.foreign     > 0 ? '#F04452' : row.foreign     < 0 ? '#1764ED' : '#B0B8C1';
+              const iColor = row.institution > 0 ? '#F04452' : row.institution < 0 ? '#1764ED' : '#B0B8C1';
+              const pColor = row.individual  > 0 ? '#F04452' : row.individual  < 0 ? '#1764ED' : '#B0B8C1';
+              const dateStr = row.date ? `${row.date.slice(4,6)}/${row.date.slice(6,8)}` : `${i + 1}일전`;
+              return (
+                <div key={i} className="flex items-center px-4 py-2 border-b border-[#F2F4F6] last:border-0">
+                  <span className="text-[11px] text-[#8B95A1] w-16 flex-shrink-0">{dateStr}</span>
+                  <span className="text-[11px] font-bold font-mono flex-1 text-center" style={{ color: fColor }}>
+                    {row.foreignFmt || formatNetAmt(row.foreign)}
+                  </span>
+                  <span className="text-[11px] font-bold font-mono flex-1 text-center" style={{ color: iColor }}>
+                    {row.institutionFmt || formatNetAmt(row.institution)}
+                  </span>
+                  <span className="text-[11px] font-bold font-mono flex-1 text-center" style={{ color: pColor }}>
+                    {row.individualFmt || formatNetAmt(row.individual)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
-      {/* 기존 InvestorFlow 컴포넌트 재사용 */}
-      <InvestorFlow symbol={symbol} />
     </div>
   );
 }
@@ -468,6 +568,16 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
     item?.name || item?.nameEn,
     newsMarket,
   );
+  // 글로벌 캐시 매칭 0건 시 종목명으로 직접 구글뉴스 검색 (fallback)
+  const directEnabled = !newsLoading && relatedNews.length === 0;
+  const { data: directNews = [], isLoading: directNewsLoading } = useStockDirectNews(
+    item?.symbol || item?.id,
+    item?.name || item?.nameEn,
+    newsMarket,
+    directEnabled,
+  );
+  const finalNews        = relatedNews.length > 0 ? relatedNews : directNews;
+  const finalNewsLoading = newsLoading || (directEnabled && directNewsLoading);
 
   // 연관 종목 — relatedAssets 매핑 기반, allData에서 현재 가격 조회
   const relatedItems = useMemo(() => {
@@ -498,7 +608,7 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
   const low52  = isCoin ? item?.low24h  : item?.low52w;
 
   // 뉴스 표시 개수: showMoreNews ? 10 : 5
-  const visibleNews = showMoreNews ? relatedNews.slice(0, 10) : relatedNews.slice(0, 5);
+  const visibleNews = showMoreNews ? finalNews.slice(0, 10) : finalNews.slice(0, 5);
 
   // ESC 닫기
   useEffect(() => {
@@ -666,25 +776,25 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
           )}
 
           {/* ─── "왜 지금?" WHY 배지 ──────────────────────────── */}
-          {!newsLoading && relatedNews.length > 0 && (
+          {!finalNewsLoading && finalNews.length > 0 && (
             <div className="mt-3 flex items-start gap-2 bg-[#F8F9FA] rounded-xl px-3 py-2.5">
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#191F28] text-white flex-shrink-0 mt-0.5">
                 WHY
               </span>
               <a
-                href={relatedNews[0].link}
+                href={finalNews[0].link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[12px] text-[#4E5968] leading-snug line-clamp-2 hover:text-[#191F28] transition-colors"
               >
-                {relatedNews[0].title}
-                {relatedNews[0].timeAgo && (
-                  <span className="text-[10px] text-[#B0B8C1] ml-1.5">{relatedNews[0].timeAgo}</span>
+                {finalNews[0].title}
+                {finalNews[0].timeAgo && (
+                  <span className="text-[10px] text-[#B0B8C1] ml-1.5">{finalNews[0].timeAgo}</span>
                 )}
               </a>
             </div>
           )}
-          {!newsLoading && relatedNews.length === 0 && Math.abs(pct) >= 2 && (
+          {!finalNewsLoading && finalNews.length === 0 && Math.abs(pct) >= 2 && (
             <div className="mt-3 flex items-center gap-2 bg-[#F8F9FA] rounded-xl px-3 py-2.5">
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#E5E8EB] text-[#6B7684] flex-shrink-0">
                 WHY
@@ -888,20 +998,20 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
               <span className="text-[11px] font-semibold text-[#B0B8C1] uppercase tracking-wide">
                 관련 뉴스
               </span>
-              {relatedNews.length > 5 && (
+              {finalNews.length > 5 && (
                 <button
                   onClick={() => setShowMoreNews(v => !v)}
                   className="text-[11px] text-[#3182F6] font-medium hover:underline"
                 >
-                  {showMoreNews ? '접기' : `더 보기 (${Math.min(relatedNews.length, 10)}건)`}
+                  {showMoreNews ? '접기' : `더 보기 (${Math.min(finalNews.length, 10)}건)`}
                 </button>
               )}
             </div>
-            {newsLoading ? (
+            {finalNewsLoading ? (
               <div className="px-4 py-4 text-center text-[12px] text-[#B0B8C1]">
                 뉴스 로딩 중...
               </div>
-            ) : relatedNews.length === 0 ? (
+            ) : finalNews.length === 0 ? (
               <div className="px-4 py-4 text-center text-[12px] text-[#B0B8C1]">
                 관련 뉴스 없음
               </div>
