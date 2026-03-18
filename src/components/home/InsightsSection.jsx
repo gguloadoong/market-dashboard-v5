@@ -58,21 +58,19 @@ const InsightCard = memo(function InsightCard({ mover, news, onMoverClick }) {
   const isDown = pct < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
   const badge  = MARKET_BADGE[mover._market] || { bg: '#F2F4F6', color: '#8B95A1' };
-  const signals = useMemo(() => extractNewsSignals(news.title), [news.title]);
-  const bgColor = isUp ? '#FFFAFA' : '#F4F8FF';
-  const borderColor = isUp ? '#FFE8E8' : '#DCE9FF';
+  const signals = useMemo(() => news ? extractNewsSignals(news.title) : [], [news?.title]);
+  const bgColor = isUp ? '#FFFAFA' : isDown ? '#F4F8FF' : '#FAFBFC';
+  const borderColor = isUp ? '#FFE8E8' : isDown ? '#DCE9FF' : '#F2F4F6';
 
-  return (
-    <a
-      href={news.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex-shrink-0 w-[260px] block rounded-xl border p-3 hover:opacity-90 transition-opacity"
+  const cardContent = (
+    <div
+      className="flex-shrink-0 w-[240px] rounded-xl border p-3"
       style={{ background: bgColor, borderColor }}
+      onClick={() => !news && onMoverClick?.(mover)}
     >
       <div className="flex items-center gap-1.5 mb-2">
         <button
-          onClick={e => { e.preventDefault(); onMoverClick?.(mover); }}
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onMoverClick?.(mover); }}
           className="flex items-center gap-1 hover:opacity-75 flex-shrink-0"
         >
           <span className="text-[12px] font-bold text-[#191F28]">{mover.name}</span>
@@ -80,26 +78,34 @@ const InsightCard = memo(function InsightCard({ mover, news, onMoverClick }) {
             {isUp ? '▲' : isDown ? '▼' : '—'}{Math.abs(pct).toFixed(2)}%
           </span>
         </button>
-        <span
-          className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0"
-          style={{ background: badge.bg, color: badge.color }}
-        >
+        <span className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0"
+          style={{ background: badge.bg, color: badge.color }}>
           {mover._market}
         </span>
         {signals.map(sig => (
-          <span
-            key={sig.tag}
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-            style={{ background: sig.bg, color: sig.color }}
-          >
+          <span key={sig.tag} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{ background: sig.bg, color: sig.color }}>
             {sig.tag}
           </span>
         ))}
-        <span className="text-[10px] text-[#B0B8C1] flex-shrink-0 ml-auto">{news.timeAgo}</span>
+        {news?.timeAgo && (
+          <span className="text-[10px] text-[#B0B8C1] flex-shrink-0 ml-auto">{news.timeAgo}</span>
+        )}
       </div>
-      <div className="text-[12px] text-[#4E5968] leading-snug line-clamp-2">
-        {news.title}
-      </div>
+      {news ? (
+        <div className="text-[12px] text-[#4E5968] leading-snug line-clamp-2">{news.title}</div>
+      ) : (
+        <div className="text-[11px] text-[#B0B8C1]">관련 뉴스 수집 중...</div>
+      )}
+    </div>
+  );
+
+  if (!news) return <div className="cursor-pointer hover:opacity-80 transition-opacity">{cardContent}</div>;
+
+  return (
+    <a href={news.link} target="_blank" rel="noopener noreferrer"
+      className="hover:opacity-90 transition-opacity">
+      {cardContent}
     </a>
   );
 });

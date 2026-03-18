@@ -98,6 +98,41 @@ export const KR_ALIASES = {
   'YG엔터테인먼트':   ['yg entertainment', 'yg엔터'],
 };
 
+// 미국 주식 별칭 — 한국 언론이 영문 대신 한국어로 표기하는 경우 커버
+export const US_ALIASES = {
+  'NVDA':  ['엔비디아', 'nvidia'],
+  'AAPL':  ['애플', 'apple'],
+  'MSFT':  ['마이크로소프트', 'microsoft', 'ms'],
+  'GOOGL': ['구글', '알파벳', 'google', 'alphabet'],
+  'GOOG':  ['구글', '알파벳', 'google', 'alphabet'],
+  'META':  ['메타', '페이스북', 'facebook'],
+  'AMZN':  ['아마존', 'amazon'],
+  'TSLA':  ['테슬라', 'tesla'],
+  'AMD':   ['에이엠디', 'advanced micro'],
+  'INTC':  ['인텔', 'intel'],
+  'QCOM':  ['퀄컴', 'qualcomm'],
+  'AVGO':  ['브로드컴', 'broadcom'],
+  'TSM':   ['tsmc', 'taiwan semiconductor', '대만 반도체'],
+  'MU':    ['마이크론', 'micron'],
+  'ASML':  ['asml'],
+  'ARM':   ['arm holdings', 'arm chip'],
+  'SMCI':  ['슈퍼마이크로', 'supermicro'],
+  'PLTR':  ['팔란티어', 'palantir'],
+  'NFLX':  ['넷플릭스', 'netflix'],
+  'DIS':   ['디즈니', 'disney'],
+  'JPM':   ['jp모건', 'jpmorgan', 'jp morgan'],
+  'GS':    ['골드만삭스', 'goldman sachs'],
+  'BAC':   ['뱅크오브아메리카', 'bank of america'],
+  'XOM':   ['엑슨모빌', 'exxon'],
+  'CVX':   ['셰브론', 'chevron'],
+  'COIN':  ['코인베이스', 'coinbase'],
+  'MSTR':  ['마이크로스트래티지', 'microstrategy'],
+  'MARA':  ['마라 홀딩스', 'marathon digital'],
+  'SPY':   ['s&p', 'sp500', 's&p500'],
+  'QQQ':   ['나스닥', 'nasdaq'],
+  'SOXL':  ['반도체 etf', 'semiconductor'],
+};
+
 // 코인 별칭
 export const COIN_ALIASES = {
   BTC:  ['bitcoin', 'btc', '비트코인'],
@@ -160,12 +195,14 @@ export function buildStockKeywords(symbol, name, market) {
     const aliases = COIN_ALIASES[symbol?.toUpperCase()] || [];
     aliases.forEach(a => keys.add(a.toLowerCase()));
   } else {
-    // 미국 주식: symbol + 이름 첫 단어
+    // 미국 주식: symbol + 이름 첫 단어 + US_ALIASES (한국어 표기 포함)
     if (symbol) keys.add(symbol.toLowerCase());
     if (name) {
       const firstWord = name.split(/[\s,./]/)[0].toLowerCase();
       if (firstWord.length >= 2) keys.add(firstWord);
     }
+    const usAliases = US_ALIASES[symbol?.toUpperCase()] || [];
+    usAliases.forEach(a => keys.add(a.toLowerCase()));
   }
 
   return [...keys].filter(k => k.length >= 2 && !/^\d{6}$/.test(k));

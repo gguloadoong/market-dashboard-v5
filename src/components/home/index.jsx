@@ -99,11 +99,22 @@ export default function HomeDashboard({
   }, [allItems]);
 
   const insights = useMemo(() => {
-    if (!recentNews.length || !topMovers.length) return [];
-    return topMovers
-      .map(mover => ({ mover, news: findRelatedNews(mover, recentNews) }))
-      .filter(({ news }) => news !== null)
-      .slice(0, 6);
+    if (!topMovers.length) return [];
+    // 1순위: 뉴스 매칭된 종목
+    const withNews = recentNews.length
+      ? topMovers
+          .map(mover => ({ mover, news: findRelatedNews(mover, recentNews) }))
+          .filter(({ news }) => news !== null)
+          .slice(0, 6)
+      : [];
+    if (withNews.length >= 3) return withNews;
+    // 2순위 fallback — 뉴스 매칭 부족 시 top movers를 뉴스 없이 포함
+    const withNewsSet = new Set(withNews.map(({ mover }) => mover.symbol || mover.id));
+    const fallback = topMovers
+      .filter(m => !withNewsSet.has(m.symbol || m.id))
+      .slice(0, 6 - withNews.length)
+      .map(mover => ({ mover, news: null }));
+    return [...withNews, ...fallback];
   }, [topMovers, recentNews]);
 
   // ─── 관심종목 필터링 ────────────────────────────────────────
