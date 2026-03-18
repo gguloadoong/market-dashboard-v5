@@ -14,6 +14,16 @@ const ALLOWED_DOMAINS = [
   'feeds.reuters.com',
   'www.bloomberg.com',
   'feeds.bbci.co.uk',
+  // 코인 뉴스 직접 RSS
+  'www.coindesk.com',
+  'decrypt.co',
+  'cointelegraph.com',
+  // 한국 금융 뉴스 직접 RSS
+  'www.yna.co.kr',
+  'www.blockmedia.co.kr',
+  // 미국 주식 뉴스 직접 RSS
+  'finance.yahoo.com',
+  'feeds.content.dowjones.io',
 ];
 
 export default async function handler(request) {
@@ -71,7 +81,9 @@ export default async function handler(request) {
       headers: {
         'Content-Type': contentType.includes('xml') ? contentType : 'text/xml; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 's-maxage=300, stale-while-revalidate=60',
+        // s-maxage 2분으로 단축 — 클라이언트 CACHE_TTL(3분)보다 짧아야 실제 최신 RSS를 받아옴
+        // stale-while-revalidate=30: CDN 캐시 만료 후 30초 이내 추가 요청은 stale 반환하며 백그라운드 갱신
+        'Cache-Control': 's-maxage=120, stale-while-revalidate=30',
       },
     });
   } catch (err) {

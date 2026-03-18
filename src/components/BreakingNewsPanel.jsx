@@ -1,10 +1,32 @@
 // 우측 고정 뉴스·속보 패널 — React Query로 중복 호출 차단
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 import WhalePanel from './WhalePanel';
 import { subscribeLatestWhale } from '../state/whaleBus';
 import { extractNewsSignals } from '../utils/newsSignal';
+// NEWS_SIGNALS는 extractNewsSignals 내부에서 처리
 
+// ─── 종목 태그 추출 — 뉴스 제목에서 주요 종목명 감지 ──────────
+// 자주 언급되는 주요 종목명만 체크 (성능 + 정확도 균형)
+const STOCK_TAG_LIST = [
+  // 국내
+  '삼성전자','SK하이닉스','LG에너지솔루션','삼성SDI','현대차','기아','LG화학',
+  '셀트리온','삼성바이오로직스','카카오','네이버','NAVER','포스코','에코프로',
+  '한화에어로스페이스','현대중공업','두산에너빌리티','삼성전기','알테오젠','한미약품',
+  // 미국
+  'NVIDIA','엔비디아','애플','Apple','테슬라','Tesla','마이크로소프트','Microsoft',
+  'Meta','아마존','Amazon','구글','Google','알파벳','Alphabet',
+  'AMD','인텔','Intel','퀄컴','Qualcomm','ASML',
+  // 코인
+  '비트코인','이더리움','리플','솔라나','Bitcoin','Ethereum',
+];
+
+function extractStockTags(title) {
+  const lower = title.toLowerCase();
+  return STOCK_TAG_LIST.filter(name => lower.includes(name.toLowerCase())).slice(0, 3);
+}
+
+// 속보 탭 제거 — 속보는 시그널 태그(🔴 속보)로 자동 표시
 const TABS = [
   { id: 'all',   label: '전체'    },
   { id: 'kr',    label: '국내'    },
@@ -20,12 +42,11 @@ const CAT_COLOR = {
 };
 
 function NewsItem({ item }) {
-  // pubDate null/undefined 방어: 유효하지 않은 날짜는 속보 아님으로 처리
-  const pubMs = item.pubDate ? new Date(item.pubDate).getTime() : 0;
-  const isBreaking = pubMs > 0 && (Date.now() - pubMs) < 3600000;
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
-  // 뉴스 제목에서 투자 시그널 태그 추출
-  const signals = extractNewsSignals(item.title);
+  // 시그널 태그 추출 — pubDate 전달하여 속보(🔴 속보) 자동 감지, 최대 2개
+  const signals = extractNewsSignals(item.title, item.pubDate);
+  // 뉴스 제목에서 종목 태그 추출
+  const stockTags = extractStockTags(item.title);
 
   return (
     <a
@@ -35,11 +56,6 @@ function NewsItem({ item }) {
       className="block px-4 py-3 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-1.5 mb-1.5">
-        {isBreaking && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] flex-shrink-0">
-            🔴 속보
-          </span>
-        )}
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0"
           style={{ background: cat.bg, color: cat.color }}
@@ -48,7 +64,7 @@ function NewsItem({ item }) {
         </span>
         <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
       </div>
-      {/* 시그널 태그 — 제목 위에 표시 */}
+      {/* 시그널 태그 — NEWS_SIGNALS 배열 기반 자동 추출, 속보 포함 */}
       {signals.length > 0 && (
         <div className="flex items-center gap-1 mb-1">
           {signals.map(sig => (
@@ -60,6 +76,16 @@ function NewsItem({ item }) {
       <div className="text-[13px] font-medium text-[#191F28] leading-snug line-clamp-2">
         {item.title}
       </div>
+      {/* 종목 태그 — 제목 아래 표시 */}
+      {stockTags.length > 0 && (
+        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+          {stockTags.map(tag => (
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#6B7684] font-medium">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
     </a>
   );
 }
@@ -155,7 +181,7 @@ export default function BreakingNewsPanel({ coins = [], onItemClick }) {
     if (activeTab === 'whale') setUnreadWhale(0);
   }, [activeTab]);
 
-  // 전체/카테고리 탭 모두 1시간 이내 속보를 상단에 핀
+  // 전체 탭은 최대 30건, 카테고리 탭은 전체 — 속보는 상단 핀 정렬
   const news = sortWithBreakingFirst(activeTab === 'all' ? rawNews.slice(0, 30) : rawNews);
 
   return (
