@@ -31,18 +31,17 @@ async function fetchStooq(symbols) {
     .filter(s => s.Close && s.Close !== 'N/D' && parseFloat(s.Close) > 0)
     .map(s => {
       const close     = parseFloat(s.Close);
-      // Prev_Close(p 필드)가 있으면 전일 종가 사용, 없으면 Open으로 근사
-      const prevClose = parseFloat(s.Prev_Close || s.Open) || close;
+      // Prev_Close(p 필드) 전일 종가 — 없으면 change=0 (Open 근사는 오류 원인)
+      const prevClose = parseFloat(s.Prev_Close) || 0;
       return {
         symbol:    s.Symbol.split('.')[0].toUpperCase(),
         price:     close,
-        // 전일 종가 대비 등락 (Prev_Close 필드 활용)
-        change:    parseFloat((close - prevClose).toFixed(2)),
+        change:    prevClose > 0 ? parseFloat((close - prevClose).toFixed(2)) : 0,
         changePct: prevClose > 0
           ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2))
           : 0,
         volume:    parseInt(s.Volume) || 0,
-        _source:   'stooq', // 데이터 소스 태그
+        _source:   'stooq',
       };
     });
 }
@@ -66,18 +65,27 @@ async function fetchAlpaca(symbols) {
   if (!res.ok) throw new Error(`Alpaca ${res.status}`);
   const data = await res.json();
 
-  // ask + bid 중간값을 현재가로 사용 (change는 이 소스에서 제공 안 함)
+  // Yahoo v7 동시 조회 — Alpaca는 change 필드 없음 → Yahoo에서 changePct 보완
+  const [alpacaData, yahooQuotes] = await Promise.all([
+    data, // 이미 fetch 완료
+    fetchYahooQuoteBatch(symbols).catch(() => []),
+  ]);
+  const yahooMap = Object.fromEntries(
+    (yahooQuotes || []).map(r => [r.symbol, r])
+  );
+
   return symbols.map(sym => {
-    const q = data.quotes?.[sym];
+    const q = alpacaData.quotes?.[sym];
     if (!q) return null;
     const price = (q.ap + q.bp) / 2; // ask/bid midpoint
+    const yq = yahooMap[sym];
     return {
       symbol:    sym,
       price,
-      change:    0,
-      changePct: 0,
+      change:    yq?.regularMarketChange       ?? 0,
+      changePct: yq?.regularMarketChangePercent ?? 0,
       volume:    0,
-      _source:   'alpaca', // 데이터 소스 태그
+      _source:   'alpaca',
     };
   }).filter(Boolean);
 }
@@ -104,8 +112,8 @@ async function fetchYahooChart(symbol) {
   return {
     symbol:    meta.symbol?.split('.')[0],
     price:     meta.regularMarketPrice,
-    change:    meta.regularMarketPrice - prev,
-    changePct: ((meta.regularMarketPrice - prev) / prev) * 100,
+    change:    parseFloat((meta.regularMarketPrice - prev).toFixed(2)),
+    changePct: parseFloat(((meta.regularMarketPrice - prev) / prev * 100).toFixed(2)),
     volume:    meta.regularMarketVolume,
     high52w:   meta.fiftyTwoWeekHigh,
     low52w:    meta.fiftyTwoWeekLow,
@@ -298,20 +306,20 @@ async function fetchYahooRace(symbol, id) {
     if (!res.ok) throw new Error(`allorigins ${res.status}`);
     const json = await res.json();
     if (!json.contents) throw new Error('allorigins empty');
-    const raw  = JSON.parse(json.contents);
-    const meta = raw?.chart?.result?.[0]?.meta;
-    if (!meta?.regularMarketPrice) throw new Error('no price');
-    return meta;
+    const raw    = JSON.parse(json.contents);
+    const result = raw?.chart?.result?.[0];
+    if (!result?.meta?.regularMarketPrice) throw new Error('no price');
+    return result;
   };
 
   // allorigins /raw — 직접 JSON 반환 (같은 서비스, 다른 엔드포인트)
   const tryAlloriginsRaw = async () => {
     const res  = await fetch(`https://api.allorigins.win/raw?url=${encoded2}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`allorigins-raw ${res.status}`);
-    const raw  = await res.json();
-    const meta = raw?.chart?.result?.[0]?.meta;
-    if (!meta?.regularMarketPrice) throw new Error('no price');
-    return meta;
+    const raw    = await res.json();
+    const result = raw?.chart?.result?.[0];
+    if (!result?.meta?.regularMarketPrice) throw new Error('no price');
+    return result;
   };
 
   // 두 엔드포인트 동시 실행 — 먼저 성공한 것 사용
@@ -320,10 +328,15 @@ async function fetchYahooRace(symbol, id) {
     let failed = 0;
 
     [tryAlloriginsGet, tryAlloriginsRaw].forEach(fn => {
-      fn().then(meta => {
+      fn().then(result => {
         if (done) return;
         done = true;
-        const prev = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
+        const meta   = result.meta;
+        const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
+        // previousClose 없을 때 closes[-2] 활용 (KOSDAQ·해외지수 간헐적 누락 대응)
+        const prev = meta.previousClose ?? meta.chartPreviousClose
+          ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
+          ?? meta.regularMarketPrice;
         resolve({
           id,
           value:     parseFloat(meta.regularMarketPrice.toFixed(2)),
@@ -353,13 +366,13 @@ async function fetchStooqKospi() {
   const s = (data.symbols || []).find(x => x.Close && x.Close !== 'N/D');
   if (!s) throw new Error('Stooq KOSPI: N/D');
   const close     = parseFloat(s.Close);
-  // Prev_Close(p 필드) 전일 종가 기준 등락 계산 — Open 대비(당일시가) 아닌 전일종가 대비
-  const prevClose = parseFloat(s.Prev_Close || s.Open) || close;
+  // Prev_Close(p 필드) 전일 종가 기준 — 없으면 change=0 (Open 근사 제거)
+  const prevClose = parseFloat(s.Prev_Close) || 0;
   return {
     id:        'KOSPI',
     value:     parseFloat(close.toFixed(2)),
-    change:    parseFloat((close - prevClose).toFixed(2)),
-    changePct: parseFloat(((close - prevClose) / prevClose * 100).toFixed(2)),
+    change:    prevClose > 0 ? parseFloat((close - prevClose).toFixed(2)) : 0,
+    changePct: prevClose > 0 ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2)) : 0,
     isDelayed: false,
     dataDelay: '실시간(추정)',
   };
