@@ -105,8 +105,9 @@ async function fetchYahooChart(symbol) {
   if (!result) throw new Error(`No chart: ${symbol}`);
   const meta   = result.meta;
   const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-  // closes[-2]를 전일 종가로 사용 (meta.previousClose 없는 소형 ETF 대응)
-  const prev   = meta.previousClose ?? meta.chartPreviousClose
+  // chartPreviousClose는 차트 시작 기준점으로 전일 종가가 아님 — 사용 금지
+  // previousClose 없으면 closes[-2] (실제 직전 거래일 종가) 사용
+  const prev   = meta.previousClose
     ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
     ?? meta.regularMarketPrice;
   return {
@@ -335,8 +336,8 @@ async function fetchYahooRace(symbol, id) {
         done = true;
         const meta   = result.meta;
         const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-        // previousClose 없을 때 closes[-2] 활용 (KOSDAQ·해외지수 간헐적 누락 대응)
-        const prev = meta.previousClose ?? meta.chartPreviousClose
+        // chartPreviousClose는 차트 시작 기준점 — 전일 종가 아님, 사용 금지
+        const prev = meta.previousClose
           ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
           ?? meta.regularMarketPrice;
         resolve({

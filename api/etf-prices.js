@@ -75,7 +75,8 @@ export default async function handler(req) {
       const meta   = result.meta;
       if (!meta?.regularMarketPrice) throw new Error('no price');
       const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-      const prev   = meta.previousClose ?? meta.chartPreviousClose
+      // chartPreviousClose는 차트 시작 기준점 — 전일 종가 아님, 사용 금지
+      const prev   = meta.previousClose
         ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
         ?? meta.regularMarketPrice;
       const price = meta.regularMarketPrice;
