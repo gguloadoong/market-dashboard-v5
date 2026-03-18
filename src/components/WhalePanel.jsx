@@ -6,6 +6,8 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   subscribeUpbitWhaleTrades,
   unsubscribeUpbitWhaleTrades,
+  subscribeBithumbWhaleTrades,
+  unsubscribeBithumbWhaleTrades,
   subscribeBtcWhales,
   unsubscribeBtcWhales,
   startWhaleAlertPolling,
@@ -56,6 +58,9 @@ function buildRouteTitle(event) {
   const from = resolveExchangeName(event.fromOwner) || event.fromOwner || null;
   const to   = resolveExchangeName(event.toOwner)   || event.toOwner   || null;
 
+  if (event.source === 'bithumb') {
+    return `빗썸 ${event.symbol || ''} ${event.side || '체결'}`;
+  }
   if (event.source !== 'whale-alert') {
     // Upbit 체결: 거래소명 없음 — 종목 + 매수/매도 방향 표시
     return `업비트 ${event.symbol || ''} ${event.side || '체결'}`;
@@ -252,6 +257,8 @@ function EventRow({ event, onItemClick, coinMap }) {
   // 체인/소스 배지
   const chainBadge = event.source === 'whale-alert'
     ? { bg: '#F0F4FF', color: '#3182F6', text: (event.chain || 'CHAIN').toUpperCase() }
+    : event.source === 'bithumb'
+    ? { bg: '#FFF0F6', color: '#E91E8C', text: '빗썸' }
     : event.chain === 'bitcoin'
     ? { bg: '#FFF4E6', color: '#FF9500', text: 'BTC 온체인' }
     : { bg: '#F2F4F6', color: '#6B7684', text: 'UPBIT' };
@@ -338,8 +345,9 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   const [exchangeEvents, setExchangeEvents] = useState([]); // 거래소 대량 체결
   const [onchainEvents,  setOnchainEvents]  = useState([]); // 온체인 자금 이동
   const [activeTab,      setActiveTab]      = useState('exchange'); // 'exchange' | 'onchain'
-  const [connected,      setConnected]      = useState(false);
-  const [btcConnected,   setBtcConnected]   = useState(false);
+  const [connected,        setConnected]        = useState(false);
+  const [bithumbConnected, setBithumbConnected] = useState(false);
+  const [btcConnected,     setBtcConnected]     = useState(false);
   const [msgCount,       setMsgCount]       = useState(0);
   const [watchSymbols,   setWatchSymbols]   = useState(FALLBACK_SYMBOLS);
 
@@ -370,6 +378,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     if (!isVisible) return;
 
     setConnected(false);
+    setBithumbConnected(false);
     setBtcConnected(false);
     setMsgCount(0);
 
@@ -382,28 +391,38 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       addEvent(evt);
     });
 
-    // ── 소스 2: Blockchain.com BTC 온체인 WebSocket ──────────────
+    // ── 소스 2: Bithumb WebSocket (거래소 대량 체결) ──────────────
+    subscribeBithumbWhaleTrades(watchSymbols, (evt) => {
+      if (evt._connected) { setBithumbConnected(true); return; }
+      setBithumbConnected(true);
+      setMsgCount(p => p + 1);
+      addEvent(evt);
+    });
+
+    // ── 소스 3: Blockchain.com BTC 온체인 WebSocket ──────────────
     subscribeBtcWhales((evt) => {
       if (evt._connected) { setBtcConnected(true); return; }
       setBtcConnected(true);
       addEvent(evt);
     });
 
-    // ── 소스 3: Whale Alert REST 폴링 (온체인 자금 이동) ─────────
+    // ── 소스 4: Whale Alert REST 폴링 (온체인 자금 이동) ─────────
     startWhaleAlertPolling((evt) => {
       addEvent(evt);
     });
 
     return () => {
       unsubscribeUpbitWhaleTrades();
+      unsubscribeBithumbWhaleTrades();
       unsubscribeBtcWhales();
       stopWhaleAlertPolling();
       setConnected(false);
+      setBithumbConnected(false);
       setBtcConnected(false);
     };
   }, [isVisible, watchSymbols]);
 
-  const isAnyConnected = connected || btcConnected;
+  const isAnyConnected = connected || bithumbConnected || btcConnected;
   const currentEvents  = activeTab === 'exchange' ? exchangeEvents : onchainEvents;
 
   return (
@@ -415,7 +434,17 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         <div className="flex items-center gap-1.5 ml-auto">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAnyConnected ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#B0B8C1]">
-            {connected && btcConnected ? '거래소 + 온체인' : connected ? '거래소 실시간' : btcConnected ? 'BTC 온체인' : '연결 중...'}
+            {(connected || bithumbConnected) && btcConnected
+              ? '거래소 + 온체인'
+              : connected && bithumbConnected
+              ? '업비트 + 빗썸'
+              : connected
+              ? '업비트 실시간'
+              : bithumbConnected
+              ? '빗썸 실시간'
+              : btcConnected
+              ? 'BTC 온체인'
+              : '연결 중...'}
           </span>
           {connected && msgCount > 0 && (
             <span className="text-[10px] text-[#C9CDD2] font-mono">{msgCount.toLocaleString()}건 수신</span>
@@ -460,7 +489,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       {/* 탭별 설명 */}
       <div className={`px-4 py-2 text-[10px] ${activeTab === 'exchange' ? 'text-[#3182F6] bg-[#F8FBFF]' : 'text-[#FF9500] bg-[#FFFBF5]'}`}>
         {activeTab === 'exchange'
-          ? '업비트 2,000만원+ 단일 체결 — 매수/매도 방향성 포착'
+          ? '업비트 · 빗썸 2,000만원+ 단일 체결 — 매수/매도 방향성 포착'
           : '블록체인 10 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름'}
       </div>
 
