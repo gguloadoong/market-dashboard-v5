@@ -699,12 +699,18 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
         {/* ─── 스크롤 영역 ──────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
 
-          {/* ── 투자자 동향 — 국내주식만, WHY 배지 바로 아래 ────── */}
-          {item.market === 'kr' && (
-            <div className="pt-3">
-              <InvestorFlowEnhanced symbol={item.symbol} />
-            </div>
-          )}
+          {/* ── 투자자 동향 — 국내주식: 외인/기관/개인, 그 외: 안내 ── */}
+          <div className="pt-3">
+            {item.market === 'kr'
+              ? <InvestorFlowEnhanced symbol={item.symbol} />
+              : (
+                <div className="mx-4 mb-3 px-3 py-2.5 rounded-xl bg-[#F7F8FA] border border-[#F2F4F6]">
+                  <div className="text-[11px] font-semibold text-[#B0B8C1] uppercase tracking-wide mb-1">투자자 동향</div>
+                  <div className="text-[12px] text-[#B0B8C1]">외인·기관·개인 순매수 데이터는 국내주식만 제공됩니다</div>
+                </div>
+              )
+            }
+          </div>
 
           {/* ── 타임프레임 + 차트 타입 버튼 ──────────────────────── */}
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
@@ -854,6 +860,9 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
                               )}
                               <span className="text-[12px] font-bold text-[#191F28] font-mono truncate">{ticker}</span>
                             </div>
+                            {(rel?.name || rel?.nameEn) && (
+                              <div className="text-[11px] text-[#4E5968] truncate font-medium">{rel.name || rel.nameEn}</div>
+                            )}
                             {relPrice && (
                               <div className="text-[10px] text-[#8B95A1] font-mono tabular-nums">{relPrice}</div>
                             )}

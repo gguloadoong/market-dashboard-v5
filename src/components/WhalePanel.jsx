@@ -321,6 +321,13 @@ function EventRow({ event, onItemClick, coinMap }) {
   );
 }
 
+// ─── 이벤트 분류 헬퍼 ────────────────────────────────────────────
+// onchain: Whale Alert REST + Blockchain.com BTC WS
+// exchange: Upbit 실시간 체결
+function isOnchainEvent(evt) {
+  return evt.source === 'whale-alert' || evt.chain === 'bitcoin';
+}
+
 // 폴백: Upbit KRW 마켓 기본 20개 (동적 로딩 전 사용)
 const FALLBACK_SYMBOLS = [
   'BTC','ETH','XRP','SOL','ADA','DOGE','AVAX','DOT','LINK','UNI',
@@ -328,13 +335,15 @@ const FALLBACK_SYMBOLS = [
 ];
 
 export default function WhalePanel({ isVisible = true, coins = [], onItemClick }) {
-  const [events,       setEvents]       = useState([]);
-  const [connected,    setConnected]    = useState(false);
-  const [btcConnected, setBtcConnected] = useState(false);
-  const [msgCount,     setMsgCount]     = useState(0); // WS 수신 전체 체결 수
-  const [watchSymbols, setWatchSymbols] = useState(FALLBACK_SYMBOLS); // 동적 Upbit 심볼
+  const [exchangeEvents, setExchangeEvents] = useState([]); // 거래소 대량 체결
+  const [onchainEvents,  setOnchainEvents]  = useState([]); // 온체인 자금 이동
+  const [activeTab,      setActiveTab]      = useState('exchange'); // 'exchange' | 'onchain'
+  const [connected,      setConnected]      = useState(false);
+  const [btcConnected,   setBtcConnected]   = useState(false);
+  const [msgCount,       setMsgCount]       = useState(0);
+  const [watchSymbols,   setWatchSymbols]   = useState(FALLBACK_SYMBOLS);
 
-  // 심볼 → 코인 빠른 조회 맵 (coins 변경 시에만 재계산)
+  // 심볼 → 코인 빠른 조회 맵
   const coinMap = useMemo(() => coins.reduce((m, c) => {
     if (c.symbol) m[c.symbol.toUpperCase()] = c;
     return m;
@@ -344,13 +353,17 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   useEffect(() => {
     fetchUpbitAllSymbols()
       .then(symbols => { if (symbols.length > 0) setWatchSymbols(symbols); })
-      .catch(() => {}); // 실패 시 폴백 유지
+      .catch(() => {});
   }, []);
 
-  // 이벤트 추가 헬퍼 (MAX_EVENTS 제한 + 버스 발행)
+  // 이벤트 추가 — 타입별 분류
   const addEvent = (evt) => {
     pushWhaleEvent(evt);
-    setEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
+    if (isOnchainEvent(evt)) {
+      setOnchainEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
+    } else {
+      setExchangeEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
+    }
   };
 
   useEffect(() => {
@@ -360,7 +373,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     setBtcConnected(false);
     setMsgCount(0);
 
-    // ── 소스 1: Upbit WebSocket (전체 KRW 마켓 감시) ─────────────
+    // ── 소스 1: Upbit WebSocket (거래소 대량 체결) ────────────────
     subscribeUpbitWhaleTrades(watchSymbols, (evt) => {
       if (evt._connected) { setConnected(true); return; }
       if (evt._tick)      { setConnected(true); setMsgCount(p => p + 1); return; }
@@ -369,14 +382,14 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       addEvent(evt);
     });
 
-    // ── 소스 2: Blockchain.com BTC 온체인 WebSocket ─────────────
+    // ── 소스 2: Blockchain.com BTC 온체인 WebSocket ──────────────
     subscribeBtcWhales((evt) => {
       if (evt._connected) { setBtcConnected(true); return; }
       setBtcConnected(true);
       addEvent(evt);
     });
 
-    // ── 소스 3: Whale Alert REST 폴링 (프록시 없으면 무시) ───────
+    // ── 소스 3: Whale Alert REST 폴링 (온체인 자금 이동) ─────────
     startWhaleAlertPolling((evt) => {
       addEvent(evt);
     });
@@ -390,16 +403,8 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     };
   }, [isVisible, watchSymbols]);
 
-  // 연결 상태 텍스트
-  const connStatus = connected && btcConnected
-    ? 'Upbit + BTC 온체인'
-    : connected
-    ? 'Upbit 실시간'
-    : btcConnected
-    ? 'BTC 온체인'
-    : '연결 중...';
-
   const isAnyConnected = connected || btcConnected;
+  const currentEvents  = activeTab === 'exchange' ? exchangeEvents : onchainEvents;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -409,44 +414,95 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         <span className="text-[14px] font-bold text-[#191F28]">고래 알림</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAnyConnected ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
-          <span className="text-[10px] text-[#B0B8C1]">{connStatus}</span>
+          <span className="text-[10px] text-[#B0B8C1]">
+            {connected && btcConnected ? '거래소 + 온체인' : connected ? '거래소 실시간' : btcConnected ? 'BTC 온체인' : '연결 중...'}
+          </span>
           {connected && msgCount > 0 && (
-            <span className="text-[10px] text-[#C9CDD2] font-mono">수신 {msgCount.toLocaleString()}건</span>
+            <span className="text-[10px] text-[#C9CDD2] font-mono">{msgCount.toLocaleString()}건 수신</span>
           )}
         </div>
       </div>
 
-      {/* 이벤트 목록 */}
-      <div className="max-h-[400px] overflow-y-auto">
-        {events.length === 0 && (
-          <div className="px-4 py-6 text-center">
-            <div className="text-[13px] text-[#B0B8C1] mb-1">
-              {isAnyConnected
-                ? `2,000만원+ 단일 체결 / 10 BTC+ 온체인 감지 중...`
-                : '웹소켓 연결 중...'}
-            </div>
-            <div className="text-[11px] text-[#C9CDD2]">대량 매매 발생 시 즉시 표시됩니다</div>
-          </div>
-        )}
-        {events.map((evt, i) => (
-          <EventRow
-            key={`${evt.id || evt.symbol}-${evt.timestamp}-${i}`}
-            event={evt}
-            coinMap={coinMap}
-            onItemClick={onItemClick}
-          />
-        ))}
+      {/* ── 탭 — 거래소 체결 / 온체인 이동 ──────────────────────── */}
+      <div className="flex border-b border-[#F2F4F6]">
+        <button
+          onClick={() => setActiveTab('exchange')}
+          className={`flex-1 py-2.5 text-[12px] font-semibold transition-colors ${
+            activeTab === 'exchange'
+              ? 'text-[#3182F6] border-b-2 border-[#3182F6] bg-white'
+              : 'text-[#B0B8C1] bg-[#FAFBFC] hover:text-[#4E5968]'
+          }`}
+        >
+          거래소 대량 체결
+          {exchangeEvents.length > 0 && (
+            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'exchange' ? 'bg-[#EDF4FF] text-[#3182F6]' : 'bg-[#F2F4F6] text-[#8B95A1]'}`}>
+              {exchangeEvents.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('onchain')}
+          className={`flex-1 py-2.5 text-[12px] font-semibold transition-colors ${
+            activeTab === 'onchain'
+              ? 'text-[#FF9500] border-b-2 border-[#FF9500] bg-white'
+              : 'text-[#B0B8C1] bg-[#FAFBFC] hover:text-[#4E5968]'
+          }`}
+        >
+          온체인 자금 이동
+          {onchainEvents.length > 0 && (
+            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'onchain' ? 'bg-[#FFF4E6] text-[#FF9500]' : 'bg-[#F2F4F6] text-[#8B95A1]'}`}>
+              {onchainEvents.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* 안내 — 이동 유형 범례 */}
-      <div className="px-4 py-2.5 border-t border-[#F2F4F6] bg-[#FAFBFC]">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          <span className="text-[10px] text-[#C9CDD2]">🔴 매도압력 = 거래소 입금</span>
-          <span className="text-[10px] text-[#C9CDD2]">🟢 HODLing = 거래소 출금</span>
-          <span className="text-[10px] text-[#C9CDD2]">🟡 차익거래 = 거래소간 이동</span>
-          <span className="text-[10px] text-[#C9CDD2]">⚪ OTC = 지갑간 이동</span>
-        </div>
+      {/* 탭별 설명 */}
+      <div className={`px-4 py-2 text-[10px] ${activeTab === 'exchange' ? 'text-[#3182F6] bg-[#F8FBFF]' : 'text-[#FF9500] bg-[#FFFBF5]'}`}>
+        {activeTab === 'exchange'
+          ? '업비트 2,000만원+ 단일 체결 — 매수/매도 방향성 포착'
+          : '블록체인 10 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름'}
       </div>
+
+      {/* 이벤트 목록 */}
+      <div className="max-h-[400px] overflow-y-auto">
+        {currentEvents.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <div className="text-[22px] mb-2">{activeTab === 'exchange' ? '📊' : '🔗'}</div>
+            <div className="text-[13px] text-[#B0B8C1] mb-1">
+              {!isAnyConnected
+                ? '연결 중...'
+                : activeTab === 'exchange'
+                ? '대량 체결 감지 중...'
+                : '온체인 자금 이동 감지 중...'}
+            </div>
+            <div className="text-[11px] text-[#C9CDD2]">
+              {activeTab === 'exchange' ? '2,000만원 이상 단일 체결 발생 시 표시' : '10 BTC 이상 이동 / 대형 자금 흐름 발생 시 표시'}
+            </div>
+          </div>
+        ) : (
+          currentEvents.map((evt, i) => (
+            <EventRow
+              key={`${evt.id || evt.symbol}-${evt.timestamp}-${i}`}
+              event={evt}
+              coinMap={coinMap}
+              onItemClick={onItemClick}
+            />
+          ))
+        )}
+      </div>
+
+      {/* 온체인 탭 범례 */}
+      {activeTab === 'onchain' && (
+        <div className="px-4 py-2.5 border-t border-[#F2F4F6] bg-[#FAFBFC]">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="text-[10px] text-[#C9CDD2]">🔴 거래소 입금 = 매도 압력</span>
+            <span className="text-[10px] text-[#C9CDD2]">🟢 거래소 출금 = HODLing</span>
+            <span className="text-[10px] text-[#C9CDD2]">🟡 거래소간 이동 = 차익거래?</span>
+            <span className="text-[10px] text-[#C9CDD2]">⚪ 지갑간 이동 = OTC</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
