@@ -44,19 +44,10 @@ export default async function handler(req) {
           });
         }
       }
-      if (results.length >= symbols.length * 0.7) {
-        return new Response(JSON.stringify({ results }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, s-maxage=60',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
-      }
     }
   } catch {}
 
-  // 2) Yahoo v8 개별 chart fallback — v7에서 누락된 심볼 보완
+  // 2) Yahoo v8 개별 chart fallback — v7에서 누락된 소형 ETF 항상 실행
   const found = new Set(results.map(r => r.symbol));
   const missing = symbols.filter(s => !found.has(s));
 
@@ -69,9 +60,14 @@ export default async function handler(req) {
       });
       if (!res.ok) throw new Error(`Yahoo v8 ${res.status}`);
       const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta || !meta.regularMarketPrice) throw new Error('no price');
-      const prev = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
+      const result = data?.chart?.result?.[0];
+      if (!result) throw new Error('no result');
+      const meta   = result.meta;
+      if (!meta?.regularMarketPrice) throw new Error('no price');
+      const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
+      const prev   = meta.previousClose ?? meta.chartPreviousClose
+        ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
+        ?? meta.regularMarketPrice;
       return {
         symbol,
         price:     meta.regularMarketPrice,

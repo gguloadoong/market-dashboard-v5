@@ -97,7 +97,10 @@ async function fetchYahooChart(symbol) {
   if (!result) throw new Error(`No chart: ${symbol}`);
   const meta   = result.meta;
   const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-  const prev   = meta.previousClose ?? meta.chartPreviousClose ?? meta.regularMarketPrice;
+  // closes[-2]를 전일 종가로 사용 (meta.previousClose 없는 소형 ETF 대응)
+  const prev   = meta.previousClose ?? meta.chartPreviousClose
+    ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
+    ?? meta.regularMarketPrice;
   return {
     symbol:    meta.symbol?.split('.')[0],
     price:     meta.regularMarketPrice,

@@ -201,8 +201,7 @@ const BLOCK_KW = [
 
 const FINANCE_SOURCES = new Set([
   '코인데스크코리아','블록미디어','한국경제','매일경제','조선비즈',
-  'CoinTelegraph','CoinDesk','Decrypt','Bloomberg','Reuters',
-  'Reuters Markets','MarketWatch','Investing.com','Finnhub',
+  '연합뉴스','구글뉴스',
 ]);
 
 function isFinancialNews(item) {
@@ -249,30 +248,13 @@ const KR_COIN_NEWS_QUERIES = [
   },
 ];
 
-// [코인] 영문 직접 RSS 피드 — CoinDesk, Decrypt, CoinTelegraph
-const EN_COIN_RSS_FEEDS = [
-  {
-    url: 'https://www.coindesk.com/arc/outboundfeeds/rss/',
-    source: 'CoinDesk',
-  },
-  {
-    url: 'https://decrypt.co/feed',
-    source: 'Decrypt',
-  },
-  {
-    url: 'https://cointelegraph.com/rss',
-    source: 'CoinTelegraph',
-  },
-];
-
 async function fetchCoinNews() {
   const cached = cacheGet('coin');
   if (cached?.fresh) return cached.data;
 
-  // 한국어 구글뉴스 2개 + 영문 직접 RSS 3개 — 총 5개 소스 병렬 취득
+  // 한국어 구글뉴스 2개만 — 영문 RSS 제거 (영어 뉴스 노출 방지)
   const allFeeds = [
     ...KR_COIN_NEWS_QUERIES.map(({ url, source }) => ({ url, source })),
-    ...EN_COIN_RSS_FEEDS,
   ];
   const results = await Promise.allSettled(
     allFeeds.map(({ url, source }) =>
@@ -316,29 +298,14 @@ const KR_US_NEWS_QUERIES = [
   },
 ];
 
-// [미장] 영문 직접 RSS 피드 — Yahoo Finance, MarketWatch
-const EN_US_RSS_FEEDS = [
-  {
-    url: 'https://finance.yahoo.com/news/rssindex',
-    source: 'Yahoo Finance',
-  },
-  {
-    url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',
-    source: 'MarketWatch',
-  },
-];
-
-// [미장] 한국어 구글뉴스 멀티쿼리 + 영문 직접 RSS
-// 한국어 구글뉴스: 미증시 + 연준/금리 + 유가 + 지정학
-// 영문 직접 RSS: Yahoo Finance, MarketWatch
+// [미장] 한국어 구글뉴스 멀티쿼리만 사용 — 영문 RSS 제거 (영어 뉴스 노출 방지)
 async function fetchUsNews() {
   const cached = cacheGet('us');
   if (cached?.fresh) return cached.data;
 
-  // 한국어 구글뉴스 4개 + 영문 직접 RSS 2개 — 총 6개 소스 병렬 취득
+  // 한국어 구글뉴스 4개만 — Yahoo Finance/MarketWatch RSS 영어 소스 제거
   const allFeeds = [
     ...KR_US_NEWS_QUERIES.map(({ url, source }) => ({ url, source })),
-    ...EN_US_RSS_FEEDS,
   ];
   const results = await Promise.allSettled(
     allFeeds.map(({ url, source }) =>
@@ -509,7 +476,8 @@ export async function fetchStockDirectNews(name, market) {
   } else if (market === 'COIN') {
     url = `https://news.google.com/rss/search?q=${q}+코인+암호화폐&hl=ko&gl=KR&ceid=KR:ko`;
   } else {
-    url = `https://news.google.com/rss/search?q=${q}+stock&hl=en&gl=US&ceid=US:en`;
+    // 미장/ETF: 한국어 구글뉴스로 검색 (영어 기사 노출 방지)
+    url = `https://news.google.com/rss/search?q=${q}+주가+증시&hl=ko&gl=KR&ceid=KR:ko`;
   }
 
   const cat   = market === 'KR' ? 'kr' : market === 'COIN' ? 'coin' : 'us';
