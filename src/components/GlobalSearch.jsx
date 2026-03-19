@@ -1,5 +1,5 @@
 // 전역 종목 검색 모달 — `/` 키로 열기, ESC / 바깥 클릭으로 닫기
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 
 function fmt(n, d = 0) {
   if (n == null || isNaN(n)) return '—';
@@ -29,8 +29,11 @@ const MARKET_COLOR = { kr: '#F04452', us: '#3182F6', coin: '#FF9500', etf: '#8B5
 export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = 1466, onSelect, onClose }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [naverItems, setNaverItems] = useState([]);
+  const [naverLoading, setNaverLoading] = useState(false);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const naverTimerRef = useRef(null);
 
   // 포커스
   useEffect(() => {
@@ -40,6 +43,29 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
   // 쿼리 변경 시 선택 초기화
   useEffect(() => {
     setSelectedIndex(-1);
+  }, [query]);
+
+  // 네이버 실시간 검색 (디바운스 300ms)
+  useEffect(() => {
+    clearTimeout(naverTimerRef.current);
+    if (!query.trim()) {
+      setNaverItems([]);
+      setNaverLoading(false);
+      return;
+    }
+    setNaverLoading(true);
+    naverTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/naver-search?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        setNaverItems(data.items || []);
+      } catch {
+        setNaverItems([]);
+      } finally {
+        setNaverLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(naverTimerRef.current);
   }, [query]);
 
   // ESC + 키보드 네비게이션
@@ -80,7 +106,9 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
   const results = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
-    return allItems
+
+    // 기존 allItems 필터
+    const local = allItems
       .filter(i =>
         (i.name   || '').toLowerCase().includes(q) ||
         (i.symbol || '').toLowerCase().includes(q)
@@ -95,14 +123,34 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         const bStart = (b.name || '').toLowerCase().startsWith(q) || (b.symbol || '').toLowerCase().startsWith(q);
         if (aStart !== bStart) return aStart ? -1 : 1;
         return 0;
-      })
-      .slice(0, 10);
-  }, [query, allItems]);
+      });
 
-  const handleSelect = (item) => {
+    // 로컬 결과의 code/symbol 집합 (중복 제거용)
+    const localCodes = new Set(local.map(i => (i.symbol || i.id || '').toUpperCase()));
+
+    // 네이버 검색 결과 정규화 — 중복 제거 후 추가
+    const naverNormalized = naverItems
+      .filter(item => !localCodes.has((item.code || '').toUpperCase()))
+      .map(item => ({
+        id:       item.code,
+        code:     item.code,
+        symbol:   item.code,
+        name:     item.name,
+        market:   'kr',
+        _market:  'kr',
+        price:    0,
+        changePct: 0,
+        change:   0,
+        _naverOnly: true,
+      }));
+
+    return [...local, ...naverNormalized].slice(0, 15);
+  }, [query, allItems, naverItems]);
+
+  const handleSelect = useCallback((item) => {
     onSelect?.(item);
     onClose?.();
-  };
+  }, [onSelect, onClose]);
 
   return (
     <>
@@ -140,9 +188,17 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
 
         {/* 결과 */}
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
-          {query && results.length === 0 ? (
+          {query && results.length === 0 && !naverLoading ? (
             <div className="px-5 py-8 text-center text-[14px] text-[#B0B8C1]">
               "{query}" 검색 결과가 없습니다.
+            </div>
+          ) : naverLoading && results.length === 0 ? (
+            <div className="px-5 py-8 text-center text-[14px] text-[#B0B8C1] flex items-center justify-center gap-2">
+              <svg className="animate-spin w-4 h-4 text-[#3182F6]" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+              </svg>
+              검색 중...
             </div>
           ) : results.length > 0 ? (
             results.map((item, idx) => {
@@ -212,7 +268,7 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         <div className="px-4 py-2.5 bg-[#F8F9FA] border-t border-[#F2F4F6] flex items-center gap-3 text-[11px] text-[#B0B8C1]">
           <span><kbd className="bg-white border border-[#E5E8EB] px-1 rounded text-[10px]">↑↓</kbd> 이동</span>
           <span><kbd className="bg-white border border-[#E5E8EB] px-1 rounded text-[10px]">Enter</kbd> 선택</span>
-          <span className="ml-auto">{allItems.length}개 종목 검색 가능</span>
+          <span className="ml-auto">{allItems.length}개 종목 + KRX 실시간 검색</span>
         </div>
       </div>
     </>
