@@ -2,14 +2,14 @@ import { useState, useMemo } from 'react';
 import SectorRotation from '../SectorRotation';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
-import { getPct, findRelatedNewsMulti } from './utils';
+import { getPct } from './utils';
 import MarketPulseWidget from './widgets/MarketPulseWidget';
 import WatchlistWidget from './widgets/WatchlistWidget';
 import TopMoversWidget from './widgets/TopMoversWidget';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import SignalWidget from './widgets/SignalWidget';
 import MarketInvestorSection from './MarketInvestorSection';
-import EventCalendar from './EventCalendar';
+// EventCalendar 삭제 — EventTicker 모달로 대체
 import EventTicker from './EventTicker';
 import CoinListingSection from './CoinListingSection';
 
@@ -49,13 +49,22 @@ export default function HomeDashboard({
     [allItems, watchlist] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // WIDGET 3: 급등/급락 TOP5
-  const krHot   = useMemo(() => [...krItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [krItems]);
-  const usHot   = useMemo(() => [...usItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [usItems]);
-  const coinHot = useMemo(() => [...coinItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [coinItems]);
-  const krDrop  = useMemo(() => [...krItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [krItems]);
-  const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
-  const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
+  // WIDGET 3: 주목할만한 움직임 — |changePct| 기준 혼합 정렬, 마켓별 최대 3개
+  const notableMovers = useMemo(() => {
+    const sorted = [...allItems]
+      .filter(i => Math.abs(getPct(i)) >= 0.5)
+      .sort((a, b) => Math.abs(getPct(b)) - Math.abs(getPct(a)));
+    const result = [];
+    const marketCount = { KR: 0, US: 0, COIN: 0 };
+    for (const item of sorted) {
+      const mkt = item._market;
+      if (marketCount[mkt] >= 3) continue;
+      result.push(item);
+      marketCount[mkt]++;
+      if (result.length >= 5) break;
+    }
+    return result;
+  }, [allItems]);
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
@@ -84,14 +93,14 @@ export default function HomeDashboard({
       {/* ─── 시장 투자자 동향 ─────────────────────────────── */}
       <MarketInvestorSection />
 
-      {/* ─── WIDGET 3: 급등/급락 ─────────────────────────── */}
-      <TopMoversWidget
-        hasData={hasData}
-        krHot={krHot} usHot={usHot} coinHot={coinHot}
-        krDrop={krDrop} usDrop={usDrop} coinDrop={coinDrop}
-        krwRate={krwRate}
-        onItemClick={onItemClick}
-      />
+      {/* ─── WIDGET 3: 주목할만한 움직임 ─────────────────── */}
+      {notableMovers.length > 0 && (
+        <TopMoversWidget
+          movers={notableMovers}
+          krwRate={krwRate}
+          onItemClick={onItemClick}
+        />
+      )}
 
       {/* ─── WIDGET 4: 뉴스 피드 ──────────────────────────── */}
       <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} />
@@ -99,26 +108,24 @@ export default function HomeDashboard({
       {/* ─── 코인 거래소 공지 ─────────────────────────────── */}
       <CoinListingSection />
 
-      {/* ─── 하단 접힘: 섹터 로테이션 + 이벤트 캘린더 ──────── */}
-      <div>
-        <button
-          onClick={() => setCollapsed(p => !p)}
-          className="w-full flex items-center justify-center gap-2 py-2 text-[12px] text-[#8B95A1] hover:text-[#4E5968] transition-colors"
-        >
-          <div className="flex-1 h-px bg-[#F2F4F6]" />
-          <span>{collapsed ? '▼ 더보기 (섹터·캘린더)' : '▲ 접기'}</span>
-          <div className="flex-1 h-px bg-[#F2F4F6]" />
-        </button>
-
-        {!collapsed && (
-          <div className="space-y-4 mt-2">
-            {(krStocks.length > 0 || usStocks.length > 0 || coins.length > 0) && (
+      {/* ─── 하단 접힘: 섹터 로테이션 ─────────────────────── */}
+      {(krStocks.length > 0 || usStocks.length > 0 || coins.length > 0) && (
+        <div>
+          <button
+            onClick={() => setCollapsed(p => !p)}
+            className="w-full flex items-center justify-center gap-2 py-2 text-[12px] text-[#8B95A1] hover:text-[#4E5968] transition-colors"
+          >
+            <div className="flex-1 h-px bg-[#F2F4F6]" />
+            <span>{collapsed ? '▼ 더보기 (섹터 로테이션)' : '▲ 접기'}</span>
+            <div className="flex-1 h-px bg-[#F2F4F6]" />
+          </button>
+          {!collapsed && (
+            <div className="mt-2">
               <SectorRotation krStocks={krStocks} usStocks={usStocks} coins={coins} />
-            )}
-            <EventCalendar />
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
