@@ -6,6 +6,7 @@ import MarketSummaryBar from './components/MarketSummaryBar';
 import WatchlistTable from './components/WatchlistTable';
 import BreakingNewsPanel from './components/BreakingNewsPanel';
 import ChartSidePanel from './components/ChartSidePanel';
+import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
 import GlobalSearch from './components/GlobalSearch';
 
@@ -40,6 +41,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [loading, setLoading]           = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedNews, setSelectedNews] = useState(null);
   const [searchOpen, setSearchOpen]     = useState(false);
   const [notifBanner, setNotifBanner]   = useState(() => {
     const perm = getNotificationPermission();
@@ -173,7 +175,7 @@ export default function App() {
             />
           ) : activeTab === 'news' ? (
             <div className="lg:hidden h-[calc(100vh-112px)]">
-              <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} />
+              <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
             </div>
           ) : (
             <>
@@ -189,12 +191,15 @@ export default function App() {
         </div>
 
         <div className="hidden lg:block self-start" style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}>
-          <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} />
+          <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
         </div>
       </div>
 
       {selectedItem && (
         <ChartSidePanel item={selectedItem} krwRate={krwRate} onClose={() => setSelectedItem(null)} onRelatedClick={setSelectedItem} allData={allData} />
+      )}
+      {selectedNews && (
+        <NewsSidePanel news={selectedNews} allData={allData} krwRate={krwRate} onClose={() => setSelectedNews(null)} onRelatedClick={setSelectedItem} />
       )}
       {searchOpen && (
         <GlobalSearch krStocks={krStocks} usStocks={usStocks} coins={coins} etfs={etfItems} krwRate={krwRate} onSelect={setSelectedItem} onClose={() => setSearchOpen(false)} />

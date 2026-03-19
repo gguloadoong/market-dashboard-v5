@@ -1,7 +1,7 @@
 // 관심종목 위젯
 import { getPct, fmt } from '../utils';
 
-function WatchRow({ item, krwRate, onItemClick }) {
+function WatchRow({ item, krwRate, onItemClick, onToggle }) {
   const pct    = getPct(item);
   const isUp   = pct > 0;
   const isDown = pct < 0;
@@ -22,10 +22,9 @@ function WatchRow({ item, krwRate, onItemClick }) {
 
   return (
     <div
-      onClick={() => onItemClick?.(item)}
-      className="flex items-center justify-between px-4 py-2.5 hover:bg-[#F7F8FA] cursor-pointer transition-colors rounded-xl"
+      className="flex items-center justify-between px-4 py-2.5 hover:bg-[#F7F8FA] transition-colors rounded-xl"
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer" onClick={() => onItemClick?.(item)}>
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
           style={{ background: mktBadge.bg, color: mktBadge.color }}>
           {mktBadge.label}
@@ -38,11 +37,18 @@ function WatchRow({ item, krwRate, onItemClick }) {
         </div>
         <div className="text-[10px] text-[#8B95A1] tabular-nums font-mono">{price}</div>
       </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle?.(item.id || item.symbol); }}
+        className="ml-2 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[#FFF0F0] transition-colors text-[14px]"
+        title="관심종목 제거"
+      >
+        ★
+      </button>
     </div>
   );
 }
 
-export default function WatchlistWidget({ watchedItems, toggle, onItemClick }) {
+export default function WatchlistWidget({ watchedItems, toggle, onItemClick, krwRate = 1466 }) {
   if (!watchedItems.length) {
     return (
       <div className="bg-white rounded-2xl p-4 border border-[#F2F4F6] shadow-sm">
@@ -64,7 +70,7 @@ export default function WatchlistWidget({ watchedItems, toggle, onItemClick }) {
       </div>
       <div className="py-1 max-h-[280px] overflow-y-auto">
         {watchedItems.map(item => (
-          <WatchRow key={item.id || item.symbol} item={item} onItemClick={onItemClick} />
+          <WatchRow key={item.id || item.symbol} item={item} krwRate={krwRate} onItemClick={onItemClick} onToggle={toggle} />
         ))}
       </div>
     </div>

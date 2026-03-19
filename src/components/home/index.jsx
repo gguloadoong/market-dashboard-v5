@@ -65,7 +65,7 @@ export default function HomeDashboard({
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
       {/* ─── WIDGET 2: 관심종목 ────────────────────────────── */}
-      <WatchlistWidget watchedItems={watchedItems} toggle={toggle} onItemClick={onItemClick} />
+      <WatchlistWidget watchedItems={watchedItems} toggle={toggle} onItemClick={onItemClick} krwRate={krwRate} />
 
       {/* ─── WIDGET 5: Signal (이유 있는 움직임 + 선행신호) ── */}
       {hasData && (
