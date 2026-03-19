@@ -396,47 +396,71 @@ const ALL_INDICES = [
   { id: 'DXY',    symbol: 'DX-Y.NYB' },
 ];
 
+// 한투 업종지수 (KOSPI/KOSDAQ — 가장 정확한 실시간)
+async function fetchHantooIndices() {
+  const res = await fetch('/api/hantoo-indices', { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`한투 지수 ${res.status}`);
+  const json = await res.json();
+  return json.data || [];
+}
+
+const ALL_INDEX_IDS = ['KOSPI', 'KOSDAQ', 'SPX', 'NDX', 'DJI', 'DXY'];
+
 export async function fetchIndices() {
-  // 0) Vercel Edge 프록시 /api/market-indices — 서버사이드 직접 Yahoo 호출 (allorigins 불필요)
+  let results = [];
+
+  // 0) Vercel Edge 프록시 /api/market-indices — 서버사이드 직접 Yahoo 호출
   try {
     const res = await fetch('/api/market-indices', { signal: AbortSignal.timeout(10000) });
     if (res.ok) {
       const data = await res.json();
-      if (data.results?.length >= 3) return data.results;
+      if (data.results?.length > 0) results = data.results;
     }
   } catch {}
 
-  // 1) KOSPI: Stooq 1순위 → Yahoo fallback (allorigins 경유)
-  const kospiPromise = (async () => {
+  // 1) 누락된 지수 확인 — Edge 프록시가 부분 결과 반환 시 보충
+  const have = new Set(results.map(r => r.id));
+  const missing = ALL_INDEX_IDS.filter(id => !have.has(id));
+
+  if (missing.length === 0) return results;
+
+  // 2) KOSPI/KOSDAQ 누락 시 한투 API 보충 (가장 정확)
+  const missingKr = missing.filter(id => id === 'KOSPI' || id === 'KOSDAQ');
+  if (missingKr.length > 0) {
     try {
-      return await fetchStooqKospi();
-    } catch {
-      // Stooq 실패 시 Yahoo Finance fallback (최대 ~10분 지연 가능)
-      const result = await fetchYahooRace('^KS11', 'KOSPI');
-      return {
-        ...result,
-        isDelayed: true,    // Yahoo 경유 시 지연 가능성 있음
-        dataDelay: '~10분 지연',
-      };
-    }
-  })();
-
-  // KOSDAQ + 해외 지수: Yahoo Finance (지연 가능성 명시)
-  const otherResults = await Promise.allSettled(
-    ALL_INDICES.map(({ id, symbol }) => fetchYahooRace(symbol, id))
-  );
-
-  const others = otherResults
-    .filter(r => r.status === 'fulfilled')
-    .map(r => {
-      const v = r.value;
-      // KOSDAQ은 Yahoo 경유 — 지연 가능성 플래그
-      if (v.id === 'KOSDAQ') {
-        return { ...v, isDelayed: true, dataDelay: '~10분 지연' };
+      const hantooData = await fetchHantooIndices();
+      for (const idx of hantooData) {
+        if (missingKr.includes(idx.id)) {
+          results.push(idx);
+          have.add(idx.id);
+        }
       }
-      return { ...v, isDelayed: false, dataDelay: '실시간(추정)' };
+    } catch {}
+  }
+
+  // 3) 여전히 누락된 지수: Stooq(KOSPI) + Yahoo allorigins(나머지) fallback
+  const stillMissing = ALL_INDEX_IDS.filter(id => !have.has(id));
+  if (stillMissing.length > 0) {
+    const fallbackPromises = stillMissing.map(async (id) => {
+      if (id === 'KOSPI') {
+        try { return await fetchStooqKospi(); } catch {}
+        try {
+          const r = await fetchYahooRace('^KS11', 'KOSPI');
+          return { ...r, isDelayed: true, dataDelay: '~10분 지연' };
+        } catch {}
+        return null;
+      }
+      const entry = ALL_INDICES.find(x => x.id === id);
+      if (!entry) return null;
+      try { return await fetchYahooRace(entry.symbol, id); } catch {}
+      return null;
     });
 
-  const kospi = await kospiPromise.catch(() => null);
-  return [...(kospi ? [kospi] : []), ...others];
+    const settled = await Promise.allSettled(fallbackPromises);
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value) results.push(r.value);
+    }
+  }
+
+  return results;
 }
