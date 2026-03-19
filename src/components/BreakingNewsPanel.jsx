@@ -41,7 +41,7 @@ const CAT_COLOR = {
   kr:   { bg: '#FFF0F0', color: '#F04452', label: 'KR'   },
 };
 
-function NewsItem({ item }) {
+function NewsItem({ item, onNewsClick }) {
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
   // 시그널 태그 추출 — pubDate 전달하여 속보(🔴 속보) 자동 감지, 최대 2개
   const signals = extractNewsSignals(item.title, item.pubDate);
@@ -49,10 +49,8 @@ function NewsItem({ item }) {
   const stockTags = extractStockTags(item.title);
 
   return (
-    <a
-      href={item.link}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
+      onClick={() => onNewsClick?.(item)}
       className="block px-4 py-3 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-1.5 mb-1.5">
@@ -86,7 +84,7 @@ function NewsItem({ item }) {
           ))}
         </div>
       )}
-    </a>
+    </div>
   );
 }
 
@@ -159,7 +157,7 @@ function getWhalePinInsight(evt) {
   return '대형 지갑 자산 이동 감지';
 }
 
-export default function BreakingNewsPanel({ coins = [], onItemClick }) {
+export default function BreakingNewsPanel({ coins = [], onItemClick, onNewsClick }) {
   const [activeTab, setActiveTab] = useState('all');
   const { data: rawNews = [], isLoading, isError, refetch } = useTabNews(activeTab);
   // 고래 미리보기 핀 — WhalePanel이 이벤트 발행 시 자동 업데이트
@@ -282,7 +280,7 @@ export default function BreakingNewsPanel({ coins = [], onItemClick }) {
             )}
 
             {!isLoading && !isError && news.map(item => (
-              <NewsItem key={item.id} item={item} />
+              <NewsItem key={item.id} item={item} onNewsClick={onNewsClick} />
             ))}
           </>
         )}
