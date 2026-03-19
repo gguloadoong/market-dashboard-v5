@@ -8,8 +8,8 @@ import WatchlistWidget from './widgets/WatchlistWidget';
 import TopMoversWidget from './widgets/TopMoversWidget';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import SignalWidget from './widgets/SignalWidget';
+import NotableMoversSection from './NotableMoversSection';
 import MarketInvestorSection from './MarketInvestorSection';
-// EventCalendar 삭제 — EventTicker 모달로 대체
 import EventTicker from './EventTicker';
 import CoinListingSection from './CoinListingSection';
 
@@ -43,28 +43,35 @@ export default function HomeDashboard({
     });
   }, [allNews]);
 
-  // WIDGET 2: 관심종목
+  // 관심종목
   const watchedItems = useMemo(
     () => allItems.filter(i => isWatched(i.id || i.symbol)),
     [allItems, watchlist] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // WIDGET 3: 주목할만한 움직임 — |changePct| 기준 혼합 정렬, 마켓별 최대 3개
-  const notableMovers = useMemo(() => {
-    const sorted = [...allItems]
-      .filter(i => Math.abs(getPct(i)) >= 0.5)
-      .sort((a, b) => Math.abs(getPct(b)) - Math.abs(getPct(a)));
+  // 관심종목 빈 상태 시 인기 종목 추천 (거래량 기준 마켓 혼합 TOP5)
+  const popularItems = useMemo(() => {
+    if (watchedItems.length > 0) return [];
+    const getVol = i => i._market === 'COIN' ? (i.volume24h ?? 0) : (i.volume ?? 0);
+    const sorted = [...allItems].sort((a, b) => getVol(b) - getVol(a));
     const result = [];
-    const marketCount = { KR: 0, US: 0, COIN: 0 };
+    const mktCount = { KR: 0, US: 0, COIN: 0 };
     for (const item of sorted) {
-      const mkt = item._market;
-      if (marketCount[mkt] >= 3) continue;
+      if (mktCount[item._market] >= 2) continue;
       result.push(item);
-      marketCount[mkt]++;
+      mktCount[item._market]++;
       if (result.length >= 5) break;
     }
     return result;
-  }, [allItems]);
+  }, [watchedItems.length, allItems]);
+
+  // 급등/급락 TOP5
+  const krHot   = useMemo(() => [...krItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [krItems]);
+  const usHot   = useMemo(() => [...usItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [usItems]);
+  const coinHot = useMemo(() => [...coinItems].sort((a, b) => getPct(b) - getPct(a)).slice(0, 5), [coinItems]);
+  const krDrop  = useMemo(() => [...krItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [krItems]);
+  const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
+  const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
@@ -74,13 +81,29 @@ export default function HomeDashboard({
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
-      {/* ─── 경제 이벤트 티커 (펄스↔관심종목 사이) ─────────── */}
+      {/* ─── 경제 이벤트 티커 ─────────────────────────────── */}
       <EventTicker />
 
-      {/* ─── WIDGET 2: 관심종목 ────────────────────────────── */}
-      <WatchlistWidget watchedItems={watchedItems} toggle={toggle} onItemClick={onItemClick} krwRate={krwRate} />
+      {/* ─── WIDGET 2: 관심종목 (빈 상태 시 인기 종목 추천) ── */}
+      <WatchlistWidget
+        watchedItems={watchedItems}
+        popularItems={popularItems}
+        toggle={toggle}
+        onItemClick={onItemClick}
+        krwRate={krwRate}
+      />
 
-      {/* ─── WIDGET 5: Signal (이유 있는 움직임 + 선행신호) ── */}
+      {/* ─── 주목할만한 움직임 (복합 스코어 카드) ───────────── */}
+      {hasData && (
+        <NotableMoversSection
+          allItems={allItems}
+          recentNews={recentNews}
+          krwRate={krwRate}
+          onItemClick={onItemClick}
+        />
+      )}
+
+      {/* ─── Signal (이유 있는 움직임) ────────────────────── */}
       {hasData && (
         <SignalWidget
           allItems={allItems}
@@ -93,16 +116,16 @@ export default function HomeDashboard({
       {/* ─── 시장 투자자 동향 ─────────────────────────────── */}
       <MarketInvestorSection />
 
-      {/* ─── WIDGET 3: 주목할만한 움직임 ─────────────────── */}
-      {notableMovers.length > 0 && (
-        <TopMoversWidget
-          movers={notableMovers}
-          krwRate={krwRate}
-          onItemClick={onItemClick}
-        />
-      )}
+      {/* ─── 급등/급락 6박스 ──────────────────────────────── */}
+      <TopMoversWidget
+        hasData={hasData}
+        krHot={krHot} usHot={usHot} coinHot={coinHot}
+        krDrop={krDrop} usDrop={usDrop} coinDrop={coinDrop}
+        krwRate={krwRate}
+        onItemClick={onItemClick}
+      />
 
-      {/* ─── WIDGET 4: 뉴스 피드 ──────────────────────────── */}
+      {/* ─── 투자 시그널 뉴스 ─────────────────────────────── */}
       <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} />
 
       {/* ─── 코인 거래소 공지 ─────────────────────────────── */}
