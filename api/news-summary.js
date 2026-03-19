@@ -3,7 +3,7 @@
 export const config = { runtime: 'edge' };
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 // HTML 엔티티 디코딩 + 공백 정리
 function cleanText(s) {
@@ -85,7 +85,10 @@ async function summarize(text, isFullArticle = false) {
     }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Gemini ${res.status}: ${errBody.slice(0, 200)}`);
+  }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
 }
@@ -113,7 +116,9 @@ export default async function handler(req) {
     let articleText = '';
     try {
       articleText = await fetchArticleText(url);
-    } catch { /* 크롤 실패 */ }
+    } catch (e) {
+      console.warn('[news-summary] 크롤 실패:', url, e.message);
+    }
 
     // 크롤 성공 시 기사 본문, 실패 시 제목+description 조합
     const isFullArticle = articleText.length > 200;
