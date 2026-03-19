@@ -470,3 +470,6 @@ export const INDICES_INITIAL = [
   { id:'DJI',    name:'DOW',      value:44027.80, change:0, changePct:0, market:'us' },
   { id:'DXY',    name:'USD Index',value:100.50,   change:0,    changePct:0,  market:'us' },
 ];
+
+// ─── 기본 국장 관심종목 (코스피 상위 20개 — 초기 watchlist 기본값) ────
+export const DEFAULT_KR_WATCHLIST = KOREAN_STOCKS.slice(0, 20);

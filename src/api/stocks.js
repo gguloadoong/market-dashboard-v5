@@ -125,19 +125,24 @@ async function fetchYahooChart(symbol) {
 
 // ─── 미국 주식 ─────────────────────────────────────────────────
 export async function fetchUsStocksBatch(symbols) {
-  // 1) Stooq (직접 CORS 허용, 안정적) — Prev_Close 필드 기반 전일 종가 대비 등락률
+  // 1) /api/us-price — Yahoo v8 실시간 (Vercel Edge 프록시)
+  try {
+    const res = await fetch(`/api/us-price?symbols=${symbols.join(',')}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results?.length >= symbols.length * 0.7) return data.results;
+    }
+  } catch {}
+
+  // 2) Stooq (직접 CORS 허용, EOD 데이터) — Prev_Close 필드 기반 전일 종가 대비 등락률
   try {
     const data = await fetchStooq(symbols);
     if (data.length >= symbols.length * 0.7) return data;
   } catch {}
 
-  // 2) Alpaca Markets — VITE_ALPACA_KEY 설정 시만 시도 (미설정이면 자동 skip)
-  try {
-    const data = await fetchAlpaca(symbols);
-    if (data.length >= symbols.length * 0.7) return data;
-  } catch {}
-
-  // 3) Yahoo v7 batch via allorigins proxy — Stooq/Alpaca 실패 시 fallback
+  // 3) Yahoo v7 batch via allorigins proxy — Stooq 실패 시 fallback
   try {
     const results = await fetchYahooQuoteBatch(symbols);
     if (results.length >= symbols.length * 0.7) return results.map(r => ({
@@ -149,7 +154,7 @@ export async function fetchUsStocksBatch(symbols) {
       marketCap: r.marketCap,
       high52w:   r.fiftyTwoWeekHigh,
       low52w:    r.fiftyTwoWeekLow,
-      _source:   'yahoo', // 데이터 소스 태그
+      _source:   'yahoo',
     }));
   } catch {}
 

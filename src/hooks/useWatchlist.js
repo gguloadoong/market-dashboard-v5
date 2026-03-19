@@ -1,7 +1,10 @@
 // 관심종목 훅 — localStorage 기반 영구 저장
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 const KEY = 'watchlist_v1';
+
+// 6자리 숫자 = 한국 주식 심볼 패턴
+const KR_SYMBOL_RE = /^\d{6}$/;
 
 function load() {
   try { return new Set(JSON.parse(localStorage.getItem(KEY)) ?? []); } catch { return new Set(); }
@@ -25,5 +28,11 @@ export function useWatchlist() {
 
   const isWatched = useCallback((id) => watchlist.has(id), [watchlist]);
 
-  return { watchlist, toggle, isWatched };
+  // 관심종목 중 한국 주식 심볼만 추출 (6자리 숫자)
+  const krSymbols = useMemo(
+    () => [...watchlist].filter(id => KR_SYMBOL_RE.test(id)),
+    [watchlist]
+  );
+
+  return { watchlist, toggle, isWatched, krSymbols };
 }
