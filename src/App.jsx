@@ -14,6 +14,7 @@ import { ETF_DATA } from './data/mock';
 import { fetchKoreanStocksBatch, fetchEtfPricesBatch } from './api/stocks';
 import { requestNotificationPermission, getNotificationPermission, setAlertWatchlistIds } from './utils/priceAlert';
 import { useWatchlist } from './hooks/useWatchlist';
+import { useKrxEtf } from './hooks/useKrxEtf';
 import { useKisWebSocket } from './hooks/useKisWebSocket';
 import { usePrices } from './hooks/usePrices';
 import { useCoins } from './hooks/useCoins';
@@ -36,6 +37,7 @@ export default function App() {
   // krSymbols 동기화
   useEffect(() => { krSymbolsRef.current = krSymbols; }, [krSymbols, krSymbolsRef]);
 
+  const { data: krxEtfs = [] } = useKrxEtf();
   const [activeTab, setActiveTab]       = useState('home');
   const [etfs, setEtfs]                 = useState(ETF_DATA);
   const [lastUpdated, setLastUpdated]   = useState(null);
@@ -124,8 +126,16 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
+  // KRX ETF 병합 — 기존 ETF_DATA + KRX 신규 ETF (중복 symbol 제거)
+  const mergedEtfs = useMemo(() => {
+    if (!krxEtfs.length) return etfs;
+    const existingSymbols = new Set(etfs.map(e => e.symbol));
+    const newEtfs = krxEtfs.filter(e => !existingSymbols.has(e.symbol));
+    return [...etfs, ...newEtfs];
+  }, [etfs, krxEtfs]);
+
   // 탭별 데이터
-  const etfItems       = useMemo(() => etfs.map(e => ({ ...e, marketCap: e.aum })), [etfs]);
+  const etfItems       = useMemo(() => mergedEtfs.map(e => ({ ...e, marketCap: e.aum })), [mergedEtfs]);
   const activeCoinData = activeTab === 'coin' ? coins : undefined;
   const tabItems       = useMemo(() => {
     switch (activeTab) {
@@ -138,7 +148,7 @@ export default function App() {
     }
   }, [activeTab, krStocks, usStocks, activeCoinData, etfItems]);
   const allStocks = useMemo(() => [...krStocks, ...usStocks], [krStocks, usStocks]);
-  const allData   = useMemo(() => ({ krStocks, usStocks, coins, etfs }), [krStocks, usStocks, coins, etfs]);
+  const allData   = useMemo(() => ({ krStocks, usStocks, coins, etfs: mergedEtfs }), [krStocks, usStocks, coins, mergedEtfs]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
@@ -171,7 +181,7 @@ export default function App() {
           {activeTab === 'home' ? (
             <HomeDashboard
               indices={indices} krStocks={krStocks} usStocks={usStocks}
-              coins={coins} etfs={etfs} krwRate={krwRate} onItemClick={setSelectedItem}
+              coins={coins} etfs={mergedEtfs} krwRate={krwRate} onItemClick={setSelectedItem}
             />
           ) : activeTab === 'news' ? (
             <div className="lg:hidden h-[calc(100vh-112px)]">
