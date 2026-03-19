@@ -402,7 +402,7 @@ export async function fetchIndices() {
     const res = await fetch('/api/market-indices', { signal: AbortSignal.timeout(10000) });
     if (res.ok) {
       const data = await res.json();
-      if (data.results?.length >= 5) return data.results;
+      if (data.results?.length >= 3) return data.results;
     }
   } catch {}
 
