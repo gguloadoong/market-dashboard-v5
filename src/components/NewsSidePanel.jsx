@@ -1,5 +1,5 @@
-// 뉴스 상세 슬라이드 패널 — 요약 + 관련 종목 + 원문 링크
-import { useMemo, useEffect } from 'react';
+// 뉴스 상세 슬라이드 패널 — AI 요약 + 관련 종목 + 원문 링크
+import { useMemo, useEffect, useState } from 'react';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 
 const CAT_COLOR = {
@@ -59,6 +59,8 @@ function RelatedRow({ item, krwRate, onItemClick }) {
 
 export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelatedClick }) {
   const { krStocks = [], usStocks = [], coins = [] } = allData || {};
+  const [aiSummary, setAiSummary]     = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   // ESC 키로 닫기
   useEffect(() => {
@@ -67,7 +69,23 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // 관련 종목 매칭 — 뉴스 제목+본문으로 종목명 스캔
+  // AI 요약 fetch — 패널 열릴 때 1회
+  useEffect(() => {
+    if (!news?.link) return;
+    setAiSummary(null);
+    setSummaryLoading(true);
+    const rssDesc = (news.description || news.summary || '')
+      .replace(/<[^>]+>/g, '').trim().slice(0, 500);
+    const params = new URLSearchParams({ url: news.link });
+    if (rssDesc) params.set('fallback', rssDesc);
+    fetch(`/api/news-summary?${params}`)
+      .then(r => r.json())
+      .then(d => { if (d.summary) setAiSummary(d.summary); })
+      .catch(() => {})
+      .finally(() => setSummaryLoading(false));
+  }, [news?.link]);
+
+  // 관련 종목 매칭
   const relatedItems = useMemo(() => {
     if (!news) return [];
     const text = `${news.title || ''} ${news.description || ''} ${news.summary || ''}`;
@@ -86,8 +104,9 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
   if (!news) return null;
 
   const cat = CAT_COLOR[news.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
-  // description에서 HTML 태그 제거
-  const summary = (news.description || news.summary || '')
+
+  // RSS description (AI 요약 로딩 중 또는 실패 시 fallback)
+  const rssSummary = (news.description || news.summary || '')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -96,13 +115,12 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     .trim()
     .slice(0, 300);
 
+  const displaySummary = aiSummary || rssSummary;
+
   return (
     <>
       {/* 딤 오버레이 */}
-      <div
-        className="fixed inset-0 bg-black/30 z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
       {/* 슬라이드 패널 */}
       <div
@@ -138,19 +156,31 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
             </h2>
           </div>
 
-          {/* 요약 */}
-          {summary && (
-            <div className="px-4 pb-4">
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F2F4F6] text-[#6B7684]">
-                  요약
-                </span>
-              </div>
-              <p className="text-[13px] text-[#4E5968] leading-relaxed">
-                {summary}{summary.length >= 300 ? '…' : ''}
-              </p>
+          {/* 요약 영역 */}
+          <div className="px-4 pb-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#EDF4FF] text-[#3182F6]">
+                AI 요약
+              </span>
+              {summaryLoading && (
+                <span className="text-[10px] text-[#B0B8C1] animate-pulse">생성 중…</span>
+              )}
+              {!summaryLoading && aiSummary && (
+                <span className="text-[10px] text-[#B0B8C1]">Gemini</span>
+              )}
             </div>
-          )}
+            {summaryLoading && !displaySummary ? (
+              <div className="space-y-2 animate-pulse">
+                <div className="h-3 bg-[#F2F4F6] rounded w-full" />
+                <div className="h-3 bg-[#F2F4F6] rounded w-4/5" />
+                <div className="h-3 bg-[#F2F4F6] rounded w-3/5" />
+              </div>
+            ) : displaySummary ? (
+              <p className="text-[13px] text-[#4E5968] leading-relaxed whitespace-pre-line">
+                {displaySummary}{!aiSummary && rssSummary.length >= 300 ? '…' : ''}
+              </p>
+            ) : null}
+          </div>
 
           {/* 관련 종목 */}
           <div className="border-t border-[#F2F4F6]">
@@ -171,9 +201,9 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
                     key={item.id || item.symbol}
                     item={item}
                     krwRate={krwRate}
-                    onItemClick={(item) => {
+                    onItemClick={(clicked) => {
                       onClose?.();
-                      setTimeout(() => onRelatedClick?.(item), 250);
+                      setTimeout(() => onRelatedClick?.(clicked), 250);
                     }}
                   />
                 ))}
