@@ -4,17 +4,22 @@ export const config = { runtime: 'edge' };
 
 // Yahoo v8 chart — 실시간 1순위
 async function fetchYahooV8(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
     signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) throw new Error(`Yahoo v8 ${res.status}`);
   const data = await res.json();
-  const meta = data?.chart?.result?.[0]?.meta;
-  if (!meta?.regularMarketPrice) throw new Error('no price');
-  const price = meta.regularMarketPrice;
-  const prev  = meta.chartPreviousClose ?? meta.previousClose ?? price;
+  const result = data?.chart?.result?.[0];
+  if (!result?.meta?.regularMarketPrice) throw new Error('no price');
+  const meta   = result.meta;
+  const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
+  const price  = meta.regularMarketPrice;
+  // chartPreviousClose는 차트 시작 기준점 — 전일 종가 아님, 사용 금지
+  const prev   = meta.previousClose
+    ?? (closes.length >= 2 ? closes[closes.length - 2] : null)
+    ?? price;
   const change    = parseFloat((price - prev).toFixed(2));
   const changePct = prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0;
   return {
