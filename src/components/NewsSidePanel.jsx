@@ -1,6 +1,7 @@
-// 뉴스 상세 슬라이드 패널 — AI 요약 + 관련 종목 + 원문 링크
+// 뉴스 상세 슬라이드 패널 — AI 요약 + 관련 종목 + 관련 뉴스 + 원문 링크
 import { useMemo, useEffect, useState } from 'react';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
+import { useAllNewsQuery } from '../hooks/useNewsQuery';
 
 const CAT_COLOR = {
   coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
@@ -57,8 +58,21 @@ function RelatedRow({ item, krwRate, onItemClick }) {
   );
 }
 
-export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelatedClick }) {
+// 제목에서 키워드 추출 (불용어 제거)
+const STOPWORDS = new Set(['the','a','an','in','on','at','to','for','of','is','are','was','were','and','or','but','not','with','from','by','as','it','its','this','that','be','have','has','had','do','does','did','will','would','shall','should','can','could','may','might','about','after','before','into','over','under','between','through','during','위해','대한','통해','따른','관련','이번','올해','내년','지난','오늘','어제','내일','것으로','있는','하는','되는','된다','한다','있다','없다','것이','라고','에서','까지','부터','으로','에게','한편','또한','이에','따라','대해','보도','전했다','밝혔다','알려졌다','나타났다','분석했다','전망했다','보였다','기자']);
+
+function extractKeywords(title) {
+  if (!title) return [];
+  return title
+    .replace(/[^\wㄱ-ㅎ가-힣\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !STOPWORDS.has(w.toLowerCase()))
+    .slice(0, 10);
+}
+
+export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelatedClick, onNewsClick }) {
   const { krStocks = [], usStocks = [], coins = [] } = allData || {};
+  const { data: allNews = [] } = useAllNewsQuery();
   const [aiSummary, setAiSummary]     = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
@@ -85,6 +99,25 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
       .catch(() => {})
       .finally(() => setSummaryLoading(false));
   }, [news?.link]);
+
+  // 관련 뉴스 매칭 — 키워드 2개 이상 겹치는 뉴스
+  const relatedNews = useMemo(() => {
+    if (!news?.title || !allNews.length) return [];
+    const keywords = extractKeywords(news.title);
+    if (keywords.length < 2) return [];
+    return allNews
+      .filter(n => n.link !== news.link && n.title !== news.title)
+      .map(n => {
+        const nTitle = (n.title || '').toLowerCase();
+        const nDesc  = (n.description || n.summary || '').toLowerCase();
+        const combined = `${nTitle} ${nDesc}`;
+        const score = keywords.filter(kw => combined.includes(kw.toLowerCase())).length;
+        return { ...n, _score: score };
+      })
+      .filter(n => n._score >= 2)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 5);
+  }, [news, allNews]);
 
   // 관련 종목 매칭
   const relatedItems = useMemo(() => {
@@ -184,18 +217,12 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
           </div>
 
           {/* 관련 종목 */}
-          <div className="border-t border-[#F2F4F6]">
-            <div className="flex items-center gap-2 px-4 py-3">
-              <span className="text-[12px] font-bold text-[#191F28]">관련 종목</span>
-              {relatedItems.length > 0 && (
+          {relatedItems.length > 0 && (
+            <div className="border-t border-[#F2F4F6]">
+              <div className="flex items-center gap-2 px-4 py-3">
+                <span className="text-[12px] font-bold text-[#191F28]">관련 종목</span>
                 <span className="text-[11px] text-[#B0B8C1]">{relatedItems.length}개</span>
-              )}
-            </div>
-            {relatedItems.length === 0 ? (
-              <div className="px-4 pb-4 text-[12px] text-[#B0B8C1]">
-                매칭된 종목이 없습니다
               </div>
-            ) : (
               <div className="divide-y divide-[#F2F4F6]">
                 {relatedItems.map(item => (
                   <RelatedRow
@@ -209,8 +236,46 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
                   />
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* 관련 뉴스 */}
+          {relatedNews.length > 0 && (
+            <div className="border-t border-[#F2F4F6]">
+              <div className="flex items-center gap-2 px-4 py-3">
+                <span className="text-[12px] font-bold text-[#191F28]">관련 뉴스</span>
+                <span className="text-[11px] text-[#B0B8C1]">{relatedNews.length}건</span>
+              </div>
+              <div className="divide-y divide-[#F2F4F6]">
+                {relatedNews.map((n, i) => {
+                  const nCat = CAT_COLOR[n.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
+                  return (
+                    <button
+                      key={n.link || i}
+                      onClick={() => onNewsClick?.(n)}
+                      className="w-full px-4 py-3 hover:bg-[#F7F8FA] transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{ background: nCat.bg, color: nCat.color }}>
+                          {nCat.label}
+                        </span>
+                        {n.source && (
+                          <span className="text-[10px] text-[#B0B8C1] flex-shrink-0">{n.source}</span>
+                        )}
+                        {n.timeAgo && (
+                          <span className="text-[10px] text-[#C9CDD2]">{n.timeAgo}</span>
+                        )}
+                      </div>
+                      <p className="text-[12px] font-medium text-[#333D4B] leading-snug line-clamp-2">
+                        {n.title}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 하단: 원문 보기 */}

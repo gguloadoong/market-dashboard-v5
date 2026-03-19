@@ -210,7 +210,7 @@ export default function App() {
         <ChartSidePanel item={selectedItem} krwRate={krwRate} onClose={() => setSelectedItem(null)} onRelatedClick={setSelectedItem} allData={allData} />
       )}
       {selectedNews && (
-        <NewsSidePanel news={selectedNews} allData={allData} krwRate={krwRate} onClose={() => setSelectedNews(null)} onRelatedClick={setSelectedItem} />
+        <NewsSidePanel news={selectedNews} allData={allData} krwRate={krwRate} onClose={() => setSelectedNews(null)} onRelatedClick={setSelectedItem} onNewsClick={setSelectedNews} />
       )}
       {searchOpen && (
         <GlobalSearch krStocks={krStocks} usStocks={usStocks} coins={coins} etfs={etfItems} krwRate={krwRate} onSelect={setSelectedItem} onClose={() => setSearchOpen(false)} />
