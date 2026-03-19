@@ -31,10 +31,12 @@ async function fetchYahooV8(symbol) {
     marketCap: 0,
     high52w:   meta.fiftyTwoWeekHigh ?? null,
     low52w:    meta.fiftyTwoWeekLow  ?? null,
+    sparkline: closes.slice(-20),
   };
 }
 
 // Stooq 개별 쿼리 — fallback (EOD 데이터)
+// Stooq JSON API는 대문자 필드명 반환 (Close, Prev_Close, Volume 등)
 async function fetchStooqSingle(symbol) {
   const url = `https://stooq.com/q/l/?s=${symbol.toLowerCase()}.us&f=sd2t2ohlcvnp&h&e=json`;
   const res = await fetch(url, {
@@ -44,15 +46,15 @@ async function fetchStooqSingle(symbol) {
   if (!res.ok) throw new Error(`Stooq ${res.status}`);
   const data = await res.json();
   const s = (data.symbols || [])[0];
-  if (!s || !s.close || s.close === 'N/D') throw new Error('N/D');
-  const close = parseFloat(s.close);
-  const prev  = parseFloat(s.previous) || close;
+  if (!s || !s.Close || s.Close === 'N/D') throw new Error('N/D');
+  const close     = parseFloat(s.Close);
+  const prevClose = parseFloat(s.Prev_Close) || close;
   return {
     symbol,
     price:     parseFloat(close.toFixed(2)),
-    change:    parseFloat((close - prev).toFixed(2)),
-    changePct: parseFloat(((close - prev) / prev * 100).toFixed(2)),
-    volume:    parseInt(s.volume) || 0,
+    change:    prevClose > 0 ? parseFloat((close - prevClose).toFixed(2)) : 0,
+    changePct: prevClose > 0 ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2)) : 0,
+    volume:    parseInt(s.Volume) || 0,
     marketCap: 0,
     high52w:   null,
     low52w:    null,
