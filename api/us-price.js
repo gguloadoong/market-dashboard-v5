@@ -1,0 +1,92 @@
+// api/us-price.js — 미국 주식 가격 배치 조회 Vercel 프록시
+// Yahoo v8 chart 1순위 (실시간 regularMarketPrice), Stooq 2순위 (fallback)
+export const config = { runtime: 'edge' };
+
+// Yahoo v8 chart — 실시간 1순위
+async function fetchYahooV8(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) throw new Error(`Yahoo v8 ${res.status}`);
+  const data = await res.json();
+  const meta = data?.chart?.result?.[0]?.meta;
+  if (!meta?.regularMarketPrice) throw new Error('no price');
+  const price = meta.regularMarketPrice;
+  const prev  = meta.chartPreviousClose ?? meta.previousClose ?? price;
+  const change    = parseFloat((price - prev).toFixed(2));
+  const changePct = prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0;
+  return {
+    symbol,
+    price:     parseFloat(price.toFixed(2)),
+    change,
+    changePct,
+    volume:    meta.regularMarketVolume ?? 0,
+    marketCap: 0,
+    high52w:   meta.fiftyTwoWeekHigh ?? null,
+    low52w:    meta.fiftyTwoWeekLow  ?? null,
+  };
+}
+
+// Stooq 개별 쿼리 — fallback (EOD 데이터)
+async function fetchStooqSingle(symbol) {
+  const url = `https://stooq.com/q/l/?s=${symbol.toLowerCase()}.us&f=sd2t2ohlcvnp&h&e=json`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) throw new Error(`Stooq ${res.status}`);
+  const data = await res.json();
+  const s = (data.symbols || [])[0];
+  if (!s || !s.close || s.close === 'N/D') throw new Error('N/D');
+  const close = parseFloat(s.close);
+  const prev  = parseFloat(s.previous) || close;
+  return {
+    symbol,
+    price:     parseFloat(close.toFixed(2)),
+    change:    parseFloat((close - prev).toFixed(2)),
+    changePct: parseFloat(((close - prev) / prev * 100).toFixed(2)),
+    volume:    parseInt(s.volume) || 0,
+    marketCap: 0,
+    high52w:   null,
+    low52w:    null,
+  };
+}
+
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  const symbolsParam = searchParams.get('symbols');
+
+  if (!symbolsParam) {
+    return new Response(JSON.stringify({ error: 'symbols required' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  if (symbols.length === 0) {
+    return new Response(JSON.stringify({ results: [] }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Yahoo v8 1순위 (실시간), Stooq 2순위 (fallback)
+  const settled = await Promise.allSettled(
+    symbols.map(symbol =>
+      fetchYahooV8(symbol).catch(() => fetchStooqSingle(symbol))
+    )
+  );
+
+  const results = settled
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value);
+
+  return new Response(JSON.stringify({ results }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, s-maxage=30',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+}
