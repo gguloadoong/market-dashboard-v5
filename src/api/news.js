@@ -179,17 +179,30 @@ async function fetchRSS(rssUrl, category, sourceName) {
   return [];
 }
 
-// ─── 금융 키워드 필터 ─────────────────────────────────────────
-const FINANCE_KW = [
+// ─── 투자 관련성 필터 ─────────────────────────────────────────
+// "경제지 기사"가 아니라 "주식/코인 판단에 직접 도움이 되는 기사"만 통과시킨다.
+const MARKET_ANCHOR_KW = [
   '주식','증시','코스피','코스닥','코인','비트코인','이더리움','솔라나','리플','암호화폐',
-  '가상화폐','나스닥','다우','s&p','금리','환율','달러','원화','기준금리',
-  '주가','상장','ipo','공모','배당','실적','매출','영업이익','순이익','시가총액',
-  '외국인','기관','etf','펀드','채권','선물','옵션','삼성전자','sk하이닉스',
-  'bitcoin','ethereum','crypto','defi','blockchain','fed','fomc','연준',
-  '금통위','한국은행','거래소','kospi','kosdaq','증권','투자','급등','급락',
-  '어닝','분기','인플레','경기','침체','무역','관세','수출','gdp','cpi',
-  'earnings','revenue','profit','shares','nasdaq','sp500','dow',
-  '반도체','배터리','전기차','ai','인공지능','클라우드','데이터센터',
+  '가상화폐','나스닥','다우','s&p','금리','환율','달러','원화','기준금리','연준',
+  '한국은행','금통위','fomc','fed','etf','펀드','채권','선물','옵션','거래소',
+  'kospi','kosdaq','nasdaq','sp500','dow','bitcoin','ethereum','crypto','defi',
+  'blockchain','증권','투자','외국인','기관','시가총액','주가','급등','급락',
+];
+
+const IMPACT_EVENT_KW = [
+  '실적','매출','영업이익','순이익','적자','흑자','어닝','분기','가이던스','전망',
+  '상장','ipo','공모','배당','자사주','유상증자','무상증자','cb','bw','전환사채',
+  'm&a','인수','합병','매각','수주','계약','투자의견','목표주가','호실적',
+  '인플레','인플레이션','침체','성장률','gdp','cpi','ppi','금리인상','금리인하',
+  '관세','무역','수출','환율','달러','유가','원유','opec','관세전쟁','지정학',
+  '정책','규제','승인','해킹','파산','청산','현물 etf','반감기',
+  'earnings','revenue','profit','guidance','shares',
+];
+
+const LISTED_COMPANY_EVENT_KW = [
+  '실적','매출','영업이익','순이익','적자','흑자','상장','공모','배당','자사주',
+  '유상증자','무상증자','cb','bw','전환사채','m&a','인수','합병','매각','수주',
+  '계약','투자의견','목표주가','호실적','어닝',
 ];
 
 const BLOCK_KW = [
@@ -199,16 +212,29 @@ const BLOCK_KW = [
   '요리','레시피','맛집','카페','패션','뷰티','화장품','수능','대입','입시',
 ];
 
-const FINANCE_SOURCES = new Set([
-  '코인데스크코리아','블록미디어','한국경제','매일경제','조선비즈',
-  '연합뉴스','구글뉴스',
+const STRICT_FINANCE_SOURCES = new Set([
+  '코인데스크코리아','블록미디어',
 ]);
 
 function isFinancialNews(item) {
   const text = ((item.title || '') + ' ' + (item.description || '')).toLowerCase();
   if (BLOCK_KW.some(k => text.includes(k))) return false;
-  if (FINANCE_SOURCES.has(item.source)) return true;
-  return FINANCE_KW.some(k => text.includes(k));
+
+  const hasMarketAnchor = MARKET_ANCHOR_KW.some(k => text.includes(k));
+  const hasImpactEvent = IMPACT_EVENT_KW.some(k => text.includes(k));
+  const hasListedCompanyEvent = LISTED_COMPANY_EVENT_KW.some(k => text.includes(k));
+
+  if (STRICT_FINANCE_SOURCES.has(item.source)) {
+    return hasMarketAnchor || hasImpactEvent;
+  }
+
+  // 시장/자산 언급 + 가격 영향 이벤트가 함께 있을 때만 일반 경제 기사를 통과시킨다.
+  if (hasMarketAnchor && hasImpactEvent) return true;
+
+  // 개별 상장사 실적/공시/딜 관련 기사는 시장 키워드가 없어도 허용.
+  if (hasListedCompanyEvent) return true;
+
+  return false;
 }
 
 function dedup(items) {
