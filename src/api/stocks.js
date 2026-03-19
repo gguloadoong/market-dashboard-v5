@@ -397,7 +397,16 @@ const ALL_INDICES = [
 ];
 
 export async function fetchIndices() {
-  // KOSPI: Stooq 1순위 → Yahoo fallback
+  // 0) Vercel Edge 프록시 /api/market-indices — 서버사이드 직접 Yahoo 호출 (allorigins 불필요)
+  try {
+    const res = await fetch('/api/market-indices', { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.results?.length >= 5) return data.results;
+    }
+  } catch {}
+
+  // 1) KOSPI: Stooq 1순위 → Yahoo fallback (allorigins 경유)
   const kospiPromise = (async () => {
     try {
       return await fetchStooqKospi();
