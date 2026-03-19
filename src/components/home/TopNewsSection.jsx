@@ -20,6 +20,16 @@ function countStockTags(title) {
   return STOCK_NAMES.filter(n => lower.includes(n.toLowerCase())).length;
 }
 
+// RSS description에서 HTML 태그/엔티티 제거
+function cleanDesc(raw) {
+  if (!raw) return '';
+  return raw
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+}
+
 export default function TopNewsSection({ allNews = [], onNewsClick }) {
   // 24시간 이내 뉴스 중 시그널 점수 기준 상위 5건
   const topNews = useMemo(() => {
@@ -92,6 +102,13 @@ export default function TopNewsSection({ allNews = [], onNewsClick }) {
               <p className="text-[13px] font-medium text-[#191F28] leading-snug line-clamp-2">
                 {item.title}
               </p>
+              {/* RSS description 미리보기 */}
+              {(() => {
+                const desc = cleanDesc(item.description || item.summary || '');
+                return desc && desc.length > 20 && !desc.startsWith(item.title?.slice(0, 30))
+                  ? <p className="text-[11px] text-[#8B95A1] leading-snug mt-1 line-clamp-1">{desc}</p>
+                  : null;
+              })()}
             </div>
           </div>
         );

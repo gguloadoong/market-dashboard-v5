@@ -41,12 +41,24 @@ const CAT_COLOR = {
   kr:   { bg: '#FFF0F0', color: '#F04452', label: 'KR'   },
 };
 
+// RSS description에서 HTML 태그/엔티티 제거 후 1줄 미리보기
+function cleanDesc(raw) {
+  if (!raw) return '';
+  return raw
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+}
+
 function NewsItem({ item, onNewsClick }) {
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
   // 시그널 태그 추출 — pubDate 전달하여 속보(🔴 속보) 자동 감지, 최대 2개
   const signals = extractNewsSignals(item.title, item.pubDate);
   // 뉴스 제목에서 종목 태그 추출
   const stockTags = extractStockTags(item.title);
+  // RSS description 1줄 미리보기
+  const desc = cleanDesc(item.description || item.summary || '');
 
   return (
     <div
@@ -74,6 +86,12 @@ function NewsItem({ item, onNewsClick }) {
       <div className="text-[13px] font-medium text-[#191F28] leading-snug line-clamp-2">
         {item.title}
       </div>
+      {/* RSS description 미리보기 — 제목과 다른 내용만 표시 */}
+      {desc && desc.length > 20 && !desc.startsWith(item.title?.slice(0, 30)) && (
+        <p className="text-[11px] text-[#8B95A1] leading-snug mt-1 line-clamp-1">
+          {desc}
+        </p>
+      )}
       {/* 종목 태그 — 제목 아래 표시 */}
       {stockTags.length > 0 && (
         <div className="flex items-center gap-1 mt-1.5 flex-wrap">
