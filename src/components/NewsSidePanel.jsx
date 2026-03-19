@@ -77,6 +77,7 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     const rssDesc = (news.description || news.summary || '')
       .replace(/<[^>]+>/g, '').trim().slice(0, 500);
     const params = new URLSearchParams({ url: news.link });
+    if (news.title) params.set('title', news.title);
     if (rssDesc) params.set('fallback', rssDesc);
     fetch(`/api/news-summary?${params}`)
       .then(r => r.json())

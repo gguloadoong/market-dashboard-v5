@@ -252,8 +252,8 @@ export function unsubscribeUpbitWhaleTrades() {
 }
 
 // ─── Layer 1b: 빗썸 WebSocket — 거래소 대량 체결 ─────────────────────────────
-const BITHUMB_THRESHOLD_KRW = 20_000_000; // 2천만 원
-const BITHUMB_HIGH_KRW      = 200_000_000; // 2억 원
+const BITHUMB_THRESHOLD_KRW = 100_000_000; // 1억 원 (고래 기준)
+const BITHUMB_HIGH_KRW      = 500_000_000; // 5억 원 (기관급)
 
 let bithumbWs        = null;
 let bithumbHandler   = null;

@@ -1,5 +1,5 @@
 // api/news-summary.js — Gemini 기반 뉴스 요약 Vercel Edge Function
-// GET /api/news-summary?url=<기사URL>&fallback=<RSS_description>
+// GET /api/news-summary?url=<기사URL>&title=<제목>&fallback=<RSS_description>
 export const config = { runtime: 'edge' };
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -52,6 +52,7 @@ async function summarize(text) {
 export default async function handler(req) {
   const { searchParams } = new URL(req.url);
   const url      = searchParams.get('url');
+  const title    = searchParams.get('title') || '';
   const fallback = searchParams.get('fallback') || '';
 
   if (!url) {
@@ -67,13 +68,18 @@ export default async function handler(req) {
   }
 
   try {
-    // 기사 크롤 시도 → 실패 시 RSS fallback 텍스트 사용
-    let text = fallback;
+    // 기사 크롤 시도 → 실패 시 제목+RSS description 조합
+    let articleText = '';
     try {
-      text = await fetchArticleText(url);
-    } catch { /* 크롤 실패 — fallback 유지 */ }
+      articleText = await fetchArticleText(url);
+    } catch { /* 크롤 실패 */ }
 
-    if (!text || text.length < 30) {
+    // 크롤 성공 시 기사 본문, 실패 시 제목+description 조합
+    const text = articleText.length > 200
+      ? articleText
+      : [title, fallback].filter(Boolean).join('\n\n');
+
+    if (!text || text.length < 20) {
       return new Response(JSON.stringify({ summary: null }), {
         headers: { 'Content-Type': 'application/json' },
       });
