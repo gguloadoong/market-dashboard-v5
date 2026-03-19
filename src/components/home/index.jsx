@@ -10,11 +10,12 @@ import NewsFeedWidget from './widgets/NewsFeedWidget';
 import SignalWidget from './widgets/SignalWidget';
 import MarketInvestorSection from './MarketInvestorSection';
 import EventCalendar from './EventCalendar';
+import EventTicker from './EventTicker';
 import CoinListingSection from './CoinListingSection';
 
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
-  krwRate = 1466, onItemClick,
+  krwRate = 1466, onItemClick, onNewsClick,
 }) {
   const { data: allNews = [] } = useAllNewsQuery();
   const { watchlist, toggle, isWatched } = useWatchlist();
@@ -64,6 +65,9 @@ export default function HomeDashboard({
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
+      {/* ─── 경제 이벤트 티커 (펄스↔관심종목 사이) ─────────── */}
+      <EventTicker />
+
       {/* ─── WIDGET 2: 관심종목 ────────────────────────────── */}
       <WatchlistWidget watchedItems={watchedItems} toggle={toggle} onItemClick={onItemClick} krwRate={krwRate} />
 
@@ -90,7 +94,7 @@ export default function HomeDashboard({
       />
 
       {/* ─── WIDGET 4: 뉴스 피드 ──────────────────────────── */}
-      <NewsFeedWidget allNews={allNews} />
+      <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} />
 
       {/* ─── 코인 거래소 공지 ─────────────────────────────── */}
       <CoinListingSection />

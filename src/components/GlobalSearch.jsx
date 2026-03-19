@@ -26,7 +26,10 @@ function getPrice(item, krwRate) {
 const MARKET_LABEL = { kr: '국내', us: '미장', coin: '코인', etf: 'ETF' };
 const MARKET_COLOR = { kr: '#F04452', us: '#3182F6', coin: '#FF9500', etf: '#8B5CF6' };
 
+import { useWatchlist } from '../hooks/useWatchlist';
+
 export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = 1466, onSelect, onClose }) {
+  const { toggle, isWatched } = useWatchlist();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [naverItems, setNaverItems] = useState([]);
@@ -246,7 +249,7 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
                   </div>
 
                   {/* 가격 + 등락률 */}
-                  <div className="text-right flex-shrink-0 pr-4">
+                  <div className="text-right flex-shrink-0">
                     <div className="text-[13px] font-semibold text-[#191F28] tabular-nums font-mono">
                       {getPrice(item, krwRate)}
                     </div>
@@ -254,6 +257,17 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
                       {isUp ? '▲' : isDown ? '▼' : ''}{Math.abs(pct).toFixed(2)}%
                     </div>
                   </div>
+
+                  {/* 관심종목 ★ */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggle(item.id || item.symbol); }}
+                    className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-[16px] mr-2 ${
+                      isWatched(item.id || item.symbol) ? 'text-[#FF9500] hover:bg-[#FFF4E6]' : 'text-[#D5D8DC] hover:bg-[#F2F4F6]'
+                    }`}
+                    title={isWatched(item.id || item.symbol) ? '관심종목 해제' : '관심종목 추가'}
+                  >
+                    {isWatched(item.id || item.symbol) ? '★' : '☆'}
+                  </button>
                 </button>
               );
             })

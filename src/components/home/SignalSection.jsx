@@ -27,7 +27,7 @@ function SignalCard({ mover, news, krwRate, onItemClick }) {
   // 시그널 강도 (이유 근거)
   const signalReason = news
     ? news.title.length > 60 ? news.title.slice(0, 58) + '…' : news.title
-    : `${Math.abs(pct).toFixed(1)}% ${isUp ? '상승' : '하락'} 중 — 이유 분석 중`;
+    : `${Math.abs(pct).toFixed(1)}% ${isUp ? '상승' : '하락'} 중`;
 
   const mktBadge = isCoin ? { label: 'COIN', bg: '#FFF4E6', color: '#FF9500' }
     : mover._market === 'KR' || mover.market === 'kr'
@@ -104,7 +104,8 @@ export default function SignalSection({ allItems, recentNews, krwRate, onItemCli
     for (const mover of movers) {
       if (results.length >= 3) break;
       const newsMatch = findRelatedNews(mover, recentNews);
-      results.push({ mover, news: newsMatch || null });
+      // 뉴스 매칭된 종목만 표시 — 매칭 없으면 카드 생성하지 않음
+      if (newsMatch) results.push({ mover, news: newsMatch });
     }
 
     // 뉴스 있는 시그널 우선 정렬

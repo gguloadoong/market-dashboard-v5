@@ -181,7 +181,8 @@ export default function App() {
           {activeTab === 'home' ? (
             <HomeDashboard
               indices={indices} krStocks={krStocks} usStocks={usStocks}
-              coins={coins} etfs={mergedEtfs} krwRate={krwRate} onItemClick={setSelectedItem}
+              coins={coins} etfs={mergedEtfs} krwRate={krwRate}
+              onItemClick={setSelectedItem} onNewsClick={setSelectedNews}
             />
           ) : activeTab === 'news' ? (
             <div className="lg:hidden h-[calc(100vh-112px)]">

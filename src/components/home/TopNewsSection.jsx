@@ -8,7 +8,7 @@ const CAT_BADGE = {
   kr:   { bg: '#FFF0F0', color: '#F04452', label: '국내' },
 };
 
-export default function TopNewsSection({ allNews = [] }) {
+export default function TopNewsSection({ allNews = [], onNewsClick }) {
   // 24시간 이내 뉴스 중 상위 5건
   const topNews = useMemo(() => {
     const cutoff = 24 * 60 * 60 * 1000;
@@ -39,12 +39,10 @@ export default function TopNewsSection({ allNews = [] }) {
         const isBreaking = item.pubDate && (Date.now() - new Date(item.pubDate).getTime()) < 3600000;
 
         return (
-          <a
+          <div
             key={item.id || i}
-            href={item.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-start gap-3 px-4 py-3 border-b border-[#F2F4F6] last:border-0 hover:bg-[#FAFBFC] transition-colors"
+            onClick={() => onNewsClick?.(item)}
+            className="flex items-start gap-3 px-4 py-3 border-b border-[#F2F4F6] last:border-0 hover:bg-[#FAFBFC] transition-colors cursor-pointer"
           >
             {/* 번호 */}
             <span className="text-[13px] font-bold text-[#C9CDD2] tabular-nums mt-0.5 flex-shrink-0 w-4">
@@ -80,7 +78,7 @@ export default function TopNewsSection({ allNews = [] }) {
                 {item.title}
               </p>
             </div>
-          </a>
+          </div>
         );
       })}
     </div>

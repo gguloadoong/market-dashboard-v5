@@ -172,21 +172,25 @@ export async function fetchCandles(item, periodKey = '5분') {
     }
   }
 
-  // 국내 주식: 일/주/월봉은 한투 API 우선 (Yahoo .KS 404 대체)
+  // 국내 주식: 일/주/월봉은 한투 API 우선 → Yahoo .KS → Yahoo .KQ (코스닥)
   // 분봉/시봉(intraday)은 Yahoo fallback (한투 분봉 API는 별도 구현 필요)
   if (item.market === 'kr') {
     if (!isIntraday) {
-      // 일봉=D, 주봉=W, 월봉=M 매핑
       const periodMap = { '1d': 'D', '1wk': 'W', '1mo': 'M' };
       const periodCode = periodMap[interval] ?? 'D';
       try {
         return await fetchHantooCandles(item.symbol, periodCode);
-      } catch {
-        // 한투 실패 시 Yahoo fallback
+      } catch (err) {
+        console.warn(`[chart] 한투 실패 ${item.symbol}:`, err.message);
       }
     }
-    const sym = `${item.symbol}.KS`;
-    return fetchStockCandles(sym, range, interval);
+    // Yahoo fallback: .KS (코스피) 시도 → .KQ (코스닥) 시도
+    try {
+      return await fetchStockCandles(`${item.symbol}.KS`, range, interval);
+    } catch {
+      console.warn(`[chart] Yahoo .KS 실패 ${item.symbol}, .KQ 시도`);
+    }
+    return fetchStockCandles(`${item.symbol}.KQ`, range, interval);
   }
 
   // 미국 주식: Yahoo Finance 그대로
