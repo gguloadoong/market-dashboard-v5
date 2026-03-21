@@ -1,0 +1,32 @@
+[config]
+model = "gemini/gemini-2.5-flash"
+fallback_models = ["gemini/gemini-2.0-flash"]
+
+[pr_reviewer]
+num_max_findings = 5
+require_score_review = true
+require_tests_review = true
+require_security_review = true
+require_estimate_effort_to_review = true
+require_can_be_split_review = false
+persistent_comment = true
+extra_instructions = """
+- 한국어로 리뷰 작성
+- 보안 취약점 우선 확인
+- 에러 핸들링 누락 체크
+- 새 로직에 대한 테스트 커버리지 확인
+"""
+
+[pr_description]
+generate_ai_title = false
+publish_labels = true
+add_original_user_description = true
+enable_semantic_files_types = true
+collapsible_file_list = "adaptive"
+
+[pr_code_suggestions]
+focus_only_on_problems = true
+suggestions_score_threshold = 5
+num_code_suggestions_per_chunk = 3
+commitable_code_suggestions = true
+persistent_comment = true
