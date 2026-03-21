@@ -1,0 +1,13 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'src/**'
+
+api:
+  - changed-files:
+      - any-glob-to-any-file: 'api/**'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - '.github/**'
