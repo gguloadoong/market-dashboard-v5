@@ -7,7 +7,7 @@ export const config = { runtime: 'edge' };
 const INDICES = [
   { id: 'KOSDAQ', symbol: '^KQ11'    },
   { id: 'SPX',    symbol: '^GSPC'    },
-  { id: 'NDX',    symbol: '^IXIC'    },
+  { id: 'NDX',    symbol: '^NDX'     },
   { id: 'DJI',    symbol: '^DJI'     },
   { id: 'DXY',    symbol: 'DX-Y.NYB' },
 ];
