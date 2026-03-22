@@ -87,9 +87,9 @@ Issue 없이 PR을 만드는 것은 금지다. 아래 절차를 순서대로 따
 ```
 PR 생성 후 필수 절차:
 1. PR 생성 → 최소 2분 대기 (봇 리뷰 도착 시간)
-2. gh api 로 봇 리뷰 코멘트 확인 (Gemini, CodeRabbit, Qodo, Copilot)
+2. gh api 로 봇 리뷰 코멘트 확인 (Gemini, CodeRabbit, Copilot)
 3. "리뷰 종합" 코멘트 작성 — 봇 간 동의/충돌/채택/기각 정리
-4. 같은 코멘트 안에서 @coderabbitai 멘션 + /ask 질문을 동시에 던진다
+4. @coderabbitai 멘션으로 토론 질문을 던진다
 5. 최소 2분 대기 → 봇 응답 확인 (gh api 로 새 코멘트 체크)
 6. 봇 응답을 읽고 "최종 판단" 코멘트 작성 후 머지
 
