@@ -14,7 +14,11 @@ export function useIndices() {
     try {
       const data = await fetchIndices();
       if (data.length > 0) {
-        setIndices(prev => prev.map(idx => ({ ...idx, ...(data.find(d => d.id === idx.id) ?? {}) })));
+        const now = Date.now();
+        setIndices(prev => prev.map(idx => {
+          const found = data.find(d => d.id === idx.id);
+          return found ? { ...idx, ...found, _lastUpdated: now } : idx;
+        }));
       }
     } catch (e) { console.warn('[지수] 갱신 실패:', e.message); }
   }, []);

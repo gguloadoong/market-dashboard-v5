@@ -369,7 +369,7 @@ const ALL_INDICES = [
   // KOSPI는 Stooq로 별도 처리
   { id: 'KOSDAQ', symbol: '^KQ11'    },
   { id: 'SPX',    symbol: '^GSPC'    },
-  { id: 'NDX',    symbol: '^IXIC'    },
+  { id: 'NDX',    symbol: '^NDX'     },
   { id: 'DJI',    symbol: '^DJI'     },
   { id: 'DXY',    symbol: 'DX-Y.NYB' },
 ];
