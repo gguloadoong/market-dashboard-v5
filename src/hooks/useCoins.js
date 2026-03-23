@@ -1,5 +1,5 @@
 // 코인 가격 폴링 + Upbit WebSocket 훅
-// 가격: Upbit(10초) + CoinPaprika/Binance(60초) + WebSocket(실시간)
+// 가격: WebSocket(실시간, 우선) + REST fallback(30초)
 // 스파크라인: CoinGecko(5분) — 유일한 소스
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { COINS_INITIAL } from '../data/mock';
@@ -14,6 +14,7 @@ export function useCoins(krwRateRef) {
   const [coinError, setCoinError] = useState(false);
   const wsTickBufRef  = useRef({});
   const wsFlushTimer  = useRef(null);
+  const wsConnectedRef = useRef(false);
   const coinsRef      = useRef(coins);
   coinsRef.current    = coins;
 
@@ -60,9 +61,12 @@ export function useCoins(krwRateRef) {
     if (btc?.priceKrw) setWhaleBtcKrwPrice(btc.priceKrw);
   }, [coins]);
 
-  // 폴링 인터벌
+  // 폴링 인터벌 — WebSocket 연결 시 REST 빠른 갱신 생략
   useEffect(() => {
-    const quickId     = setInterval(() => refreshCoinsQuick(), POLLING.FAST);
+    // WebSocket이 실시간 가격을 제공하므로 10초 REST 폴링은 WS 끊김 시만 사용
+    const quickId = setInterval(() => {
+      if (!wsConnectedRef.current) refreshCoinsQuick();
+    }, POLLING.FAST);
     const fullId      = setInterval(refreshCoins, POLLING.SLOW);
     const sparklineId = setInterval(refreshSparklines, POLLING.SPARKLINE);
     return () => { clearInterval(quickId); clearInterval(fullId); clearInterval(sparklineId); };
@@ -96,7 +100,8 @@ export function useCoins(krwRateRef) {
       });
     };
     const wsHandler = (tick) => {
-      if (tick._connected) return;
+      if (tick._connected) { wsConnectedRef.current = true; return; }
+      if (tick._disconnected) { wsConnectedRef.current = false; return; }
       wsTickBufRef.current[tick.symbol] = tick;
       if (!wsFlushTimer.current) wsFlushTimer.current = setTimeout(flushTicks, 200);
     };

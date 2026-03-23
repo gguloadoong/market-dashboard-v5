@@ -52,6 +52,7 @@ function connectCoinWs() {
     ws.onerror  = () => {};
     ws.onclose  = () => {
       coinWs = null;
+      coinHandler?.({ _disconnected: true });
       if (!coinDestroyed) {
         coinReconnTimer = setTimeout(connectCoinWs, 5000);
       }
