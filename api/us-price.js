@@ -1,46 +1,45 @@
 // api/us-price.js — 미국 주식 가격 배치 조회 Vercel 프록시
-// Yahoo v8 chart 1순위 (실시간 regularMarketPrice), Stooq 2순위 (fallback)
+// Yahoo v7 배치 1순위 (50개씩 병렬), Stooq 개별 2순위 (fallback)
 export const config = { runtime: 'edge' };
 
-// Yahoo v8 chart — 실시간 1순위
-async function fetchYahooV8(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`Yahoo v8 ${res.status}`);
-  const data = await res.json();
-  const result = data?.chart?.result?.[0];
-  if (!result?.meta?.regularMarketPrice) throw new Error('no price');
-  const meta   = result.meta;
-  const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-  const price  = meta.regularMarketPrice;
-  // chartPreviousClose는 차트 시작 기준점 — 전일 종가 아님, 사용 금지
-  // previousClose가 현재가와 같거나 없으면 closes에서 현재가와 다른 가장 최근 값 사용
-  // 부동소수점 비교: 상대 0.01% 이내 차이는 동일 가격으로 간주
-  // 절대 0.01 임계값은 penny stock($0.03)이나 지수(2500+)에서 오작동 → 상대 비교로 변경
-  const almostEqual = (a, b) => Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1) < 0.0001;
-  let prev = meta.previousClose;
-  if (!prev || almostEqual(prev, price)) {
-    for (let i = closes.length - 2; i >= 0; i--) {
-      if (closes[i] && !almostEqual(closes[i], price)) { prev = closes[i]; break; }
-    }
+// Yahoo v7 배치 — 50개씩 청크, 병렬
+async function fetchYahooV7Batch(symbols) {
+  const CHUNK = 50;
+  const chunks = [];
+  for (let i = 0; i < symbols.length; i += CHUNK) {
+    chunks.push(symbols.slice(i, i + CHUNK));
   }
-  if (!prev) prev = price;
-  const change    = parseFloat((price - prev).toFixed(2));
-  const changePct = prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0;
-  return {
-    symbol,
-    price:     parseFloat(price.toFixed(2)),
-    change,
-    changePct,
-    volume:    meta.regularMarketVolume ?? 0,
-    marketCap: 0,
-    high52w:   meta.fiftyTwoWeekHigh ?? null,
-    low52w:    meta.fiftyTwoWeekLow  ?? null,
-    sparkline: closes.slice(-20),
-  };
+
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${chunk.join(',')}`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error(`Yahoo v7 ${res.status}`);
+      const data = await res.json();
+      const quotes = data?.quoteResponse?.result ?? [];
+      return quotes.map(r => {
+        const price     = r.regularMarketPrice;
+        const prev      = r.previousClose || price;
+        const change    = r.regularMarketChange ?? parseFloat((price - prev).toFixed(2));
+        const changePct = r.regularMarketChangePercent ?? (prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0);
+        return {
+          symbol:    r.symbol,
+          price:     parseFloat(price.toFixed(2)),
+          change:    parseFloat(change.toFixed(2)),
+          changePct: parseFloat(changePct.toFixed(2)),
+          volume:    r.regularMarketVolume ?? 0,
+          marketCap: 0,
+          high52w:   r.fiftyTwoWeekHigh ?? null,
+          low52w:    r.fiftyTwoWeekLow  ?? null,
+        };
+      }).filter(r => r.price > 0);
+    })
+  );
+
+  return chunkResults.flat();
 }
 
 // Stooq 개별 쿼리 — fallback (EOD 데이터)
@@ -89,30 +88,31 @@ export default async function handler(req) {
     });
   }
 
-  // Yahoo v8 1순위 (실시간), Stooq 2순위 (fallback)
-  // 15개씩 청크 분할 후 병렬 처리 — 순차 처리 대비 7x 속도 향상
-  const CHUNK = 15;
-  const chunks = [];
-  for (let i = 0; i < symbols.length; i += CHUNK) {
-    chunks.push(symbols.slice(i, i + CHUNK));
+  let results = [];
+
+  // 1순위: Yahoo v7 배치 (50개씩 병렬)
+  try {
+    results = await fetchYahooV7Batch(symbols);
+  } catch (e) {
+    console.warn('[us-price] Yahoo v7 배치 실패:', e.message);
   }
-  const chunkResults = await Promise.all(
-    chunks.map(chunk =>
-      Promise.allSettled(
-        chunk.map(symbol =>
-          fetchYahooV8(symbol).catch(() => fetchStooqSingle(symbol))
-        )
-      )
-    )
-  );
-  const results = chunkResults.flatMap(settled =>
-    settled.filter(r => r.status === 'fulfilled').map(r => r.value)
-  );
+
+  // 70% 이상 결과면 반환, 미달이면 Stooq로 나머지 채움
+  if (results.length < symbols.length * 0.7) {
+    const have = new Set(results.map(r => r.symbol));
+    const missing = symbols.filter(s => !have.has(s));
+    const stooqSettled = await Promise.allSettled(
+      missing.map(s => fetchStooqSingle(s))
+    );
+    for (const r of stooqSettled) {
+      if (r.status === 'fulfilled') results.push(r.value);
+    }
+  }
 
   return new Response(JSON.stringify({ results }), {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, s-maxage=30',
+      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=10',
       'Access-Control-Allow-Origin': '*',
     },
   });

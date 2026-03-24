@@ -158,37 +158,44 @@ async function fetchNaverBatch(stocks) {
 
 // ─── 한국투자증권 Open API (1순위 — 실시간 정확 데이터) ─────────
 // Vercel serverless /api/hantoo-price 프록시 경유
-// 서버 측 20개 제한 → 클라이언트에서 18개씩 배치 분할 후 순차 요청
-// KIS API 20 TPS 보호: 배치 간 50ms 딜레이
-const HANTOO_BATCH = 18;
+// 서버 측 20개 제한 → 클라이언트에서 27개씩 배치 분할 후 병렬 요청
+// KIS API TPS 보호: 라운드 간 200ms 딜레이
+const HANTOO_BATCH = 27;
+
+async function fetchSingleHantooBatch(chunk) {
+  const res = await fetch(
+    `/api/hantoo-price?symbols=${chunk.join(',')}`,
+    { signal: AbortSignal.timeout(10000) }
+  );
+  if (!res.ok) throw new Error(`한투 프록시 ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json.data) ? json.data : [];
+}
 
 async function fetchKoreanStocksHantoo(stocks) {
   const symbols = stocks.map(s => s.symbol);
-  const results = [];
-
+  const chunks = [];
   for (let i = 0; i < symbols.length; i += HANTOO_BATCH) {
-    const chunk = symbols.slice(i, i + HANTOO_BATCH);
-    try {
-      const res = await fetch(
-        `/api/hantoo-price?symbols=${chunk.join(',')}`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      // 키 미설정(503)은 첫 배치에서만 전체 중단 (불필요한 배치 요청 방지)
-      if (!res.ok) {
-        if (i === 0) throw new Error(`한투 프록시 ${res.status}`);
-        continue; // 중간 배치 실패는 건너뜀
-      }
-      const json = await res.json();
-      if (Array.isArray(json.data)) results.push(...json.data);
-    } catch (e) {
-      if (i === 0) throw e; // 첫 배치 실패 = API 자체 미사용 → fallback
-      // 중간 배치 실패 시 경고 후 계속
-      console.warn(`[한투] 배치 ${i / HANTOO_BATCH + 1} 실패 (건너뜀):`, e.message);
-      continue;
+    chunks.push(symbols.slice(i, i + HANTOO_BATCH));
+  }
+
+  // 첫 배치 먼저 실행 — 키 미설정(503) 등 API 자체 문제 조기 감지
+  const firstResult = await fetchSingleHantooBatch(chunks[0]);
+  const results = [...firstResult];
+
+  // 나머지 배치: 동시 처리, 라운드 간 200ms 딜레이
+  for (let i = 1; i < chunks.length; i += HANTOO_BATCH) {
+    const round = chunks.slice(i, i + HANTOO_BATCH);
+    const settled = await Promise.allSettled(
+      round.map(chunk => fetchSingleHantooBatch(chunk))
+    );
+    for (const r of settled) {
+      if (r.status === 'fulfilled') results.push(...r.value);
+      else console.warn(`[한투] 배치 실패 (건너뜀):`, r.reason?.message);
     }
-    // 배치 간 딜레이 (마지막 배치 제외)
-    if (i + HANTOO_BATCH < symbols.length) {
-      await new Promise(r => setTimeout(r, 50));
+    // 라운드 간 200ms 딜레이 (마지막 라운드 제외)
+    if (i + HANTOO_BATCH < chunks.length) {
+      await new Promise(r => setTimeout(r, 200));
     }
   }
 

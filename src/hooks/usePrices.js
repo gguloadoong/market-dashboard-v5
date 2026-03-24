@@ -7,9 +7,34 @@ import { POLLING } from '../constants/polling';
 
 const US_SYMBOLS = US_STOCKS_INITIAL.map(s => s.symbol);
 
+// ─── localStorage 가격 캐시 (구조 변경 시 버전 업) ──────────
+const CACHE_KEY_US = 'prices_us_v1';
+const CACHE_KEY_KR = 'prices_kr_v1';
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6시간
+
+function loadPriceCache(key, defaultData) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return defaultData;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) return defaultData; // 만료
+    // defaultData의 구조에 캐시 가격을 덮어씌움
+    return defaultData.map(s => {
+      const cached = data.find(c => c.symbol === s.symbol);
+      return cached?.price ? { ...s, ...cached } : s;
+    });
+  } catch { return defaultData; }
+}
+
+function savePriceCache(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
 export function usePrices() {
-  const [usStocks, setUsStocks]   = useState(US_STOCKS_INITIAL);
-  const [krStocks, setKrStocks]   = useState(KOREAN_STOCKS);
+  const [usStocks, setUsStocks]   = useState(() => loadPriceCache(CACHE_KEY_US, US_STOCKS_INITIAL));
+  const [krStocks, setKrStocks]   = useState(() => loadPriceCache(CACHE_KEY_KR, KOREAN_STOCKS));
   const [dataErrors, setDataErrors] = useState({ kr: false, us: false });
   // 최신 watchlist 심볼 — 클로저 없이 참조 (App이 주입)
   const krSymbolsRef = useRef([]);
@@ -38,6 +63,7 @@ export function usePrices() {
           }
           return [...map.values()];
         });
+        savePriceCache(CACHE_KEY_US, data);
         checkAndAlertBatch(data, 'us');
         setDataErrors(prev => ({ ...prev, us: false }));
       } else {
@@ -70,6 +96,7 @@ export function usePrices() {
           }
           return [...map.values()];
         });
+        savePriceCache(CACHE_KEY_KR, data);
         checkAndAlertBatch(data, 'kr');
         setDataErrors(prev => ({ ...prev, kr: false }));
       } else {
