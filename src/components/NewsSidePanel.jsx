@@ -138,7 +138,15 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
       return keywords.length > 0 && matchesKeywords(text, keywords);
     });
 
-    // 2단계: 직접 매칭된 종목의 연관 종목 확장 (relatedAssets)
+    // 2단계: 직접 매칭 종목의 연관 종목 확장 (relatedAssets)
+    // 뉴스 카테고리 기준으로 허용 시장을 제한 — 코인 뉴스에 국장 종목이 딸려오는 오염 방지
+    const newsCategory = news.category;
+    const allowedMarkets = new Set(
+      newsCategory === 'coin' ? ['COIN', 'US']      // 코인 뉴스: 코인·미장만, KR 차단
+      : newsCategory === 'kr' ? ['KR', 'US']        // 국장 뉴스: KR·미장만, 코인 차단
+      : ['US', 'COIN', 'KR']                        // 미장·일반: 전체 허용
+    );
+
     const seen = new Set(directMatches.map(d => d.symbol));
     const expanded = [];
     for (const matched of directMatches) {
@@ -146,6 +154,7 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
       if (!info?.related) continue;
       for (const rel of info.related) {
         if (seen.has(rel.symbol)) continue;
+        if (!allowedMarkets.has(rel.market)) continue; // 뉴스 맥락과 맞지 않는 시장 차단
         seen.add(rel.symbol);
         expanded.push(allMap[rel.symbol] ?? {
           symbol: rel.symbol,
