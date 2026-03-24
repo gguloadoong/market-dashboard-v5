@@ -216,7 +216,7 @@ export default function App() {
         <NewsSidePanel news={selectedNews} allData={allData} krwRate={krwRate} onClose={() => setSelectedNews(null)} onRelatedClick={setSelectedItem} onNewsClick={setSelectedNews} />
       )}
       {searchOpen && (
-        <GlobalSearch krStocks={krStocks} usStocks={usStocks} coins={coins} etfs={etfItems} krwRate={krwRate} onSelect={setSelectedItem} onClose={() => setSearchOpen(false)} />
+        <GlobalSearch krStocks={krStocks} usStocks={usStocks} coins={coins} etfs={etfItems} krwRate={krwRate} onSelect={setSelectedItem} onNewsClick={setSelectedNews} onClose={() => setSearchOpen(false)} />
       )}
     </div>
   );

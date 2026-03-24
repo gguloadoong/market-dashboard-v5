@@ -27,9 +27,11 @@ const MARKET_LABEL = { kr: '국내', us: '미장', coin: '코인', etf: 'ETF' };
 const MARKET_COLOR = { kr: '#F04452', us: '#3182F6', coin: '#FF9500', etf: '#8B5CF6' };
 
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useAllNewsQuery } from '../hooks/useNewsQuery';
 
-export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = 1466, onSelect, onClose }) {
+export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = 1466, onSelect, onNewsClick, onClose }) {
   const { toggle, isWatched } = useWatchlist();
+  const { data: allNews = [] } = useAllNewsQuery();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [naverItems, setNaverItems] = useState([]);
@@ -147,8 +149,17 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         _naverOnly: true,
       }));
 
-    return [...local, ...naverNormalized].slice(0, 15);
+    return [...local, ...naverNormalized].slice(0, 12);
   }, [query, allItems, naverItems]);
+
+  // 뉴스 검색 결과
+  const newsResults = useMemo(() => {
+    if (!query.trim() || query.trim().length < 2) return [];
+    const q = query.toLowerCase().trim();
+    return allNews
+      .filter(n => (n.title || '').toLowerCase().includes(q))
+      .slice(0, 4);
+  }, [query, allNews]);
 
   const handleSelect = useCallback((item) => {
     onSelect?.(item);
@@ -191,7 +202,7 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
 
         {/* 결과 */}
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto">
-          {query && results.length === 0 && !naverLoading ? (
+          {query && results.length === 0 && newsResults.length === 0 && !naverLoading ? (
             <div className="px-5 py-8 text-center text-[14px] text-[#B0B8C1]">
               "{query}" 검색 결과가 없습니다.
             </div>
@@ -274,6 +285,26 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
           ) : (
             <div className="px-5 py-8 text-center text-[13px] text-[#B0B8C1]">
               종목명 또는 티커를 입력하세요
+            </div>
+          )}
+
+          {/* 뉴스 검색 결과 */}
+          {newsResults.length > 0 && (
+            <div className="border-t border-[#F2F4F6]">
+              <div className="px-4 py-2 text-[11px] font-bold text-[#8B95A1] bg-[#F8F9FA] border-b border-[#F2F4F6]">뉴스</div>
+              {newsResults.map((news, idx) => (
+                <button
+                  key={news.link || idx}
+                  onClick={() => { onNewsClick?.(news); onClose?.(); }}
+                  className="w-full flex items-start gap-3 px-4 py-3 border-b border-[#F2F4F6] last:border-0 hover:bg-[#F7F8FA] active:bg-[#F2F4F6] text-left transition-colors"
+                >
+                  <span className="flex-shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F2F4F6] text-[#8B95A1]">뉴스</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] text-[#191F28] leading-snug line-clamp-2">{news.title}</div>
+                    {news.source && <div className="text-[11px] text-[#B0B8C1] mt-0.5">{news.source}</div>}
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>

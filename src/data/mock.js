@@ -373,6 +373,14 @@ export const US_STOCKS_INITIAL = [
   { symbol:'BBAI',  name:'빅베어AI',        nameEn:'BigBear.ai',      market:'us', sector:'AI',         price:4.45,  change:0, changePct:0, volume:18000000, marketCap:0.001e12, high52w:10.81, low52w:1.15  },
   // ─── 신규 추가: 우주항공 ─────────────────────────────────────
   { symbol:'RKLB',  name:'로켓랩',          nameEn:'Rocket Lab',      market:'us', sector:'우주항공',   price:25.45, change:0, changePct:0, volume:22000000, marketCap:0.012e12, high52w:28.58, low52w:4.43  },
+  // ─── 신규 추가: 핀테크/크립토 인프라 ─────────────────────────
+  { symbol:'SQ',    name:'블록(스퀘어)',     nameEn:'Block',            market:'us', sector:'핀테크',     price:68.45, change:0, changePct:0, volume:8000000,  marketCap:0.042e12, high52w:101.12, low52w:52.38 },
+  { symbol:'SOFI',  name:'소파이',           nameEn:'SoFi Technologies', market:'us', sector:'핀테크',    price:12.85, change:0, changePct:0, volume:35000000, marketCap:0.013e12, high52w:18.42, low52w:6.01  },
+  { symbol:'CRCL',  name:'서클',             nameEn:'Circle Internet',  market:'us', sector:'크립토',     price:31.50, change:0, changePct:0, volume:5000000,  marketCap:0.018e12, high52w:45.00, low52w:0     },
+  // ─── 신규 추가: AI/우주 ──────────────────────────────────────
+  { symbol:'PATH',  name:'유아이패스',       nameEn:'UiPath',           market:'us', sector:'AI/자동화',  price:13.45, change:0, changePct:0, volume:9000000,  marketCap:0.008e12, high52w:22.68, low52w:10.82 },
+  { symbol:'ASTS',  name:'AST스페이스모바일',nameEn:'AST SpaceMobile',  market:'us', sector:'우주통신',   price:22.40, change:0, changePct:0, volume:12000000, marketCap:0.007e12, high52w:42.42, low52w:5.53  },
+  { symbol:'NVO',   name:'노보노디스크',     nameEn:'Novo Nordisk',     market:'us', sector:'제약',       price:78.40, change:0, changePct:0, volume:5800000,  marketCap:0.35e12,  high52w:138.26, low52w:65.24 },
 ].map(s => ({ ...s, sparkline: genSparkline(s.price, 20, 0.015) }));
 
 // ─── 코인 초기값 (Upbit 2026-03-13 실제가, CoinGecko로 즉시 갱신됨) ─
