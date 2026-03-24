@@ -9,6 +9,7 @@ const TR_ID       = 'HDFSCNT0';
 const MAX_RETRY   = 3;
 const RETRY_DELAY = 5000;
 const MAX_SYMS    = 40;
+const KEY_TTL_MS  = 23 * 60 * 60 * 1000; // 23h — 한투 approval_key 24h 만료 1h 전 자동 갱신
 
 // 거래소 코드 매핑 (KIS HDFSCNT0 기준)
 // NASD: NASDAQ, NYSE: New York Stock Exchange
@@ -83,14 +84,15 @@ function parseSymbol(trKey) {
  * @param {Function} onQuote  - 콜백: ({ symbol, price, change, changePct }) => void
  */
 export function useKisUsWebSocket(symbols, onQuote) {
-  const onQuoteRef     = useRef(onQuote);
-  const symbolsRef     = useRef(symbols);
-  const prevSymbolsRef = useRef([]);
-  const wsRef          = useRef(null);
-  const approvalKeyRef = useRef(null);
-  const retryRef       = useRef(0);
-  const retryTimer     = useRef(null);
-  const mountedRef     = useRef(true);
+  const onQuoteRef      = useRef(onQuote);
+  const symbolsRef      = useRef(symbols);
+  const prevSymbolsRef  = useRef([]);
+  const wsRef           = useRef(null);
+  const approvalKeyRef  = useRef(null);
+  const retryRef        = useRef(0);
+  const retryTimer      = useRef(null);
+  const keyRefreshTimer = useRef(null);
+  const mountedRef      = useRef(true);
 
   useEffect(() => { onQuoteRef.current = onQuote; }, [onQuote]);
   useEffect(() => { symbolsRef.current = symbols; }, [symbols]);
@@ -229,15 +231,36 @@ export function useKisUsWebSocket(symbols, onQuote) {
       };
     }
 
+    // approval_key 갱신 + WS 재연결 (23시간마다 자동 실행)
+    function scheduleKeyRefresh() {
+      clearTimeout(keyRefreshTimer.current);
+      keyRefreshTimer.current = setTimeout(async () => {
+        if (!mountedRef.current) return;
+        const newKey = await fetchApprovalKey();
+        if (!mountedRef.current || !newKey) return;
+        approvalKeyRef.current = newKey;
+        // 기존 WS 정리 후 새 키로 재연결
+        clearTimeout(retryTimer.current);
+        const oldWs = wsRef.current;
+        if (oldWs) { oldWs.onclose = null; oldWs.close(); wsRef.current = null; }
+        retryRef.current = 0;
+        prevSymbolsRef.current = [];
+        connect(newKey);
+        scheduleKeyRefresh(); // 다음 갱신 예약
+      }, KEY_TTL_MS);
+    }
+
     fetchApprovalKey().then(key => {
       if (!mountedRef.current || !key) return;
       approvalKeyRef.current = key;
       connect(key);
+      scheduleKeyRefresh();
     });
 
     return () => {
       mountedRef.current = false;
       clearTimeout(retryTimer.current);
+      clearTimeout(keyRefreshTimer.current);
       const ws  = wsRef.current;
       const key = approvalKeyRef.current;
       if (ws) {

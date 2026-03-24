@@ -108,9 +108,16 @@ export function usePrices() {
   useEffect(() => {
     refreshUsStocks();
     refreshKoreanStocks();
-    const usId = setInterval(refreshUsStocks, POLLING.NORMAL);
-    const krId = setInterval(refreshKoreanStocks, POLLING.NORMAL);
-    return () => { clearInterval(usId); clearInterval(krId); };
+    const usId = setInterval(() => { if (!document.hidden) refreshUsStocks(); }, POLLING.NORMAL);
+    const krId = setInterval(() => { if (!document.hidden) refreshKoreanStocks(); }, POLLING.NORMAL);
+    // 탭 복귀 시 즉시 갱신
+    const onVisible = () => { if (!document.hidden) { refreshUsStocks(); refreshKoreanStocks(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(usId);
+      clearInterval(krId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refreshUsStocks, refreshKoreanStocks]);
 
   return {
