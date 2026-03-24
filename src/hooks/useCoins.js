@@ -9,8 +9,35 @@ import { setWhaleBtcKrwPrice } from '../api/whale';
 import { POLLING } from '../constants/polling';
 import { checkAndAlertBatch } from '../utils/priceAlert';
 
+// ─── localStorage 코인 가격 캐시 (6h TTL) ───────────────────────
+const COIN_CACHE_KEY = 'prices_coin_v1';
+const COIN_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+function loadCoinCache() {
+  try {
+    const raw = localStorage.getItem(COIN_CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > COIN_CACHE_TTL || !data?.length) return null;
+    return data;
+  } catch { return null; }
+}
+
+function saveCoinCache(coins) {
+  try {
+    // priceKrw/priceUsd/change24h 핵심 필드만 저장 (용량 최적화)
+    const slim = coins.map(c => ({
+      id: c.id, symbol: c.symbol, name: c.name, market: c.market,
+      priceKrw: c.priceKrw, priceUsd: c.priceUsd, change24h: c.change24h,
+      marketCap: c.marketCap, volume24h: c.volume24h,
+      image: c.image, sector: c.sector, sparkline: c.sparkline ?? [],
+    }));
+    localStorage.setItem(COIN_CACHE_KEY, JSON.stringify({ data: slim, ts: Date.now() }));
+  } catch {}
+}
+
 export function useCoins(krwRateRef) {
-  const [coins, setCoins]   = useState(COINS_INITIAL);
+  const [coins, setCoins] = useState(() => loadCoinCache() ?? COINS_INITIAL);
   const [coinError, setCoinError] = useState(false);
   const wsTickBufRef  = useRef({});
   const wsFlushTimer  = useRef(null);
@@ -23,7 +50,7 @@ export function useCoins(krwRateRef) {
     try {
       if (!coinsRef.current.length) return;
       const data = await fetchCoinsUpbitOnly(coinsRef.current, krwRateRef.current);
-      if (data.length) { setCoins(data); checkAndAlertBatch(data, 'coin'); }
+      if (data.length) { setCoins(data); saveCoinCache(data); checkAndAlertBatch(data, 'coin'); }
     } catch (err) { console.warn('[useCoins] quick refresh 실패:', err.message); }
   }, [krwRateRef]);
 
@@ -36,6 +63,7 @@ export function useCoins(krwRateRef) {
           const old = prev.find(p => p.id === c.id || p.symbol === c.symbol);
           return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
         }));
+        saveCoinCache(data);
         setCoinError(false);
       }
     } catch (err) { console.warn('[useCoins] full refresh 실패:', err.message); setCoinError(true); }
@@ -63,7 +91,8 @@ export function useCoins(krwRateRef) {
 
   // 폴링 인터벌 — WebSocket 연결 시 REST 빠른 갱신 생략
   useEffect(() => {
-    // WebSocket이 실시간 가격을 제공하므로 10초 REST 폴링은 WS 끊김 시만 사용
+    // 마운트 즉시 Upbit REST로 첫 가격 로드 (WS 연결 대기 없이 ~1s 내 실제 가격 표시)
+    refreshCoinsQuick();
     const quickId = setInterval(() => {
       if (!wsConnectedRef.current) refreshCoinsQuick();
     }, POLLING.FAST);
