@@ -144,6 +144,9 @@ export async function fetchBinancePrices() {
 }
 
 // ─── CoinGecko — 스파크라인 전용 (5분 간격) ────────────────────
+const CG_API_KEY = import.meta.env.VITE_COINGECKO_API_KEY ?? '';
+const CG_HEADERS = CG_API_KEY ? { 'x-cg-demo-api-key': CG_API_KEY } : {};
+
 let cgSparklineCache = {};
 let cgFullCache = [];
 
@@ -157,7 +160,7 @@ export async function fetchCoinGecko() {
     '&sparkline=true',
     '&price_change_percentage=24h',
   ].join('');
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const res = await fetch(url, { headers: CG_HEADERS, signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
   const data = await res.json();
   cgFullCache = data;
@@ -219,7 +222,7 @@ export async function fetchExchangeRate() {
     const res = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC', { signal: AbortSignal.timeout(4000) });
     const data = await res.json();
     const btcKrw = data[0]?.trade_price;
-    const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
+    const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { headers: CG_HEADERS, signal: AbortSignal.timeout(5000) });
     const cgData = await cgRes.json();
     const btcUsd = cgData?.bitcoin?.usd;
     if (btcKrw && btcUsd) {
