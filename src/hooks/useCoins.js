@@ -93,12 +93,18 @@ export function useCoins(krwRateRef) {
   useEffect(() => {
     // 마운트 즉시 Upbit REST로 첫 가격 로드 (WS 연결 대기 없이 ~1s 내 실제 가격 표시)
     refreshCoinsQuick();
-    const quickId = setInterval(() => {
-      if (!wsConnectedRef.current) refreshCoinsQuick();
-    }, POLLING.FAST);
-    const fullId      = setInterval(refreshCoins, POLLING.SLOW);
-    const sparklineId = setInterval(refreshSparklines, POLLING.SPARKLINE);
-    return () => { clearInterval(quickId); clearInterval(fullId); clearInterval(sparklineId); };
+    const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
+    const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
+    const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
+    // 탭 복귀 시 즉시 갱신
+    const onVisible = () => { if (!document.hidden) refreshCoinsQuick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(quickId);
+      clearInterval(fullId);
+      clearInterval(sparklineId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refreshCoinsQuick, refreshCoins, refreshSparklines]);
 
   // 최초 로드 시 스파크라인 즉시 가져오기
