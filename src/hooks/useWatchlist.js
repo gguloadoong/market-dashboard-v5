@@ -34,5 +34,11 @@ export function useWatchlist() {
     [watchlist]
   );
 
-  return { watchlist, toggle, isWatched, krSymbols };
+  // 관심종목 중 미국 주식 심볼만 추출 (영문자 포함, 6자리 숫자 아닌 것)
+  const usSymbols = useMemo(
+    () => [...watchlist].filter(id => !KR_SYMBOL_RE.test(id) && /^[A-Z]/.test(id)),
+    [watchlist]
+  );
+
+  return { watchlist, toggle, isWatched, krSymbols, usSymbols };
 }

@@ -35,7 +35,9 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [naverItems, setNaverItems] = useState([]);
+  const [usSearchItems, setUsSearchItems] = useState([]);
   const [naverLoading, setNaverLoading] = useState(false);
+  const usSearchTimerRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const naverTimerRef = useRef(null);
@@ -71,6 +73,20 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
       }
     }, 300);
     return () => clearTimeout(naverTimerRef.current);
+  }, [query]);
+
+  // 미장 종목 실시간 검색 (NASDAQ/Yahoo, 디바운스 400ms)
+  useEffect(() => {
+    clearTimeout(usSearchTimerRef.current);
+    if (!query.trim() || query.trim().length < 2) { setUsSearchItems([]); return; }
+    usSearchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/us-stock-search?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        setUsSearchItems(data.items || []);
+      } catch { setUsSearchItems([]); }
+    }, 400);
+    return () => clearTimeout(usSearchTimerRef.current);
   }, [query]);
 
   // ESC + 키보드 네비게이션
@@ -149,7 +165,22 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         _naverOnly: true,
       }));
 
-    return [...local, ...naverNormalized].slice(0, 12);
+    // 미장 검색 결과 정규화 — 로컬에 없는 종목만 추가
+    const allCodes = new Set([...localCodes, ...naverNormalized.map(i => i.symbol.toUpperCase())]);
+    const usNormalized = usSearchItems
+      .filter(item => !allCodes.has((item.symbol || '').toUpperCase()))
+      .map(item => ({
+        symbol:   item.symbol,
+        name:     item.name,
+        market:   'us',
+        _market:  'us',
+        price:    0,
+        changePct: 0,
+        change:   0,
+        _searchOnly: true,
+      }));
+
+    return [...local, ...naverNormalized, ...usNormalized].slice(0, 15);
   }, [query, allItems, naverItems]);
 
   // 뉴스 검색 결과

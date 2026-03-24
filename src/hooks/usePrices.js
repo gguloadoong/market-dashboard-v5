@@ -11,21 +11,36 @@ export function usePrices() {
   const [usStocks, setUsStocks]   = useState(US_STOCKS_INITIAL);
   const [krStocks, setKrStocks]   = useState(KOREAN_STOCKS);
   const [dataErrors, setDataErrors] = useState({ kr: false, us: false });
-  // 최신 watchlist KR 심볼 — 클로저 없이 참조 (App이 주입)
+  // 최신 watchlist 심볼 — 클로저 없이 참조 (App이 주입)
   const krSymbolsRef = useRef([]);
+  const usSymbolsRef = useRef([]);
 
   const refreshUsStocks = useCallback(async () => {
     try {
-      const data = await fetchUsStocksBatch(US_SYMBOLS);
+      // 기본 목록 + watchlist US 심볼 합산
+      const extraSymbols = usSymbolsRef.current.filter(
+        sym => !US_STOCKS_INITIAL.some(s => s.symbol === sym)
+      );
+      const symbolsToFetch = [...US_SYMBOLS, ...extraSymbols];
+      const data = await fetchUsStocksBatch(symbolsToFetch);
       if (data.length > 0) {
-        setUsStocks(prev => prev.map(s => {
-          const u = data.find(d => d.symbol === s.symbol);
-          return u?.price ? { ...s, ...u, sparkline: u.sparkline?.length ? u.sparkline : s.sparkline } : s;
-        }));
+        setUsStocks(prev => {
+          const map = new Map(prev.map(s => [s.symbol, s]));
+          for (const u of data) {
+            if (!u?.price) continue;
+            if (map.has(u.symbol)) {
+              const old = map.get(u.symbol);
+              map.set(u.symbol, { ...old, ...u, sparkline: u.sparkline?.length ? u.sparkline : old.sparkline });
+            } else {
+              // watchlist에서 새로 추가된 미장 종목
+              map.set(u.symbol, { symbol: u.symbol, name: u.name || u.symbol, market: 'us', sparkline: [], ...u });
+            }
+          }
+          return [...map.values()];
+        });
         checkAndAlertBatch(data, 'us');
         setDataErrors(prev => ({ ...prev, us: false }));
       } else {
-        // 모든 소스가 빈 결과 반환 — 에러 상태 설정
         setDataErrors(prev => ({ ...prev, us: true }));
       }
     } catch { setDataErrors(prev => ({ ...prev, us: true })); }
@@ -75,7 +90,7 @@ export function usePrices() {
     usStocks, setUsStocks,
     krStocks, setKrStocks,
     dataErrors, setDataErrors,
-    krSymbolsRef,
+    krSymbolsRef, usSymbolsRef,
     refreshUsStocks, refreshKoreanStocks,
   };
 }

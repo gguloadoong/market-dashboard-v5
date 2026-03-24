@@ -23,7 +23,7 @@ import { useIndices } from './hooks/useIndices';
 import { KOREAN_STOCKS } from './data/mock';
 
 export default function App() {
-  const { watchlist, krSymbols }    = useWatchlist();
+  const { watchlist, krSymbols, usSymbols } = useWatchlist();
   const { indices, krwRate }        = useIndices();
   const krwRateRef                  = useRef(1466);
   useEffect(() => { krwRateRef.current = krwRate; }, [krwRate]);
@@ -32,11 +32,12 @@ export default function App() {
   const {
     usStocks, setUsStocks, krStocks, setKrStocks,
     dataErrors, setDataErrors,
-    krSymbolsRef, refreshUsStocks, refreshKoreanStocks,
+    krSymbolsRef, usSymbolsRef, refreshUsStocks, refreshKoreanStocks,
   } = usePrices();
 
-  // krSymbols 동기화
+  // watchlist 심볼 동기화
   useEffect(() => { krSymbolsRef.current = krSymbols; }, [krSymbols, krSymbolsRef]);
+  useEffect(() => { usSymbolsRef.current = usSymbols; }, [usSymbols, usSymbolsRef]);
 
   const { data: krxEtfs = [] } = useKrxEtf();
   const [activeTab, setActiveTab]       = useState('home');
