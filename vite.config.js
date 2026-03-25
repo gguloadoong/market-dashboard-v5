@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages는 /market-dashboard-v2/ 경로에서 서빙 — Vercel은 / 유지
+  base: process.env.GITHUB_PAGES === 'true' ? '/market-dashboard-v2/' : '/',
   plugins: [
     react(),
     VitePWA({
