@@ -139,7 +139,7 @@
 - 난이도: 낮음 (useNewsQuery + priceAlert 인프라 재사용)
 - 완료 기준: 관심종목 뉴스 발행 후 5분 내 알림 수신
 
-### [P2-8] Fear & Greed 지수 위젯
+### ~~[P2-8] Fear & Greed 지수 위젯~~ ✅ 완료 (2026-03-26 PR #160)
 - 배경: 시장 센티먼트 한눈에 보기 — 한국어 서비스 중 통합 제공 없음
 - 기능:
   1. Alternative.me Crypto Fear & Greed (코인)
