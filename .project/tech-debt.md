@@ -19,7 +19,9 @@
 
 ## 🟢 P2 — 백로그
 
-현재 없음 ✅
+| 파일 | 내용 | 등록일 |
+|------|------|--------|
+| `NewsSidePanel.jsx` | Stage 3 섹터 확장 시 `Object.entries(RELATED_ASSETS)` 전수 순회 — 현재 ~50항목 무해, 향후 500+ 시 sector→symbols 역인덱스 Map으로 최적화 필요 | 2026-03-26 |
 
 ---
 
