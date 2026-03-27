@@ -161,7 +161,7 @@ export default function App() {
 
   // 관심종목 뉴스 알림 — watchlist에 있는 종목 필터링 후 useNewsAlerts에 주입
   const watchedItemsForAlert = useMemo(() => {
-    const watchSet = new Set(watchlist.map(w => (typeof w === 'string' ? w : w.symbol)));
+    const watchSet = watchlist instanceof Set ? watchlist : new Set([...watchlist].map(w => (typeof w === 'string' ? w : w.symbol)));
     return [
       ...krStocks.filter(s => watchSet.has(s.symbol)).map(s => ({ ...s, _market: 'KR' })),
       ...usStocks.filter(s => watchSet.has(s.symbol)).map(s => ({ ...s, _market: 'US' })),
