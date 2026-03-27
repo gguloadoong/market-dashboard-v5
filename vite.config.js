@@ -6,6 +6,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   // GitHub Pages는 /market-dashboard-v2/ 경로에서 서빙 — Vercel은 / 유지
   base: process.env.GITHUB_PAGES === 'true' ? '/market-dashboard-v2/' : '/',
+  server: {
+    // 로컬 개발 시 /api/* 요청을 프로덕션 Vercel로 프록시
+    proxy: {
+      '/api': {
+        target: 'https://market-dashboard-v2-mu.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
