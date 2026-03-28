@@ -139,6 +139,19 @@ npm run review:gate
 두 리뷰어는 서로 다른 모델(Claude / OpenAI)로 교차 검증한다.
 `npm run ship` = lint + test + build + review:gate 전체 파이프라인.
 
+**리뷰 결과는 PR 본문에 요약 기록:**
+```markdown
+## 독립 리뷰 결과
+
+### code-reviewer (Claude)
+- [채택] 지적 내용 → 수정 완료
+- [기각] 지적 내용 → 사유
+
+### Codex gate (OpenAI)
+- DECISION: PASS 또는 BLOCK
+- [P1/P2] 지적 내용 → 조치
+```
+
 ### PR 생성 후 봇 리뷰 (필수 응답)
 
 **⚠️ 봇 리뷰를 무시하고 머지하는 것은 금지다.**
