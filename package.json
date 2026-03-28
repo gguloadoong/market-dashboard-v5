@@ -11,7 +11,9 @@
     "review:main": "node scripts/ai-pr-review.mjs --mode=local --base=origin/main",
     "review:base": "node scripts/ai-pr-review.mjs --mode=local",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "review:gate": "bash scripts/codex-review-gate.sh strict origin/main",
+    "ship": "npm run lint && npm run test && npm run build && npm run review:gate"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
