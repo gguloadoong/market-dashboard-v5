@@ -28,3 +28,6 @@ dist-ssr
 .env.local
 .env.*.local
 .vercel
+
+# OMC 플러그인 상태 (로컬 전용)
+.omc/
