@@ -249,6 +249,36 @@
 - 해결: Playwright E2E 테스트 환경 초기 구성
 - 완료 기준: 주요 시나리오(홈 로딩, 탭 전환, 차트 오픈) 테스트 실행 가능
 
+### ~~[P1-11] Redis 스냅샷 캐시 + mock 제거 + 종목 확장~~ ✅ 완료 (2026-03-29 PR #197)
+- 문제: 브라우저 첫 로딩 시 mock 0% 데이터 → 실 데이터 전환까지 1-3초 공백
+- 해결: Upstash Redis snap 캐시 + Vercel Cron (KR 5분, US 2분, Coins 1분) + snapshot API
+- 완료 기준: 첫 로딩 <100ms 내 실시간 가격 표시, mock 완전 제거
+
+### ~~[P1-12] update-us cron Yahoo v7 → v8 교체~~ ✅ 완료 (2026-03-29 PR #199)
+- 문제: Yahoo v7 batch API Vercel Edge(icn1)에서 차단 → snap:us count=0
+- 해결: v8 chart per-symbol + query1/query2 rotation (us-price.js 동일 패턴)
+- 완료 기준: update-us cron count > 0 정상 반환
+
+### [P2-15] 코인 WS cold load 구독 지연
+- 문제: Upbit WebSocket 구독이 마운트 직후 실행되어 snapshot 로드 전에 symbols 비어있을 수 있음 → WS 구독 없이 실시간 가격 미수신
+- 제안: snapshot hydration 완료 후 WS 재구독 또는 구독 심볼 동적 추가 지원
+- 우선순위: P2 (발생 시 WebSocket fallback으로 REST polling이 대체)
+
+### [P2-16] 신규 사용자 첫 로딩 blank 화면
+- 문제: localStorage 캐시 없는 신규 사용자 — loading=false + items.length===0 → WatchlistTable 스켈레톤 미표시
+- 제안: 초기 마운트 시 snapshot 로딩 전까지 loading=true 유지 또는 별도 `initializing` 플래그
+- 우선순위: P2 (재방문자는 영향 없음, 신규 사용자만 수백ms 공백)
+
+### [P2-17] Upbit ticker 전체 마켓 일괄 조회 → 배치 처리
+- 문제: update-coins.js가 전체 KRW 마켓(300+)을 단일 URL로 호출 → URL 길이 초과 시 실패 위험
+- 제안: 100개씩 청크 분할 후 순차/병렬 호출 (프론트 fetchUpbitAllSymbols와 동일 방식)
+- 우선순위: P2 (현재 count=243 정상 동작 확인, 마켓 수 증가 시 위험)
+
+### [P3-1] update-kr.js fallback 에러 로깅
+- 문제: KRX→한투 fallback 실패 시 조용히 넘어감 → 운영 문제 파악 지연
+- 제안: fallback catch에 console.error 추가
+- 우선순위: P3 (기능 영향 없음, 디버깅 편의성)
+
 ---
 
 ## ✅ 완료 이력
