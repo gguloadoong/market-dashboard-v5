@@ -1,6 +1,6 @@
 ---
 소유자: 이준혁 (CPO)
-마지막 업데이트: 2026-03-18 킥오프 v4.0 반영
+마지막 업데이트: 2026-03-28
 ---
 
 # 마켓레이더 v4.0 백로그
@@ -130,15 +130,15 @@
 > **선정 기준**: 매수 결정 직전 5분을 돕는가 + DAU를 높이는가 + 경쟁사가 못하는가
 > **리서치 날짜**: 2026-03-26
 
-### [P2-11] CDS 번들 블로트 해소 (재산정: P1→P2)
+### ~~[P2-11] CDS 번들 블로트 해소~~ ✅ 완료 (2026-03-27 PR #186)
 - 배경: cds 번들 361KB(gzip 100KB) — 앱 번들(340KB)보다 큼
 - 실제 사용 범위 (딥다이브 2026-03-26 재조사):
   - TabbedChips: 4곳 (TopMovers, MarketInvestor, WatchlistTable, ChartSidePanel)
   - Button: 1곳 (Header)
   - Table 6종: WatchlistTable.jsx 전체 (교체 난이도 높음)
   - ThemeProvider/MediaQueryProvider: main.jsx 코어 — Table 의존
-- 완료 조건: WatchlistTable Table 교체 + ThemeProvider 제거가 필수 → P1 아닌 P2 스코프
-- 해결 경로: TabbedChips/Button 먼저 직접 구현 → WatchlistTable Table 교체 → CDS 전체 제거
+- 해결: TabbedChips/Button 직접 구현 → WatchlistTable Table 교체 → CDS 전체 제거
+- 결과: 번들 750KB (CDS 361KB 제거, gzip 100KB 절감)
 
 ### ~~[P2-7] 관심종목 뉴스 알림~~ ✅ 완료 (기구현 확인 — 2026-03-26)
 - `useNewsAlerts.js` 완성 구현 확인 (React Query 캐시 구독 → 새 기사 감지 → watchlist 매칭)
@@ -212,6 +212,45 @@
 
 ---
 
+## 🟤 Phase 7: 안정성 & 실사용 품질 (2026-03-28 스프린트)
+
+> **목표**: 에러 0, 첫 로딩 3초 이내, 시세 정확도 100%
+> **기준**: 실사용 환경에서 데이터 신뢰도 · 응답 속도 · 배포 안정성 완결
+
+### ~~[P0-8] Vercel ignoreCommand P0 수정~~ ✅ 완료 (2026-03-28 PR #194)
+- 문제: ignoreCommand 오설정으로 불필요한 배포 트리거 또는 배포 스킵 오류
+- 해결: `vercel.json` ignoreCommand 정상화 → 변경 없는 커밋 시 배포 건너뜀
+- 완료 기준: main 머지 후 실제 변경 있을 때만 Vercel 빌드 실행
+
+### ~~[P1-8] 시세 6단계 fallback + 네이버 해외시세 추가~~ ✅ 완료 (2026-03-28 PR #193)
+- 문제: 미장 Yahoo 단일 소스 의존 → 장애 시 시세 공백
+- 해결: 미장 6단계 fallback 체인 구축 (Yahoo v8 → Yahoo v7 → Stooq → Alpaca → 네이버 해외시세 → 캐시)
+- 완료 기준: Yahoo 전체 장애 시에도 미장 시세 표시
+
+### ~~[P1-9] API 단일 게이트웨이 난독화 `/api/d`~~ ✅ 완료 (2026-03-28 PR #193)
+- 문제: API 엔드포인트 노출 → 크롤러/무단 사용 위험
+- 해결: `/api/d` 단일 게이트웨이로 모든 시세 요청 라우팅 + 경로 난독화
+- 완료 기준: 기존 직접 엔드포인트 접근 차단, 프론트엔드 정상 동작
+
+### ~~[P1-10] 한투 토큰 Upstash Redis 캐시~~ ✅ 완료 (2026-03-28 PR #193)
+- 문제: 한투 OAuth 토큰 매 요청마다 재발급 → 속도 저하 + API 할당량 낭비
+- 해결: Upstash Redis에 토큰 캐시 (TTL: 만료 5분 전 갱신)
+- 완료 기준: 토큰 재발급 없이 연속 요청 처리, 응답시간 단축
+
+### ~~[P2-12] Vercel Pro 전환 + 배포 파이프라인 정비~~ ✅ 완료 (2026-03-28)
+- 해결: Vercel Pro 플랜 전환 → 빌드 시간 단축, 팀 기능 활성화
+- 배포 파이프라인: main 머지 → 자동 배포, PR → Preview 비활성화 유지
+
+### ~~[P2-13] 독립 리뷰 2단계 체계 수립~~ ✅ 완료 (2026-03-28)
+- 해결: code-reviewer 에이전트 + Codex gate 2단계 독립 리뷰 프로세스 수립
+- CLAUDE.md 반영 완료 — PR 생성 전 필수 절차로 명문화
+
+### ~~[P2-14] Playwright 테스트 환경 구축~~ ✅ 완료 (2026-03-28)
+- 해결: Playwright E2E 테스트 환경 초기 구성
+- 완료 기준: 주요 시나리오(홈 로딩, 탭 전환, 차트 오픈) 테스트 실행 가능
+
+---
+
 ## ✅ 완료 이력
 
 | 날짜 | 내용 |
@@ -244,3 +283,11 @@
 | 2026-03-25 | SurgeBanner Coinbase ticker 스타일 재설계 + 시간외 단일가 배지 (PR #144) |
 | 2026-03-25 | 퍼포먼스 고도화 — KIS WS 40종목, Yahoo v8 동시처리 10개, 한투 50종목 배치 (PR #143) |
 | 2026-03-25 | 국장 애프터마켓(시간외 단일가) 데이터 필드 추가 — hantoo-price API (PR #143) |
+| 2026-03-27 | CDS 번들 361KB 전체 제거 — TabbedChips/Button 직접 구현, WatchlistTable Table 교체 (PR #186) |
+| 2026-03-28 | 시세 6단계 fallback + 네이버 해외시세 추가 (PR #193) |
+| 2026-03-28 | API 단일 게이트웨이 난독화 /api/d (PR #193) |
+| 2026-03-28 | 한투 토큰 Upstash Redis 캐시 (PR #193) |
+| 2026-03-28 | Vercel ignoreCommand P0 수정 (PR #194) |
+| 2026-03-28 | Vercel Pro 전환 + 배포 파이프라인 정비 |
+| 2026-03-28 | 독립 리뷰 2단계 체계 수립 (code-reviewer + Codex gate) |
+| 2026-03-28 | Playwright E2E 테스트 환경 구축 |
