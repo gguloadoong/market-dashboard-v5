@@ -1,5 +1,10 @@
 // 뉴스 상세 슬라이드 패널 — AI 요약 + 관련 종목 + 관련 뉴스 + 원문 링크
 import { useMemo, useEffect, useState } from 'react';
+
+// AI 요약 클라이언트 캐시 — 페이지 생존 기간 동안 동일 기사 재열람 시 즉시 표시
+// 최대 50개 보관 (Map 삽입 순서 보장 → 초과 시 가장 오래된 항목 제거)
+const _summaryCache = new Map();
+const _CACHE_MAX = 50;
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 import { RELATED_ASSETS } from '../data/relatedAssets';
 import { detectNewsSectors } from '../utils/newsTopicMap';
@@ -123,15 +128,29 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // AI 요약 fetch — 패널 열릴 때 1회
+  // AI 요약 fetch — 캐시 히트 시 즉시 표시, 미스 시 fetch 후 캐시 저장
   useEffect(() => {
     if (!news?.link) return;
+    // 캐시 히트: 로딩 없이 즉시 표시
+    if (_summaryCache.has(news.link)) {
+      setAiSummary(_summaryCache.get(news.link));
+      setSummaryLoading(false);
+      return;
+    }
     setAiSummary(null);
     setSummaryLoading(true);
     const rssDesc = (news.description || news.summary || '')
       .replace(/<[^>]+>/g, '').trim().slice(0, 500);
     fetchNewsSummary(news.link, news.title || '', rssDesc)
-      .then(d => { if (d.summary) setAiSummary(d.summary); })
+      .then(d => {
+        if (d.summary) {
+          if (_summaryCache.size >= _CACHE_MAX) {
+            _summaryCache.delete(_summaryCache.keys().next().value);
+          }
+          _summaryCache.set(news.link, d.summary);
+          setAiSummary(d.summary);
+        }
+      })
       .catch(() => {})
       .finally(() => setSummaryLoading(false));
   }, [news?.link]);
