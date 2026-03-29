@@ -66,6 +66,30 @@ function parseKrxItems(items, exchange) {
     }));
 }
 
+// 한투 fallback 종목 정적 이름 맵 — API가 주말에 hts_kor_isnm 빈값 반환 시 보정
+const HANTOO_NAME_MAP = {
+  '005930': '삼성전자',
+  '000660': 'SK하이닉스',
+  '035420': 'NAVER',
+  '035720': '카카오',
+  '051910': 'LG화학',
+  '006400': '삼성SDI',
+  '068270': '셀트리온',
+  '028260': '삼성물산',
+  '105560': 'KB금융',
+  '055550': '신한지주',
+  '003670': '포스코퓨처엠',
+  '096770': 'SK이노베이션',
+  '034730': 'SK',
+  '032830': '삼성생명',
+  '012330': '현대모비스',
+  '066570': 'LG전자',
+  '003550': 'LG',
+  '015760': '한국전력',
+  '017670': 'SK텔레콤',
+  '316140': '우리금융지주',
+};
+
 // 한투 API fallback (기존 hantoo-price.js 패턴 참고)
 async function fetchHantooFallback() {
   // 한투 토큰이 없으면 fallback 불가
@@ -79,12 +103,8 @@ async function fetchHantooFallback() {
   if (!token) return null;
 
   // 주요 종목만 조회 (전종목 불가 — 한투는 개별 API)
-  const majorSymbols = [
-    '005930', '000660', '035420', '035720', '051910',
-    '006400', '068270', '028260', '105560', '055550',
-    '003670', '096770', '034730', '032830', '012330',
-    '066570', '003550', '015760', '017670', '316140',
-  ];
+  // HANTOO_NAME_MAP에서 파생 — 단일 소스, 종목 추가·삭제 시 맵만 수정
+  const majorSymbols = Object.keys(HANTOO_NAME_MAP);
 
   const results = await Promise.allSettled(
     majorSymbols.map(async (symbol) => {
@@ -109,7 +129,7 @@ async function fetchHantooFallback() {
       const change = (sign === '4' || sign === '5') ? -changeAbs : changeAbs;
       return {
         symbol,
-        name: o.hts_kor_isnm || symbol,
+        name: (o.hts_kor_isnm || '').trim() || HANTOO_NAME_MAP[symbol] || symbol,
         price,
         change,
         changePct: parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0,
