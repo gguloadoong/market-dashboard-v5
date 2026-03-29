@@ -6,9 +6,11 @@ import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
 
 const MKT_BADGE = {
-  KR:   { label: '국내', bg: '#FFF0F0', color: '#F04452' },
-  US:   { label: '미장', bg: '#EDF4FF', color: '#3182F6' },
-  COIN: { label: '코인', bg: '#FFF4E6', color: '#FF9500' },
+  KR:         { label: '국내',      bg: '#FFF0F0', color: '#F04452' },
+  US:         { label: '미장',      bg: '#EDF4FF', color: '#3182F6' },
+  COIN:       { label: '코인',      bg: '#FFF4E6', color: '#FF9500' },
+  KR_CLOSED:  { label: '국내 마감', bg: '#F8F9FA', color: '#8B95A1' },
+  US_CLOSED:  { label: '미장 마감', bg: '#F8F9FA', color: '#8B95A1' },
 };
 
 // 이유 태그 생성
@@ -33,7 +35,8 @@ function NotableCard({ item, newsCount, volumeRank, newsTitle, newsSource, krwRa
   const isUp   = pct > 0;
   const isDown = pct < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
-  const badge  = MKT_BADGE[item._market] || MKT_BADGE.KR;
+  const badgeKey = item._isClosed ? `${item._market}_CLOSED` : item._market;
+  const badge  = MKT_BADGE[badgeKey] || MKT_BADGE.KR;
   const tags   = buildReasonTags(item, newsCount, volumeRank);
 
   const logoUrls = getLogoUrls(item);
@@ -133,17 +136,18 @@ function NotableCard({ item, newsCount, volumeRank, newsTitle, newsSource, krwRa
 }
 
 export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = 1466, onItemClick }) {
+  const krOpen = getKoreanMarketStatus().status === 'open';
+  const usOpen = getUsMarketStatus().status === 'open';
+  const hasClosedMarket = !krOpen || !usOpen;
   const notables = useMemo(() => {
     if (!allItems.length) return [];
 
-    // 휴장 시장 필터링 — 열려있는 시장 + 코인(24h)만 포함
-    const krOpen = getKoreanMarketStatus().status === 'open';
-    const usOpen = getUsMarketStatus().status === 'open';
-    const activeItems = allItems.filter(item => {
-      if (item._market === 'COIN') return true;
-      if (item._market === 'KR') return krOpen;
-      if (item._market === 'US') return usOpen;
-      return true;
+    // 시장 상태 확인 — 휴장 시장도 포함하되 _isClosed 플래그로 구분
+    // krOpen/usOpen은 컴포넌트 본문에서 전달받아 의존성 배열에 포함
+    const activeItems = allItems.map(item => {
+      if (item._market === 'KR' && !krOpen) return { ...item, _isClosed: true };
+      if (item._market === 'US' && !usOpen) return { ...item, _isClosed: true };
+      return item;
     });
     if (!activeItems.length) return [];
 
@@ -177,10 +181,12 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         const relatedNews = findRelatedNews(item, recentNews);
 
         // 복합 점수: 변동폭(0~5) + 거래량 순위(0~3) + 뉴스(0~3)
+        // 휴장 시장은 -2 패널티 → 라이브 종목이 자연스럽게 상위 노출
         const pctScore = pct >= 10 ? 5 : pct >= 5 ? 4 : pct >= 3 ? 3 : pct >= 1.5 ? 2 : pct >= 0.5 ? 1 : 0;
         const volScore = volRank <= 5 ? 3 : volRank <= 10 ? 2 : volRank <= 20 ? 1 : 0;
         const newsScore = Math.min(newsCount, 3);
-        const totalScore = pctScore + volScore + newsScore;
+        const closedPenalty = item._isClosed ? -2 : 0;
+        const totalScore = pctScore + volScore + newsScore + closedPenalty;
 
         return {
           ...item,
@@ -194,25 +200,28 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
       .filter(i => i._totalScore >= 3)
       .sort((a, b) => b._totalScore - a._totalScore)
       .slice(0, 7);
-  }, [allItems, recentNews]);
+  }, [allItems, recentNews, krOpen, usOpen]);
 
   // 최소 2개 보장 — 점수 부족하면 변동폭 기준 fallback
   const displayed = useMemo(() => {
     if (notables.length >= 2) return notables;
+    // fallback도 _isClosed 플래그 부여 (휴장 종목 오인 방지)
     const fallback = [...allItems]
       .sort((a, b) => Math.abs(getPct(b)) - Math.abs(getPct(a)))
       .slice(0, 2)
       .map(i => {
+        const isClosed = (i._market === 'KR' && !krOpen) || (i._market === 'US' && !usOpen);
         const relatedNews = findRelatedNews(i, recentNews);
         return {
           ...i,
+          _isClosed: isClosed,
           _totalScore: 0, _newsCount: 0, _volRank: 999,
           _newsTitle: relatedNews?.title || null,
           _newsSource: relatedNews?.source || null,
         };
       });
     return fallback;
-  }, [notables, allItems, recentNews]);
+  }, [notables, allItems, recentNews, krOpen, usOpen]);
 
   if (!displayed.length) return null;
 
@@ -222,6 +231,9 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-[#191F28]">주목할 종목</span>
           <span className="w-1.5 h-1.5 rounded-full bg-[#2AC769] animate-pulse" />
+          {hasClosedMarket && (
+            <span className="text-[9px] text-[#8B95A1] bg-[#F8F9FA] px-1.5 py-0.5 rounded">마감 포함</span>
+          )}
         </div>
         <span className="text-[11px] text-[#B0B8C1]">변동폭 + 거래량 + 뉴스</span>
       </div>
