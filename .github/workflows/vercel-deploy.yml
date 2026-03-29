@@ -1,0 +1,50 @@
+# ⚠️ 이 워크플로우는 의도적으로 workflow_dispatch(수동 트리거)만 허용한다.
+# push: branches: [main] 자동 트리거 추가 금지 — ADR-013 참고.
+#
+# 이유: Vercel Pro 6,000 builds/월을 여러 프로젝트(chimp-pick, signalplay,
+#       costock, aptner 등)가 공유한다. PR 머지마다 자동 배포하면 한도 초과.
+#       main 머지 여러 개 → 배포는 1회. 준비됐을 때 수동으로 트리거한다.
+#
+# 배포 방법: GitHub → Actions → "Deploy to Vercel" → Run workflow → Run
+
+name: Deploy to Vercel
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm install -g vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Production
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

@@ -93,6 +93,16 @@
 - **기각**: 다크모드 즉시 착수 — tokens.css 준비됐으나 접근성(ADR-002 빨강=상승) 검증 공수 필요, P2로 연기
 - **담당**: 김민준(fallback), 최유나+박서연(아이콘), 박서연(알림+다크모드)
 
+## ADR-013: Vercel 수동 배포 게이트 (workflow_dispatch 전용)
+- **날짜**: 2026-03-29
+- **결정**: Vercel Git 통합 자동 배포 비활성화. 프로덕션 배포는 GitHub Actions `workflow_dispatch` 수동 트리거로만 실행.
+- **근거**: Vercel Pro 6,000 builds/월을 여러 프로젝트(chimp-pick, signalplay, costock, aptner 등)가 공유. PR 머지마다 자동 배포 시 빌드 한도 소진 불가피. 작업 단위 완료 후 배포 1회가 원칙.
+- **구현**:
+  - `vercel.json` → `ignoreCommand: "exit 0"` (Vercel Git 통합 배포 항상 스킵)
+  - `.github/workflows/vercel-deploy.yml` → `workflow_dispatch`만 허용 (push 트리거 없음)
+- **⚠️ 복원 금지**: `ignoreCommand`를 `exit 1` 또는 조건부 로직으로 되돌리는 것은 이 ADR 위반. "비표준"이 아니라 의도된 설계다. Vercel 기본값(main 머지 = 자동 배포)은 개인 프로젝트 기준이며 다중 프로젝트 운영 환경에 맞지 않는다.
+- **배포 방법**: GitHub → Actions 탭 → "Deploy to Vercel" → Run workflow 클릭
+
 ## ADR-014: 반복 회귀 방지 — 파일 삭제 원칙 + 아키텍처 테스트 도입
 - **날짜**: 2026-03-26
 - **컨텍스트**: Sprint 1~6 동안 동일 기능이 반복 회귀한 구조적 원인 분석

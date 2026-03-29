@@ -16,7 +16,8 @@
 
 1. **Issue → Code** — 코드 1줄 수정 전 반드시 Issue 생성 (`feat:`/`fix:`). Issue 없는 변경은 무효.
 2. **품질 래칫** — `.project/quality-baseline.md` 기준 이하로 내려가면 P0. 모든 신규 작업 중단, 복구 후 재개.
-3. **배포 규칙** — main 머지 = Vercel 자동 배포. PR 건건이 즉시 머지 금지. 작업 단위 완료 시 일괄 머지. 로컬 확인 없이 머지 금지. `vercel --prod` CLI는 긴급 시에만.
+3. **배포 규칙** — main 머지 = 자동 배포 없음 (ADR-013). 배포는 GitHub Actions → "Deploy to Vercel" → Run workflow 수동 실행. PR 건건이 즉시 머지 금지. 작업 단위 완료 시 일괄 머지 후 배포 1회. 로컬 확인 없이 머지 금지. `vercel --prod` CLI는 긴급 시에만.
+   - ⚠️ `vercel.json`의 `ignoreCommand`는 반드시 `"exit 0"` 유지. Vercel Git 통합 자동 배포 절대 복원 금지 (ADR-013).
 
 ### 대표에게만 묻는 것 (request-to-ceo)
 
