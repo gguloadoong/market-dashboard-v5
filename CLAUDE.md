@@ -16,8 +16,26 @@
 
 1. **Issue → Code** — 코드 1줄 수정 전 반드시 Issue 생성 (`feat:`/`fix:`). Issue 없는 변경은 무효.
 2. **품질 래칫** — `.project/quality-baseline.md` 기준 이하로 내려가면 P0. 모든 신규 작업 중단, 복구 후 재개.
-3. **배포 규칙** — main 머지 = 자동 배포 없음 (ADR-013). 배포는 GitHub Actions → "Deploy to Vercel" → Run workflow 수동 실행. PR 건건이 즉시 머지 금지. 작업 단위 완료 시 일괄 머지 후 배포 1회. 로컬 확인 없이 머지 금지. `vercel --prod` CLI는 긴급 시에만.
-   - ⚠️ `vercel.json`의 `ignoreCommand`는 반드시 `"exit 0"` 유지. Vercel Git 통합 자동 배포 절대 복원 금지 (ADR-013).
+3. **배포 규칙** — 배포는 반드시 아래 두 경우에만 실행한다. 그 외 어떤 상황에도 배포를 실행하거나 제안 없이 트리거하지 않는다.
+
+   **배포 실행 조건 (둘 중 하나만):**
+   - 대표님이 명시적으로 "배포해줘" / "배포하자"고 말할 때 → 즉시 실행
+   - Claude가 배포 필요하다고 판단 시 → "XX, XX가 머지된 상태입니다. 배포할까요?" 제안 후 대표님 확인 받고 실행
+
+   **배포 방법:** GitHub Actions → "Deploy to Vercel" → Run workflow 클릭
+
+   **절대 금지:**
+   - PR 머지 후 자동/임의 배포
+   - 확인 없이 혼자 판단해서 배포 실행
+   - PR 건건이 즉시 머지 (작업 단위 완료 시 일괄 머지)
+   - 로컬 확인 없이 머지
+   - `vercel --prod` CLI (긴급 시에만 허용)
+
+   **배포 제안 기준 (이 조건 충족 시에만 제안):**
+   - P0/P1 버그 수정이 머지된 상태, 또는
+   - 주요 기능 완료로 작업 단위 마무리된 상태
+
+   ⚠️ `vercel.json`의 `ignoreCommand`는 반드시 `"exit 0"` 유지. Vercel Git 통합 자동 배포 절대 복원 금지 (ADR-013).
 
 ### 대표에게만 묻는 것 (request-to-ceo)
 
