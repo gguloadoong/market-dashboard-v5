@@ -55,8 +55,13 @@ if command -v codex &>/dev/null; then
 
   # BLOCK 체크
   if [ "$CODEX_EXIT" -ne 0 ] || echo "$CODEX_OUTPUT" | grep -q "BLOCK"; then
-    echo -e "${YELLOW}[pr] Codex gate BLOCK — 수정 후 재실행하세요${NC}"
-    exit 1
+    if [ "${SKIP_CODEX_REVIEW:-0}" = "1" ]; then
+      echo -e "${YELLOW}[pr] Codex gate BLOCK → SKIP_CODEX_REVIEW=1 우회 (PR 본문에 사유 기록 필수)${NC}"
+      CODEX_STATUS="BLOCK → SKIP_CODEX_REVIEW=1 우회"
+    else
+      echo -e "${YELLOW}[pr] Codex gate BLOCK — 수정 후 재실행하세요${NC}"
+      exit 1
+    fi
   fi
 
   # P1/P2/HIGH/CRITICAL 이슈 추출
@@ -83,7 +88,10 @@ if command -v codex &>/dev/null; then
 
     CODEX_STATUS="PASS (지적사항 처리: ${CODEX_ISSUES_DECISION})"
   else
-    CODEX_STATUS="PASS"
+    # SKIP_CODEX_REVIEW=1 우회 상태를 덮어쓰지 않도록 — 이미 우회 기록이 있으면 유지
+    if [[ "$CODEX_STATUS" != *"우회"* ]]; then
+      CODEX_STATUS="PASS"
+    fi
   fi
 else
   echo -e "${YELLOW}[pr] Codex CLI 미설치 — 스킵${NC}"

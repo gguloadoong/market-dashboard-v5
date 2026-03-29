@@ -5,9 +5,13 @@
 
 import { SNAP_KEYS, SNAP_TTL, setSnap } from '../_price-cache.js';
 
-// KST 기준 오늘 날짜 (YYYYMMDD)
+// KST 기준 마지막 거래일 날짜 (YYYYMMDD)
+// 주말이면 직전 금요일을 반환 — KRX는 비거래일에 빈 배열을 주므로 사전 보정
 function getTrdDd() {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const day = kst.getDay(); // 0=일, 6=토
+  if (day === 0) kst.setDate(kst.getDate() - 2); // 일 → 금
+  else if (day === 6) kst.setDate(kst.getDate() - 1); // 토 → 금
   return kst.toISOString().slice(0, 10).replace(/-/g, '');
 }
 
@@ -23,7 +27,7 @@ function parseFloat2(str) {
 }
 
 // KRX API에서 전종목 시세 조회
-async function fetchKrxMarket(mktId, trdDd) {
+async function fetchKrxMarket(mktId, trdDd, timeoutMs = 15000) {
   const body = new URLSearchParams({
     bld: 'dbms/MDC/STAT/standard/MDCSTAT01501',
     mktId,
@@ -40,7 +44,7 @@ async function fetchKrxMarket(mktId, trdDd) {
       'Referer': 'https://data.krx.co.kr/contents/MDC/MDI/mdiStat/tables/MDCSTAT01501.html',
     },
     body: body.toString(),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!res.ok) throw new Error(`KRX ${mktId} HTTP ${res.status}`);
@@ -147,6 +151,38 @@ async function fetchHantooFallback() {
   return items.length > 0 ? items : null;
 }
 
+// 네이버 증권 모바일 API fallback — 주말 포함 24/7 전일 종가 제공
+async function fetchNaverFallback() {
+  const symbols = Object.keys(HANTOO_NAME_MAP);
+  const results = await Promise.allSettled(
+    symbols.map(async (symbol) => {
+      const res = await fetch(`https://m.stock.naver.com/api/stock/${symbol}/basic`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+          'Referer': 'https://m.stock.naver.com/',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const price = parseFloat2(data.closePrice);
+      if (!price) return null;
+      return {
+        symbol,
+        name: (data.stockName || '').trim() || HANTOO_NAME_MAP[symbol] || symbol,
+        price,
+        change: parseFloat2(data.compareToPreviousClosePrice),
+        changePct: parseFloat2(data.fluctuationsRatio),
+        volume: parseFloat2(data.accumulatedTradingVolume),
+        marketCap: 0,
+        market: 'kr',
+      };
+    }),
+  );
+  const fetched = results.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value);
+  return fetched.length > 0 ? fetched : null;
+}
+
 export default async function handler(req, res) {
   // Vercel Cron Bearer 인증 — CRON_SECRET 미설정 시 프로덕션 거부
   const secret = process.env.CRON_SECRET;
@@ -172,24 +208,56 @@ export default async function handler(req, res) {
       fetchKrxMarket('KSQ', trdDd),
     ]);
 
-    const kospiParsed = parseKrxItems(kospi, 'kospi');
-    const kosdaqParsed = parseKrxItems(kosdaq, 'kosdaq');
-    items = [...kospiParsed, ...kosdaqParsed];
+    let krxItems = [...parseKrxItems(kospi, 'kospi'), ...parseKrxItems(kosdaq, 'kosdaq')];
+
+    // 비거래일(공휴일/연휴) 대응: 빈 응답이면 직전 영업일로 최대 5회 재시도
+    // 주말은 getTrdDd()에서 이미 보정 → 여기선 평일 공휴일·연휴(추석 등) 대응
+    if (krxItems.length === 0) {
+      const retryBase = new Date(`${trdDd.slice(0, 4)}-${trdDd.slice(4, 6)}-${trdDd.slice(6, 8)}`);
+      for (let attempt = 1; attempt <= 5 && krxItems.length === 0; attempt++) {
+        retryBase.setDate(retryBase.getDate() - 1);
+        // 주말 건너뛰기 — 일요일/토요일이면 계속 -1
+        while ([0, 6].includes(retryBase.getDay())) {
+          retryBase.setDate(retryBase.getDate() - 1);
+        }
+        const retryDd = retryBase.toISOString().slice(0, 10).replace(/-/g, '');
+        console.info(`[update-kr] KRX 비거래일(${trdDd}) — ${retryDd}로 재시도 (${attempt}번째)`);
+        const [kp2, kq2] = await Promise.all([
+          fetchKrxMarket('STK', retryDd, 5000),
+          fetchKrxMarket('KSQ', retryDd, 5000),
+        ]);
+        krxItems = [...parseKrxItems(kp2, 'kospi'), ...parseKrxItems(kq2, 'kosdaq')];
+      }
+    }
+
+    if (krxItems.length === 0) throw new Error('KRX 5영업일 내 데이터 없음');
+    items = krxItems;
     source = 'krx';
   } catch (krxErr) {
-    // KRX 실패 → 한투 fallback
-    console.warn('[update-kr] KRX 조회 실패, 한투 fallback 시도:', krxErr);
+    // KRX 실패/비거래일 → 한투 fallback
+    console.warn('[update-kr] KRX 조회 실패, 한투 fallback 시도:', krxErr.message);
     try {
-      const fallback = await fetchHantooFallback();
-      if (fallback) {
-        items = fallback;
+      const hantooItems = await fetchHantooFallback();
+      if (hantooItems) {
+        items = hantooItems;
         source = 'hantoo';
       } else {
-        console.error('[update-kr] 한투 fallback 빈 응답 — items 비어있음');
+        throw new Error('한투 fallback 빈 응답');
       }
-    } catch (fallbackErr) {
-      console.error('[update-kr] 한투 fallback 실패:', fallbackErr);
-      // 한투도 실패 — items 빈 배열 유지
+    } catch (hantooErr) {
+      // 한투 실패 → 네이버 fallback
+      console.warn('[update-kr] 한투 fallback 실패, 네이버 fallback 시도:', hantooErr.message);
+      try {
+        const naverItems = await fetchNaverFallback();
+        if (naverItems) {
+          items = naverItems;
+          source = 'naver';
+        } else {
+          console.error('[update-kr] 네이버 fallback 빈 응답 — 모든 소스 실패');
+        }
+      } catch (naverErr) {
+        console.error('[update-kr] 네이버 fallback 실패:', naverErr.message);
+      }
     }
   }
 
