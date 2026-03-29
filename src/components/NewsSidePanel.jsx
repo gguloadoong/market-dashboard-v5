@@ -2,8 +2,18 @@
 import { useMemo, useEffect, useState } from 'react';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 import { RELATED_ASSETS } from '../data/relatedAssets';
+import { detectNewsSectors } from '../utils/newsTopicMap';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
 import { fetchNewsSummary } from '../api/_gateway.js';
+
+// newsTopicMap 섹터('암호화폐') → RELATED_ASSETS 실제 섹터명 매핑
+const TOPIC_TO_ASSET_SECTORS = {
+  '암호화폐': ['비트코인', '이더리움', '알트코인', '밈코인', 'DeFi', '레이어2', '암호화폐기업'],
+  '반도체':   ['반도체'],
+  'AI':      ['빅테크', '소프트웨어', '클라우드'],
+  '은행':    ['금융'],
+  '바이오':  ['바이오', '제약', '헬스케어'],
+};
 
 const CAT_COLOR = {
   coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
@@ -213,6 +223,13 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     for (const [sym] of scored) {
       const sector = RELATED_ASSETS[sym]?.sector;
       if (sector) matchedSectors.add(sector);
+    }
+    // Stage 3b: newsTopicMap 뉴스 텍스트 기반 섹터 보강
+    // — 직접 매칭 없어도 'CLARITY Act', '법안' 등 규제 키워드로 관련 자산 섹터 추가
+    const titleTopicSectors = detectNewsSectors(`${news.title || ''} ${news.description || ''} ${news.summary || ''}`);
+    for (const ts of titleTopicSectors) {
+      const assetSectors = TOPIC_TO_ASSET_SECTORS[ts] || [];
+      for (const s of assetSectors) matchedSectors.add(s);
     }
     if (matchedSectors.size > 0) {
       for (const [sym, info] of Object.entries(RELATED_ASSETS)) {
