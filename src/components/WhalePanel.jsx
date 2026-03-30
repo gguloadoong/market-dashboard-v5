@@ -87,8 +87,49 @@ function buildRouteTitle(event) {
   }
 }
 
+// ─── 스테이블코인 판별 ────────────────────────────────────────────
+const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD']);
+
+function isStablecoin(symbol) {
+  return STABLECOIN_SYMBOLS.has((symbol || '').toUpperCase());
+}
+
+// ─── 이벤트 규모 등급 판별 (금액 기반 3단계) ─────────────────────
+// 'normal' | 'notable'(주요) | 'major'(대형)
+function getEventGrade(event) {
+  const amt = event.tradeAmt || 0;
+  const usd = event.tradeUsd || 0;
+  if (amt >= 5_000_000_000 || usd >= 3_500_000) return 'major';   // 대형: 50억원+ / $3.5M+
+  if (amt >= 1_000_000_000 || usd >= 700_000)   return 'notable'; // 주요: 10억원+ / $700K+
+  return 'normal'; // 일반
+}
+
 // ─── 이동 패턴별 배지 스타일 ────────────────────────────────────
-function getMovementBadge(movementType, side) {
+function getMovementBadge(movementType, side, symbol) {
+  const stable = isStablecoin(symbol);
+
+  // 스테이블코인 특수 로직: 입금/출금 방향성 반전
+  if (stable && movementType === 'exchange_deposit') {
+    // 스테이블코인 거래소 입금 = 매수 대기 자금 유입 (bullish)
+    return {
+      emoji: '💵',
+      label: '매수 대기 자금 유입',
+      bg: '#F0FFF6',
+      border: '#C6F6D5',
+      color: '#2AC769',
+    };
+  }
+  if (stable && movementType === 'exchange_withdrawal') {
+    // 스테이블코인 거래소 출금 = 자금 이탈 (bearish)
+    return {
+      emoji: '💵',
+      label: '자금 이탈',
+      bg: '#FFF0F1',
+      border: '#FFD0D4',
+      color: '#F04452',
+    };
+  }
+
   // Whale Alert 온체인 이벤트 (movementType 있음)
   if (movementType === 'exchange_deposit') {
     return {
@@ -200,6 +241,18 @@ function buildInsightText(event) {
   const fromLabel = fromKo || event.fromOwner || '지갑';
   const toLabel   = toKo   || event.toOwner   || '지갑';
 
+  // 스테이블코인 이벤트: 방향성 반전된 설명 반환
+  if (isStablecoin(event.symbol)) {
+    switch (event.movementType) {
+      case 'exchange_deposit':
+        return `💵 ${sym} 거래소 유입 — 매수 대기 자금. 상방 압력 가능성`;
+      case 'exchange_withdrawal':
+        return `💵 ${sym} 거래소 출금 — 자금 이탈. 매수 여력 감소 신호`;
+      default:
+        break;
+    }
+  }
+
   switch (event.movementType) {
     case 'exchange_deposit':
       return `${sym}을 ${toLabel}으로 이동. 매도 준비 가능성`;
@@ -246,7 +299,8 @@ function _buildRouteLabel(event) {
 // ─── 이벤트 카드 컴포넌트 ────────────────────────────────────────
 function EventRow({ event, onItemClick, coinMap }) {
   const isHigh      = event.severity === 'high';
-  const badge       = getMovementBadge(event.movementType, event.side);
+  const badge       = getMovementBadge(event.movementType, event.side, event.symbol);
+  const grade       = getEventGrade(event); // 'normal' | 'notable' | 'major'
   const routeTitle  = buildRouteTitle(event);   // "바이낸스 → 콜드월렛 (HODLing 신호)"
   const insightText = buildInsightText(event);   // 한 줄 설명
 
@@ -272,12 +326,19 @@ function EventRow({ event, onItemClick, coinMap }) {
   // 코인 맵에서 종목 조회 (심볼 기반)
   const linkedCoin = coinMap?.[event.symbol?.toUpperCase()];
 
+  // 등급별 카드 테두리·배경 스타일
+  const gradeCardClass = grade === 'major'
+    ? 'border-l-[3px] border-l-[#F04452] bg-gradient-to-r from-[#FFF8F8] to-white'
+    : grade === 'notable'
+    ? 'border-l-2 border-l-[#FF9500]'
+    : '';
+
   return (
     <div
-      className={`px-4 py-3 border-b border-[#F2F4F6] last:border-0 ${isHigh ? 'bg-[#FFFBF0]' : ''} ${linkedCoin ? 'cursor-pointer hover:bg-[#F7F8FA] active:bg-[#F2F4F6] transition-colors' : ''}`}
+      className={`px-4 py-3 border-b border-[#F2F4F6] last:border-0 ${gradeCardClass} ${isHigh ? 'bg-[#FFFBF0]' : ''} ${linkedCoin ? 'cursor-pointer hover:bg-[#F7F8FA] active:bg-[#F2F4F6] transition-colors' : ''}`}
       onClick={() => linkedCoin && onItemClick?.(linkedCoin)}
     >
-      {/* 1행: 거래소 경로 제목 (크게) + 심볼 배지 + HIGH 배지 */}
+      {/* 1행: 거래소 경로 제목 (크게) + 심볼 배지 + 등급 배지 + HIGH 배지 */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <span className="text-[13px] font-bold text-[#191F28] leading-snug flex-1 min-w-0">
           {routeTitle}
@@ -290,6 +351,13 @@ function EventRow({ event, onItemClick, coinMap }) {
           >
             {chainBadge.text}
           </span>
+          {/* 시그널 강도 배지: 주요/대형만 표시 */}
+          {grade === 'major' && (
+            <span className="text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] px-1.5 py-0.5 rounded">🚨 대형 이동</span>
+          )}
+          {grade === 'notable' && (
+            <span className="text-[10px] font-bold bg-[#FFF4E6] text-[#FF9500] px-1.5 py-0.5 rounded">⚠️ 주요 이동</span>
+          )}
           {isHigh && (
             <span className="text-[10px] font-bold bg-[#FFF0F1] text-[#F04452] px-1.5 py-0.5 rounded">🔥 HIGH</span>
           )}
@@ -524,6 +592,50 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   const isAnyConnected = connected || bithumbConnected || btcConnected || binanceActive;
   const currentEvents  = activeTab === 'exchange' ? exchangeEvents : onchainEvents;
 
+  // ─── 일간 고래 통계 요약 계산 ─────────────────────────────────
+  const dailySummary = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayTs = todayStart.getTime();
+
+    // 거래소 + 온체인 전체 이벤트 중 오늘 이벤트 필터
+    const allEvents = [...exchangeEvents, ...onchainEvents];
+    const todayEvents = allEvents.filter(e => e.timestamp >= todayTs);
+
+    let totalInflow = 0;  // 거래소 입금(매도 압력) 합산
+    let totalOutflow = 0; // 거래소 출금(HODLing) 합산
+
+    for (const e of todayEvents) {
+      const amt = e.tradeAmt || 0;
+      const stable = isStablecoin(e.symbol);
+
+      if (stable) {
+        // 스테이블코인: 입금 = 유입(bullish), 출금 = 이탈
+        if (e.movementType === 'exchange_deposit') totalOutflow += amt; // 유입이지만 outflow 칸 재활용
+        else if (e.movementType === 'exchange_withdrawal') totalInflow += amt;
+      } else {
+        // 일반 코인: 입금 = 유입(inflow, bearish), 출금 = 유출(outflow, bullish)
+        if (e.movementType === 'exchange_deposit' || e.side === '매도') totalInflow += amt;
+        else if (e.movementType === 'exchange_withdrawal' || e.side === '매수') totalOutflow += amt;
+        else totalInflow += amt; // 분류 불명 — 보수적으로 유입 처리
+      }
+    }
+
+    const total = totalInflow + totalOutflow;
+    const inflowPct = total > 0 ? Math.round((totalInflow / total) * 100) : 0;
+
+    return { todayCount: todayEvents.length, totalInflow, totalOutflow, inflowPct };
+  }, [exchangeEvents, onchainEvents]);
+
+  // 원화 금액 단축 포맷 (일간 요약 전용)
+  function fmtKrw(n) {
+    if (!n || n === 0) return '0';
+    if (n >= 1e12) return `${(n / 1e12).toFixed(1)}조`;
+    if (n >= 1e8)  return `${(n / 1e8).toFixed(1)}억`;
+    if (n >= 1e4)  return `${(n / 1e4).toFixed(0)}만`;
+    return n.toLocaleString('ko-KR');
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
       {/* 헤더 */}
@@ -578,6 +690,24 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
             </span>
           )}
         </button>
+      </div>
+
+      {/* 일간 고래 요약 — 오늘 이벤트 집계 */}
+      <div className="px-4 py-2 bg-[#FAFBFC] border-b border-[#F2F4F6]">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-[#8B95A1]">오늘 {dailySummary.todayCount}건</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[#2AC769]">유출 ₩{fmtKrw(dailySummary.totalOutflow)}</span>
+            <span className="text-[#F04452]">유입 ₩{fmtKrw(dailySummary.totalInflow)}</span>
+          </div>
+        </div>
+        {/* 유입/유출 비율 바 */}
+        <div className="h-1 bg-[#E5E8EB] rounded-full mt-1 overflow-hidden">
+          <div
+            className="h-full bg-[#F04452] rounded-full transition-all duration-500"
+            style={{ width: `${dailySummary.inflowPct}%` }}
+          />
+        </div>
       </div>
 
       {/* 탭별 설명 */}

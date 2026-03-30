@@ -13,6 +13,30 @@ const MKT_BADGE = {
   US_CLOSED:  { label: '미장 마감', bg: '#F8F9FA', color: '#8B95A1' },
 };
 
+/**
+ * buildWhyReason(item, newsTitle, newsSource)
+ * WHY 카드에 표시할 이유를 다중 소스로 추론
+ * 1순위: 뉴스, 2순위: 거래량 TOP, 3순위: 변동폭
+ */
+function buildWhyReason(item, newsTitle, newsSource) {
+  // 1순위: 뉴스가 있으면 그대로 사용
+  if (newsTitle) return { text: newsTitle, source: newsSource, type: 'news' };
+
+  // 2순위: 거래량 TOP 5 이내
+  if (item._volRank && item._volRank <= 5) {
+    return { text: `거래량 TOP ${item._volRank} — 거래 활발`, source: null, type: 'volume' };
+  }
+
+  // 3순위: 변동폭 5% 이상
+  const pct = Math.abs(getPct(item));
+  if (pct >= 5) {
+    const dir = getPct(item) > 0 ? '급등' : '급락';
+    return { text: `${dir} ${pct.toFixed(1)}% — 변동폭 주의`, source: null, type: 'price' };
+  }
+
+  return null;
+}
+
 // 이유 태그 생성
 function buildReasonTags(item, newsCount, volumeRank) {
   const tags = [];
@@ -30,7 +54,14 @@ function buildReasonTags(item, newsCount, volumeRank) {
   return tags.slice(0, 2);
 }
 
-function NotableCard({ item, newsCount, volumeRank, newsTitle, newsSource, krwRate, onClick }) {
+// WHY 배지 type별 스타일 정의
+const WHY_BADGE_STYLE = {
+  news:   { label: 'WHY',  bg: '#191F28', color: '#FFFFFF' },
+  volume: { label: 'VOL',  bg: '#2AC769', color: '#FFFFFF' },
+  price:  { label: 'MOVE', bg: '#FF9500', color: '#FFFFFF' },
+};
+
+function NotableCard({ item, newsCount, volumeRank, whyReason, krwRate, onClick }) {
   const pct    = getPct(item);
   const isUp   = pct > 0;
   const isDown = pct < 0;
@@ -63,10 +94,11 @@ function NotableCard({ item, newsCount, volumeRank, newsTitle, newsSource, krwRa
     }).join(' ');
   }
 
-  // WHY 뉴스 이유 텍스트
-  const whyText = newsTitle
-    ? (newsTitle.length > 50 ? newsTitle.slice(0, 48) + '…' : newsTitle)
+  // WHY 이유 텍스트 및 배지 스타일
+  const whyDisplayText = whyReason?.text
+    ? (whyReason.text.length > 50 ? whyReason.text.slice(0, 48) + '…' : whyReason.text)
     : null;
+  const whyBadge = whyReason ? (WHY_BADGE_STYLE[whyReason.type] || WHY_BADGE_STYLE.news) : null;
 
   return (
     <div
@@ -108,17 +140,22 @@ function NotableCard({ item, newsCount, volumeRank, newsTitle, newsSource, krwRa
         </svg>
       )}
 
-      {/* WHY 뉴스 이유 — SignalSection 통합 */}
-      {whyText && (
+      {/* WHY 이유 — 뉴스(검정)/거래량(초록)/변동폭(주황) 배지 */}
+      {whyDisplayText && whyBadge && (
         <div className="flex items-start gap-1.5 mb-1.5">
-          <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-[#191F28] text-white flex-shrink-0 mt-0.5">WHY</span>
-          <p className="text-[10px] text-[#4E5968] leading-snug line-clamp-2">{whyText}</p>
+          <span
+            className="text-[8px] font-bold px-1 py-0.5 rounded flex-shrink-0 mt-0.5"
+            style={{ background: whyBadge.bg, color: whyBadge.color }}
+          >
+            {whyBadge.label}
+          </span>
+          <p className="text-[10px] text-[#4E5968] leading-snug line-clamp-2">{whyDisplayText}</p>
         </div>
       )}
 
-      {/* 뉴스 출처 */}
-      {newsSource && (
-        <div className="text-[9px] text-[#B0B8C1] mb-1.5 truncate">{newsSource}</div>
+      {/* 뉴스 출처 (뉴스 타입일 때만 표시) */}
+      {whyReason?.type === 'news' && whyReason?.source && (
+        <div className="text-[9px] text-[#B0B8C1] mb-1.5 truncate">{whyReason.source}</div>
       )}
 
       {/* 이유 태그 */}
@@ -200,13 +237,22 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         const leveragedPenalty = isLeveraged ? -2 : 0;
         const totalScore = pctScore + volScore + newsScore + closedPenalty + leveragedPenalty;
 
+        const newsTitle = relatedNews?.title || null;
+        const newsSource = relatedNews?.source || null;
+
+        // WHY 이유 다중 소스 추론 (뉴스 → 거래량 → 변동폭 순)
+        // _volRank는 이 시점에서 아직 item에 없으므로 volRank 직접 전달
+        const whyItem = { ...item, _volRank: volRank };
+        const whyReason = buildWhyReason(whyItem, newsTitle, newsSource);
+
         return {
           ...item,
           _totalScore: totalScore,
           _newsCount: newsCount,
           _volRank: volRank,
-          _newsTitle: relatedNews?.title || null,
-          _newsSource: relatedNews?.source || null,
+          _newsTitle: newsTitle,
+          _newsSource: newsSource,
+          _whyReason: whyReason,
         };
       })
       .filter(i => i._totalScore >= 3)
@@ -230,12 +276,17 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
       .map(i => {
         const isClosed = (i._market === 'KR' && !krOpen) || (i._market === 'US' && !usOpen);
         const relatedNews = findRelatedNews(i, recentNews);
+        const newsTitle = relatedNews?.title || null;
+        const newsSource = relatedNews?.source || null;
+        const whyItem = { ...i, _volRank: 999 };
+        const whyReason = buildWhyReason(whyItem, newsTitle, newsSource);
         return {
           ...i,
           _isClosed: isClosed,
           _totalScore: 0, _newsCount: 0, _volRank: 999,
-          _newsTitle: relatedNews?.title || null,
-          _newsSource: relatedNews?.source || null,
+          _newsTitle: newsTitle,
+          _newsSource: newsSource,
+          _whyReason: whyReason,
         };
       });
     return fallback;
@@ -265,8 +316,7 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
                 item={item}
                 newsCount={item._newsCount}
                 volumeRank={item._volRank}
-                newsTitle={item._newsTitle}
-                newsSource={item._newsSource}
+                whyReason={item._whyReason}
                 krwRate={krwRate}
                 onClick={onItemClick}
               />

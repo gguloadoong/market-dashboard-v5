@@ -161,6 +161,73 @@ export const NEWS_SIGNALS = [
   { tag: '⚡ 신제품',  keywords: ['출시','공개','발표','개발','특허','계약','수주','신제품','업그레이드'], bg: '#F0FFF6', color: '#059669', priority: 3 },
 ];
 
+// ─── 감성 점수 5단계 키워드 분류 ────────────────────────────
+// +2: 강한 호재, +1: 호재, 0: 중립, -1: 악재, -2: 강한 악재
+const STRONG_POSITIVE_KW = [
+  '사상 최대', '어닝 서프라이즈', '깜짝 실적', '흑자전환', '흑자 전환',
+  '대규모 수주', '신약 승인', 'fda 승인', '상장 확정', '역대 최대',
+  '대폭 상향', '급등', '폭등', '서프라이즈', '대박',
+  'all-time high', 'record high', 'beat estimates', 'upgrade',
+];
+const STRONG_NEGATIVE_KW = [
+  '적자전환', '적자 전환', '상장폐지', '거래정지', '거래 정지',
+  '횡령', '분식회계', '리콜 확대', '파산', '부도', '상폐',
+  '급락', '폭락', '어닝쇼크', '대규모 적자',
+  'bankruptcy', 'default', 'downgrade', 'crash', 'plunge',
+];
+const MILD_POSITIVE_KW = [
+  '목표가 상향', '투자의견 상향', '매수 추천', '신사업', '제휴',
+  '계약 체결', '수주', '특허', '승인', '상향', '호실적',
+  '성장', '확대', '기대', '반등', '회복',
+  'bullish', 'outperform', 'buy rating', 'rally',
+];
+const MILD_NEGATIVE_KW = [
+  '목표가 하향', '투자의견 하향', '매도 추천', '소송', '경쟁 심화',
+  '실적 하회', '하향', '둔화', '우려', '리스크', '하락',
+  '감소', '축소', '부진', '위축',
+  'bearish', 'underperform', 'sell rating', 'decline',
+];
+
+/**
+ * getNewsSentimentScore(title)
+ * 뉴스 제목의 감성 점수를 5단계로 반환
+ * +2(강한 호재) / +1(호재) / 0(중립) / -1(악재) / -2(강한 악재)
+ * 복합 키워드 상쇄: 긍정+부정 동시 존재 시 합산 ("급락 후 반등" → -1)
+ * @param {string} title
+ * @returns {number}
+ */
+export function getNewsSentimentScore(title) {
+  if (!title) return 0;
+  const t = title.toLowerCase();
+
+  // 복합 키워드 상쇄: 긍정과 부정이 동시 존재하면 약한 쪽으로
+  const strongPos = STRONG_POSITIVE_KW.some(k => t.includes(k));
+  const strongNeg = STRONG_NEGATIVE_KW.some(k => t.includes(k));
+  const mildPos = MILD_POSITIVE_KW.some(k => t.includes(k));
+  const mildNeg = MILD_NEGATIVE_KW.some(k => t.includes(k));
+
+  const posScore = strongPos ? 2 : mildPos ? 1 : 0;
+  const negScore = strongNeg ? -2 : mildNeg ? -1 : 0;
+
+  // 양쪽 모두 있으면 합산 (상쇄)
+  if (posScore && negScore) return posScore + negScore;
+  return posScore || negScore;
+}
+
+/**
+ * getSentimentStyle(score)
+ * 감성 점수 → 라벨·색상·이모지 반환 (중립은 null)
+ * @param {number} score
+ * @returns {{ label: string, color: string, bg: string, emoji: string } | null}
+ */
+export function getSentimentStyle(score) {
+  if (score >= 2)  return { label: '강한 호재', color: '#F04452', bg: '#FFF0F1', emoji: '🔥' };
+  if (score >= 1)  return { label: '호재',     color: '#2AC769', bg: '#F0FFF6', emoji: '📈' };
+  if (score <= -2) return { label: '강한 악재', color: '#F04452', bg: '#FFF0F1', emoji: '💥' };
+  if (score <= -1) return { label: '악재',     color: '#1764ED', bg: '#EDF4FF', emoji: '📉' };
+  return null; // 중립은 배지 표시 안 함
+}
+
 // ─── 호재/악재/중립 임팩트 분류 ─────────────────────────────
 const IMPACT_POSITIVE = [
   '실적 개선','영업이익 증가','흑자전환','흑자','어닝서프라이즈','목표가 상향','상향','매수',

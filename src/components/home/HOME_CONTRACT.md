@@ -12,13 +12,14 @@
 ```
 1. EventTicker          — 경제 이벤트 롤링 티커 (상단 고정)
 2. MarketPulseWidget    — 지수 6개 + 환율
-3. WatchlistWidget      — 관심종목 실시간 등락률
-4. TopMoversWidget      — 급등/급락 (KR/US/COIN 탭)
-5. SectorMiniWidget     — 섹터 HOT/COLD 칩 (index.jsx 인라인 정의)
-6. NewsFeedWidget       — 투자 뉴스 최신 (가격영향 필터 적용)
-7. FearGreedWidget      — Fear & Greed 지수
-8. NotableMoversSection — 수급 이상 종목
-9. MarketInvestorSection— 외국인/기관 수급
+3. SignalSummaryWidget  — 투자 시그널 요약 (상위 3개)
+4. WatchlistWidget      — 관심종목 실시간 등락률
+5. TopMoversWidget      — 급등/급락 (KR/US/COIN 탭)
+6. SectorMiniWidget     — 섹터 HOT/COLD 칩 (index.jsx 인라인 정의)
+7. NewsFeedWidget       — 투자 뉴스 최신 (가격영향 필터 적용)
+8. FearGreedWidget      — Fear & Greed 지수
+9. NotableMoversSection — 수급 이상 종목
+10. MarketInvestorSection— 외국인/기관 수급
 ```
 
 ---
@@ -49,6 +50,7 @@
 | `TopMoversWidget.jsx` | 급등/급락 랭킹 (HotListSection 래퍼) | `krStocks`, `usStocks`, `coins` |
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
+| `SignalSummaryWidget.jsx` | 투자 시그널 요약 (상위 3개) | `useTopSignals` |
 
 ### 섹션 (src/components/home/)
 

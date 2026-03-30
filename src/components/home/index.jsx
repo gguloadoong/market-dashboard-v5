@@ -10,6 +10,8 @@ import FearGreedWidget from './widgets/FearGreedWidget';
 import NotableMoversSection from './NotableMoversSection';
 import MarketInvestorSection from './MarketInvestorSection';
 import EventTicker from './EventTicker';
+import SignalSummaryWidget from './SignalSummaryWidget';
+import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 
 // ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 → 섹터 탭 유도) ──
 function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
@@ -132,6 +134,9 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
+  // 투자자 시그널 스캔 (5분 간격 폴링)
+  useInvestorSignals(allItems);
+
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
   return (
@@ -139,6 +144,9 @@ export default function HomeDashboard({
 
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
+
+      {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
+      <SignalSummaryWidget />
 
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
       {hasData && (
