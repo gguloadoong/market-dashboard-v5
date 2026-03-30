@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
@@ -13,8 +13,10 @@ import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 
-// ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 → 섹터 탭 유도) ──
-function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
+// ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
+function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, onItemClick }) {
+  const [expandedSector, setExpandedSector] = useState(null);
+
   const sectors = useMemo(() => {
     const coinsWithPct = coins.filter(c => c.sector).map(c => ({ ...c, changePct: c.change24h ?? 0 }));
     const items = [...krStocks, ...usStocks, ...coinsWithPct];
@@ -30,10 +32,24 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
       .sort((a, b) => b.avg - a.avg);
   }, [krStocks, usStocks, coins]);
 
+  // 펼쳐진 섹터의 종목 리스트
+  const expandedItems = useMemo(() => {
+    if (!expandedSector || !allItems) return [];
+    return allItems
+      .filter(i => i.sector === expandedSector)
+      .sort((a, b) => (getPct(b) || 0) - (getPct(a) || 0))
+      .slice(0, 10);
+  }, [expandedSector, allItems]);
+
   if (!sectors.length) return null;
 
   const hot  = sectors.filter(s => s.avg > 0).slice(0, 5);
   const cold = [...sectors.filter(s => s.avg <= 0)].reverse().slice(0, 5);
+
+  // 섹터 칩 클릭 핸들러
+  const handleSectorClick = (sectorName) => {
+    setExpandedSector(prev => prev === sectorName ? null : sectorName);
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
@@ -53,9 +69,17 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
           <span className="text-[10px] font-bold text-[#F04452] uppercase mb-1.5 block">HOT</span>
           <div className="flex flex-wrap gap-1.5">
             {hot.length > 0 ? hot.map(s => (
-              <span key={s.name} className="text-[11px] font-medium px-2 py-1 rounded-lg bg-[#FFF0F1] text-[#F04452]">
+              <button
+                key={s.name}
+                onClick={() => handleSectorClick(s.name)}
+                className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${
+                  expandedSector === s.name
+                    ? 'bg-[#F04452] text-white'
+                    : 'bg-[#FFF0F1] text-[#F04452] hover:bg-[#FFE0E3]'
+                }`}
+              >
                 {s.name} +{s.avg.toFixed(1)}%
-              </span>
+              </button>
             )) : <span className="text-[10px] text-[#B0B8C1]">없음</span>}
           </div>
         </div>
@@ -64,13 +88,55 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
           <span className="text-[10px] font-bold text-[#1764ED] uppercase mb-1.5 block">COLD</span>
           <div className="flex flex-wrap gap-1.5">
             {cold.length > 0 ? cold.map(s => (
-              <span key={s.name} className="text-[11px] font-medium px-2 py-1 rounded-lg bg-[#EDF4FF] text-[#1764ED]">
+              <button
+                key={s.name}
+                onClick={() => handleSectorClick(s.name)}
+                className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${
+                  expandedSector === s.name
+                    ? 'bg-[#1764ED] text-white'
+                    : 'bg-[#EDF4FF] text-[#1764ED] hover:bg-[#DCE8FF]'
+                }`}
+              >
                 {s.name} {s.avg.toFixed(1)}%
-              </span>
+              </button>
             )) : <span className="text-[10px] text-[#B0B8C1]">없음</span>}
           </div>
         </div>
       </div>
+
+      {/* 섹터 drill-down: 종목 리스트 인라인 펼침 */}
+      {expandedSector && expandedItems.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[#F2F4F6]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold text-[#191F28]">{expandedSector} 종목</span>
+            <button
+              onClick={() => setExpandedSector(null)}
+              className="text-[10px] text-[#B0B8C1] hover:text-[#4E5968]"
+            >접기 ✕</button>
+          </div>
+          <div className="space-y-1">
+            {expandedItems.map(item => {
+              const pct = getPct(item) || 0;
+              const color = pct > 0 ? '#F04452' : pct < 0 ? '#1764ED' : '#8B95A1';
+              return (
+                <button
+                  key={item.symbol || item.id}
+                  onClick={() => onItemClick?.(item)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F7F8FA] active:bg-[#F2F4F6] transition-colors text-left"
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[12px] font-medium text-[#191F28] truncate block">{item.name || item.symbol}</span>
+                    <span className="text-[10px] text-[#8B95A1] font-mono">{item.symbol}</span>
+                  </div>
+                  <span className="text-[12px] font-bold font-mono tabular-nums flex-shrink-0 ml-2" style={{ color }}>
+                    {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -146,7 +212,7 @@ export default function HomeDashboard({
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
-      <SignalSummaryWidget />
+      <SignalSummaryWidget onItemClick={onItemClick} />
 
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
       {hasData && (
@@ -172,7 +238,7 @@ export default function HomeDashboard({
           krwRate={krwRate}
         />
         {(krStocks.length > 0 || usStocks.length > 0 || coins.length > 0) && (
-          <SectorMiniWidget krStocks={krStocks} usStocks={usStocks} coins={coins} onTabChange={onTabChange} />
+          <SectorMiniWidget krStocks={krStocks} usStocks={usStocks} coins={coins} onTabChange={onTabChange} allItems={allItems} onItemClick={onItemClick} />
         )}
       </div>
 

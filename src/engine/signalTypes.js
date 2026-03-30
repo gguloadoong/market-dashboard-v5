@@ -1,4 +1,8 @@
 // 시그널 타입 상수 — 시그널 엔진 전체에서 공유
+
+// 스테이블코인 심볼 집합 — WhalePanel·signalEngine 공유
+export const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD']);
+
 export const SIGNAL_TYPES = {
   FOREIGN_CONSECUTIVE_BUY: 'foreign_consecutive_buy',
   FOREIGN_CONSECUTIVE_SELL: 'foreign_consecutive_sell',

@@ -16,6 +16,13 @@ import {
 import { fetchUpbitAllSymbols } from '../api/coins';
 import { fetchWhaleChain, fetchBinanceWhale } from '../api/_gateway';
 import { pushWhaleEvent } from '../state/whaleBus';
+import { detectWhalePatterns } from '../engine/whalePattern';
+import { createSignal, addSignal } from '../engine/signalEngine';
+import { SIGNAL_TYPES, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
+import { DEFAULT_KRW_RATE } from '../constants/market';
+
+// 패턴 스캔 주기 (60초)
+const PATTERN_SCAN_INTERVAL_MS = 60 * 1000;
 
 const MAX_EVENTS = 30;
 
@@ -88,8 +95,6 @@ function buildRouteTitle(event) {
 }
 
 // ─── 스테이블코인 판별 ────────────────────────────────────────────
-const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD']);
-
 function isStablecoin(symbol) {
   return STABLECOIN_SYMBOLS.has((symbol || '').toUpperCase());
 }
@@ -304,9 +309,9 @@ function EventRow({ event, onItemClick, coinMap }) {
   const routeTitle  = buildRouteTitle(event);   // "바이낸스 → 콜드월렛 (HODLing 신호)"
   const insightText = buildInsightText(event);   // 한 줄 설명
 
-  // 달러 환산: tradeAmt(원화) → USD 역산 (1466원/달러 근사)
+  // 달러 환산: tradeAmt(원화) → USD 역산
   const usdAmt = event.source === 'whale-alert'
-    ? fmtUsd(Math.round((event.tradeAmt || 0) / 1466))
+    ? fmtUsd(Math.round((event.tradeAmt || 0) / DEFAULT_KRW_RATE))
     : null;
 
   // 수량 + 심볼 표시
@@ -497,6 +502,39 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     };
   }, [isVisible, watchSymbols]);
 
+  // 고래 연속 패턴 감지 → 시그널 엔진에 추가 (60초 간격)
+  useEffect(() => {
+    if (!isVisible) return;
+    const detectAndPush = () => {
+      const allEvents = [...exchangeEvents, ...onchainEvents];
+      if (allEvents.length === 0) return;
+      const patterns = detectWhalePatterns(allEvents);
+      for (const p of patterns) {
+        // 패턴 타입 → 시그널 타입 매핑
+        const typeMap = {
+          consecutive_deposit: SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW,
+          consecutive_withdrawal: SIGNAL_TYPES.WHALE_EXCHANGE_OUTFLOW,
+          bidirectional: SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW,
+          large_single: SIGNAL_TYPES.WHALE_LARGE_SINGLE,
+        };
+        const sig = createSignal({
+          type: typeMap[p.type] || SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW,
+          symbol: p.symbol,
+          name: p.symbol,
+          market: 'crypto',
+          direction: p.direction,
+          strength: p.strength,
+          title: p.title,
+          meta: { patternType: p.type, count: p.count, totalAmt: p.totalAmt },
+        });
+        addSignal(sig);
+      }
+    };
+    detectAndPush();
+    const iv = setInterval(detectAndPush, PATTERN_SCAN_INTERVAL_MS);
+    return () => clearInterval(iv);
+  }, [isVisible, exchangeEvents, onchainEvents]);
+
   // ── 소스 6: Blockchair 온체인 폴링 (BTC/ETH $1M+, 5분 간격) ──
   const seenChainIds = useRef(new Set()).current;
   useEffect(() => {
@@ -518,7 +556,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
             symbol:      tx.symbol,
             chain:       tx.chain,
             side:        '온체인',
-            tradeAmt:    Math.round((tx.amountUsd || 0) * 1450), // KRW 변환: 1450 고정 (온체인 USD 기준)
+            tradeAmt:    Math.round((tx.amountUsd || 0) * DEFAULT_KRW_RATE), // KRW 변환 (온체인 USD 기준)
             tradeUsd:    tx.amountUsd,
             volume:      tx.volume,
             severity:    tx.amountUsd >= 5_000_000 ? 'high' : 'normal',
@@ -564,7 +602,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
             for (let i = 0; i < 100; i++) seenBinanceIds.delete(iter.next().value);
           }
           const side = tx.side === 'buy' ? '매수' : '매도';
-          const krwAmt = Math.round(tx.usdAmt * 1450);
+          const krwAmt = Math.round(tx.usdAmt * DEFAULT_KRW_RATE);
           addEvent({
             id:        tx.id,
             symbol:    tx.symbol,

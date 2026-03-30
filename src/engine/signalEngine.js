@@ -1,5 +1,5 @@
 // 시그널 엔진 — 시그널 생성/관리/만료/구독
-import { SIGNAL_TYPES, DIRECTIONS, getTTL } from './signalTypes';
+import { SIGNAL_TYPES, DIRECTIONS, getTTL, STABLECOIN_SYMBOLS } from './signalTypes';
 
 // ─── 내부 저장소 ────────────────────────────────────────────
 const MAX_SIGNALS = 100;
@@ -119,8 +119,6 @@ export function _resetStore() {
 
 // ─── 시그널 생성 헬퍼 ───────────────────────────────────────
 
-// 스테이블코인 심볼 목록
-const STABLECOIN_SYMBOLS = ['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD'];
 
 /** 금액을 한국어 단위로 포맷 (억 단위) */
 function _formatAmount(amount) {
@@ -215,7 +213,7 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol) {
  */
 export function createWhaleSignal(event) {
   const { symbol, name, movementType, amount, from, to, tradeAmt, tradeUsd } = event;
-  const isStablecoin = STABLECOIN_SYMBOLS.includes(symbol?.toUpperCase());
+  const isStablecoin = STABLECOIN_SYMBOLS.has(symbol?.toUpperCase());
 
   // 방향 결정: 거래소 입금 = 매도 압력 (스테이블코인은 반대)
   let direction = DIRECTIONS.NEUTRAL;

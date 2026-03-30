@@ -46,6 +46,8 @@ import { fetchInvestorDataSafe, fetchInvestorTrendSafe, formatNetAmt } from '../
 import { useStockAndRelatedNews, useStockDirectNews } from '../hooks/useNewsQuery';
 import { findRelatedItems } from '../data/relatedAssets';
 import { detectNewsSectors, findStocksBySectors } from '../utils/newsTopicMap';
+import { useSymbolSignals } from '../hooks/useSignals';
+import { getNewsSentimentScore } from '../utils/newsSignal';
 
 // ─── 로고 URL + 아바타 색상 (home/utils.js 통합본 사용) ──────
 import { getLogoUrls, getAvatarBg as colorFor } from './home/utils';
@@ -697,6 +699,9 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
     return merged.slice(0, 10);
   }, [item?.symbol, item?.name, allData, newsBasedItems]);
 
+  // 종목별 시그널 조회
+  const symbolSignals = useSymbolSignals(item?.symbol || item?.id || '');
+
   // 종목 키워드 + 관련종목 기반 관련 뉴스 — 주 종목 → 관련종목 순으로 합산
   const newsMarket = item?.id ? 'COIN' : item?.market === 'kr' ? 'KR' : 'US';
   const { news: relatedNews, isLoading: newsLoading } = useStockAndRelatedNews(
@@ -715,6 +720,15 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
   );
   const finalNews        = relatedNews.length > 0 ? relatedNews : directNews;
   const finalNewsLoading = newsLoading || (directEnabled && directNewsLoading);
+
+  // 감성 트렌드 계산
+  const sentimentSummary = useMemo(() => {
+    if (!finalNews?.length) return null;
+    const scores = finalNews.map(n => getNewsSentimentScore(n.title)).filter(s => s !== 0);
+    if (!scores.length) return null;
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    return { avg, count: scores.length, label: avg > 0 ? '호재 우세' : avg < 0 ? '악재 우세' : '중립' };
+  }, [finalNews]);
 
   // ETF와 일반종목 분리
   const etfItems     = relatedItems.filter(r => r.isEtf);
@@ -954,6 +968,48 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
               )
             }
           </div>
+
+          {/* ── 종목 시그널 섹션 — "왜 지금?" 강화 ──────────────── */}
+          {symbolSignals.length > 0 && (
+            <div className="px-4 py-3 border-b border-[#F2F4F6]">
+              <span className="text-[12px] font-bold text-[#191F28] mb-2 block">투자 시그널</span>
+              {symbolSignals.map(sig => (
+                <div key={sig.id} className="flex items-start gap-2 py-1.5">
+                  <span className="text-[14px]">{sig.direction === 'bullish' ? '🟢' : sig.direction === 'bearish' ? '🔴' : '🟡'}</span>
+                  <div>
+                    <p className="text-[11px] font-medium text-[#191F28]">{sig.title}</p>
+                    {(sig.detail || sig.meta?.currentZoneKo) && (
+                      <p className="text-[10px] text-[#8B95A1]">{sig.detail || sig.meta?.currentZoneKo}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── 뉴스 감성 미니 바 ────────────────────────────────── */}
+          {sentimentSummary && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-[#F2F4F6]">
+              <span className="text-[10px] text-[#8B95A1] flex-shrink-0">뉴스 감성</span>
+              <div className="flex-1 h-1.5 bg-[#E5E8EB] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(Math.abs(sentimentSummary.avg) * 25 + 50, 100)}%`,
+                    background: sentimentSummary.avg > 0 ? '#2AC769' : sentimentSummary.avg < 0 ? '#F04452' : '#8B95A1',
+                  }}
+                />
+              </div>
+              <span
+                className="text-[10px] font-bold flex-shrink-0"
+                style={{
+                  color: sentimentSummary.avg > 0 ? '#2AC769' : sentimentSummary.avg < 0 ? '#F04452' : '#8B95A1',
+                }}
+              >
+                {sentimentSummary.avg > 0 ? '+' : ''}{sentimentSummary.avg.toFixed(1)} {sentimentSummary.label} ({sentimentSummary.count}건)
+              </span>
+            </div>
+          )}
 
           {/* ── 타임프레임 + 차트 타입 버튼 ──────────────────────── */}
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
