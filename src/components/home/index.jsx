@@ -186,7 +186,7 @@ export default function HomeDashboard({
       />
 
       {/* ─── 시장을 움직이는 뉴스 (종목 연결 카드) ──────────── */}
-      <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} allItems={allItems} />
+      <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
 
       {/* ─── 시장 투자자 동향 (모바일 숨김) ────────────────── */}
       <div className="hidden md:block">

@@ -59,7 +59,7 @@ function findMatchedStocks(newsTitle, allItems, max = 3) {
   return matched;
 }
 
-function StockBadge({ stock }) {
+function StockBadge({ stock, onClick }) {
   const isUp = stock.pct > 0;
   const isDown = stock.pct < 0;
   const pctColor = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
@@ -67,7 +67,11 @@ function StockBadge({ stock }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+      onClick={(e) => {
+        e.stopPropagation(); // 뉴스 클릭 이벤트와 분리
+        onClick?.({ symbol: stock.symbol, name: stock.name, _market: stock.market });
+      }}
+      className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1.5 min-h-[44px] rounded-full cursor-pointer hover:opacity-80 hover:shadow-sm transition-all active:scale-95"
       style={{ background: bgColor, color: pctColor }}
     >
       <span className="text-[#4E5968] font-medium">{stock.name?.slice(0, 6)}</span>
@@ -76,7 +80,7 @@ function StockBadge({ stock }) {
   );
 }
 
-export default function TopNewsSection({ allNews = [], onNewsClick, allItems = [] }) {
+export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick, allItems = [] }) {
   // 24시간 이내 뉴스 중 시그널 점수 + 종목 매칭 기준 상위 5건
   const topNews = useMemo(() => {
     const cutoff = 24 * 60 * 60 * 1000;
@@ -182,7 +186,7 @@ export default function TopNewsSection({ allNews = [], onNewsClick, allItems = [
               {item._matchedStocks?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {item._matchedStocks.map(stock => (
-                    <StockBadge key={stock.symbol} stock={stock} />
+                    <StockBadge key={stock.symbol} stock={stock} onClick={onItemClick} />
                   ))}
                 </div>
               )}

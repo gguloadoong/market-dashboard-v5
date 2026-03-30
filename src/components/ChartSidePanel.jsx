@@ -232,6 +232,31 @@ function genInvestorInsight(data) {
   return null;
 }
 
+// ─── 관련 종목 연결 이유 태그 생성 ────────────────────────────────
+function getRelationReason(rel, targetItem) {
+  if (!rel || !targetItem) return null;
+  // 1. 같은 섹터
+  if (rel.sector && rel.sector === targetItem.sector)
+    return `같은 ${rel.sector} 섹터`;
+  // 2. 같은 그룹 (삼성, SK, LG, 현대, 한화)
+  const groups = [['삼성','Samsung'],['SK','에스케이'],['LG','엘지'],['현대','Hyundai'],['한화','Hanwha']];
+  for (const g of groups) {
+    const relMatch = g.some(k => (rel.name || '').includes(k));
+    const targetMatch = g.some(k => (targetItem.name || '').includes(k));
+    if (relMatch && targetMatch) return `${g[0]} 그룹주`;
+  }
+  // 3. 같은 마켓 + 동반 등락
+  const relMarket = rel._market || rel.market || (rel.id ? 'COIN' : '');
+  const targetMarket = targetItem._market || targetItem.market || (targetItem.id ? 'COIN' : '');
+  if (relMarket === targetMarket) {
+    const pctA = rel.changePct || rel.change24h || 0;
+    const pctB = targetItem.changePct || targetItem.change24h || 0;
+    if (Math.sign(pctA) === Math.sign(pctB) && Math.abs(pctA) > 1)
+      return `동반 ${pctA > 0 ? '상승' : '하락'}`;
+  }
+  return null;
+}
+
 // ─── 뉴스 시그널 라벨 (간단 버전) ────────────────────────────────
 function extractSignalLabel(title = '') {
   if (/급등|상승|돌파|신고가|매수|호재/.test(title)) return { label: '호재', color: '#F04452', bg: '#FFF0F1' };
@@ -1035,7 +1060,9 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
                     {newsBasedItems.length > 0 ? '이 뉴스 관련 종목' : '연관 종목'}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {nonEtfItems.map(({ ticker, item: rel, type, reason: _reason }) => {
+                    {nonEtfItems.map(({ ticker, item: rel, type, reason: existingReason }) => {
+                      // 연결 이유 태그 — 기존 reason 우선, 없으면 자동 생성
+                      const relationReason = existingReason || getRelationReason(rel, item);
                       const relPct   = rel ? (rel.change24h ?? rel.changePct ?? 0) : null;
                       const relColor = relPct == null ? '#B0B8C1' : relPct > 0 ? '#F04452' : relPct < 0 ? '#1764ED' : '#8B95A1';
                       const relPrice = rel
@@ -1083,6 +1110,11 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
                               <div className="text-[10px] text-[#8B95A1] font-mono tabular-nums">{relPrice}</div>
                             )}
                             {!rel && <div className="text-[10px] text-[#C9CDD2]">미추적</div>}
+                            {relationReason && (
+                              <div className="text-[9px] text-[#8B95A1] mt-0.5 truncate">
+                                <span className="bg-[#F2F4F6] px-1 py-0.5 rounded">{relationReason}</span>
+                              </div>
+                            )}
                           </div>
                           {relPct != null && (
                             <span className="text-[12px] font-bold tabular-nums font-mono flex-shrink-0 ml-1" style={{ color: relColor }}>
