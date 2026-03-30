@@ -2,8 +2,8 @@
 // 5분 간격 폴링으로 시그널 엔진에 시그널 추가
 import { useEffect, useRef } from 'react';
 import { fetchInvestorTrendGateway } from '../api/_gateway';
-import { createInvestorSignal, createVolumeSignal } from '../engine/signalEngine';
-import { SIGNAL_TYPES } from '../engine/signalTypes';
+import { createInvestorSignal, createVolumeSignal, createSignal, addSignal, getActiveSignals } from '../engine/signalEngine';
+import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
 
 // 시총 상위 KR 종목 (최소 5개)
 const KR_TOP_SYMBOLS = [
@@ -91,6 +91,12 @@ export function useInvestorSignals(allItems = []) {
 
         // ── P0-2: 거래량 이상치 시그널 ──
         scanVolumeAnomalies(allItems);
+
+        // ── P0-3: 섹터 로테이션 + 현재 섹터 강세/약세 감지 ──
+        detectSectorRotation(allItems);
+
+        // ── P0-4: 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 ──
+        generateBootSeedSignals(allItems);
       } catch {
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
@@ -158,6 +164,127 @@ async function scanInvestorTrends() {
     } catch {
       // 개별 종목 실패 시 다음 종목 계속
     }
+  }
+}
+
+/** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널 */
+function detectSectorRotation(allItems) {
+  if (!allItems?.length) return;
+
+  // 섹터별 평균 등락률
+  const sectorPcts = {};
+  for (const item of allItems) {
+    if (!item.sector) continue;
+    const pct = item.changePct ?? item.change24h ?? 0;
+    if (!sectorPcts[item.sector]) sectorPcts[item.sector] = [];
+    sectorPcts[item.sector].push(pct);
+  }
+
+  const sectorAvg = Object.entries(sectorPcts)
+    .map(([sector, pcts]) => ({
+      sector,
+      avg: pcts.reduce((a, b) => a + b, 0) / pcts.length,
+    }))
+    .sort((a, b) => b.avg - a.avg);
+
+  // 현재 순위
+  const curRanks = {};
+  sectorAvg.forEach((s, i) => { curRanks[s.sector] = i + 1; });
+
+  // 이전 순위 비교
+  const prevRaw = localStorage.getItem('sector_ranks_prev');
+  const prevRanks = prevRaw ? JSON.parse(prevRaw) : null;
+  localStorage.setItem('sector_ranks_prev', JSON.stringify(curRanks));
+
+  // ── P0-3: 첫 방문에도 섹터 강세/약세 시그널 생성 ──
+  // 상위 3개 섹터 평균 등락률 2% 이상이면 강세 시그널
+  const topSectors = sectorAvg.slice(0, 3);
+  for (const { sector, avg } of topSectors) {
+    if (avg >= 2) {
+      const signal = createSignal({
+        type: SIGNAL_TYPES.SECTOR_ROTATION,
+        symbol: null,
+        name: sector,
+        market: 'kr',
+        direction: DIRECTIONS.BULLISH,
+        strength: avg >= 5 ? 3 : 2,
+        title: `${sector} 섹터 +${avg.toFixed(1)}% 강세`,
+        meta: { sector, avg },
+      });
+      addSignal(signal);
+    }
+  }
+  // 하위 3개 섹터 평균 등락률 -2% 이하이면 약세 시그널
+  const bottomSectors = sectorAvg.slice(-3);
+  for (const { sector, avg } of bottomSectors) {
+    if (avg <= -2) {
+      const signal = createSignal({
+        type: SIGNAL_TYPES.SECTOR_ROTATION,
+        symbol: null,
+        name: sector,
+        market: 'kr',
+        direction: DIRECTIONS.BEARISH,
+        strength: avg <= -5 ? 3 : 2,
+        title: `${sector} 섹터 ${avg.toFixed(1)}% 약세`,
+        meta: { sector, avg },
+      });
+      addSignal(signal);
+    }
+  }
+
+  if (!prevRanks) return;
+
+  for (const [sector, curRank] of Object.entries(curRanks)) {
+    const prevRank = prevRanks[sector];
+    if (!prevRank) continue;
+    const diff = prevRank - curRank; // 양수면 순위 상승
+    if (Math.abs(diff) >= 3) {
+      const direction = diff > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+      const strength = Math.min(Math.abs(diff), 5);
+      const title = `${sector} 섹터 ${diff > 0 ? '급상승' : '급하락'} (${prevRank}위\u2192${curRank}위)`;
+
+      const signal = createSignal({
+        type: SIGNAL_TYPES.SECTOR_ROTATION,
+        symbol: null,
+        name: sector,
+        market: 'kr',
+        direction,
+        strength,
+        title,
+        meta: { sector, prevRank, curRank, diff },
+      });
+      addSignal(signal);
+    }
+  }
+}
+
+/** 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 */
+function generateBootSeedSignals(allItems) {
+  if (getActiveSignals().length > 0 || !allItems?.length) return;
+
+  // 등락률 추출 헬퍼
+  const getPct = (item) => item.changePct ?? item.change24h ?? 0;
+
+  const topMovers = [...allItems]
+    .filter(i => i._market) // 유효한 종목만
+    .sort((a, b) => Math.abs(getPct(b)) - Math.abs(getPct(a)))
+    .slice(0, 3);
+
+  for (const item of topMovers) {
+    const pct = getPct(item);
+    if (Math.abs(pct) < 1) continue; // 1% 미만은 무시
+    const marketLabel = item._market === 'COIN' ? '코인' : item._market === 'US' ? '미장' : '국장';
+    const signal = createSignal({
+      type: SIGNAL_TYPES.VOLUME_ANOMALY,
+      symbol: item.symbol,
+      name: item.name ?? item.symbol,
+      market: (item._market || 'kr').toLowerCase(),
+      direction: pct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH,
+      strength: Math.abs(pct) >= 5 ? 3 : 2,
+      title: `${item.name ?? item.symbol} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% — 주목할 움직임`,
+      detail: `${marketLabel} 변동폭 상위`,
+    });
+    addSignal(signal);
   }
 }
 

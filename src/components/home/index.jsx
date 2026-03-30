@@ -11,6 +11,8 @@ import NotableMoversSection from './NotableMoversSection';
 import MarketInvestorSection from './MarketInvestorSection';
 import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
+import SignalFeed from './SignalFeed';
+import MarketTimeline from './MarketTimeline';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 
 // ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
@@ -214,6 +216,9 @@ export default function HomeDashboard({
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
       <SignalSummaryWidget onItemClick={onItemClick} />
 
+      {/* ─── 3시장 통합 시그널 피드 ──────────────────────── */}
+      <SignalFeed onItemClick={onItemClick} />
+
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
       {hasData && (
         <NotableMoversSection
@@ -253,6 +258,9 @@ export default function HomeDashboard({
 
       {/* ─── 시장을 움직이는 뉴스 (종목 연결 카드) ──────────── */}
       <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
+
+      {/* ─── 오늘의 타임라인 ────────────────────────────────── */}
+      <MarketTimeline />
 
       {/* ─── 시장 투자자 동향 (모바일 숨김) ────────────────── */}
       <div className="hidden md:block">

@@ -255,3 +255,21 @@ export function matchesKeywords(text, keywords) {
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// ─── 뉴스 매칭 신뢰도 등급 ─────────────────────────────────
+// DIRECT: 심볼/종목명 직접 언급, SECTOR: 섹터 키워드 매칭, WEAK: 약한 매칭
+export function getMatchConfidence(title, keywords, symbol) {
+  const t = (title || '').toLowerCase();
+  // DIRECT: 심볼 또는 주요 키워드(처음 2개) 직접 매칭
+  if (
+    (symbol && t.includes(symbol.toLowerCase())) ||
+    keywords.slice(0, 2).some(k => t.includes(k.toLowerCase()))
+  ) {
+    return 'DIRECT';
+  }
+  // SECTOR: 나머지 키워드(섹터/별칭) 매칭
+  if (keywords.slice(2).some(k => t.includes(k.toLowerCase()))) {
+    return 'SECTOR';
+  }
+  return 'WEAK';
+}

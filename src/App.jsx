@@ -25,6 +25,43 @@ import { usePrices } from './hooks/usePrices';
 import { useCoins } from './hooks/useCoins';
 import { useIndices } from './hooks/useIndices';
 
+// PWA 설치 유도 배너 — standalone이 아닌 환경에서 1회 표시
+function InstallBanner() {
+  const [show, setShow] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    // 이미 PWA로 실행 중이면 표시 안 함
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    // 이미 닫았으면 표시 안 함
+    if (localStorage.getItem('pwa_banner_dismissed')) return;
+
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShow(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed bottom-16 left-4 right-4 bg-[#191F28] text-white rounded-xl p-3 flex items-center gap-3 shadow-lg z-50">
+      <span className="text-[13px] flex-1">홈 화면에 추가하면 더 빠르게 접근할 수 있어요</span>
+      <button
+        onClick={() => { deferredPrompt?.prompt(); setShow(false); }}
+        className="text-[12px] font-bold bg-[#3182F6] px-3 py-1.5 rounded-lg"
+      >추가</button>
+      <button
+        onClick={() => { setShow(false); localStorage.setItem('pwa_banner_dismissed', '1'); }}
+        className="text-[#8B95A1] text-[11px]"
+      >닫기</button>
+    </div>
+  );
+}
+
 export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode();
   const { watchlist, krSymbols, usSymbols } = useWatchlist();
@@ -345,6 +382,9 @@ export default function App() {
         usStocks={usStocks}
         coins={coins}
       />
+
+      {/* PWA 설치 유도 배너 */}
+      <InstallBanner />
     </div>
   );
 }

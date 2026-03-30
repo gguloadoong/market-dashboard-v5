@@ -105,8 +105,15 @@ export default function SignalSummaryWidget({ onItemClick }) {
         </div>
       ))}
       {allSignals.length === 0 && (
-        <div className="px-4 py-6 text-center text-[12px] text-[#B0B8C1]">
-          시그널 수집 중...
+        <div className="px-4 py-3">
+          <p className="text-[11px] text-[#8B95A1] leading-relaxed">
+            시장 데이터를 분석 중입니다. 외국인/기관 매매 동향, 거래량 이상치, 고래 움직임이 감지되면 여기에 표시됩니다.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F2F4F6] text-[#8B95A1]">🏦 외국인 동향</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F2F4F6] text-[#8B95A1]">📊 거래량</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F2F4F6] text-[#8B95A1]">🐋 고래</span>
+          </div>
         </div>
       )}
       {/* 더보기/접기 버튼 — 시그널 5개 이상일 때 표시 */}

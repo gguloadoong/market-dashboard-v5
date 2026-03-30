@@ -60,10 +60,25 @@ export const KR_STOCK_LIST = [
   // 건설/지주
   { symbol: '028260', name: '삼성물산',        sector: '건설' },
   { symbol: '000720', name: '현대건설',        sector: '건설' },
-  // 소비재/유통
+  // 소비재
   { symbol: '033780', name: 'KT&G',            sector: '소비재' },
   { symbol: '004370', name: '농심',            sector: '소비재' },
   { symbol: '271560', name: '오리온',          sector: '소비재' },
+  // 게임
+  { symbol: '259960', name: '크래프톤',        sector: '게임' },
+  { symbol: '036570', name: '엔씨소프트',      sector: '게임' },
+  { symbol: '112040', name: '위메이드',        sector: '게임' },
+  { symbol: '293490', name: '카카오게임즈',    sector: '게임' },
+  { symbol: '263750', name: '펄어비스',        sector: '게임' },
+  // 엔터
+  { symbol: '352820', name: '하이브',          sector: '엔터' },
+  { symbol: '041510', name: 'SM엔터테인먼트',  sector: '엔터' },
+  { symbol: '035900', name: 'JYP엔터테인먼트', sector: '엔터' },
+  { symbol: '122870', name: 'YG엔터테인먼트',  sector: '엔터' },
+  // 유통/리테일
+  { symbol: '139480', name: '이마트',          sector: '유통' },
+  { symbol: '023530', name: '롯데쇼핑',        sector: '유통' },
+  { symbol: '069960', name: '현대백화점',      sector: '유통' },
 ];
 
 // symbol → sector 빠른 조회용 Map

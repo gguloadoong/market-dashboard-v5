@@ -22,6 +22,8 @@ const SECTOR_GROUPS = {
   'Privacy':   ['XMR','ZEC','DASH','ROSE','KEEP','BEAM','GRIN','ZEN'],
   'CrossChain':['ATOM','QNT','RUNE','AXL','LOOM','POLS'],
   'NFT/메타버스':['APE','BLUR','X2Y2','LOOKS','RARE','FLOW','CHZ','WAX'],
+  'RWA':     ['ONDO','MKR','COMP','AAVE','MAPLE','CFG','GFI'],
+  'Storage': ['FIL','AR','STORJ','SIA','BLZ'],
 };
 
 // 역방향 맵 생성: symbol → sector

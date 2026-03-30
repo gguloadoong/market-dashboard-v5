@@ -12,7 +12,7 @@ function computeTimeAgo(pubDate) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 import { extractNewsSignals, getNewsImpact, getNewsImportanceScore, isBreakingNews } from '../../utils/newsSignal';
-import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
+import { buildStockKeywords, matchesKeywords, getMatchConfidence } from '../../utils/newsAlias';
 
 const CAT_BADGE = {
   coin: { bg: '#FFF4E6', color: '#FF9500', label: 'COIN' },
@@ -46,6 +46,9 @@ function findMatchedStocks(newsTitle, allItems, max = 3) {
       item._market === 'KR' ? 'KR' : item._market === 'COIN' ? 'COIN' : 'US'
     );
     if (keywords.length > 0 && matchesKeywords(newsTitle, keywords)) {
+      const confidence = getMatchConfidence(newsTitle, keywords, item.symbol);
+      // WEAK 매칭은 제외
+      if (confidence === 'WEAK') continue;
       seen.add(key);
       const pct = item._market === 'COIN' ? (item.change24h ?? 0) : (item.changePct ?? 0);
       matched.push({
@@ -53,6 +56,7 @@ function findMatchedStocks(newsTitle, allItems, max = 3) {
         name: item.name,
         market: item._market,
         pct,
+        confidence,
       });
     }
   }
@@ -64,6 +68,7 @@ function StockBadge({ stock, onClick }) {
   const isDown = stock.pct < 0;
   const pctColor = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
   const bgColor = isUp ? '#FFF0F1' : isDown ? '#F0F4FF' : '#F2F4F6';
+  const isDirect = stock.confidence === 'DIRECT';
 
   return (
     <span
@@ -72,9 +77,10 @@ function StockBadge({ stock, onClick }) {
         onClick?.({ symbol: stock.symbol, name: stock.name, _market: stock.market });
       }}
       className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1.5 min-h-[44px] rounded-full cursor-pointer hover:opacity-80 hover:shadow-sm transition-all active:scale-95"
-      style={{ background: bgColor, color: pctColor }}
+      style={{ background: bgColor, color: pctColor, fontWeight: isDirect ? 800 : 600 }}
     >
       <span className="text-[#4E5968] font-medium">{stock.name?.slice(0, 6)}</span>
+      {!isDirect && <span className="text-[8px] text-[#B0B8C1] font-normal">관련</span>}
       <span>{isUp ? '+' : ''}{stock.pct.toFixed(1)}%</span>
     </span>
   );
