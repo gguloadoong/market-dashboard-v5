@@ -2,7 +2,7 @@
 // 소스 1: Upbit WebSocket (2000만원+ 단일 체결)
 // 소스 2: Blockchain.com WebSocket (10 BTC+ 온체인 이동)
 // 소스 3: Whale Alert REST 폴링 (Vercel 프록시, 60초 간격)
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   subscribeUpbitWhaleTrades,
   unsubscribeUpbitWhaleTrades,
@@ -14,6 +14,7 @@ import {
   stopWhaleAlertPolling,
 } from '../api/whale';
 import { fetchUpbitAllSymbols } from '../api/coins';
+import { fetchWhaleChain, fetchBinanceWhale } from '../api/_gateway';
 import { pushWhaleEvent } from '../state/whaleBus';
 
 const MAX_EVENTS = 30;
@@ -61,7 +62,10 @@ function buildRouteTitle(event) {
   if (event.source === 'bithumb') {
     return `빗썸 ${event.symbol || ''} ${event.side || '체결'}`;
   }
-  if (event.source !== 'whale-alert') {
+  if (event.source === 'binance') {
+    return `바이낸스 ${event.symbol || ''} ${event.side || '체결'} ${event.tradeUsd ? `$${(event.tradeUsd / 1e6).toFixed(1)}M` : ''}`;
+  }
+  if (event.source !== 'whale-alert' && event.source !== 'blockchair') {
     // Upbit 체결: 거래소명 없음 — 종목 + 매수/매도 방향 표시
     return `업비트 ${event.symbol || ''} ${event.side || '체결'}`;
   }
@@ -257,6 +261,8 @@ function EventRow({ event, onItemClick, coinMap }) {
   // 체인/소스 배지
   const chainBadge = event.source === 'whale-alert'
     ? { bg: '#F0F4FF', color: '#3182F6', text: (event.chain || 'CHAIN').toUpperCase() }
+    : event.source === 'binance'
+    ? { bg: '#FFF8E1', color: '#F0B90B', text: 'BINANCE' }
     : event.source === 'bithumb'
     ? { bg: '#FFF0F6', color: '#E91E8C', text: '빗썸' }
     : event.chain === 'bitcoin'
@@ -332,7 +338,7 @@ function EventRow({ event, onItemClick, coinMap }) {
 // onchain: Whale Alert REST + Blockchain.com BTC WS
 // exchange: Upbit 실시간 체결
 function isOnchainEvent(evt) {
-  return evt.source === 'whale-alert' || evt.chain === 'bitcoin';
+  return evt.source === 'whale-alert' || evt.source === 'blockchair' || evt.chain === 'bitcoin';
 }
 
 // 폴백: Upbit KRW 마켓 기본 20개 (동적 로딩 전 사용)
@@ -348,6 +354,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   const [connected,        setConnected]        = useState(false);
   const [bithumbConnected, setBithumbConnected] = useState(false);
   const [btcConnected,     setBtcConnected]     = useState(false);
+  const [binanceActive,    setBinanceActive]    = useState(false);
   const [msgCount,       setMsgCount]       = useState(0);
   const [watchSymbols,   setWatchSymbols]   = useState(FALLBACK_SYMBOLS);
 
@@ -422,7 +429,99 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     };
   }, [isVisible, watchSymbols]);
 
-  const isAnyConnected = connected || bithumbConnected || btcConnected;
+  // ── 소스 6: Blockchair 온체인 폴링 (BTC/ETH $1M+, 5분 간격) ──
+  const seenChainIds = useRef(new Set()).current;
+  useEffect(() => {
+    if (!isVisible) return;
+    const poll = async () => {
+      try {
+        const data = await fetchWhaleChain('all', 1_000_000);
+        for (const tx of (data.transactions || [])) {
+          if (seenChainIds.has(tx.id)) continue;
+          seenChainIds.add(tx.id);
+          if (seenChainIds.size > 200) {
+            const iter = seenChainIds.values();
+            for (let i = 0; i < 100; i++) seenChainIds.delete(iter.next().value);
+          }
+          const fromKnown = tx.fromLabel ? `${tx.fromFlag || ''} ${tx.fromLabel}` : null;
+          const toKnown   = tx.toLabel   ? `${tx.toFlag   || ''} ${tx.toLabel}`   : null;
+          addEvent({
+            id:          tx.id,
+            symbol:      tx.symbol,
+            chain:       tx.chain,
+            side:        '온체인',
+            tradeAmt:    Math.round((tx.amountUsd || 0) * 1450), // KRW 변환: 1450 고정 (온체인 USD 기준)
+            tradeUsd:    tx.amountUsd,
+            volume:      tx.volume,
+            severity:    tx.amountUsd >= 5_000_000 ? 'high' : 'normal',
+            timestamp:   tx.time ? new Date(tx.time).getTime() : Date.now(),
+            txHash:      tx.hash,
+            source:      'blockchair',
+            movementType: (() => {
+              if (tx.fromType === 'exchange' && tx.toType !== 'exchange') return 'exchange_to_wallet';
+              if (tx.fromType !== 'exchange' && tx.toType === 'exchange') return 'wallet_to_exchange';
+              if (fromKnown || toKnown) return 'wallet_to_wallet';
+              return undefined;
+            })(),
+            fromOwner:   tx.fromLabel || null,
+            toOwner:     tx.toLabel   || null,
+            insight:     fromKnown
+              ? `${fromKnown} → ${toKnown || '지갑'} 온체인 이동 $${(tx.amountUsd / 1e6).toFixed(0)}M`
+              : `${tx.symbol} 온체인 대형 이동 $${(tx.amountUsd / 1e6).toFixed(0)}M`,
+            label:       fromKnown
+              ? `${fromKnown} → ${toKnown || '지갑'}`
+              : `${tx.symbol} 온체인`,
+          });
+        }
+      } catch { /* 실패 무시, 다음 폴링에 재시도 */ }
+    };
+    poll();
+    const timer = setInterval(poll, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [isVisible]);
+
+  // ── 소스 4b: Binance Edge Function 폴링 (서버사이드, 30초 간격) ──
+  const seenBinanceIds = useRef(new Set()).current;
+  useEffect(() => {
+    if (!isVisible) return;
+    const poll = async () => {
+      try {
+        const data = await fetchBinanceWhale();
+        setBinanceActive(true);
+        for (const tx of (data.trades || [])) {
+          if (seenBinanceIds.has(tx.id)) continue;
+          seenBinanceIds.add(tx.id);
+          if (seenBinanceIds.size > 200) {
+            const iter = seenBinanceIds.values();
+            for (let i = 0; i < 100; i++) seenBinanceIds.delete(iter.next().value);
+          }
+          const side = tx.side === 'buy' ? '매수' : '매도';
+          const krwAmt = Math.round(tx.usdAmt * 1450);
+          addEvent({
+            id:        tx.id,
+            symbol:    tx.symbol,
+            chain:     'binance',
+            side,
+            tradeAmt:  krwAmt,
+            tradeUsd:  tx.usdAmt,
+            volume:    tx.qty,
+            severity:  tx.usdAmt >= 2_000_000 ? 'high' : 'medium',
+            timestamp: tx.time || Date.now(),
+            source:    'binance',
+            signal:    side === '매수' ? 'bullish' : 'bearish',
+            insight:   `[Binance] ${tx.symbol} ${side} $${(tx.usdAmt / 1e6).toFixed(1)}M`,
+            label:     `Binance ${tx.symbol}`,
+            message:   `${tx.symbol} ${side} $${(tx.usdAmt / 1e6).toFixed(1)}M (Binance)`,
+          });
+        }
+      } catch (e) { console.warn('[WhalePanel] Binance poll fail:', e.message); }
+    };
+    poll();
+    const timer = setInterval(poll, 30 * 1000);
+    return () => clearInterval(timer);
+  }, [isVisible]);
+
+  const isAnyConnected = connected || bithumbConnected || btcConnected || binanceActive;
   const currentEvents  = activeTab === 'exchange' ? exchangeEvents : onchainEvents;
 
   return (
@@ -434,17 +533,12 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         <div className="flex items-center gap-1.5 ml-auto">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAnyConnected ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#B0B8C1]">
-            {(connected || bithumbConnected) && btcConnected
-              ? '거래소 + 온체인'
-              : connected && bithumbConnected
-              ? '업비트 + 빗썸'
-              : connected
-              ? '업비트 실시간'
-              : bithumbConnected
-              ? '빗썸 실시간'
-              : btcConnected
-              ? 'BTC 온체인'
-              : '연결 중...'}
+            {[
+              connected && '업비트',
+              bithumbConnected && '빗썸',
+              binanceActive && '바이낸스',
+              btcConnected && 'BTC온체인',
+            ].filter(Boolean).join(' · ') || '연결 중...'}
           </span>
           {connected && msgCount > 0 && (
             <span className="text-[10px] text-[#C9CDD2] font-mono">{msgCount.toLocaleString()}건 수신</span>
@@ -489,8 +583,8 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       {/* 탭별 설명 */}
       <div className={`px-4 py-2 text-[10px] ${activeTab === 'exchange' ? 'text-[#3182F6] bg-[#F8FBFF]' : 'text-[#FF9500] bg-[#FFFBF5]'}`}>
         {activeTab === 'exchange'
-          ? '업비트 · 빗썸 2,000만원+ 단일 체결 — 매수/매도 방향성 포착'
-          : '블록체인 10 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름'}
+          ? '업비트 · 빗썸 · 바이낸스 대량 체결 — 매수/매도 방향성 포착'
+          : '블록체인 15 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름'}
       </div>
 
       {/* 이벤트 목록 */}
@@ -506,7 +600,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
                 : '온체인 자금 이동 감지 중...'}
             </div>
             <div className="text-[11px] text-[#C9CDD2]">
-              {activeTab === 'exchange' ? '2,000만원 이상 단일 체결 발생 시 표시' : '10 BTC 이상 이동 / 대형 자금 흐름 발생 시 표시'}
+              {activeTab === 'exchange' ? '2억원+ / $500K+ 단일 체결 발생 시 표시' : '15 BTC 이상 이동 / 대형 자금 흐름 발생 시 표시'}
             </div>
           </div>
         ) : (

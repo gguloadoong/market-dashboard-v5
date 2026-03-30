@@ -292,9 +292,10 @@ async function fetchCoinNews() {
   const cached = cacheGet('coin');
   if (cached?.fresh) return cached.data;
 
-  // 한국어 구글뉴스 2개만 — 영문 RSS 제거 (영어 뉴스 노출 방지)
+  // 한국어 구글뉴스 2개 + 블록미디어 직접 RSS
   const allFeeds = [
     ...KR_COIN_NEWS_QUERIES.map(({ url, source }) => ({ url, source })),
+    ...COIN_DIRECT_RSS_FEEDS,
   ];
   const results = await Promise.allSettled(
     allFeeds.map(({ url, source }) =>
@@ -303,7 +304,20 @@ async function fetchCoinNews() {
   );
   const allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-  const items = dedup(allItems.filter(isFinancialNews).filter(isRecentNews))
+  // 거시경제(연준·파월·금리 등) 기사는 코인이 아닌 'us'로 재분류
+  const COIN_US_RECLASSIFY_KW = ['연준','파월','fed','fomc','금리인상','금리인하','기준금리','인플레','cpi','ppi','gdp','뉴욕증시','나스닥','s&p','다우'];
+  const reclassified = allItems.map(item => {
+    const title = (item.title || '').toLowerCase();
+    if (COIN_US_RECLASSIFY_KW.some(kw => title.includes(kw))) {
+      return { ...item, category: 'us' };
+    }
+    return item;
+  });
+  const coinOnly = reclassified.filter(i => i.category === 'coin');
+  const coinReclassifiedUs = reclassified.filter(i => i.category === 'us');
+  if (coinReclassifiedUs.length > 0) _lastReclassifiedUs = [..._lastReclassifiedUs, ...coinReclassifiedUs];
+
+  const items = dedup(coinOnly.filter(isFinancialNews).filter(isRecentNews))
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 30);
 
@@ -354,7 +368,12 @@ async function fetchUsNews() {
   );
   const allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-  const items = dedup(allItems.filter(isFinancialNews).filter(isRecentNews))
+  // 미장은 이미 구글뉴스 쿼리가 금융 관련 기사를 걸러줌 → BLOCK_KW만 제외
+  const items = dedup(allItems.filter(item => {
+    if (!isRecentNews(item)) return false;
+    const text = ((item.title || '') + ' ' + (item.description || '')).toLowerCase();
+    return !BLOCK_KW.some(k => text.includes(k));
+  }))
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 40);
 
@@ -387,7 +406,16 @@ const KR_STOCK_NEWS_QUERIES = [
   },
 ];
 
-// [국장] 한국 금융 직접 RSS 피드 — 한경, 매경, 연합뉴스 경제, 블록미디어, 이데일리, 머니투데이, 뉴스핌
+// [코인] 직접 RSS 피드 — 블록미디어 (암호화폐 전문 매체)
+const COIN_DIRECT_RSS_FEEDS = [
+  {
+    url: 'https://www.blockmedia.co.kr/feed',
+    source: '블록미디어',
+  },
+];
+
+// [국장] 한국 금융 직접 RSS 피드 — 한경, 매경, 연합뉴스 경제, 이데일리, 머니투데이, 뉴스핌
+// 주의: 블록미디어는 코인 전문 매체 → COIN_DIRECT_RSS_FEEDS로 이동 (kr 태그 오분류 방지)
 const KR_DIRECT_RSS_FEEDS = [
   {
     url: 'https://www.hankyung.com/feed/all-news',
@@ -400,10 +428,6 @@ const KR_DIRECT_RSS_FEEDS = [
   {
     url: 'https://www.yna.co.kr/rss/economy.xml',
     source: '연합뉴스',
-  },
-  {
-    url: 'https://www.blockmedia.co.kr/feed',
-    source: '블록미디어',
   },
   {
     url: 'https://www.edaily.co.kr/rss/rssnews.asp',
@@ -435,9 +459,24 @@ async function fetchKrNews() {
   );
   const allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-  const items = dedup(allItems.filter(isFinancialNews).filter(isRecentNews))
+  // 미장 키워드가 제목에 포함된 기사는 'kr'이 아닌 'us'로 재분류
+  const US_RECLASSIFY_KW = ['뉴욕증시','나스닥','다우존스','S&P','연준','Fed','미국증시','월가','월스트리트'];
+  const reclassified = allItems.map(item => {
+    const title = (item.title || '').toLowerCase();
+    if (US_RECLASSIFY_KW.some(kw => title.includes(kw.toLowerCase()))) {
+      return { ...item, category: 'us' };
+    }
+    return item;
+  });
+  // 재분류 후 'kr' 카테고리만 필터
+  const krOnly = reclassified.filter(i => i.category === 'kr');
+  const items = dedup(krOnly.filter(isFinancialNews).filter(isRecentNews))
     .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
     .slice(0, 50);
+
+  // 재분류된 'us' 기사는 모듈 변수에 보관 → fetchAllNews에서 병합
+  const reclassifiedUs = reclassified.filter(i => i.category === 'us');
+  _lastReclassifiedUs = reclassifiedUs;
 
   if (items.length > 0) cacheSet('kr', items);
   else if (cached?.data) return cached.data.filter(isRecentNews);
@@ -448,6 +487,9 @@ async function fetchKrNews() {
 // stale 데이터가 있으면 즉시 반환하고, 백그라운드에서 갱신
 // 주의: fetchFn(내부 fetchCoinNews 등)도 캐시를 체크하므로,
 //       stale 상태에서 강제 갱신할 때는 캐시를 무효화하고 호출해야 함
+// fetchKrNews에서 재분류된 US 기사를 임시 보관 → fetchAllNews에서 병합
+let _lastReclassifiedUs = [];
+
 const _pending = { all: null, coin: null, us: null, kr: null };
 
 function withDedup(key, fetchFn) {
@@ -497,9 +539,16 @@ export function fetchAllNews() {
       fetchKrNews(),
     ]);
 
+    // kr 패치 후 재분류된 us 기사를 us 결과와 병합
+    const usItems = usRes.status === 'fulfilled' ? usRes.value : [];
+    const mergedUs = _lastReclassifiedUs.length > 0
+      ? dedup([..._lastReclassifiedUs, ...usItems].filter(isRecentNews))
+          .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+      : usItems;
+
     const all = [
       ...(coinRes.status === 'fulfilled' ? coinRes.value : []),
-      ...(usRes.status   === 'fulfilled' ? usRes.value   : []),
+      ...mergedUs,
       ...(krRes.status   === 'fulfilled' ? krRes.value   : []),
     ].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 

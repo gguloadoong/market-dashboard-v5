@@ -11,7 +11,7 @@ import NotableMoversSection from './NotableMoversSection';
 import MarketInvestorSection from './MarketInvestorSection';
 import EventTicker from './EventTicker';
 
-// ─── 섹터 미니 위젯 (HOT 3 + COLD 3 칩 → 섹터 탭 유도) ──
+// ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 → 섹터 탭 유도) ──
 function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
   const sectors = useMemo(() => {
     const coinsWithPct = coins.filter(c => c.sector).map(c => ({ ...c, changePct: c.change24h ?? 0 }));
@@ -30,8 +30,8 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange }) {
 
   if (!sectors.length) return null;
 
-  const hot  = sectors.filter(s => s.avg > 0).slice(0, 3);
-  const cold = [...sectors.filter(s => s.avg <= 0)].reverse().slice(0, 3);
+  const hot  = sectors.filter(s => s.avg > 0).slice(0, 5);
+  const cold = [...sectors.filter(s => s.avg <= 0)].reverse().slice(0, 5);
 
   return (
     <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">

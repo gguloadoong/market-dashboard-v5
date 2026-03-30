@@ -150,8 +150,8 @@ function fmtKrw(n) {
 function connectWs() {
   if (destroyed || !whaleSymbols || !whaleHandler) return;
 
-  const THRESHOLD_KRW = 100_000_000; // 1억 원 (의미 있는 단일 체결 기준)
-  const HIGH_KRW      = 500_000_000; // 5억 원 (기관급 대량 체결)
+  const THRESHOLD_KRW = 200_000_000; // 2억 원 (고래 기준)
+  const HIGH_KRW      = 1_000_000_000; // 10억 원 (기관급 대량 체결)
   const markets = whaleSymbols.map(s => `KRW-${s}`);
 
   try {
@@ -206,10 +206,10 @@ function connectWs() {
           message:   `${symbol} ${side} ${fmtKrw(tradeAmt)}원 (${volume % 1 === 0 ? volume : volume.toFixed(4)})`,
           timestamp: Date.now(),
         });
-      } catch {}
+      } catch (e) { console.warn('[Whale] Upbit WS parse error:', e.message); }
     };
 
-    ws.onerror = () => {};
+    ws.onerror = (e) => { console.warn('[Whale] Upbit WS error:', e.message || 'connection error'); };
 
     ws.onclose = () => {
       whaleWs = null;
@@ -218,7 +218,8 @@ function connectWs() {
         reconnectTimer = setTimeout(connectWs, 5000);
       }
     };
-  } catch {
+  } catch (e) {
+    console.warn('[Whale] Upbit WS connect error:', e.message);
     if (!destroyed) reconnectTimer = setTimeout(connectWs, 5000);
   }
 }
@@ -253,8 +254,8 @@ export function unsubscribeUpbitWhaleTrades() {
 }
 
 // ─── Layer 1b: 빗썸 WebSocket — 거래소 대량 체결 ─────────────────────────────
-const BITHUMB_THRESHOLD_KRW = 100_000_000; // 1억 원 (고래 기준)
-const BITHUMB_HIGH_KRW      = 500_000_000; // 5억 원 (기관급)
+const BITHUMB_THRESHOLD_KRW = 200_000_000; // 2억 원 (고래 기준)
+const BITHUMB_HIGH_KRW      = 1_000_000_000; // 10억 원 (기관급)
 
 let bithumbWs        = null;
 let bithumbHandler   = null;
@@ -304,17 +305,18 @@ function connectBithumbWs() {
             source:    'bithumb',
           });
         }
-      } catch {}
+      } catch (e) { console.warn('[Whale] Bithumb WS parse error:', e.message); }
     };
 
-    ws.onerror = () => {};
+    ws.onerror = (e) => { console.warn('[Whale] Bithumb WS error:', e.message || 'connection error'); };
     ws.onclose = () => {
       bithumbWs = null;
       if (!bithumbDestroyed) {
         bithumbReconnect = setTimeout(connectBithumbWs, 5000);
       }
     };
-  } catch {
+  } catch (e) {
+    console.warn('[Whale] Bithumb WS connect error:', e.message);
     if (!bithumbDestroyed) bithumbReconnect = setTimeout(connectBithumbWs, 5000);
   }
 }
@@ -338,7 +340,7 @@ export function unsubscribeBithumbWhaleTrades() {
 
 // ─── Layer 2: Blockchain.com WebSocket — BTC 온체인 대형 이동 ──────────────
 const BTC_WS_URL = 'wss://ws.blockchain.info/inv';
-const BTC_WHALE_THRESHOLD = 10; // 10 BTC+ (약 10억원)
+const BTC_WHALE_THRESHOLD = 15; // 15 BTC+ (약 20억원, 고래 기준 하향)
 let btcWs = null;
 let btcDestroyed = false;
 
@@ -497,7 +499,7 @@ async function pollWhaleAlert(callback) {
         toType,
       });
     }
-  } catch { /* 실패 시 다음 폴링에 재시도 */ }
+  } catch (e) { console.warn('[Whale] WhaleAlert poll fail:', e.message); }
 }
 
 /**
@@ -507,4 +509,97 @@ async function pollWhaleAlert(callback) {
 export function stopWhaleAlertPolling() {
   waDestroyed = true;
   if (waTimer) { clearInterval(waTimer); waTimer = null; }
+}
+
+// ─── Layer 4: Binance 공개 WebSocket — $1M+ 단일 체결 감지 ────────────────────
+// Binance aggTrade stream: 인증 불필요, 공개 스트림
+// BTC/ETH/SOL/XRP/BNB 5개 코인 동시 구독
+const BINANCE_SYMBOLS  = ['btcusdt', 'ethusdt', 'solusdt', 'xrpusdt', 'bnbusdt'];
+const BINANCE_THRESHOLD_USD = 500_000; // $500K+ 단일 체결
+const BINANCE_HIGH_USD      = 2_000_000; // $2M+ 기관급
+
+// 알려진 거래소/기관 label — Binance 체결은 Binance 내부이므로 출처 표시
+const BINANCE_SYMBOL_NAMES = {
+  btcusdt: 'BTC', ethusdt: 'ETH', solusdt: 'SOL', xrpusdt: 'XRP', bnbusdt: 'BNB',
+};
+
+let binanceWs        = null;
+let binanceHandler   = null;
+let binanceDestroyed = false;
+let binanceReconnect = null;
+
+function connectBinanceWs() {
+  if (binanceDestroyed || !binanceHandler) return;
+  const streams = BINANCE_SYMBOLS.map(s => `${s}@aggTrade`).join('/');
+  const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+  try {
+    const ws = new WebSocket(url);
+    binanceWs = ws;
+
+    ws.onopen = () => {
+      binanceHandler?.({ _connected: true, source: 'binance' });
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        const t = msg.data; // aggTrade 데이터
+        if (!t || t.e !== 'aggTrade') return;
+
+        const symbol  = BINANCE_SYMBOL_NAMES[t.s?.toLowerCase()] || t.s;
+        const price   = parseFloat(t.p || 0);
+        const qty     = parseFloat(t.q || 0);
+        const usdAmt  = price * qty;
+
+        if (usdAmt < BINANCE_THRESHOLD_USD) return;
+
+        const side = t.m ? '매도' : '매수'; // m=true: buyer is maker → taker(공격적)는 매도
+        const krwAmt = Math.round(usdAmt * currentKrwRate);
+
+        binanceHandler?.({
+          id:        `bn-${t.a}`, // aggTradeId
+          symbol,
+          chain:     'binance',
+          type:      'whale_trade',
+          severity:  usdAmt >= BINANCE_HIGH_USD ? 'high' : 'medium',
+          price,
+          volume:    qty,
+          tradeAmt:  krwAmt,
+          tradeUsd:  usdAmt,
+          side,
+          signal:    side === '매수' ? 'bullish' : 'bearish',
+          insight:   `[Binance] ${symbol} ${side} $${(usdAmt / 1e6).toFixed(1)}M — ${side === '매수' ? '대규모 매수 압력' : '대규모 차익실현'}`,
+          message:   `${symbol} ${side} $${(usdAmt / 1e6).toFixed(1)}M (Binance)`,
+          source:    'binance',
+          timestamp: t.T || Date.now(),
+        });
+      } catch (e) { console.warn('[Whale] Binance WS parse error:', e.message); }
+    };
+
+    ws.onerror = (e) => { console.warn('[Whale] Binance WS error:', e.message || 'connection error'); };
+    ws.onclose = () => {
+      binanceWs = null;
+      if (!binanceDestroyed) {
+        binanceReconnect = setTimeout(connectBinanceWs, 5000);
+      }
+    };
+  } catch (e) {
+    console.warn('[Whale] Binance WS connect error:', e.message);
+    if (!binanceDestroyed) binanceReconnect = setTimeout(connectBinanceWs, 5000);
+  }
+}
+
+export function subscribeBinanceWhaleTrades(onEvent) {
+  binanceDestroyed = false;
+  binanceHandler   = onEvent;
+  if (binanceWs) { try { binanceWs.close(); } catch {} binanceWs = null; }
+  clearTimeout(binanceReconnect);
+  connectBinanceWs();
+}
+
+export function unsubscribeBinanceWhaleTrades() {
+  binanceDestroyed = true;
+  binanceHandler   = null;
+  clearTimeout(binanceReconnect);
+  if (binanceWs) { try { binanceWs.close(); } catch {} binanceWs = null; }
 }

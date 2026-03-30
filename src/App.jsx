@@ -190,6 +190,14 @@ export default function App() {
     if (searchOpen) history.pushState({ panel: 'search' }, '');
   }, [searchOpen]);
 
+  // 앱 마운트 시 기본 history entry 깔기 — 뒤로가기 이탈 방지의 핵심
+  useEffect(() => {
+    if (!history.state?._appBase) {
+      history.replaceState({ _appBase: true }, '');
+      history.pushState({ _appGuard: true }, '');
+    }
+  }, []);
+
   useEffect(() => {
     const onPop = () => {
       // X 버튼 닫기 → history.back() → popstate 중복 차단
@@ -198,6 +206,8 @@ export default function App() {
       if (searchOpen)   { setSearchOpen(false);  return; }
       if (selectedNews) { setSelectedNews(null); return; }
       if (selectedItem) { setSelectedItem(null); return; }
+      // 모든 패널 닫힌 상태 — guard entry 재삽입하여 브라우저 이탈 방지
+      history.pushState({ _appGuard: true }, '');
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -318,7 +328,7 @@ export default function App() {
       </div>
 
       {selectedItem && (
-        <ChartSidePanel item={selectedItem} krwRate={krwRate} onClose={closeSelectedItem} onRelatedClick={handleChartRelatedClick} allData={allData} newsContext={newsContext} />
+        <ChartSidePanel item={selectedItem} krwRate={krwRate} onClose={closeSelectedItem} onRelatedClick={handleChartRelatedClick} onNewsClick={setSelectedNews} allData={allData} newsContext={newsContext} />
       )}
       {selectedNews && (
         <NewsSidePanel news={selectedNews} allData={allData} krwRate={krwRate} onClose={closeSelectedNews} onRelatedClick={handleNewsRelatedClick} onNewsClick={setSelectedNews} />

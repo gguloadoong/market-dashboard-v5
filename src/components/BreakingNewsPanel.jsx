@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 import WhalePanel from './WhalePanel';
 import { subscribeLatestWhale } from '../state/whaleBus';
-import { extractNewsSignals, getNewsImpact } from '../utils/newsSignal';
+import { extractNewsSignals, getNewsImpact, isBreakingNews, getNewsImpactType } from '../utils/newsSignal';
 
 // ─── 종목 태그 추출 — 뉴스 제목에서 주요 종목명 감지 ──────────
 // 자주 언급되는 주요 종목명만 체크 (성능 + 정확도 균형)
@@ -55,6 +55,7 @@ function NewsItem({ item, onNewsClick }) {
   // 시그널 태그 추출 — pubDate 전달하여 속보(🔴 속보) 자동 감지, 최대 2개
   const signals = extractNewsSignals(item.title, item.pubDate);
   const impact = getNewsImpact(item.title);
+  const impactType = getNewsImpactType(item.title, item.pubDate);
   // 뉴스 제목에서 종목 태그 추출
   const stockTags = extractStockTags(item.title);
   // RSS description 1줄 미리보기
@@ -74,13 +75,17 @@ function NewsItem({ item, onNewsClick }) {
         </span>
         <span className="text-[11px] text-[#B0B8C1] flex-shrink-0 ml-auto">{item.timeAgo}</span>
       </div>
-      {/* 시그널 태그 + 호재/악재 배지 */}
-      {(signals.length > 0 || impact) && (
+      {/* 시그널 태그 + 영향 유형 + 호재/악재 배지 */}
+      {(signals.length > 0 || impact || impactType) && (
         <div className="flex items-center gap-1 mb-1 flex-wrap">
           {signals.map(sig => (
             <span key={sig.tag} className="text-[9px] font-bold px-1.5 py-0.5 rounded"
               style={{ background: sig.bg, color: sig.color }}>{sig.tag}</span>
           ))}
+          {impactType && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+              style={{ background: impactType.bg, color: impactType.color }}>{impactType.label}</span>
+          )}
           {impact && (
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
               style={{ background: impact.bg, color: impact.color }}>{impact.label}</span>
@@ -134,18 +139,15 @@ function useTabNews(activeTab) {
   return allQuery;
 }
 
-// 1시간 이내 속보를 상단에 핀 — 속보 내에서도 최신순, 일반 뉴스도 최신순
+// 속보(긴급성+중요도+시장영향도)를 상단에 핀 — 속보 내에서도 최신순, 일반 뉴스도 최신순
 function sortWithBreakingFirst(items) {
-  const now = Date.now();
-  const ONE_HOUR = 3600000;
-  // pubDate null/undefined 방어: 유효하지 않은 날짜는 일반 뉴스로 분류
   const getMs = (i) => {
     const ms = i.pubDate ? new Date(i.pubDate).getTime() : 0;
     return isNaN(ms) ? 0 : ms;
   };
-  const breaking = items.filter(i => { const ms = getMs(i); return ms > 0 && (now - ms) < ONE_HOUR; })
+  const breaking = items.filter(i => isBreakingNews(i.title, i.pubDate))
     .sort((a, b) => getMs(b) - getMs(a));
-  const normal = items.filter(i => { const ms = getMs(i); return ms === 0 || (now - ms) >= ONE_HOUR; })
+  const normal = items.filter(i => !isBreakingNews(i.title, i.pubDate))
     .sort((a, b) => getMs(b) - getMs(a));
   return [...breaking, ...normal];
 }

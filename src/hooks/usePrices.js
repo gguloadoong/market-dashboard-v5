@@ -1,6 +1,7 @@
 // 미국·국내 주식 가격 폴링 훅
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { US_STOCK_LIST } from '../data/usStockList';
+import { KR_SECTOR_MAP } from '../data/krStockList';
 import KR_STOCK_NAMES from '../data/krStockNames.json';
 import { fetchSnapshot } from '../api/snapshot';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch } from '../api/stocks';
@@ -112,10 +113,12 @@ export function usePrices() {
             if (map.has(u.symbol)) {
               const old = map.get(u.symbol);
               const name = resolveKrName(u.symbol, u.name) || old.name || u.symbol;
-              map.set(u.symbol, { ...old, ...u, name, sparkline: [...(old.sparkline?.slice(1) ?? []), u.price] });
+              const sector = old.sector || KR_SECTOR_MAP.get(u.symbol);
+              map.set(u.symbol, { ...old, ...u, name, sector, sparkline: [...(old.sparkline?.slice(1) ?? []), u.price] });
             } else {
               const name = resolveKrName(u.symbol, u.name) || u.symbol;
-              map.set(u.symbol, { ...u, symbol: u.symbol, name, market: 'kr', sparkline: [u.price] });
+              const sector = KR_SECTOR_MAP.get(u.symbol);
+              map.set(u.symbol, { ...u, symbol: u.symbol, name, sector, market: 'kr', sparkline: [u.price] });
             }
           }
           mergedKr = [...map.values()];
@@ -137,13 +140,16 @@ export function usePrices() {
       const snap = await fetchSnapshot();
       if (snap?.kr?.length > 0) {
         setKrStocks(prev => {
-          if (prev.length === 0) return snap.kr;
+          if (prev.length === 0) {
+            return snap.kr.map(u => ({ ...u, sector: KR_SECTOR_MAP.get(u.symbol) ?? u.sector }));
+          }
           const map = new Map(prev.map(s => [s.symbol, s]));
           for (const u of snap.kr) {
             if (u?.price > 0) {
               const old = map.get(u.symbol) ?? {};
               const name = resolveKrName(u.symbol, u.name) || old.name || u.symbol;
-              map.set(u.symbol, { ...old, ...u, name });
+              const sector = old.sector || KR_SECTOR_MAP.get(u.symbol) || u.sector;
+              map.set(u.symbol, { ...old, ...u, name, sector });
             }
           }
           return [...map.values()];

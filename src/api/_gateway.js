@@ -79,6 +79,25 @@ export function fetchWhaleProxy(cursor, timeoutMs = 8000) {
   return gwJson({ t: 'w', ...(cursor ? { cr: cursor } : {}) }, timeoutMs);
 }
 
+// ─── 온체인 고래 (Blockchair, 키 불필요) ─────────────────────
+// whale-chain.js Edge Function 직접 호출 (d.js 우회 — 응답 크기 때문에 별도)
+export async function fetchWhaleChain(chain = 'all', minUsd = 1_000_000, timeoutMs = 10000) {
+  const res = await fetch(`/api/whale-chain?chain=${chain}&min_usd=${minUsd}`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`whale-chain ${res.status}`);
+  return res.json();
+}
+
+// ─── 바이낸스 고래 (Edge Function, IP 차단 우회) ─────────────
+export async function fetchBinanceWhale(timeoutMs = 8000) {
+  const res = await fetch('/api/binance-whale', {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`binance-whale ${res.status}`);
+  return res.json();
+}
+
 // ─── 투자자 동향 ─────────────────────────────────────────────
 export function fetchHantooInvestor(symbol, timeoutMs = 8000) {
   return gwJson({ t: 'v', s: symbol }, timeoutMs);

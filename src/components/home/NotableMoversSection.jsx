@@ -1,6 +1,6 @@
 // 주목할만한 움직임 — 복합 스코어 기반 히어로 수평 카드
 // 변동폭 + 거래량 순위 + 뉴스 매칭 복합 점수 + WHY 뉴스 연결
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews } from './utils';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
@@ -139,6 +139,14 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
   const krOpen = getKoreanMarketStatus().status === 'open';
   const usOpen = getUsMarketStatus().status === 'open';
   const hasClosedMarket = !krOpen || !usOpen;
+
+  // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
+  const [timeSlot, setTimeSlot] = useState(() => Math.floor(Date.now() / (20 * 60 * 1000)));
+  useEffect(() => {
+    const id = setInterval(() => setTimeSlot(Math.floor(Date.now() / (20 * 60 * 1000))), 20 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const notables = useMemo(() => {
     if (!allItems.length) return [];
 
@@ -181,12 +189,16 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         const relatedNews = findRelatedNews(item, recentNews);
 
         // 복합 점수: 변동폭(0~5) + 거래량 순위(0~3) + 뉴스(0~3)
-        // 휴장 시장은 -2 패널티 → 라이브 종목이 자연스럽게 상위 노출
+        // 휴장 시장은 -5 패널티 → 라이브 종목이 압도적으로 상위
+        // 인버스/레버리지 ETF는 변동폭이 과대표현되므로 추가 감점
         const pctScore = pct >= 10 ? 5 : pct >= 5 ? 4 : pct >= 3 ? 3 : pct >= 1.5 ? 2 : pct >= 0.5 ? 1 : 0;
         const volScore = volRank <= 5 ? 3 : volRank <= 10 ? 2 : volRank <= 20 ? 1 : 0;
         const newsScore = Math.min(newsCount, 3);
-        const closedPenalty = item._isClosed ? -2 : 0;
-        const totalScore = pctScore + volScore + newsScore + closedPenalty;
+        const closedPenalty = item._isClosed ? -5 : 0;
+        const nameLower = (item.name || '').toLowerCase();
+        const isLeveraged = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage/i.test(nameLower);
+        const leveragedPenalty = isLeveraged ? -2 : 0;
+        const totalScore = pctScore + volScore + newsScore + closedPenalty + leveragedPenalty;
 
         return {
           ...item,
@@ -198,9 +210,15 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         };
       })
       .filter(i => i._totalScore >= 3)
-      .sort((a, b) => b._totalScore - a._totalScore)
+      .sort((a, b) => {
+        if (b._totalScore !== a._totalScore) return b._totalScore - a._totalScore;
+        // 동점 시 timeSlot 기반 해시로 순환 — 같은 종목이 고정되지 않도록
+        const hashA = ((a.symbol || a.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlot)) & 0x7fffffff;
+        const hashB = ((b.symbol || b.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlot)) & 0x7fffffff;
+        return hashA - hashB;
+      })
       .slice(0, 7);
-  }, [allItems, recentNews, krOpen, usOpen]);
+  }, [allItems, recentNews, krOpen, usOpen, timeSlot]);
 
   // 최소 2개 보장 — 점수 부족하면 변동폭 기준 fallback
   const displayed = useMemo(() => {

@@ -39,15 +39,31 @@ async function fetchVkospiKis(token) {
 
 // ─── Naver 증권 VKOSPI fallback (장 마감/주말에도 전일 종가 반환) ─
 async function fetchVkospiNaver() {
-  const res = await fetch('https://m.stock.naver.com/api/index/VKOSPI/basic', {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`Naver VKOSPI HTTP ${res.status}`);
-  const data = await res.json();
-  const val = parseFloat(data.closePrice ?? data.indexNowVal ?? '0');
-  if (!val || val <= 0) throw new Error('Naver VKOSPI 값 없음');
-  return val;
+  const NAVER_URLS = [
+    'https://m.stock.naver.com/api/index/VKOSPI/basic',
+    'https://m.stock.naver.com/api/index/VKOSPI200/basic', // 대안
+  ];
+  for (const url of NAVER_URLS) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Referer': 'https://m.stock.naver.com/',
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      // 다양한 필드명 시도 (Naver API 응답 구조 변경 대응)
+      const rawVal = data.closePrice ?? data.indexNowVal ?? data.nvsValueClose
+        ?? data.compareToPreviousClosePrice ?? data.stockEndPrice ?? null;
+      if (rawVal == null) continue;
+      const val = parseFloat(String(rawVal).replace(/,/g, ''));
+      if (!isNaN(val) && val > 0) return val;
+    } catch { /* 다음 URL 시도 */ }
+  }
+  throw new Error('Naver VKOSPI 값 없음');
 }
 
 // ─── Naver 외국인 순매수 fallback ────────────────────────────────

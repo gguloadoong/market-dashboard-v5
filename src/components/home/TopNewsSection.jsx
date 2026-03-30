@@ -11,7 +11,7 @@ function computeTimeAgo(pubDate) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
   return `${Math.floor(diff / 86400)}일 전`;
 }
-import { extractNewsSignals, getNewsImpact } from '../../utils/newsSignal';
+import { extractNewsSignals, getNewsImpact, getNewsImportanceScore, isBreakingNews } from '../../utils/newsSignal';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 
 const CAT_BADGE = {
@@ -19,18 +19,6 @@ const CAT_BADGE = {
   us:   { bg: '#EDF4FF', color: '#3182F6', label: '미장' },
   kr:   { bg: '#FFF0F0', color: '#F04452', label: '국내' },
 };
-
-// 종목 태그 추출
-const STOCK_NAMES = [
-  '삼성전자','SK하이닉스','LG에너지솔루션','현대차','기아','셀트리온','카카오','네이버',
-  'NVIDIA','엔비디아','애플','테슬라','Tesla','마이크로소프트','Meta','아마존','구글','AMD',
-  '비트코인','이더리움','리플','솔라나','Bitcoin','Ethereum',
-];
-
-function countStockTags(title) {
-  const lower = (title || '').toLowerCase();
-  return STOCK_NAMES.filter(n => lower.includes(n.toLowerCase())).length;
-}
 
 // RSS description에서 HTML 태그/엔티티 제거
 function cleanDesc(raw) {
@@ -100,15 +88,14 @@ export default function TopNewsSection({ allNews = [], onNewsClick, allItems = [
 
     return recent
       .map(n => {
-        const signals = extractNewsSignals(n.title);
+        const signals = extractNewsSignals(n.title, n.pubDate);
         const impact = getNewsImpact(n.title);
-        const stockCount = countStockTags(n.title);
-        const isRecent = n.pubDate && (Date.now() - new Date(n.pubDate).getTime()) < 3600000;
+        const importanceScore = getNewsImportanceScore(n);
         // 종목 실제 움직임 점수 (연결된 종목의 변동폭 합산)
         const matchedStocks = findMatchedStocks(n.title, allItems);
         const movementScore = matchedStocks.reduce((sum, s) => sum + Math.abs(s.pct), 0);
-        // 점수: 시그널 태그 2점 + 종목 태그 1점 + 1시간 이내 1점 + 종목 움직임 가산
-        const score = signals.length * 2 + stockCount + (isRecent ? 1 : 0) + Math.min(movementScore * 0.5, 3);
+        // 점수: 중요도 점수 + 종목 움직임 가산
+        const score = importanceScore + Math.min(movementScore * 0.5, 3);
         return { ...n, _signals: signals, _impact: impact, _score: score, _matchedStocks: matchedStocks };
       })
       .sort((a, b) => {
@@ -138,7 +125,7 @@ export default function TopNewsSection({ allNews = [], onNewsClick, allItems = [
 
       {topNews.map((item, i) => {
         const cat = CAT_BADGE[item.category] || { bg: '#F2F4F6', color: '#8B95A1', label: 'NEWS' };
-        const isBreaking = item.pubDate && (Date.now() - new Date(item.pubDate).getTime()) < 3600000;
+        const isBreaking = isBreakingNews(item.title, item.pubDate);
 
         return (
           <div
