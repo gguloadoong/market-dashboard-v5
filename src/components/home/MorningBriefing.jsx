@@ -25,11 +25,11 @@ function fgColor(value) {
   return '#2AC769';
 }
 
-// 방향 색상
+// 방향 색상 — SignalSummaryWidget 기준으로 통일 (금융 표준: 강세=초록, 약세=빨강)
 function directionColor(direction) {
-  if (direction === 'bullish') return '#F04452';
-  if (direction === 'bearish') return '#1764ED';
-  return '#8B95A1';
+  if (direction === 'bullish') return '#2AC769';
+  if (direction === 'bearish') return '#F04452';
+  return '#FF9500';
 }
 
 export default function MorningBriefing() {

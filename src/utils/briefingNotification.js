@@ -10,7 +10,7 @@ export async function showBriefingNotification(briefing) {
 
   new Notification(title, {
     body,
-    icon: '/icon-192.png',
+    icon: '/icons/icon-192.png',
     tag: 'morning-briefing',
   });
 }

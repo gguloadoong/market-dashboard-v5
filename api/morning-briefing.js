@@ -4,7 +4,7 @@
 export const config = { runtime: 'edge' };
 
 // ─── 시장 지수 조회 (market-indices.js 패턴) ────────────────────
-async function fetchIndex(id, symbol) {
+async function fetchIndex(_id, symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
