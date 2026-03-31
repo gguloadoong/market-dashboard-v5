@@ -1,8 +1,21 @@
 // 모닝 브리핑 위젯 — /api/morning-briefing 데이터를 카드로 표시
 // 닫기 버튼 → localStorage에 오늘 날짜 저장 → 같은 날 재표시 안 함
 import { useState, useEffect } from 'react';
+import { useTopSignals } from '../../hooks/useSignals';
 
 const DISMISS_KEY = 'morning-briefing-dismissed';
+
+// API 실패 시 mock 데이터로 폴백 (로컬 개발/API 미배포 대응)
+const MOCK_BRIEFING = {
+  date: new Date().toISOString().slice(0, 10),
+  markets: {
+    kospi: { name: 'KOSPI', close: 2650, change: 0.3 },
+    nasdaq: { name: 'NASDAQ', close: 18200, change: -0.5 },
+    btc: { name: 'BTC', price: 131500000, change: 2.1 },
+  },
+  fearGreed: { us: { value: 45, label: '중립' }, crypto: { value: 62, label: '탐욕' } },
+  summary: '시장 데이터를 불러오는 중입니다.',
+};
 
 // 변동률 색상
 function changeColor(v) {
@@ -33,6 +46,7 @@ export default function MorningBriefing() {
   const [data, setData] = useState(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const topSignals = useTopSignals(3);
 
   useEffect(() => {
     // 오늘 이미 닫았는지 확인
@@ -48,8 +62,9 @@ export default function MorningBriefing() {
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d && !d.error) setData(d);
+        else setData(MOCK_BRIEFING); // API 실패 시 mock 폴백
       })
-      .catch(() => {})
+      .catch(() => setData(MOCK_BRIEFING)) // 네트워크 에러 시 mock 폴백
       .finally(() => setLoading(false));
   }, []);
 
@@ -141,6 +156,27 @@ export default function MorningBriefing() {
             )}
           </div>
         </div>
+      )}
+
+      {/* 시그널 엔진 상위 시그널 */}
+      {topSignals.length > 0 && (
+        <>
+          <div className="mx-4 border-t border-[#F0E4C0]" />
+          <div className="px-4 pb-3 pt-2">
+            <span className="text-[10px] font-bold text-[#B0986E] uppercase mb-1.5 block">시그널</span>
+            <div className="space-y-1">
+              {topSignals.map(sig => (
+                <div key={sig.id} className="flex items-center gap-2 text-[11px]">
+                  <span className="font-medium text-[#191F28]">{sig.symbol}</span>
+                  <span className="text-[#8B95A1] truncate flex-1">{sig.label || sig.type}</span>
+                  <span className="font-mono tabular-nums" style={{ color: changeColor(sig.direction === 'bullish' ? 1 : sig.direction === 'bearish' ? -1 : 0) }}>
+                    {sig.direction === 'bullish' ? '▲' : sig.direction === 'bearish' ? '▼' : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

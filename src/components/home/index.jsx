@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
@@ -148,6 +149,7 @@ export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
   krwRate = 1466, onItemClick, onNewsClick, onTabChange,
 }) {
+  const queryClient = useQueryClient();
   const { data: allNews = [] } = useAllNewsQuery();
   const { watchlist, toggle, isWatched } = useWatchlist();
 
@@ -211,6 +213,7 @@ export default function HomeDashboard({
   // ─── Pull-to-refresh ──────────────────────────────────────
   const [pulling, setPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const startY = useRef(0);
 
   const onTouchStart = useCallback((e) => {
@@ -228,11 +231,13 @@ export default function HomeDashboard({
 
   const onTouchEnd = useCallback(() => {
     if (pullDistance > 60) {
-      window.location.reload();
+      queryClient.invalidateQueries(); // SPA 상태 유지, 데이터만 갱신
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 1500);
     }
     setPulling(false);
     setPullDistance(0);
-  }, [pullDistance]);
+  }, [pullDistance, queryClient]);
 
   return (
     <div
@@ -243,9 +248,13 @@ export default function HomeDashboard({
     >
 
       {/* ─── Pull-to-refresh 인디케이터 ──────────────────── */}
-      {pulling && pullDistance > 10 && (
-        <div className="flex justify-center items-center overflow-hidden transition-all" style={{ height: pullDistance }}>
-          <span className={`text-[20px] text-[#B0B8C1] ${pullDistance > 60 ? 'animate-spin' : ''}`}>↻</span>
+      {(pulling || refreshing) && (
+        <div className="flex flex-col items-center justify-center py-3 text-[#3182F6] transition-all"
+          style={{ height: pulling ? pullDistance : 40, opacity: pulling ? Math.min(pullDistance / 60, 1) : 1 }}>
+          <div className={`w-5 h-5 border-2 border-[#3182F6] border-t-transparent rounded-full ${pullDistance > 60 || refreshing ? 'animate-spin' : ''}`} />
+          <span className="text-[10px] mt-1 text-[#8B95A1]">
+            {refreshing ? '새로고침 중...' : pullDistance > 60 ? '놓으면 새로고침' : '당겨서 새로고침'}
+          </span>
         </div>
       )}
 
