@@ -30,6 +30,16 @@ const KNOWN_WALLETS = {
   '0x6cc5f688a315f3dc28a7781717a9a798a59fda7b': { label: 'OKX', type: 'exchange', flag: '🔴' },
   // ── 저스틴선 (Tron 창업자) ──
   '0x3ddfa8ec3052539b6c9549f12cea2c295cff5296': { label: 'Justin Sun', type: 'whale', flag: '🐳' },
+  // ── Grayscale GBTC ──
+  'bc1qfnklqr7cl30k4c43zxpfhgphlu5c7rx2f6lwre': { label: 'Grayscale GBTC', type: 'etf', flag: '🔷' },
+  // ── 미국 정부 (DOJ 압수) ──
+  'bc1qazcm763858nkj2dz7g0s2lu7n0ywjzwkg2tzz': { label: 'US Gov (DOJ)', type: 'government', flag: '🏛️' },
+  // ── Tether Treasury ──
+  '0x5754284f345afc66a98fbb0a0afe71e0f007b949': { label: 'Tether Treasury', type: 'issuer', flag: '💵' },
+  // ── Wrapped Bitcoin ──
+  '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599': { label: 'WBTC', type: 'bridge', flag: '🌉' },
+  // ── Ethereum Foundation ──
+  '0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae': { label: 'Ethereum Foundation', type: 'foundation', flag: '💎' },
 };
 
 function labelAddress(addr) {

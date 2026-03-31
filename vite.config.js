@@ -49,6 +49,26 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        shortcuts: [
+          {
+            name: '시그널 피드',
+            short_name: '시그널',
+            url: '/?tab=signal',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: '고래 알림',
+            short_name: '고래',
+            url: '/?tab=whale',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: '관심종목',
+            short_name: '관심',
+            url: '/?tab=watchlist',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+          },
+        ],
       },
       workbox: {
         // navigateFallback: null — navigation 요청은 항상 네트워크에서 서빙
