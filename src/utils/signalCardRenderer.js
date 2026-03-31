@@ -31,7 +31,7 @@ export async function renderSignalCard(signal) {
   // 방향 색상
   const isBullish = signal.direction === 'bullish';
   const dirColor = isBullish ? '#2AC769' : '#F04452';
-  const dirEmoji = isBullish ? '▲' : '▼';
+  const dirEmoji = signal.direction === 'bullish' ? '▲' : signal.direction === 'bearish' ? '▼' : '—';
   const neutralColor = '#FF9500';
 
   // 상단 방향 바
