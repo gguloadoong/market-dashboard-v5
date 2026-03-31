@@ -70,6 +70,8 @@ export function usePrices() {
       const data = await fetchUsStocksBatch(symbolsToFetch);
       if (data.length > 0) {
         let mergedUs = null;
+        // US_STOCK_LIST 메타맵 — sector/nameEn fallback 용
+        const metaMap = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
         setUsStocks(prev => {
           const map = new Map(prev.map(s => [s.symbol, s]));
           for (const u of data) {
@@ -77,11 +79,13 @@ export function usePrices() {
             if (map.has(u.symbol)) {
               const old = map.get(u.symbol);
               // sector/nameEn 메타 보존 — API가 새 값을 주면 업데이트, null/undefined일 때만 기존 유지
-              const sector = u.sector ?? old.sector;
-              const nameEn = u.nameEn ?? old.nameEn;
+              const sector = u.sector ?? old.sector ?? metaMap.get(u.symbol)?.sector;
+              const nameEn = u.nameEn ?? old.nameEn ?? metaMap.get(u.symbol)?.nameEn;
               map.set(u.symbol, { ...old, ...u, sector, nameEn, sparkline: u.sparkline?.length ? u.sparkline : old.sparkline });
             } else {
-              map.set(u.symbol, { symbol: u.symbol, name: u.name || u.symbol, market: 'us', sparkline: [], ...u });
+              // 신규 심볼 — US_STOCK_LIST 메타(sector, nameEn) 반영
+              const meta = metaMap.get(u.symbol) ?? {};
+              map.set(u.symbol, { symbol: u.symbol, name: u.name || meta.name || u.symbol, market: 'us', sparkline: [], ...u, sector: u.sector ?? meta.sector, nameEn: u.nameEn ?? meta.nameEn });
             }
           }
           mergedUs = [...map.values()];
@@ -158,21 +162,22 @@ export function usePrices() {
           return [...map.values()];
         });
       }
-      if (snap?.us?.length > 0) {
-        setUsStocks(prev => {
-          // US_STOCK_LIST 메타(sector, nameEn) 보존 — cold load 시 전체 목록 베이스로 시작
-          const metaMap = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
-          const base = prev.length === 0 ? [...US_STOCK_LIST] : [...prev];
-          const map = new Map(base.map(s => [s.symbol, s]));
-          for (const u of snap.us) {
-            if (u?.price > 0) {
-              const existing = map.get(u.symbol) ?? metaMap.get(u.symbol) ?? {};
-              map.set(u.symbol, { ...existing, ...u });
-            }
+      // prev가 비어있으면 snapshot 유무와 무관하게 US_STOCK_LIST 메타(sector, nameEn)로 시드
+      // Redis 미연결(snapshot 비어있음)이어도 섹터자금흐름이 정상 동작하도록 보장
+      setUsStocks(prev => {
+        if (prev.length > 0 && !snap?.us?.length) return prev; // 이미 데이터 있고 snapshot도 없으면 스킵
+        // US_STOCK_LIST 메타(sector, nameEn) 보존 — cold load 시 전체 목록 베이스로 시작
+        const metaMap = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
+        const base = prev.length === 0 ? [...US_STOCK_LIST] : [...prev];
+        const map = new Map(base.map(s => [s.symbol, s]));
+        for (const u of (snap?.us ?? [])) {
+          if (u?.price > 0) {
+            const existing = map.get(u.symbol) ?? metaMap.get(u.symbol) ?? {};
+            map.set(u.symbol, { ...existing, ...u });
           }
-          return [...map.values()];
-        });
-      }
+        }
+        return [...map.values()];
+      });
       setPricesReady(true);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
