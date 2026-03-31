@@ -231,9 +231,8 @@ export default function HomeDashboard({
 
   const onTouchEnd = useCallback(() => {
     if (pullDistance > 60) {
-      queryClient.invalidateQueries(); // SPA 상태 유지, 데이터만 갱신
-      setRefreshing(true);
-      setTimeout(() => setRefreshing(false), 1500);
+      setRefreshing(true); // 먼저 refreshing 상태 설정
+      queryClient.invalidateQueries().then(() => setRefreshing(false)); // 완료 후 해제
     }
     setPulling(false);
     setPullDistance(0);

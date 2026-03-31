@@ -84,7 +84,10 @@ export default function App() {
   useEffect(() => { usSymbolsRef.current = usSymbols; }, [usSymbols, usSymbolsRef]);
 
   const { data: krxEtfs = [] } = useKrxEtf();
-  const [activeTab, setActiveTab]       = useState('home');
+  const [activeTab, setActiveTab]       = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') || 'home';
+  });
   const [etfs, setEtfs]                 = useState(ETF_LIST);
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [loading, setLoading]           = useState(false);

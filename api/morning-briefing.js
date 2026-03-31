@@ -4,7 +4,7 @@
 export const config = { runtime: 'edge' };
 
 // ─── 시장 지수 조회 (market-indices.js 패턴) ────────────────────
-async function fetchIndex(id, symbol) {
+async function fetchIndex(_id, symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
@@ -97,7 +97,7 @@ function changeText(change) {
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
-export default async function handler() {
+export default async function handler(req) {
   try {
     // 병렬 호출
     const [kospiRes, nasdaqRes, btcRes, usFgRes, cryptoFgRes] = await Promise.allSettled([
@@ -146,7 +146,7 @@ export default async function handler() {
       },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: 'Failed to fetch market data' }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },
     });

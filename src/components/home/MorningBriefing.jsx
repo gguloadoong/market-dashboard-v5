@@ -2,7 +2,7 @@
 // 닫기 버튼 → localStorage에 오늘 날짜 저장 → 같은 날 재표시 안 함
 import { useState, useEffect } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
-import { showBriefingNotification } from '../../utils/briefingNotification';
+import { showBriefingNotification, requestNotificationPermission } from '../../utils/briefingNotification';
 
 const DISMISS_KEY = 'morning-briefing-dismissed';
 
@@ -25,11 +25,11 @@ function fgColor(value) {
   return '#2AC769';
 }
 
-// 방향 색상
+// 방향 색상 — SignalSummaryWidget 기준으로 통일 (금융 표준: 강세=초록, 약세=빨강)
 function directionColor(direction) {
-  if (direction === 'bullish') return '#F04452';
-  if (direction === 'bearish') return '#1764ED';
-  return '#8B95A1';
+  if (direction === 'bullish') return '#2AC769';
+  if (direction === 'bearish') return '#F04452';
+  return '#FF9500';
 }
 
 export default function MorningBriefing() {
@@ -92,13 +92,21 @@ export default function MorningBriefing() {
             <span className="text-[16px]">☀️</span>
             <span className="text-[13px] font-bold text-[#191F28]">오늘의 마켓 브리핑</span>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="text-[#B0B8C1] hover:text-[#4E5968] transition-colors p-1"
-            title="브리핑 닫기"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {Notification?.permission === 'default' && (
+              <button onClick={async () => { await requestNotificationPermission(); }}
+                className="text-[10px] text-[#3182F6] font-medium">
+                🔔 알림 받기
+              </button>
+            )}
+            <button
+              onClick={handleDismiss}
+              className="text-[#B0B8C1] hover:text-[#4E5968] transition-colors p-1"
+              title="브리핑 닫기"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
         </div>
 
         {/* 준비 중 메시지 */}
@@ -142,13 +150,21 @@ export default function MorningBriefing() {
           <span className="text-[13px] font-bold text-[#191F28]">오늘의 마켓 브리핑</span>
           {dateLabel && <span className="text-[11px] text-[#B0B8C1]">{dateLabel}</span>}
         </div>
-        <button
-          onClick={handleDismiss}
-          className="text-[#B0B8C1] hover:text-[#4E5968] transition-colors p-1"
-          title="브리핑 닫기"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {Notification?.permission === 'default' && (
+            <button onClick={async () => { await requestNotificationPermission(); }}
+              className="text-[10px] text-[#3182F6] font-medium">
+              🔔 알림 받기
+            </button>
+          )}
+          <button
+            onClick={handleDismiss}
+            className="text-[#B0B8C1] hover:text-[#4E5968] transition-colors p-1"
+            title="브리핑 닫기"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
+        </div>
       </div>
 
       {/* 시그널 엔진 상위 시그널 */}

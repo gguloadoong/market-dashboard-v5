@@ -76,7 +76,10 @@ export function usePrices() {
             if (!u?.price) continue;
             if (map.has(u.symbol)) {
               const old = map.get(u.symbol);
-              map.set(u.symbol, { ...old, ...u, sparkline: u.sparkline?.length ? u.sparkline : old.sparkline });
+              // sector/nameEn 메타 보존 — API가 새 값을 주면 업데이트, null/undefined일 때만 기존 유지
+              const sector = u.sector ?? old.sector;
+              const nameEn = u.nameEn ?? old.nameEn;
+              map.set(u.symbol, { ...old, ...u, sector, nameEn, sparkline: u.sparkline?.length ? u.sparkline : old.sparkline });
             } else {
               map.set(u.symbol, { symbol: u.symbol, name: u.name || u.symbol, market: 'us', sparkline: [], ...u });
             }
