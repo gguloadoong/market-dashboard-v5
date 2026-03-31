@@ -97,7 +97,7 @@ function changeText(change) {
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
-export default async function handler() {
+export default async function handler(req) {
   try {
     // 병렬 호출
     const [kospiRes, nasdaqRes, btcRes, usFgRes, cryptoFgRes] = await Promise.allSettled([
@@ -146,7 +146,7 @@ export default async function handler() {
       },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: 'Failed to fetch market data' }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },
     });
