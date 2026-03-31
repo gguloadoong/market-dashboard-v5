@@ -1,6 +1,7 @@
-// 투자 시그널 요약 위젯 — 더보기 + 타입별 아이콘 + 클릭 + 공유
+// 투자 시그널 요약 위젯 — 더보기 + 타입별 아이콘 + 클릭 + 공유 + 이미지 공유
 import { useState, useCallback } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
+import { renderSignalCard } from '../../utils/signalCardRenderer';
 
 // 시그널 타입별 아이콘 매핑
 const TYPE_ICON = {
@@ -18,10 +19,26 @@ const TYPE_ICON = {
   sector_rotation: '🔄',
 };
 
-// 시그널 공유 — Web Share API + 클립보드 폴백
+// 시그널 공유 — 이미지 우선, Web Share API + 클립보드 폴백
 async function shareSignal(signal) {
   const emoji = signal.direction === 'bullish' ? '🟢' : signal.direction === 'bearish' ? '🔴' : '🟡';
   const text = `${emoji} ${signal.title}\n${signal.detail || signal.meta?.currentZoneKo || ''}\n\n마켓레이더에서 확인 →`;
+
+  // 이미지 공유 시도
+  try {
+    const dataUrl = await renderSignalCard(signal);
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], 'signal.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text: signal.title, url: window.location.origin });
+      return;
+    }
+  } catch {
+    // 이미지 공유 실패 → 텍스트 폴백
+  }
+
+  // 텍스트 공유 폴백
   if (navigator.share) {
     try {
       await navigator.share({ text, url: window.location.origin });
@@ -29,7 +46,6 @@ async function shareSignal(signal) {
       // 사용자 취소 — 무시
     }
   } else {
-    // 폴백: 클립보드 복사
     try {
       await navigator.clipboard?.writeText(`${text} ${window.location.origin}`);
     } catch {

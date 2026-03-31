@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
+import MorningBriefing from './MorningBriefing';
 import MarketPulseWidget from './widgets/MarketPulseWidget';
 import WatchlistWidget from './widgets/WatchlistWidget';
 import TopMoversWidget from './widgets/TopMoversWidget';
@@ -207,8 +208,49 @@ export default function HomeDashboard({
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
+  // ─── Pull-to-refresh ──────────────────────────────────────
+  const [pulling, setPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const startY = useRef(0);
+
+  const onTouchStart = useCallback((e) => {
+    startY.current = e.touches[0].clientY;
+  }, []);
+
+  const onTouchMove = useCallback((e) => {
+    if (window.scrollY > 0) return; // 스크롤 중이면 무시
+    const dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) {
+      setPullDistance(Math.min(dy * 0.4, 80));
+      setPulling(true);
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (pullDistance > 60) {
+      window.location.reload();
+    }
+    setPulling(false);
+    setPullDistance(0);
+  }, [pullDistance]);
+
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+
+      {/* ─── Pull-to-refresh 인디케이터 ──────────────────── */}
+      {pulling && pullDistance > 10 && (
+        <div className="flex justify-center items-center overflow-hidden transition-all" style={{ height: pullDistance }}>
+          <span className={`text-[20px] text-[#B0B8C1] ${pullDistance > 60 ? 'animate-spin' : ''}`}>↻</span>
+        </div>
+      )}
+
+      {/* ─── 모닝 브리핑 ─────────────────────────────────── */}
+      <MorningBriefing />
 
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
