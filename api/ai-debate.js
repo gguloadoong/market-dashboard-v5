@@ -1,5 +1,11 @@
-// AI 종목토론 — Claude API 직접 호출 (Edge, 30s 타임아웃)
+// AI 종목토론 — Gemini API (Edge, 무료 tier 활용)
+// primary: gemini-2.5-flash-lite, fallback: gemini-2.5-flash
 export const config = { runtime: 'edge' };
+
+const GEMINI_MODELS = [
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+];
 
 export default async function handler(request) {
   if (request.method === 'OPTIONS') {
@@ -12,9 +18,9 @@ export default async function handler(request) {
     return new Response(JSON.stringify({ error: 'POST only' }), { status: 405 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
+    return new Response(JSON.stringify({ error: 'GEMINI_KEY not configured' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
     });
@@ -48,54 +54,62 @@ JSON 형식으로만 응답:
   "confidence": 0.0~1.0 숫자 (강세 확신도)
 }`;
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: AbortSignal.timeout(25000),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return new Response(JSON.stringify({ error: `claude_api: ${res.status}`, detail: errText }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text ?? '';
-
-    // JSON 파싱 시도
-    let parsed;
+  for (const modelUrl of GEMINI_MODELS) {
     try {
-      const match = text.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(match?.[0] ?? text);
-    } catch {
-      parsed = { bull: text, bear: '', verdict: '', confidence: 0.5 };
-    }
+      const res = await fetch(`${modelUrl}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
 
-    return new Response(JSON.stringify({ symbol, ...parsed }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=1800',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
-    });
+      // rate limit → 다음 모델 시도
+      if (res.status === 429) continue;
+
+      if (!res.ok) {
+        const errText = await res.text();
+        return new Response(JSON.stringify({ error: `gemini_api: ${res.status}`, detail: errText }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+      // JSON 파싱 시도
+      let parsed;
+      try {
+        const match = text.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(match?.[0] ?? text);
+      } catch {
+        parsed = { bull: text, bear: '', verdict: '', confidence: 0.5 };
+      }
+
+      return new Response(JSON.stringify({ symbol, ...parsed }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=1800',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    } catch (e) {
+      // 타임아웃 등 → 다음 모델 시도
+      if (GEMINI_MODELS.indexOf(modelUrl) === GEMINI_MODELS.length - 1) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+    }
   }
+
+  return new Response(JSON.stringify({ error: 'all models failed' }), {
+    status: 502,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
+  });
 }
