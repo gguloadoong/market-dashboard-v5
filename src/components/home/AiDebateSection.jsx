@@ -1,5 +1,5 @@
 // AI 종목토론 섹션 — Bull vs Bear 토론
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { fetchAiDebate } from '../../api/_gateway';
 
 // sessionStorage 캐시 (30분)
@@ -76,6 +76,14 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       setLoading(false);
     }
   }, [usStocks]);
+
+  // 마운트 시 첫 종목 자동 토론 — ref로 1회만 실행
+  const autoLoaded = useRef(false);
+  useEffect(() => {
+    if (autoLoaded.current) return;
+    autoLoaded.current = true;
+    runDebate(DEFAULT_SYMBOLS[0]);
+  }, [runDebate]);
 
   const confidence = result?.confidence ?? 0.5;
   const confColor = confidence > 0.6 ? '#2AC769' : confidence < 0.4 ? '#F04452' : '#FF9500';

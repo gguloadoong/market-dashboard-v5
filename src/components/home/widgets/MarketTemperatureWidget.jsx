@@ -37,21 +37,8 @@ export default function MarketTemperatureWidget() {
   const signals = useSignals();
   const temp = useMemo(() => calcTemperature(signals), [signals]);
 
-  // 시그널 없으면 대기 상태
-  if (temp.count === 0) {
-    return (
-      <div
-        data-testid="market-temperature"
-        className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] font-bold text-[#191F28]">마켓 온도계</span>
-          <span className="text-[10px] text-[#B0B8C1]">시그널 분석 중...</span>
-        </div>
-        <div className="text-[11px] text-[#B0B8C1]">시장 시그널을 수집하고 있어요</div>
-      </div>
-    );
-  }
+  // 시그널 없으면 렌더 안 함 — 빈 상태가 홈 최상단 차지하는 것 방지
+  if (temp.count === 0) return null;
 
   const zone = ZONE[temp.label] || ZONE['중립'];
   // -1 ~ +1 → 0% ~ 100% 게이지 변환
