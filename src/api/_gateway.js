@@ -157,3 +157,28 @@ export function fetchKrxEtf(timeoutMs = 8000) {
 export function fetchInvestorTrendGateway(symbol, days = 30, timeoutMs = 10000) {
   return gwJson({ t: 'it', s: symbol, d: days }, timeoutMs);
 }
+
+// ─── Put/Call Ratio ──────────────────────────────────────────
+export function fetchPCR(timeoutMs = 8000) {
+  return gwJson({ t: 'pc' }, timeoutMs);
+}
+
+// ─── 펀딩비 + OI ─────────────────────────────────────────────
+export function fetchFundingRate(symbol = 'BTCUSDT', timeoutMs = 8000) {
+  return gwJson({ t: 'fr', s: symbol }, timeoutMs);
+}
+
+// ─── 주문장 불균형 ───────────────────────────────────────────
+export function fetchOrderFlow(symbol = 'BTCUSDT', timeoutMs = 5000) {
+  return gwJson({ t: 'of', s: symbol }, timeoutMs);
+}
+
+// ─── 소셜 감성 ──────────────────────────────────────────────
+export function fetchSocialSentiment(symbol, timeoutMs = 6000) {
+  return gwJson({ t: 'social', s: symbol }, timeoutMs);
+}
+
+// ─── AI 종목토론 ─────────────────────────────────────────────
+export function fetchAiDebate(symbol, ctx = {}, timeoutMs = 25000) {
+  return gwJson({ t: 'debate', s: symbol, ctx }, timeoutMs);
+}

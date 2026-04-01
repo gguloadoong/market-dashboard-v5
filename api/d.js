@@ -27,6 +27,11 @@
 //   ub = upbit-notices   (업비트 공지)
 //   ke = krx-etf         (KRX ETF)
 //   s  = snapshot        (가격 스냅샷)
+//   pc = pcr            (Put/Call Ratio)
+//   fr = funding-rate   (펀딩비 + OI)
+//   of = order-flow     (주문장 불균형)
+//   social = social     (소셜 감성)
+//   debate = ai-debate  (AI 종목토론)
 
 export const config = { runtime: 'edge' };
 
@@ -41,6 +46,11 @@ import usStockSearchHandler from './us-stock-search.js';
 import upbitNoticesHandler from './upbit-notices.js';
 import newsSummaryHandler from './news-summary.js';
 import snapshotHandler from './snapshot.js';
+import pcrHandler from './pcr.js';
+import fundingRateHandler from './funding-rate.js';
+import orderFlowHandler from './order-flow.js';
+import socialHandler from './social.js';
+import aiDebateHandler from './ai-debate.js';
 
 // ─── Serverless Function 은 Edge에서 직접 import 불가 ─────────
 // hantoo-price, naver-price, hantoo-indices, hantoo-investor,
@@ -240,6 +250,29 @@ export default async function handler(request) {
         // 투자자 동향 추이: s = symbol, d = days
         const qs = `symbol=${encodeURIComponent(body.s || '')}&days=${encodeURIComponent(body.d || 30)}`;
         return proxyToServerless(baseUrl, `/api/investor-trend?${qs}`);
+      }
+      case 'pc': {
+        return pcrHandler(makeEdgeRequest(baseUrl, '/api/pcr'));
+      }
+      case 'fr': {
+        const sym = body.s || 'BTCUSDT';
+        return fundingRateHandler(makeEdgeRequest(baseUrl, `/api/funding-rate?symbol=${sym}`));
+      }
+      case 'of': {
+        const sym = body.s || 'BTCUSDT';
+        return orderFlowHandler(makeEdgeRequest(baseUrl, `/api/order-flow?symbol=${sym}`));
+      }
+      case 'social': {
+        const sym = body.s || 'AAPL';
+        return socialHandler(makeEdgeRequest(baseUrl, `/api/social?symbol=${encodeURIComponent(sym)}`));
+      }
+      case 'debate': {
+        // ai-debate는 POST body를 그대로 전달
+        return aiDebateHandler(new Request(`${baseUrl}/api/ai-debate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }));
       }
       case 's': {
         // 가격 스냅샷

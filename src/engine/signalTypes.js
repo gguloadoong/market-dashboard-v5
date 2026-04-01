@@ -16,6 +16,11 @@ export const SIGNAL_TYPES = {
   FEAR_GREED_SHIFT: 'fear_greed_shift',
   NEWS_SENTIMENT_CLUSTER: 'news_sentiment_cluster',
   SECTOR_ROTATION: 'sector_rotation',
+  PUT_CALL_RATIO: 'put_call_ratio',
+  FUNDING_RATE_EXTREME: 'funding_rate_extreme',
+  ORDER_FLOW_IMBALANCE: 'order_flow_imbalance',
+  VWAP_DEVIATION: 'vwap_deviation',
+  SOCIAL_SENTIMENT: 'social_sentiment',
 };
 
 // 시그널 방향
@@ -41,6 +46,11 @@ export const SIGNAL_TTL = {
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: 12 * 3600000,
   [SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER]: 2 * 3600000,
   [SIGNAL_TYPES.SECTOR_ROTATION]: 6 * 3600000,
+  [SIGNAL_TYPES.PUT_CALL_RATIO]: 4 * 3600000,
+  [SIGNAL_TYPES.FUNDING_RATE_EXTREME]: 8 * 3600000,
+  [SIGNAL_TYPES.ORDER_FLOW_IMBALANCE]: 15 * 60000,
+  [SIGNAL_TYPES.VWAP_DEVIATION]: 2 * 3600000,
+  [SIGNAL_TYPES.SOCIAL_SENTIMENT]: 4 * 3600000,
 };
 
 /** 시그널 타입별 TTL 조회 (기본값 2시간) */
