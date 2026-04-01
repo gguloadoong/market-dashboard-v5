@@ -345,3 +345,112 @@ export function createFearGreedSignal(current, previous, market) {
   });
   return addSignal(signal);
 }
+
+/** PCR 역발상 시그널 — PCR>1.2 극도공포→매수, PCR<0.7 탐욕→매도 */
+export function createPCRSignal(pcr, totalPuts, totalCalls) {
+  if (pcr == null) return null;
+  let direction = DIRECTIONS.NEUTRAL;
+  let strength = 2;
+  let hint = '';
+  if (pcr > 1.2) {
+    direction = DIRECTIONS.BULLISH;
+    strength = pcr > 1.5 ? 4 : 3;
+    hint = '역발상 매수 구간';
+  } else if (pcr < 0.7) {
+    direction = DIRECTIONS.BEARISH;
+    strength = pcr < 0.5 ? 4 : 3;
+    hint = '역발상 매도 구간';
+  } else {
+    return null;
+  }
+  const title = `S&P500 PCR ${pcr.toFixed(2)} — ${hint}`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.PUT_CALL_RATIO,
+    symbol: 'SPY', name: 'S&P500 옵션',
+    market: 'us', direction, strength,
+    title, meta: { pcr, totalPuts, totalCalls },
+  }));
+}
+
+/** 펀딩비 과열 시그널 */
+export function createFundingRateSignal(symbol, fundingRate, openInterest) {
+  if (fundingRate == null) return null;
+  const ratePercent = fundingRate * 100;
+  let direction = DIRECTIONS.NEUTRAL;
+  let strength = 2;
+  if (ratePercent > 0.05) {
+    direction = DIRECTIONS.BEARISH;
+    strength = ratePercent > 0.1 ? 4 : 3;
+  } else if (ratePercent < -0.05) {
+    direction = DIRECTIONS.BULLISH;
+    strength = ratePercent < -0.1 ? 4 : 3;
+  } else {
+    return null;
+  }
+  const label = direction === DIRECTIONS.BEARISH ? '롱 과열 — 조정 주의' : '숏 과열 — 반등 가능';
+  const title = `${symbol} 펀딩비 ${ratePercent > 0 ? '+' : ''}${ratePercent.toFixed(3)}% — ${label}`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.FUNDING_RATE_EXTREME,
+    symbol, name: symbol,
+    market: 'crypto', direction, strength,
+    title, meta: { fundingRate, openInterest },
+  }));
+}
+
+/** 주문장 불균형 시그널 */
+export function createOrderFlowSignal(symbol, bidVolume, askVolume) {
+  if (!bidVolume || !askVolume) return null;
+  const total = bidVolume + askVolume;
+  if (total === 0) return null;
+  const imbalance = (bidVolume - askVolume) / total;
+  if (Math.abs(imbalance) < 0.3) return null;
+  const direction = imbalance > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = Math.abs(imbalance) > 0.5 ? 4 : 3;
+  const label = imbalance > 0 ? '매수벽 형성' : '매도벽 형성';
+  const title = `${symbol} 호가 ${label} (${(Math.abs(imbalance) * 100).toFixed(0)}% 불균형)`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.ORDER_FLOW_IMBALANCE,
+    symbol, name: symbol,
+    market: 'crypto', direction, strength,
+    title, meta: { bidVolume, askVolume, imbalance },
+  }));
+}
+
+/** VWAP 편차 평균회귀 시그널 */
+export function createVWAPSignal(symbol, name, market, currentPrice, vwap) {
+  if (!vwap || !currentPrice) return null;
+  const deviation = ((currentPrice - vwap) / vwap) * 100;
+  if (Math.abs(deviation) < 3) return null;
+  // 평균회귀: VWAP 위로 이탈 → 하방, 아래로 이탈 → 상방
+  const direction = deviation > 0 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
+  const strength = Math.abs(deviation) > 5 ? 4 : 3;
+  const title = `${name} VWAP 대비 ${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}% — 평균회귀 가능`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.VWAP_DEVIATION,
+    symbol, name, market, direction, strength,
+    title, meta: { currentPrice, vwap, deviation },
+  }));
+}
+
+/** 소셜 감성 시그널 — bullRatio > 0.7 → BULLISH, < 0.3 → BEARISH */
+export function createSocialSentimentSignal(symbol, name, market, bullRatio, totalMessages) {
+  if (bullRatio == null || totalMessages < 10) return null;
+  let direction = DIRECTIONS.NEUTRAL;
+  let strength = 2;
+  if (bullRatio > 0.7) {
+    direction = DIRECTIONS.BULLISH;
+    strength = bullRatio > 0.85 ? 4 : 3;
+  } else if (bullRatio < 0.3) {
+    direction = DIRECTIONS.BEARISH;
+    strength = bullRatio < 0.15 ? 4 : 3;
+  } else {
+    return null;
+  }
+  const label = direction === DIRECTIONS.BULLISH ? '강세 심리 우세' : '약세 심리 우세';
+  const title = `${name} 소셜 ${label} (강세 ${(bullRatio * 100).toFixed(0)}%, ${totalMessages}건)`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.SOCIAL_SENTIMENT,
+    symbol, name, market, direction, strength,
+    title, meta: { bullRatio, totalMessages },
+  }));
+}

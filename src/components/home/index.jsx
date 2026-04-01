@@ -15,6 +15,9 @@ import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
 import MarketTimeline from './MarketTimeline';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
+import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
+import DerivativesWidget from './widgets/DerivativesWidget';
+import AiDebateSection from './AiDebateSection';
 
 // ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
 function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, onItemClick }) {
@@ -207,6 +210,10 @@ export default function HomeDashboard({
   // 투자자 시그널 스캔 (5분 간격 폴링)
   useInvestorSignals(allItems);
 
+  // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
+  const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
+  useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
+
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
   // ─── Pull-to-refresh ──────────────────────────────────────
@@ -265,6 +272,9 @@ export default function HomeDashboard({
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
       <SignalSummaryWidget onItemClick={onItemClick} />
 
+      {/* ─── AI 종목토론 (Bull vs Bear) ───────────────────── */}
+      <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
+
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
       {hasData && (
         <NotableMoversSection
@@ -275,8 +285,9 @@ export default function HomeDashboard({
         />
       )}
 
-      {/* ─── 공포탐욕 지수 + 경제 이벤트 티커 ─────────────── */}
+      {/* ─── 공포탐욕 지수 + 파생 시그널 + 경제 이벤트 티커 ── */}
       <FearGreedWidget />
+      <DerivativesWidget />
       <EventTicker />
 
       {/* ─── 관심종목 + 섹터 흐름 (2열 나란히, 모바일은 세로) ── */}

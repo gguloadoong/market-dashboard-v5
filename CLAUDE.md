@@ -50,6 +50,34 @@
 
 ---
 
+## 🤖 에이전트 & 모델 라우팅 규칙 (HARD RULE)
+
+**논리가 필요하고 정교해야 하는 작업은 반드시 Opus 에이전트를 사용한다. 자동으로 판단하여 스스로 불러낸다.**
+
+| 상황 | 사용 에이전트/모델 | 예시 |
+|------|-----------------|------|
+| 아키텍처 설계 / 시스템 설계 | `architect (opus)` | 신규 기능 설계, Phase 계획 |
+| 복잡한 비즈니스 로직 구현 | `executor (opus)` | 시그널 알고리즘, 데이터 파이프라인 |
+| 코드 리뷰 / 품질 검증 | `code-reviewer (opus)` | PR 리뷰, 버그 사전 탐지 |
+| 전략적 분석 / 요구사항 분석 | `analyst (opus)` | PRD 분석, 우선순위 결정 |
+| 보안 취약점 / 크리티컬 검증 | `verifier (opus)` | 배포 전 검증 |
+| 단순 검색 / 파일 탐색 | `explore (sonnet)` | 파일 찾기, 패턴 검색 |
+| 문서 작성 | `writer (sonnet)` | README, 주석 |
+| 표준 구현 / 단순 버그 수정 | `executor (sonnet)` | UI 컴포넌트, 간단한 fix |
+
+**Opus 자동 트리거 조건:**
+- 시그널 알고리즘 설계/구현 → `architect (opus)` → `executor (opus)`
+- 3개 이상 파일 연동하는 신규 기능 → `architect (opus)` 먼저
+- 수학적 계산/통계 로직 → `executor (opus)`
+- Phase 단위 작업 시작 시 → `architect (opus)` 설계 → 구현
+- PR 전 최종 검토 → `code-reviewer (opus)`
+
+**절대 금지:**
+- 복잡한 알고리즘을 설계 없이 바로 코딩하는 것
+- Opus가 필요한 작업에 Sonnet만 사용하는 것
+
+---
+
 ## 🚀 작업 방식
 
 - 작업 중 절대 나에게 묻지 않는다
