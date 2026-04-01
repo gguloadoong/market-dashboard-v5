@@ -216,6 +216,19 @@ export default function HomeDashboard({
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
+  // 시그널 클릭 → allItems에서 full item 조회 후 ChartSidePanel 오픈
+  const handleSignalItemClick = useCallback((sigItem) => {
+    if (!sigItem?.symbol || !onItemClick) return;
+    const marketMap = { crypto: 'COIN', coin: 'COIN', us: 'US', kr: 'KR' };
+    const _market = marketMap[(sigItem.market || '').toLowerCase()] ||
+                    (sigItem._market || '').toUpperCase() || 'US';
+    const sym = sigItem.symbol.toLowerCase();
+    const full = allItems.find(i =>
+      i.symbol?.toLowerCase() === sym || i.id?.toLowerCase() === sym,
+    );
+    onItemClick(full || { ...sigItem, _market });
+  }, [allItems, onItemClick]);
+
   // ─── Pull-to-refresh ──────────────────────────────────────
   const [pulling, setPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -270,7 +283,7 @@ export default function HomeDashboard({
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
-      <SignalSummaryWidget onItemClick={onItemClick} />
+      <SignalSummaryWidget onItemClick={handleSignalItemClick} />
 
       {/* ─── AI 종목토론 (Bull vs Bear) ───────────────────── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
