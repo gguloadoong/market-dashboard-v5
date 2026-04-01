@@ -5,21 +5,23 @@
 
 ---
 
-## 현재 활성 렌더 구조 (2026-03-29 기준)
+## 현재 활성 렌더 구조 (2026-04-01 기준)
 
 `src/components/home/index.jsx`의 `HomeDashboard` 렌더 순서:
 
 ```
-1. EventTicker          — 경제 이벤트 롤링 티커 (상단 고정)
+1. MorningBriefing      — 모닝 브리핑
 2. MarketPulseWidget    — 지수 6개 + 환율
-3. SignalSummaryWidget  — 투자 시그널 요약 (상위 3개)
-4. WatchlistWidget      — 관심종목 실시간 등락률
-5. TopMoversWidget      — 급등/급락 (KR/US/COIN 탭)
-6. SectorMiniWidget     — 섹터 HOT/COLD 칩 (index.jsx 인라인 정의)
-7. NewsFeedWidget       — 투자 뉴스 최신 (가격영향 필터 적용)
-8. FearGreedWidget      — Fear & Greed 지수
-9. NotableMoversSection — 수급 이상 종목
-10. MarketInvestorSection— 외국인/기관 수급
+3. SignalSummaryWidget  — 투자 시그널 요약 (강도순 TOP 3~20)
+4. NotableMoversSection — 수급 이상 종목
+5. FearGreedWidget      — Fear & Greed 지수
+6. EventTicker          — 경제 이벤트 롤링 티커
+7. WatchlistWidget      — 관심종목 실시간 등락률
+8. SectorMiniWidget     — 섹터 HOT/COLD 칩 (index.jsx 인라인 정의)
+9. TopMoversWidget      — 급등/급락 (KR/US/COIN 탭)
+10. NewsFeedWidget      — 투자 뉴스 최신 (가격영향 필터 적용)
+11. MarketTimeline      — 오늘의 타임라인
+12. MarketInvestorSection— 외국인/기관 수급 (모바일 숨김)
 ```
 
 ---
@@ -34,6 +36,7 @@
 | `InsightsSection` | TopMoversWidget + NewsFeedWidget으로 기능 통합 | #180 (2026-03-26) |
 | `SurgeSection` | TopMoversWidget으로 통합 | #180 (2026-03-26) |
 | `CoinListingSection` | 거래소 상장 공지 섹션 — 사용자 요청으로 제거 | #213 (2026-03-29) |
+| `SignalFeed` | SignalSummaryWidget과 완전 중복 — 동일 데이터 소스, 시간순/강도순 차이만 있으나 UX 혼란 유발 | #8 (2026-04-01) |
 
 > ⚠️ 위 목록의 파일이 `src/` 어딘가에 남아있으면 즉시 삭제하라. 파일 존재 = 살아있는 기능으로 오인.
 

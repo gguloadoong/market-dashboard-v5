@@ -174,13 +174,14 @@ export default async function handler(req, res) {
 
     // 모두 실패 = Redis 캐시 → 그것도 없으면 closed
     if (vkospiFinal == null && !foreignAvailableFinal) {
-      const cached = await getSnap(CACHE_KEY);
+      let cached = null;
+      try { cached = await getSnap(CACHE_KEY); } catch {}
       if (cached) {
         res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
         return res.json({ ...cached, cached: true });
       }
       res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
-      return res.json({ score: null, closed: true });
+      return res.json({ score: null, closed: true, label: '데이터 없음' });
     }
 
     const vs = vkospiFinal != null ? vkospiToScore(vkospiFinal) : null;
@@ -198,12 +199,13 @@ export default async function handler(req, res) {
 
     const payload = { score, vkospi: vkospiFinal, vkospiScore: vs, foreignNet: foreignNetFinal, foreignScore: fs };
     // 성공 시 Redis에 저장 (48시간 — 주말/공휴일 대비)
-    await setSnap(CACHE_KEY, payload, CACHE_TTL);
+    try { await setSnap(CACHE_KEY, payload, CACHE_TTL); } catch {}
 
     res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=30');
     res.json(payload);
   } catch (e) {
     console.error('[kr-fear-greed]', e.message);
-    res.status(500).json({ error: e.message });
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.json({ score: null, closed: true, label: '데이터 없음' });
   }
 }

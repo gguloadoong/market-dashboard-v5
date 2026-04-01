@@ -72,7 +72,7 @@ function PanelLogo({ item }) {
 
 // ─── 시장 배지 컴포넌트 ────────────────────────────────────────
 function MarketBadge({ item }) {
-  if (item.id) {
+  if (isCoinItem(item)) {
     return (
       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFF3E0] text-[#E65100] flex-shrink-0">
         코인
@@ -114,9 +114,14 @@ function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+// 코인 여부 판별 — id 필드 또는 _market === 'COIN' 으로 감지
+function isCoinItem(item) {
+  return !!(item.id || item._market === 'COIN');
+}
+
 function fmtKrwPrice(item, krwRate) {
-  if (item.id) {
-    const p = item.priceKrw || item.priceUsd * krwRate;
+  if (isCoinItem(item)) {
+    const p = item.priceKrw || ((item.priceUsd ?? 0) * krwRate) || 0;
     if (!p) return '—';
     if (p < 1) return `₩${p.toFixed(6)}`;
     if (p < 100) return `₩${fmt(p, 2)}`;
@@ -129,14 +134,14 @@ function fmtKrwPrice(item, krwRate) {
 
 // 절대 가격 (원화 기준)
 function getAbsPrice(item, krwRate) {
-  if (item.id) return item.priceKrw || (item.priceUsd ?? 0) * krwRate;
+  if (isCoinItem(item)) return item.priceKrw || (item.priceUsd ?? 0) * krwRate;
   if (item.market === 'kr') return item.price ?? 0;
   if (item.market === 'us') return (item.price ?? 0) * krwRate;
   return item.price ?? 0;
 }
 
 function getPct(item) {
-  return item.id ? (item.change24h ?? 0) : (item.changePct ?? 0);
+  return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
 }
 
 function _timeAgo(date) {
@@ -354,7 +359,7 @@ function LightweightChart({ candles, loading, type, isIntraday = false }) {
 
 // ─── 핵심 지표 그리드 ─────────────────────────────────────────────
 function MetricsGrid({ item, krwRate }) {
-  const isCoin = !!item.id;
+  const isCoin = isCoinItem(item);
   const high   = isCoin ? item.high24h : item.high52w;
   const low    = isCoin ? item.low24h  : item.low52w;
   const curPx  = isCoin ? (item.priceKrw || (item.priceUsd ?? 0) * krwRate) : item.price;
@@ -741,7 +746,7 @@ export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelate
   // 현재가 (KRW 기준 숫자)
   const curPriceRaw = item ? getAbsPrice(item, krwRate) : 0;
   // 52주 고저가
-  const isCoin = !!item?.id;
+  const isCoin = item ? isCoinItem(item) : false;
   const high52 = isCoin ? item?.high24h : item?.high52w;
   const low52  = isCoin ? item?.low24h  : item?.low52w;
 

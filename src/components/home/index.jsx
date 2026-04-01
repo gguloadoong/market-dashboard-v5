@@ -13,7 +13,6 @@ import NotableMoversSection from './NotableMoversSection';
 import MarketInvestorSection from './MarketInvestorSection';
 import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
-import SignalFeed from './SignalFeed';
 import MarketTimeline from './MarketTimeline';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 
@@ -265,9 +264,6 @@ export default function HomeDashboard({
 
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
       <SignalSummaryWidget onItemClick={onItemClick} />
-
-      {/* ─── 3시장 통합 시그널 피드 ──────────────────────── */}
-      <SignalFeed onItemClick={onItemClick} />
 
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
       {hasData && (
