@@ -31,3 +31,7 @@ dist-ssr
 
 # OMC 플러그인 상태 (로컬 전용)
 .omc/
+
+# e2e / playwright
+e2e-report/
+test-results/
