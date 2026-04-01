@@ -175,10 +175,10 @@ export function fetchOrderFlow(symbol = 'BTCUSDT', timeoutMs = 5000) {
 
 // ─── 소셜 감성 ──────────────────────────────────────────────
 export function fetchSocialSentiment(symbol, timeoutMs = 6000) {
-  return gwJson({ t: 'social', s: symbol }, timeoutMs);
+  return gwJson({ t: 'sc', s: symbol }, timeoutMs);
 }
 
 // ─── AI 종목토론 ─────────────────────────────────────────────
 export function fetchAiDebate(symbol, ctx = {}, timeoutMs = 25000) {
-  return gwJson({ t: 'debate', s: symbol, ctx }, timeoutMs);
+  return gwJson({ t: 'db', s: symbol, ctx }, timeoutMs);
 }

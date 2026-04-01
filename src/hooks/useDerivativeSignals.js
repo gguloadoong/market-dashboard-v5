@@ -16,7 +16,6 @@ function calcVWAPFromSparkline(sparkline) {
 }
 
 export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSymbols = [] } = {}) {
-  const runningRef = useRef(false);
   const usStocksRef = useRef(usStocks);
   const krStocksRef = useRef(krStocks);
   const watchlistRef = useRef(watchlistSymbols);
@@ -70,7 +69,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
           if (data?.bullRatio != null) {
             const stock = usStocksRef.current.find(s => s.symbol === sym);
             const name = stock?.name || sym;
-            createSocialSentimentSignal(sym, name, 'us', data.bullRatio, data.totalMessages);
+            createSocialSentimentSignal(sym, name, 'us', data.bullRatio, data.sentimentMessages);
           }
         }));
       } catch {}
@@ -91,15 +90,12 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
-    if (runningRef.current) return;
-    runningRef.current = true;
-
     // 초기 실행
     runPCR();
     runFundingRate();
     runOrderFlow();
     runSocial();
-    runVWAP();
+    setTimeout(() => { if (!document.hidden) runVWAP(); }, 30000);
 
     // 폴링 설정
     pcrTimer = setInterval(() => { if (!document.hidden) runPCR(); }, 5 * 60 * 1000);
@@ -109,7 +105,6 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 5 * 60 * 1000);
 
     return () => {
-      runningRef.current = false;
       clearInterval(pcrTimer);
       clearInterval(frTimer);
       clearInterval(ofTimer);

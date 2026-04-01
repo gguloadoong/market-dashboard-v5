@@ -15,8 +15,8 @@ export default async function handler(request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
     });
   }
 
@@ -67,8 +67,8 @@ JSON 형식으로만 응답:
     if (!res.ok) {
       const errText = await res.text();
       return new Response(JSON.stringify({ error: `claude_api: ${res.status}`, detail: errText }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        status: 502,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
@@ -94,8 +94,8 @@ JSON 형식으로만 응답:
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      status: 502,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
     });
   }
 }

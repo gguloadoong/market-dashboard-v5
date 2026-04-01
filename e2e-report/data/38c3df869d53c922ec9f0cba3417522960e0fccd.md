@@ -1,0 +1,1032 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e10]: LIVE
+    - generic [ref=e11]:
+      - button "USDA +369.21%" [ref=e12] [cursor=pointer]:
+        - generic [ref=e14]: USDA
+        - generic [ref=e15]: +369.21%
+      - button "ZEC +13.27%" [ref=e17] [cursor=pointer]:
+        - generic [ref=e19]: ZEC
+        - generic [ref=e20]: +13.27%
+      - button "ALGO +12.44%" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]: ALGO
+        - generic [ref=e25]: +12.44%
+      - button "NIGHT +10.06%" [ref=e27] [cursor=pointer]:
+        - generic [ref=e29]: NIGHT
+        - generic [ref=e30]: +10.06%
+      - button "2Z +9.87%" [ref=e32] [cursor=pointer]:
+        - generic [ref=e34]: 2Z
+        - generic [ref=e35]: +9.87%
+      - button "STABLE +9.47%" [ref=e37] [cursor=pointer]:
+        - generic [ref=e39]: STABLE
+        - generic [ref=e40]: +9.47%
+      - button "RAY +7.93%" [ref=e42] [cursor=pointer]:
+        - generic [ref=e44]: RAY
+        - generic [ref=e45]: +7.93%
+      - button "MON +7.90%" [ref=e47] [cursor=pointer]:
+        - generic [ref=e49]: MON
+        - generic [ref=e50]: +7.90%
+      - button "RIVER +7.37%" [ref=e52] [cursor=pointer]:
+        - generic [ref=e54]: RIVER
+        - generic [ref=e55]: +7.37%
+      - button "B +6.68%" [ref=e57] [cursor=pointer]:
+        - generic [ref=e59]: B
+        - generic [ref=e60]: +6.68%
+      - button "SIREN -53.68%" [ref=e62] [cursor=pointer]:
+        - generic [ref=e64]: SIREN
+        - generic [ref=e65]: "-53.68%"
+      - button "TWT -15.57%" [ref=e67] [cursor=pointer]:
+        - generic [ref=e69]: TWT
+        - generic [ref=e70]: "-15.57%"
+      - button "KITE -10.25%" [ref=e72] [cursor=pointer]:
+        - generic [ref=e74]: KITE
+        - generic [ref=e75]: "-10.25%"
+      - button "AB -6.94%" [ref=e77] [cursor=pointer]:
+        - generic [ref=e79]: AB
+        - generic [ref=e80]: "-6.94%"
+      - button "GOMINING -5.84%" [ref=e82] [cursor=pointer]:
+        - generic [ref=e84]: GOMINING
+        - generic [ref=e85]: "-5.84%"
+      - button "COCA -5.58%" [ref=e87] [cursor=pointer]:
+        - generic [ref=e89]: COCA
+        - generic [ref=e90]: "-5.58%"
+      - button "ZRO -4.06%" [ref=e92] [cursor=pointer]:
+        - generic [ref=e94]: ZRO
+        - generic [ref=e95]: "-4.06%"
+      - button "BANANA -3.75%" [ref=e97] [cursor=pointer]:
+        - generic [ref=e99]: BANANA
+        - generic [ref=e100]: "-3.75%"
+      - button "PLSX -3.67%" [ref=e102] [cursor=pointer]:
+        - generic [ref=e104]: PLSX
+        - generic [ref=e105]: "-3.67%"
+      - button "ULTIMA -3.31%" [ref=e107] [cursor=pointer]:
+        - generic [ref=e109]: ULTIMA
+        - generic [ref=e110]: "-3.31%"
+      - button "USDA +369.21%" [ref=e112] [cursor=pointer]:
+        - generic [ref=e114]: USDA
+        - generic [ref=e115]: +369.21%
+      - button "ZEC +13.27%" [ref=e117] [cursor=pointer]:
+        - generic [ref=e119]: ZEC
+        - generic [ref=e120]: +13.27%
+      - button "ALGO +12.44%" [ref=e122] [cursor=pointer]:
+        - generic [ref=e124]: ALGO
+        - generic [ref=e125]: +12.44%
+      - button "NIGHT +10.06%" [ref=e127] [cursor=pointer]:
+        - generic [ref=e129]: NIGHT
+        - generic [ref=e130]: +10.06%
+      - button "2Z +9.87%" [ref=e132] [cursor=pointer]:
+        - generic [ref=e134]: 2Z
+        - generic [ref=e135]: +9.87%
+      - button "STABLE +9.47%" [ref=e137] [cursor=pointer]:
+        - generic [ref=e139]: STABLE
+        - generic [ref=e140]: +9.47%
+      - button "RAY +7.93%" [ref=e142] [cursor=pointer]:
+        - generic [ref=e144]: RAY
+        - generic [ref=e145]: +7.93%
+      - button "MON +7.90%" [ref=e147] [cursor=pointer]:
+        - generic [ref=e149]: MON
+        - generic [ref=e150]: +7.90%
+      - button "RIVER +7.37%" [ref=e152] [cursor=pointer]:
+        - generic [ref=e154]: RIVER
+        - generic [ref=e155]: +7.37%
+      - button "B +6.68%" [ref=e157] [cursor=pointer]:
+        - generic [ref=e159]: B
+        - generic [ref=e160]: +6.68%
+      - button "SIREN -53.68%" [ref=e162] [cursor=pointer]:
+        - generic [ref=e164]: SIREN
+        - generic [ref=e165]: "-53.68%"
+      - button "TWT -15.57%" [ref=e167] [cursor=pointer]:
+        - generic [ref=e169]: TWT
+        - generic [ref=e170]: "-15.57%"
+      - button "KITE -10.25%" [ref=e172] [cursor=pointer]:
+        - generic [ref=e174]: KITE
+        - generic [ref=e175]: "-10.25%"
+      - button "AB -6.94%" [ref=e177] [cursor=pointer]:
+        - generic [ref=e179]: AB
+        - generic [ref=e180]: "-6.94%"
+      - button "GOMINING -5.84%" [ref=e182] [cursor=pointer]:
+        - generic [ref=e184]: GOMINING
+        - generic [ref=e185]: "-5.84%"
+      - button "COCA -5.58%" [ref=e187] [cursor=pointer]:
+        - generic [ref=e189]: COCA
+        - generic [ref=e190]: "-5.58%"
+      - button "ZRO -4.06%" [ref=e192] [cursor=pointer]:
+        - generic [ref=e194]: ZRO
+        - generic [ref=e195]: "-4.06%"
+      - button "BANANA -3.75%" [ref=e197] [cursor=pointer]:
+        - generic [ref=e199]: BANANA
+        - generic [ref=e200]: "-3.75%"
+      - button "PLSX -3.67%" [ref=e202] [cursor=pointer]:
+        - generic [ref=e204]: PLSX
+        - generic [ref=e205]: "-3.67%"
+      - button "ULTIMA -3.31%" [ref=e207] [cursor=pointer]:
+        - generic [ref=e209]: ULTIMA
+        - generic [ref=e210]: "-3.31%"
+  - generic [ref=e212]:
+    - generic [ref=e213]: 🔔
+    - paragraph [ref=e214]: 급등 알림이 차단되어 있어요. 주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 설정해 주세요.
+    - button "닫기" [ref=e215] [cursor=pointer]
+  - banner [ref=e216]:
+    - generic [ref=e217]:
+      - generic [ref=e218]:
+        - generic [ref=e219]: 마켓레이더
+        - navigation [ref=e220]:
+          - button "🏠 홈" [ref=e221] [cursor=pointer]: 🏠 홈
+          - button "🇰🇷 국내" [ref=e223] [cursor=pointer]
+          - button "🇺🇸 미장" [ref=e224] [cursor=pointer]
+          - button "🪙 코인 🔥" [ref=e225] [cursor=pointer]:
+            - text: 🪙 코인
+            - generic [ref=e226]: 🔥
+          - button "📊 ETF" [ref=e227] [cursor=pointer]
+          - button "🔄 섹터" [ref=e228] [cursor=pointer]
+      - generic [ref=e229]:
+        - generic [ref=e230]:
+          - generic [ref=e231]:
+            - generic [ref=e233]: 국장
+            - generic [ref=e234]: 장마감
+          - generic [ref=e235]: "|"
+          - generic [ref=e236]:
+            - generic [ref=e238]: 미장
+            - generic [ref=e239]: 거래중
+        - generic [ref=e240]: ₩1,466USD/KRW
+        - button "다크 모드로 전환" [ref=e241] [cursor=pointer]:
+          - img [ref=e242]
+        - button "새로고침" [ref=e244] [cursor=pointer]:
+          - img [ref=e245]
+          - text: 새로고침
+  - generic [ref=e248]:
+    - generic [ref=e250]:
+      - generic [ref=e251]:
+        - generic [ref=e252]:
+          - generic [ref=e253]:
+            - generic [ref=e254]: ☀️
+            - generic [ref=e255]: 오늘의 마켓 브리핑
+            - generic [ref=e256]: 04/01
+          - button "브리핑 닫기" [ref=e258] [cursor=pointer]:
+            - img [ref=e259]
+        - generic [ref=e263]:
+          - generic [ref=e264]:
+            - text: F&G US 14
+            - generic [ref=e265]: (극도의 공포)
+          - generic [ref=e266]:
+            - text: Crypto 11
+            - generic [ref=e267]: (Extreme Fear)
+        - paragraph [ref=e270]: 코스피 -7.1%, 나스닥 +3.65%, BTC +1.84%.
+      - generic [ref=e271]:
+        - generic [ref=e273]: Market Pulse
+        - generic [ref=e275]:
+          - generic [ref=e276]:
+            - generic [ref=e277]: 시장 지수
+            - generic [ref=e279]: ₩1,466USD/KRW
+          - generic [ref=e280]:
+            - generic [ref=e281]:
+              - generic [ref=e282]: 🇰🇷
+              - generic [ref=e283]: 5,052
+              - generic [ref=e284]: ▼7.10%
+            - generic [ref=e285]:
+              - generic [ref=e286]: 🇰🇷
+              - generic [ref=e287]: 1,052
+              - generic [ref=e288]: ▼7.81%
+            - generic [ref=e289]:
+              - generic [ref=e290]: 🇺🇸
+              - generic [ref=e291]: 6,535
+              - generic [ref=e292]: ▲3.02%
+            - generic [ref=e293]:
+              - generic [ref=e294]: 🇺🇸
+              - generic [ref=e295]: 23,772
+              - generic [ref=e296]: ▲3.57%
+            - generic [ref=e297]:
+              - generic [ref=e298]: 🇺🇸
+              - generic [ref=e299]: 46,360
+              - generic [ref=e300]: ▲2.53%
+            - generic [ref=e301]:
+              - generic [ref=e302]: 🌐
+              - generic [ref=e303]: "99.89"
+              - generic [ref=e304]: ▼0.62%
+      - generic [ref=e305]:
+        - generic [ref=e306]:
+          - generic [ref=e307]: 투자 시그널
+          - generic [ref=e308]: 실시간
+        - generic [ref=e309]:
+          - paragraph [ref=e310]: 시장 데이터를 분석 중입니다. 외국인/기관 매매 동향, 거래량 이상치, 고래 움직임이 감지되면 여기에 표시됩니다.
+          - generic [ref=e311]:
+            - generic [ref=e312]: 🏦 외국인 동향
+            - generic [ref=e313]: 📊 거래량
+            - generic [ref=e314]: 🐋 고래
+      - generic [ref=e316]:
+        - generic [ref=e317]: 시그널 피드
+        - generic [ref=e318]: 시그널 감지 시 실시간 표시
+      - generic [ref=e319]:
+        - generic [ref=e320]:
+          - generic [ref=e321]:
+            - generic [ref=e322]: 주목할 종목
+            - generic [ref=e324]: 마감 포함
+          - generic [ref=e325]: 변동폭 + 거래량 + 뉴스
+        - generic [ref=e328]:
+          - generic [ref=e329] [cursor=pointer]:
+            - generic [ref=e330]:
+              - img "ETH" [ref=e331]
+              - generic [ref=e332]:
+                - generic [ref=e333]: Ethereum
+                - generic [ref=e334]:
+                  - generic [ref=e335]: 코인
+                  - generic [ref=e336]: ETH
+            - generic [ref=e337]: +3.53%
+            - generic [ref=e338]: ₩3,071,321
+            - generic [ref=e339]:
+              - generic [ref=e340]: WHY
+              - paragraph [ref=e341]: 비트코인 1억 원 재돌파·이더리움 상승…리플은 숨 고르기, 공포탐욕지수 ‘47’ 중립권
+            - generic [ref=e342]: 구글뉴스
+            - generic [ref=e343]:
+              - generic [ref=e344]: 큰 변동
+              - generic [ref=e345]: 거래량 TOP
+          - generic [ref=e346] [cursor=pointer]:
+            - generic [ref=e347]:
+              - img "BTC" [ref=e348]
+              - generic [ref=e349]:
+                - generic [ref=e350]: Bitcoin
+                - generic [ref=e351]:
+                  - generic [ref=e352]: 코인
+                  - generic [ref=e353]: BTC
+            - generic [ref=e354]: +1.78%
+            - generic [ref=e355]: ₩99,389,335
+            - generic [ref=e356]:
+              - generic [ref=e357]: WHY
+              - paragraph [ref=e358]: 비트코인 6.7만달러 공방…중동 ‘전쟁 vs 종전’ 소식에 출렁
+            - generic [ref=e359]: 블록미디어
+            - generic [ref=e360]:
+              - generic [ref=e361]: 거래량 TOP
+              - generic [ref=e362]: 뉴스 8건
+          - generic [ref=e363] [cursor=pointer]:
+            - generic [ref=e364]:
+              - img "NIGHT" [ref=e365]
+              - generic [ref=e366]:
+                - generic [ref=e367]: Midnight
+                - generic [ref=e368]:
+                  - generic [ref=e369]: 코인
+                  - generic [ref=e370]: NIGHT
+            - generic [ref=e371]: +10.06%
+            - generic [ref=e372]: ₩70
+            - generic [ref=e373]:
+              - generic [ref=e374]: MOVE
+              - paragraph [ref=e375]: 급등 10.1% — 변동폭 주의
+            - generic [ref=e376]:
+              - generic [ref=e377]: 급변동
+              - generic [ref=e378]: 거래 활발
+          - generic [ref=e379] [cursor=pointer]:
+            - generic [ref=e380]:
+              - img "QQQ" [ref=e381]
+              - generic [ref=e382]:
+                - generic [ref=e383]: Invesco QQQ
+                - generic [ref=e384]:
+                  - generic [ref=e385]: 미장
+                  - generic [ref=e386]: QQQ
+            - generic [ref=e387]: +3.56%
+            - generic [ref=e388]: $578.15
+            - generic [ref=e389]:
+              - generic [ref=e390]: WHY
+              - paragraph [ref=e391]: 뉴욕증시, 종전 기대감에 상승출발…나스닥 1.9%↑
+            - generic [ref=e392]: 한국경제
+            - generic [ref=e393]:
+              - generic [ref=e394]: 큰 변동
+              - generic [ref=e395]: 거래량 TOP
+          - generic [ref=e396] [cursor=pointer]:
+            - generic [ref=e397]:
+              - img "ZEC" [ref=e398]
+              - generic [ref=e399]:
+                - generic [ref=e400]: Zcash
+                - generic [ref=e401]:
+                  - generic [ref=e402]: 코인
+                  - generic [ref=e403]: ZEC
+            - generic [ref=e404]: +13.27%
+            - generic [ref=e405]: ₩374,089
+            - generic [ref=e406]:
+              - generic [ref=e407]: MOVE
+              - paragraph [ref=e408]: 급등 13.3% — 변동폭 주의
+            - generic [ref=e409]:
+              - generic [ref=e410]: 급변동
+              - generic [ref=e411]: 거래 활발
+          - generic [ref=e412] [cursor=pointer]:
+            - generic [ref=e413]:
+              - img "ARKK" [ref=e414]
+              - generic [ref=e415]:
+                - generic [ref=e416]: ARK Innovation
+                - generic [ref=e417]:
+                  - generic [ref=e418]: 미장
+                  - generic [ref=e419]: ARKK
+            - generic [ref=e420]: +6.59%
+            - generic [ref=e421]: $67.70
+            - generic [ref=e422]:
+              - generic [ref=e423]: MOVE
+              - paragraph [ref=e424]: 급등 6.6% — 변동폭 주의
+            - generic [ref=e425]:
+              - generic [ref=e426]: 급변동
+              - generic [ref=e427]: 거래 활발
+          - generic [ref=e428] [cursor=pointer]:
+            - generic [ref=e429]:
+              - img "SOXX" [ref=e430]
+              - generic [ref=e431]:
+                - generic [ref=e432]: iShares Semi
+                - generic [ref=e433]:
+                  - generic [ref=e434]: 미장
+                  - generic [ref=e435]: SOXX
+            - generic [ref=e436]: +6.07%
+            - generic [ref=e437]: $328.58
+            - generic [ref=e438]:
+              - generic [ref=e439]: MOVE
+              - paragraph [ref=e440]: 급등 6.1% — 변동폭 주의
+            - generic [ref=e441]:
+              - generic [ref=e442]: 급변동
+              - generic [ref=e443]: 거래 활발
+      - generic [ref=e444]:
+        - generic [ref=e445]:
+          - generic [ref=e446]: 공포 & 탐욕 지수
+          - generic [ref=e447]: Fear & Greed Index
+        - generic [ref=e448]:
+          - generic [ref=e449]:
+            - generic [ref=e450]:
+              - generic [ref=e451]: 🇰🇷 국장
+              - generic [ref=e452]: VKOSPI
+            - text: 불러오기 실패
+          - generic [ref=e453]:
+            - generic [ref=e454]:
+              - generic [ref=e455]: 🇺🇸 미장
+              - generic [ref=e456]: CNN Money
+            - generic [ref=e459]:
+              - generic [ref=e460]: "14"
+              - generic [ref=e461]: 극단적 공포
+          - generic [ref=e464]:
+            - generic [ref=e465]:
+              - generic [ref=e466]: 🪙 코인
+              - generic [ref=e467]: Alternative.me
+            - generic [ref=e470]:
+              - generic [ref=e471]: "11"
+              - generic [ref=e472]: 극단적 공포
+      - button "📊 CPI CPI 발표 (3월) D-9 +5" [ref=e475] [cursor=pointer]:
+        - generic [ref=e476]: 📊
+        - generic [ref=e477]: CPI
+        - generic [ref=e478]: CPI 발표 (3월)
+        - generic [ref=e479]: D-9
+        - generic [ref=e480]: "+5"
+      - generic [ref=e481]:
+        - generic [ref=e482]:
+          - generic [ref=e483]:
+            - generic [ref=e484]: 관심종목
+            - generic [ref=e485]: / 검색
+          - paragraph [ref=e487]: 관심종목을 추가해보세요 — 인기 종목을 둘러보세요
+          - generic [ref=e488]:
+            - generic [ref=e489]:
+              - generic [ref=e490] [cursor=pointer]:
+                - generic [ref=e491]: COIN
+                - generic [ref=e492]: Bitcoin
+              - generic [ref=e493]:
+                - generic [ref=e494]: ▲1.78%
+                - generic [ref=e495]: ₩99,389,335
+              - button "+" [ref=e496] [cursor=pointer]
+            - generic [ref=e497]:
+              - generic [ref=e498] [cursor=pointer]:
+                - generic [ref=e499]: COIN
+                - generic [ref=e500]: Ethereum
+              - generic [ref=e501]:
+                - generic [ref=e502]: ▲3.53%
+                - generic [ref=e503]: ₩3,071,321
+              - button "+" [ref=e504] [cursor=pointer]
+            - generic [ref=e505]:
+              - generic [ref=e506] [cursor=pointer]:
+                - generic [ref=e507]: KR
+                - generic [ref=e508]: 삼성전자
+              - generic [ref=e509]:
+                - generic [ref=e510]: ▼5.16%
+                - generic [ref=e511]: ₩167,200
+              - button "+" [ref=e512] [cursor=pointer]
+        - generic [ref=e513]:
+          - generic [ref=e514]:
+            - generic [ref=e515]:
+              - generic [ref=e516]: 섹터 자금 흐름
+              - generic [ref=e517]: HOT · COLD
+            - button "섹터 탭에서 상세 →" [ref=e518] [cursor=pointer]
+          - generic [ref=e519]:
+            - generic [ref=e520]:
+              - generic [ref=e521]: HOT
+              - generic [ref=e522]:
+                - button "Privacy +6.2%" [ref=e523] [cursor=pointer]
+                - button "DeFi +3.0%" [ref=e524] [cursor=pointer]
+                - button "Storage +3.0%" [ref=e525] [cursor=pointer]
+                - button "CrossChain +2.3%" [ref=e526] [cursor=pointer]
+                - button "RWA +2.3%" [ref=e527] [cursor=pointer]
+            - generic [ref=e528]:
+              - generic [ref=e529]: COLD
+              - generic [ref=e530]:
+                - button "반도체 -6.4%" [ref=e531] [cursor=pointer]
+                - button "자동차 -4.6%" [ref=e532] [cursor=pointer]
+                - button "2차전지 -4.1%" [ref=e533] [cursor=pointer]
+                - button "금융 -2.9%" [ref=e534] [cursor=pointer]
+                - button "플랫폼 -2.7%" [ref=e535] [cursor=pointer]
+      - generic [ref=e536]:
+        - generic [ref=e537]:
+          - generic [ref=e538]: 급등/급락
+          - generic [ref=e539]:
+            - button "전체" [ref=e540] [cursor=pointer]
+            - button "국내" [ref=e541] [cursor=pointer]
+            - button "미장" [ref=e542] [cursor=pointer]
+            - button "코인" [ref=e543] [cursor=pointer]
+        - generic [ref=e544]:
+          - generic [ref=e545]:
+            - generic [ref=e546]:
+              - generic [ref=e547]:
+                - generic [ref=e548]: 🇰🇷
+                - generic [ref=e549]: 국내 급등
+                - generic [ref=e550]: 장마감
+              - generic [ref=e551]: TOP 5
+            - generic [ref=e552]:
+              - generic [ref=e553]:
+                - generic [ref=e554]: 🌙 장마감
+                - generic [ref=e555]: · 전일 종가 기준
+              - generic [ref=e556] [cursor=pointer]:
+                - generic [ref=e557]: "1"
+                - generic [ref=e558]: "25"
+                - generic [ref=e559]:
+                  - generic [ref=e560]: KODEX 200선물인버스2X
+                  - generic [ref=e561]: "252670"
+                - generic [ref=e562]:
+                  - generic [ref=e563]: ▲8.81%
+                  - generic [ref=e564]: ₩321
+              - generic [ref=e565] [cursor=pointer]:
+                - generic [ref=e566]: "2"
+                - generic [ref=e567]: "41"
+                - generic [ref=e568]:
+                  - generic [ref=e569]: ACE 미국나스닥100
+                  - generic [ref=e570]: "411060"
+                - generic [ref=e571]:
+                  - generic [ref=e572]: ▲1.86%
+                  - generic [ref=e573]: ₩31,540
+              - generic [ref=e574] [cursor=pointer]:
+                - generic [ref=e575]: "3"
+                - generic [ref=e576]: "37"
+                - generic [ref=e577]:
+                  - generic [ref=e578]: KODEX 미국S&P500
+                  - generic [ref=e579]: "379800"
+                - generic [ref=e580]:
+                  - generic [ref=e581]: ▲1.23%
+                  - generic [ref=e582]: ₩22,215
+              - generic [ref=e583] [cursor=pointer]:
+                - generic [ref=e584]: "4"
+                - img "006400" [ref=e585]
+                - generic [ref=e586]:
+                  - generic [ref=e587]: 삼성SDI
+                  - generic [ref=e588]: "006400"
+                - generic [ref=e589]:
+                  - generic [ref=e590]: ▼1.09%
+                  - generic [ref=e591]: ₩408,000
+              - generic [ref=e592] [cursor=pointer]:
+                - generic [ref=e593]: "5"
+                - img "207940" [ref=e594]
+                - generic [ref=e595]:
+                  - generic [ref=e596]: 삼성바이오로직스
+                  - generic [ref=e597]: "207940"
+                - generic [ref=e598]:
+                  - generic [ref=e599]: ▼1.70%
+                  - generic [ref=e600]: ₩1,504,000
+          - generic [ref=e601]:
+            - generic [ref=e602]:
+              - generic [ref=e603]:
+                - generic [ref=e604]: 🇺🇸
+                - generic [ref=e605]: 미장 급등
+              - generic [ref=e606]: TOP 5
+            - generic [ref=e607]:
+              - generic [ref=e608] [cursor=pointer]:
+                - generic [ref=e609]: "1"
+                - img "SOXL" [ref=e610]
+                - generic [ref=e611]:
+                  - generic [ref=e612]: Direxion Semi Bull 3X
+                  - generic [ref=e613]: SOXL
+                - generic [ref=e614]:
+                  - generic [ref=e615]: ▲18.00%
+                  - generic [ref=e616]: ₩70,265
+              - generic [ref=e617] [cursor=pointer]:
+                - generic [ref=e618]: "2"
+                - generic [ref=e619]: CO
+                - generic [ref=e620]:
+                  - generic [ref=e621]: GraniteShares 2x Long COIN
+                  - generic [ref=e622]: CONL
+                - generic [ref=e623]:
+                  - generic [ref=e624]: ▲17.67%
+                  - generic [ref=e625]: ₩10,350
+              - generic [ref=e626] [cursor=pointer]:
+                - generic [ref=e627]: "3"
+                - img "TQQQ" [ref=e628]
+                - generic [ref=e629]:
+                  - generic [ref=e630]: ProShares UltraPro QQQ
+                  - generic [ref=e631]: TQQQ
+                - generic [ref=e632]:
+                  - generic [ref=e633]: ▲10.60%
+                  - generic [ref=e634]: ₩61,433
+              - generic [ref=e635] [cursor=pointer]:
+                - generic [ref=e636]: "4"
+                - img "TSLL" [ref=e637]
+                - generic [ref=e638]:
+                  - generic [ref=e639]: Direxion Daily TSLA Bull 2X
+                  - generic [ref=e640]: TSLL
+                - generic [ref=e641]:
+                  - generic [ref=e642]: ▲9.93%
+                  - generic [ref=e643]: ₩17,937
+              - generic [ref=e644] [cursor=pointer]:
+                - generic [ref=e645]: "5"
+                - generic [ref=e646]: ET
+                - generic [ref=e647]:
+                  - generic [ref=e648]: 2x Ether ETF
+                  - generic [ref=e649]: ETHU
+                - generic [ref=e650]:
+                  - generic [ref=e651]: ▲7.50%
+                  - generic [ref=e652]: ₩32,794
+          - generic [ref=e653]:
+            - generic [ref=e654]:
+              - generic [ref=e655]:
+                - generic [ref=e656]: 🪙
+                - generic [ref=e657]: 코인 급등
+              - generic [ref=e658]: TOP 5
+            - generic [ref=e659]:
+              - generic [ref=e660] [cursor=pointer]:
+                - generic [ref=e661]: "1"
+                - img "USDA" [ref=e662]
+                - generic [ref=e663]:
+                  - generic [ref=e664]: USDA
+                  - generic [ref=e665]: USDA
+                - generic [ref=e666]:
+                  - generic [ref=e667]: ▲369.21%
+                  - generic [ref=e668]: ₩1,443
+              - generic [ref=e669] [cursor=pointer]:
+                - generic [ref=e670]: "2"
+                - img "ZEC" [ref=e671]
+                - generic [ref=e672]:
+                  - generic [ref=e673]: Zcash
+                  - generic [ref=e674]: ZEC
+                - generic [ref=e675]:
+                  - generic [ref=e676]: ▲13.27%
+                  - generic [ref=e677]: ₩374,089
+              - generic [ref=e678] [cursor=pointer]:
+                - generic [ref=e679]: "3"
+                - img "ALGO" [ref=e680]
+                - generic [ref=e681]:
+                  - generic [ref=e682]: Algorand
+                  - generic [ref=e683]: ALGO
+                - generic [ref=e684]:
+                  - generic [ref=e685]: ▲12.44%
+                  - generic [ref=e686]: ₩136
+              - generic [ref=e687] [cursor=pointer]:
+                - generic [ref=e688]: "4"
+                - img "NIGHT" [ref=e689]
+                - generic [ref=e690]:
+                  - generic [ref=e691]: Midnight
+                  - generic [ref=e692]: NIGHT
+                - generic [ref=e693]:
+                  - generic [ref=e694]: ▲10.06%
+                  - generic [ref=e695]: ₩70
+              - generic [ref=e696] [cursor=pointer]:
+                - generic [ref=e697]: "5"
+                - img "2Z" [ref=e698]
+                - generic [ref=e699]:
+                  - generic [ref=e700]: DoubleZero
+                  - generic [ref=e701]: 2Z
+                - generic [ref=e702]:
+                  - generic [ref=e703]: ▲9.87%
+                  - generic [ref=e704]: ₩117
+        - generic [ref=e705]:
+          - generic [ref=e706]:
+            - generic [ref=e707]:
+              - generic [ref=e708]:
+                - generic [ref=e709]: 🇰🇷
+                - generic [ref=e710]: 국내 급락
+                - generic [ref=e711]: 장마감
+              - generic [ref=e712]: TOP 5
+            - generic [ref=e713]:
+              - generic [ref=e714]:
+                - generic [ref=e715]: 🌙 장마감
+                - generic [ref=e716]: · 전일 종가 기준
+              - generic [ref=e717] [cursor=pointer]:
+                - generic [ref=e718]: "1"
+                - generic [ref=e719]: "12"
+                - generic [ref=e720]:
+                  - generic [ref=e721]: KODEX 레버리지
+                  - generic [ref=e722]: "122630"
+                - generic [ref=e723]:
+                  - generic [ref=e724]: ▼8.76%
+                  - generic [ref=e725]: ₩66,510
+              - generic [ref=e726] [cursor=pointer]:
+                - generic [ref=e727]: "2"
+                - img "000660" [ref=e728]
+                - generic [ref=e729]:
+                  - generic [ref=e730]: SK하이닉스
+                  - generic [ref=e731]: "000660"
+                - generic [ref=e732]:
+                  - generic [ref=e733]: ▼7.56%
+                  - generic [ref=e734]: ₩807,000
+              - generic [ref=e735] [cursor=pointer]:
+                - generic [ref=e736]: "3"
+                - img "051910" [ref=e737]
+                - generic [ref=e738]:
+                  - generic [ref=e739]: LG화학
+                  - generic [ref=e740]: "051910"
+                - generic [ref=e741]:
+                  - generic [ref=e742]: ▼7.14%
+                  - generic [ref=e743]: ₩299,000
+              - generic [ref=e744] [cursor=pointer]:
+                - generic [ref=e745]: "4"
+                - img "005930" [ref=e746]
+                - generic [ref=e747]:
+                  - generic [ref=e748]: 삼성전자
+                  - generic [ref=e749]: "005930"
+                - generic [ref=e750]:
+                  - generic [ref=e751]: ▼5.16%
+                  - generic [ref=e752]: ₩167,200
+              - generic [ref=e753] [cursor=pointer]:
+                - generic [ref=e754]: "5"
+                - img "005380" [ref=e755]
+                - generic [ref=e756]:
+                  - generic [ref=e757]: 현대차
+                  - generic [ref=e758]: "005380"
+                - generic [ref=e759]:
+                  - generic [ref=e760]: ▼5.11%
+                  - generic [ref=e761]: ₩445,500
+          - generic [ref=e762]:
+            - generic [ref=e763]:
+              - generic [ref=e764]:
+                - generic [ref=e765]: 🇺🇸
+                - generic [ref=e766]: 미장 급락
+              - generic [ref=e767]: TOP 5
+            - generic [ref=e768]:
+              - generic [ref=e769] [cursor=pointer]:
+                - generic [ref=e770]: "1"
+                - img "SOXS" [ref=e771]
+                - generic [ref=e772]:
+                  - generic [ref=e773]: Direxion Semi Bear 3X
+                  - generic [ref=e774]: SOXS
+                - generic [ref=e775]:
+                  - generic [ref=e776]: ▼18.11%
+                  - generic [ref=e777]: ₩58,515
+              - generic [ref=e778] [cursor=pointer]:
+                - generic [ref=e779]: "2"
+                - generic [ref=e780]: SB
+                - generic [ref=e781]:
+                  - generic [ref=e782]: ProShares Short Bitcoin
+                  - generic [ref=e783]: SBIT
+                - generic [ref=e784]:
+                  - generic [ref=e785]: ▼4.00%
+                  - generic [ref=e786]: ₩83,371
+              - generic [ref=e787] [cursor=pointer]:
+                - generic [ref=e788]: "3"
+                - img "IEF" [ref=e789]
+                - generic [ref=e790]:
+                  - generic [ref=e791]: iShares 7-10Y
+                  - generic [ref=e792]: IEF
+                - generic [ref=e793]:
+                  - generic [ref=e794]: ▲0.39%
+                  - generic [ref=e795]: ₩140,204
+              - generic [ref=e796] [cursor=pointer]:
+                - generic [ref=e797]: "4"
+                - img "TLT" [ref=e798]
+                - generic [ref=e799]:
+                  - generic [ref=e800]: iShares 20Y+ Treasury
+                  - generic [ref=e801]: TLT
+                - generic [ref=e802]:
+                  - generic [ref=e803]: ▲0.39%
+                  - generic [ref=e804]: ₩127,711
+              - generic [ref=e805] [cursor=pointer]:
+                - generic [ref=e806]: "5"
+                - img "XLV" [ref=e807]
+                - generic [ref=e808]:
+                  - generic [ref=e809]: Health Care Select SPDR
+                  - generic [ref=e810]: XLV
+                - generic [ref=e811]:
+                  - generic [ref=e812]: ▲1.93%
+                  - generic [ref=e813]: ₩214,916
+          - generic [ref=e814]:
+            - generic [ref=e815]:
+              - generic [ref=e816]:
+                - generic [ref=e817]: 🪙
+                - generic [ref=e818]: 코인 급락
+              - generic [ref=e819]: TOP 5
+            - generic [ref=e820]:
+              - generic [ref=e821] [cursor=pointer]:
+                - generic [ref=e822]: "1"
+                - img "SIREN" [ref=e823]
+                - generic [ref=e824]:
+                  - generic [ref=e825]: Siren
+                  - generic [ref=e826]: SIREN
+                - generic [ref=e827]:
+                  - generic [ref=e828]: ▼53.68%
+                  - generic [ref=e829]: ₩1,194
+              - generic [ref=e830] [cursor=pointer]:
+                - generic [ref=e831]: "2"
+                - img "TWT" [ref=e832]
+                - generic [ref=e833]:
+                  - generic [ref=e834]: Trust Wallet Token
+                  - generic [ref=e835]: TWT
+                - generic [ref=e836]:
+                  - generic [ref=e837]: ▼15.57%
+                  - generic [ref=e838]: ₩527
+              - generic [ref=e839] [cursor=pointer]:
+                - generic [ref=e840]: "3"
+                - img "KITE" [ref=e841]
+                - generic [ref=e842]:
+                  - generic [ref=e843]: Kite
+                  - generic [ref=e844]: KITE
+                - generic [ref=e845]:
+                  - generic [ref=e846]: ▼10.25%
+                  - generic [ref=e847]: ₩227
+              - generic [ref=e848] [cursor=pointer]:
+                - generic [ref=e849]: "4"
+                - img "AB" [ref=e850]
+                - generic [ref=e851]:
+                  - generic [ref=e852]: AB (prev. Newton)
+                  - generic [ref=e853]: AB
+                - generic [ref=e854]:
+                  - generic [ref=e855]: ▼6.94%
+                  - generic [ref=e856]: ₩2
+              - generic [ref=e857] [cursor=pointer]:
+                - generic [ref=e858]: "5"
+                - img "GOMINING" [ref=e859]
+                - generic [ref=e860]:
+                  - generic [ref=e861]: GoMining Token
+                  - generic [ref=e862]: GOMINING
+                - generic [ref=e863]:
+                  - generic [ref=e864]: ▼5.84%
+                  - generic [ref=e865]: ₩422
+      - generic [ref=e866]:
+        - generic [ref=e867]:
+          - generic [ref=e868]: 시장을 움직이는 뉴스
+          - generic [ref=e869]: 24시간 이내
+        - generic [ref=e870] [cursor=pointer]:
+          - generic [ref=e871]: "1"
+          - generic [ref=e872]:
+            - generic [ref=e873]:
+              - generic [ref=e874]: COIN
+              - generic [ref=e875]: 15분 전
+            - paragraph [ref=e876]: 비트코인 6.7만달러 공방…중동 ‘전쟁 vs 종전’ 소식에 출렁
+            - paragraph [ref=e877]: "[멕시코=심영재 특파원] 비트코인이 6만7000달러선을 중심으로 등락을 거듭하는 가운데, 지정학적 긴장과 완화 기대가 교차하며 디지털자산(가상자산) 시장이 뚜렷한 방향성 없이 박스권 흐름을 이어가고 있다. 월말을 앞두고 단기 변동성은 확대됐지만, 결과적으로는 소폭 상승에 성공하며 시장은 ‘저점 형성’ 기대와 불확실성이 공존하는 국면에 진입했다. 비트코인 6"
+            - generic [ref=e879]:
+              - generic [ref=e880]: Bitcoi
+              - generic [ref=e881]: 관련
+              - generic [ref=e882]: +1.8%
+        - generic [ref=e883] [cursor=pointer]:
+          - generic [ref=e884]: "2"
+          - generic [ref=e885]:
+            - generic [ref=e886]:
+              - generic [ref=e887]: COIN
+              - generic [ref=e888]: 1시간 전
+            - paragraph [ref=e889]: 이란 “보장 없인 휴전 없다”…비트코인 ‘종전 기대’에 베팅
+            - paragraph [ref=e890]: "[멕시코=심영재 특파원] 이란이 전쟁 종료 조건을 재확인한 가운데, 중동 긴장 완화 기대가 반영되며 비트코인이 반등했다. 마수드 페제시키안 이란 대통령은 전쟁 종료는 국민의 안전과 국가 이익이 보장되는 조건에서만 가능하다고 밝혔다. 지난 30일(현지시각) 이란 관영매체 IRNA 보도에 따르면 페제시키안 대통령은 “전쟁을 끝내기 위한 어떤 결정도 국민의 안전"
+            - generic [ref=e892]:
+              - generic [ref=e893]: Bitcoi
+              - generic [ref=e894]: 관련
+              - generic [ref=e895]: +1.8%
+        - generic [ref=e896] [cursor=pointer]:
+          - generic [ref=e897]: "3"
+          - generic [ref=e898]:
+            - generic [ref=e899]:
+              - generic [ref=e900]: COIN
+              - generic [ref=e901]: 1시간 전
+            - paragraph [ref=e902]: “전쟁 곧 끝난다” 트럼프 한마디에…달러·원 1510원대 ‘수직 낙하’
+            - paragraph [ref=e903]: "[멕시코=심영재 특파원] 이란 전쟁 종료 기대감이 확산되면서 달러·원 환율이 급락했다. 글로벌 달러 약세와 유가 안정 기대가 동시에 반영된 결과다. 특히 도널드 트럼프 미국 대통령의 발언과 이란 측의 유화적 입장이 맞물리며 외환시장의 변동성이 확대됐다. 트레이딩뷰에 따르면 한국시간으로 1일 새벽 2시 기준 환율은 1515.70원에 마감하며 서울 종가 대비"
+        - generic [ref=e904] [cursor=pointer]:
+          - generic [ref=e905]: "4"
+          - generic [ref=e906]:
+            - generic [ref=e907]:
+              - generic [ref=e908]: COIN
+              - generic [ref=e909]: 1시간 전
+            - paragraph [ref=e910]: 비트코인 6만7000달러대 하락
+            - generic [ref=e912]:
+              - generic [ref=e913]: Bitcoi
+              - generic [ref=e914]: 관련
+              - generic [ref=e915]: +1.8%
+        - generic [ref=e916] [cursor=pointer]:
+          - generic [ref=e917]: "5"
+          - generic [ref=e918]:
+            - generic [ref=e919]:
+              - generic [ref=e920]: 속보
+              - generic [ref=e921]: COIN
+              - generic [ref=e922]: 🔴 속보
+              - generic [ref=e923]: ⚠️ 급락
+              - generic [ref=e924]: 🔴 악재
+              - generic [ref=e925]: 1시간 전
+            - paragraph [ref=e926]: “달러 버리고 금 산다”… 피터 시프, 미 재정 신뢰 붕괴 경고
+            - paragraph [ref=e927]: "[멕시코=심영재 특파원] 금 가격이 4600달러를 돌파한 가운데 피터 시프가 달러 신뢰 약화와 탈달러화 가속을 경고했다. 지정학적 긴장이 귀금속 강세를 더욱 강화하고 있다는 분석이다. 시프는 미국이 부채 증가, 금리 상승, 인플레이션, 경기 침체로 이어지는 악순환에 직면할 수 있다고 주장했다. 31일(현지시각) 피터 시프는 X(옛 트위터)를 통해 “전쟁이"
+      - generic [ref=e928]:
+        - generic [ref=e929]:
+          - generic [ref=e930]: 오늘의 타임라인
+          - generic [ref=e931]: 시간순
+        - generic [ref=e933]:
+          - generic [ref=e934]: 오전 02:53
+          - generic [ref=e937]:
+            - generic [ref=e938]: 📰
+            - paragraph [ref=e939]: “달러 버리고 금 산다”… 피터 시프, 미 재정 신뢰 붕괴 경고
+    - generic [ref=e941]:
+      - generic [ref=e943]:
+        - button "전체" [ref=e944] [cursor=pointer]
+        - button "국내" [ref=e945] [cursor=pointer]
+        - button "미장" [ref=e946] [cursor=pointer]
+        - button "코인" [ref=e947] [cursor=pointer]
+        - button "🐋 고래" [ref=e948] [cursor=pointer]
+      - generic [ref=e949]:
+        - generic [ref=e951]: 투자 뉴스 · 5분 갱신
+        - generic [ref=e952]: 25건
+      - generic [ref=e953]:
+        - generic [ref=e954] [cursor=pointer]:
+          - generic [ref=e955]:
+            - generic [ref=e956]: 주요
+            - generic [ref=e957]: COIN
+            - generic [ref=e958]: 1시간 전
+          - generic [ref=e959]:
+            - generic [ref=e960]: 🔴 속보
+            - generic [ref=e961]: ⚠️ 급락
+            - generic [ref=e962]: ⚡ 속보
+            - generic [ref=e963]: 🔴 악재
+          - generic [ref=e964]: “달러 버리고 금 산다”… 피터 시프, 미 재정 신뢰 붕괴 경고
+          - paragraph [ref=e965]: "[멕시코=심영재 특파원] 금 가격이 4600달러를 돌파한 가운데 피터 시프가 달러 신뢰 약화와 탈달러화 가속을 경고했다. 지정학적 긴장이 귀금속 강세를 더욱 강화하고 있다는 분석이다. 시프는 미국이 부채 증가, 금리 상승, 인플레이션, 경기 침체로 이어지는 악순환에 직면할 수 있다고 주장했다. 31일(현지시각) 피터 시프는 X(옛 트위터)를 통해 “전쟁이"
+        - generic [ref=e966] [cursor=pointer]:
+          - generic [ref=e967]:
+            - generic [ref=e968]: COIN
+            - generic [ref=e969]: 15분 전
+          - generic [ref=e970]: 비트코인 6.7만달러 공방…중동 ‘전쟁 vs 종전’ 소식에 출렁
+          - paragraph [ref=e971]: "[멕시코=심영재 특파원] 비트코인이 6만7000달러선을 중심으로 등락을 거듭하는 가운데, 지정학적 긴장과 완화 기대가 교차하며 디지털자산(가상자산) 시장이 뚜렷한 방향성 없이 박스권 흐름을 이어가고 있다. 월말을 앞두고 단기 변동성은 확대됐지만, 결과적으로는 소폭 상승에 성공하며 시장은 ‘저점 형성’ 기대와 불확실성이 공존하는 국면에 진입했다. 비트코인 6"
+          - generic [ref=e973]: "#비트코인"
+        - generic [ref=e974] [cursor=pointer]:
+          - generic [ref=e975]:
+            - generic [ref=e976]: COIN
+            - generic [ref=e977]: 1시간 전
+          - generic [ref=e978]: 이란 “보장 없인 휴전 없다”…비트코인 ‘종전 기대’에 베팅
+          - paragraph [ref=e979]: "[멕시코=심영재 특파원] 이란이 전쟁 종료 조건을 재확인한 가운데, 중동 긴장 완화 기대가 반영되며 비트코인이 반등했다. 마수드 페제시키안 이란 대통령은 전쟁 종료는 국민의 안전과 국가 이익이 보장되는 조건에서만 가능하다고 밝혔다. 지난 30일(현지시각) 이란 관영매체 IRNA 보도에 따르면 페제시키안 대통령은 “전쟁을 끝내기 위한 어떤 결정도 국민의 안전"
+          - generic [ref=e981]: "#비트코인"
+        - generic [ref=e982] [cursor=pointer]:
+          - generic [ref=e983]:
+            - generic [ref=e984]: COIN
+            - generic [ref=e985]: 1시간 전
+          - generic [ref=e986]: “전쟁 곧 끝난다” 트럼프 한마디에…달러·원 1510원대 ‘수직 낙하’
+          - paragraph [ref=e987]: "[멕시코=심영재 특파원] 이란 전쟁 종료 기대감이 확산되면서 달러·원 환율이 급락했다. 글로벌 달러 약세와 유가 안정 기대가 동시에 반영된 결과다. 특히 도널드 트럼프 미국 대통령의 발언과 이란 측의 유화적 입장이 맞물리며 외환시장의 변동성이 확대됐다. 트레이딩뷰에 따르면 한국시간으로 1일 새벽 2시 기준 환율은 1515.70원에 마감하며 서울 종가 대비"
+        - generic [ref=e988] [cursor=pointer]:
+          - generic [ref=e989]:
+            - generic [ref=e990]: COIN
+            - generic [ref=e991]: 1시간 전
+          - generic [ref=e992]: 비트코인 6만7000달러대 하락
+          - generic [ref=e994]: "#비트코인"
+        - generic [ref=e995] [cursor=pointer]:
+          - generic [ref=e996]:
+            - generic [ref=e997]: KR
+            - generic [ref=e998]: 2시간 전
+          - generic [ref=e999]:
+            - generic [ref=e1000]: ⚠️ 급락
+            - generic [ref=e1001]: 🔴 악재
+          - generic [ref=e1002]: 달러-원, 이란 전쟁 종전 기대감에 급락…1,517.00원 마감
+          - paragraph [ref=e1003]: (서울=연합뉴스) 김성진 연합인포맥스 기자 = 달러-원 환율은 야간 거래에서 이란 전쟁 종전 기대감에 급락했다.
+        - generic [ref=e1004] [cursor=pointer]:
+          - generic [ref=e1005]:
+            - generic [ref=e1006]: COIN
+            - generic [ref=e1007]: 2시간 전
+          - generic [ref=e1008]: 비트코인 6만8000달러대 상승
+          - generic [ref=e1010]: "#비트코인"
+        - generic [ref=e1011] [cursor=pointer]:
+          - generic [ref=e1012]:
+            - generic [ref=e1013]: COIN
+            - generic [ref=e1014]: 2시간 전
+          - generic [ref=e1016]: 🏛 정책
+          - generic [ref=e1017]: 다이먼 “정책 실패가 발목”…JP모건 ‘아메리칸 드림’ 가동
+          - paragraph [ref=e1018]: "[멕시코=심영재 특파원] JP모건이 소상공인, 주택 구매, 의료 접근성 확대를 지원하는 ‘아메리칸 드림 이니셔티브’를 발표했다. 미국 경제의 구조적 정체를 해소하기 위한 민간 주도의 대규모 프로젝트다. 제이미 다이먼 CEO는 미국이 정책 실패로 성장 동력을 잃고 있다며, 은행 차원의 직접 개입 필요성을 강조했다. 31일(현지시각) 월스트리트저널(WSJ)에"
+        - generic [ref=e1019] [cursor=pointer]:
+          - generic [ref=e1020]:
+            - generic [ref=e1021]: COIN
+            - generic [ref=e1022]: 2시간 전
+          - generic [ref=e1023]: 리플-콘베라 맞손… ‘스테이블코인’으로 기업 결제 혁신
+          - paragraph [ref=e1024]: "[멕시코=심영재 특파원] 리플이 글로벌 결제 기업 콘베라와 협력해 기업용 크로스보더 결제 시장 확대에 나선다. 스테이블코인을 활용한 중간 결제 구조를 통해 속도와 유동성을 개선한다는 전략이다. 전통 금융 인프라와 블록체인 결제 기술을 결합한 ‘하이브리드 결제 모델’이 기업 자금 운영의 새로운 대안으로 부상하고 있다. 31일(현지시각) 리플은 콘베라와 파트너"
+          - generic [ref=e1026]: "#리플"
+        - generic [ref=e1027] [cursor=pointer]:
+          - generic [ref=e1028]:
+            - generic [ref=e1029]: COIN
+            - generic [ref=e1030]: 3시간 전
+          - generic [ref=e1032]: ⚡ 신제품
+          - generic [ref=e1033]: 비트겟 ‘AI 에이전트 허브’ 공개…분석부터 주문까지 ‘원스톱’
+          - paragraph [ref=e1034]: "[멕시코=심영재 특파원] 비트겟이 AI 기반 트레이딩 플랫폼 ‘에이전트 허브’를 확장하며 시장 분석부터 거래 실행까지 하나의 시스템으로 통합했다. 복잡한 데이터 처리 과정을 줄이고 실행 속도를 높이겠다는 전략이다. 이번 업데이트는 AI를 단순 보조 도구가 아닌 거래 인프라 핵심으로 끌어올렸다는 점에서 주목된다. 31일(현지시각) 코인게이프에 따르면 비트겟은"
+        - generic [ref=e1035] [cursor=pointer]:
+          - generic [ref=e1036]:
+            - generic [ref=e1037]: COIN
+            - generic [ref=e1038]: 3시간 전
+          - generic [ref=e1039]: 구글 연구에 시장 긴장⋯양자 리스크 전면 부상
+          - paragraph [ref=e1040]: "[멕시코=심영재 특파원] 비트코인이 중동발 거시 경제 불안에 이어 이번에는 양자컴퓨터라는 위협과 마주했다. 시장은 단순한 가격 조정을 넘어 비트코인의 암호 체계가 언제까지 안전한지, 네트워크가 그 전에 대응할 수 있는지를 본격적으로 묻기 시작했다. 31일(현지시각) 코인데스크에 따르면 구글과 칼텍·오라토믹의 새 연구는 비트코인과 이더리움의 기존 암호 체계를"
+          - generic [ref=e1042]: "#구글"
+        - generic [ref=e1043] [cursor=pointer]:
+          - generic [ref=e1044]:
+            - generic [ref=e1045]: KR
+            - generic [ref=e1046]: 4시간 전
+          - generic [ref=e1047]:
+            - generic [ref=e1048]: 📊 지표
+            - generic [ref=e1049]: 🏦 거시
+          - generic [ref=e1050]: “매·비둘기 구분 적절치 않아”…한은 총재후보, 금리에 ‘신중’
+          - paragraph [ref=e1051]: 신현송 한은 총재 후보 첫 출근신현송 한국은행 총재 후보자가 달러 유동성이 충분하기 때문에 현재 환율에 대해 크게 우려할 필요가 없다고 31일 강조했다. 또 일각에서 ‘실용적 매파..
+        - generic [ref=e1052] [cursor=pointer]:
+          - generic [ref=e1053]:
+            - generic [ref=e1054]: US
+            - generic [ref=e1055]: 5시간 전
+          - generic [ref=e1056]: 뉴욕증시, 종전 기대감에 상승출발…나스닥 1.9%↑
+        - generic [ref=e1057] [cursor=pointer]:
+          - generic [ref=e1058]:
+            - generic [ref=e1059]: US
+            - generic [ref=e1060]: 5시간 전
+          - generic [ref=e1061]: 뉴욕증시, 종전 기대감에 상승 출발…다우 1.12%↑
+          - paragraph [ref=e1062]: 도널드 트럼프 미국 대통령이 호르무즈 해협 개방 없이 전쟁을 끝낼 의사를 밝혔다는 보도가 나오면서 뉴욕증시가 상승 출발했다. 31일(현지 시간) 뉴욕증권거래소(NYSE)에 따르면 ..
+        - generic [ref=e1063] [cursor=pointer]:
+          - generic [ref=e1064]:
+            - generic [ref=e1065]: KR
+            - generic [ref=e1066]: 5시간 전
+          - generic [ref=e1067]:
+            - generic [ref=e1068]: 📋 공시
+            - generic [ref=e1069]: 🏢 공시
+          - generic [ref=e1070]: “데뷔날에 온동네 초상집”…두산그룹ETF, 상장 첫날 3.7% 빠져
+          - paragraph [ref=e1071]: 인공지능(AI) 시대에 주목받고 있는 두산그룹 주요 계열사와 핵심 협력사에 집중 투자하는 ‘WON 두산그룹포커스’ 상장지수펀드(ETF)가 상장 첫날 호된 신고식을 치렀다. 31일 ..
+        - generic [ref=e1072] [cursor=pointer]:
+          - generic [ref=e1073]:
+            - generic [ref=e1074]: KR
+            - generic [ref=e1075]: 7시간 전
+          - generic [ref=e1077]: ⚠️ 급락
+          - generic [ref=e1078]: “샤워기 앞에 서 있지 마”…유가 충격, 동네 목욕탕도 못 피했다는데
+          - paragraph [ref=e1079]: 중동 정세 불안에 따른 국제유가 상승 여파가 일본 서민생활 전반으로 확산하고 있는 모양새다. 보일러 연료로 쓰이는 중유 가격이 급등하면서 대중목욕탕 ‘센토’가 직격탄을 맞으면서다...
+        - generic [ref=e1080] [cursor=pointer]:
+          - generic [ref=e1081]:
+            - generic [ref=e1082]: KR
+            - generic [ref=e1083]: 8시간 전
+          - generic [ref=e1084]: 외국계 금융기관 "WGBI편입, 500억∼600억달러 신규자금 유입할듯"
+          - paragraph [ref=e1085]: (세종=연합뉴스) 안채원 기자 = 허장 재정경제부 2차관은 31일 정부서울청사에서 외국계 금융기관과 국고채 전문딜러(PD)들을 대상으로 간담회를...
+        - generic [ref=e1086] [cursor=pointer]:
+          - generic [ref=e1087]:
+            - generic [ref=e1088]: KR
+            - generic [ref=e1089]: 9시간 전
+          - generic [ref=e1090]:
+            - generic [ref=e1091]: 📋 공시
+            - generic [ref=e1092]: 🏢 공시
+          - generic [ref=e1093]: 유투바이오, 59억원 유상증자…이수지에 제3자배정
+          - paragraph [ref=e1094]: (서울=연합뉴스) 코스닥 상장사 유투바이오[221800]는 타법인증권취득자금 약 59억원을 조달하고자 제3자배정 유상증자를 결정했다고 31일 공...
+        - generic [ref=e1095] [cursor=pointer]:
+          - generic [ref=e1096]:
+            - generic [ref=e1097]: KR
+            - generic [ref=e1098]: 10시간 전
+          - generic [ref=e1099]:
+            - generic [ref=e1100]: 📋 공시
+            - generic [ref=e1101]: 🏢 공시
+          - generic [ref=e1102]: 삼익악기 "미국 계열사 주식 151억원에 추가취득…지분율 100%"
+          - paragraph [ref=e1103]: (서울=연합뉴스) 코스피 상장사 삼익악기[002450]는 미국의 악기판매업 계열사(SAMICK MUSIC)의 주식 5만주를 약 151억원에 추가...
+        - generic [ref=e1104] [cursor=pointer]:
+          - generic [ref=e1105]:
+            - generic [ref=e1106]: KR
+            - generic [ref=e1107]: 10시간 전
+          - generic [ref=e1108]: HS효성첨단소재 "벨기에 계열사 주식 1천40억원에 취득"
+          - paragraph [ref=e1109]: (서울=연합뉴스) 코스피 상장사 HS효성첨단소재[298050]는 벨기에의 이차전지소재 및 전지 관련 연구, 제조 및 판매 계열사(Extra Mi...
+        - generic [ref=e1110] [cursor=pointer]:
+          - generic [ref=e1111]:
+            - generic [ref=e1112]: KR
+            - generic [ref=e1113]: 10시간 전
+          - generic [ref=e1114]:
+            - generic [ref=e1115]: 📋 공시
+            - generic [ref=e1116]: 🏢 공시
+          - generic [ref=e1117]: KS인더스트리 "인스코비 주식 100억원어치 취득…지분율 13.7%"
+          - paragraph [ref=e1118]: (서울=연합뉴스) 코스닥 상장사 KS인더스트리[101000]는 MVNO(알뜰폰) 업체 인스코비의 주식 2천만주를 100억원에 취득한다고 31일 ...
+        - generic [ref=e1119] [cursor=pointer]:
+          - generic [ref=e1120]:
+            - generic [ref=e1121]: COIN
+            - generic [ref=e1122]: 13시간 전
+          - generic [ref=e1123]:
+            - generic [ref=e1124]: 📊 지표
+            - generic [ref=e1125]: 🏦 거시
+          - generic [ref=e1126]: 투자자 30% "금리 상관없이 BTC 오른다"...이번주 전망은 '하락' 우세
+        - generic [ref=e1127] [cursor=pointer]:
+          - generic [ref=e1128]:
+            - generic [ref=e1129]: COIN
+            - generic [ref=e1130]: 17시간 전
+          - generic [ref=e1131]:
+            - generic [ref=e1132]: 🚀 급등
+            - generic [ref=e1133]: ⚠️ 급락
+          - generic [ref=e1134]: 비트코인 1억 원 재돌파·이더리움 상승…리플은 숨 고르기, 공포탐욕지수 ‘47’ 중립권
+          - generic [ref=e1135]:
+            - generic [ref=e1136]: "#비트코인"
+            - generic [ref=e1137]: "#이더리움"
+            - generic [ref=e1138]: "#리플"
+        - generic [ref=e1139] [cursor=pointer]:
+          - generic [ref=e1140]:
+            - generic [ref=e1141]: KR
+            - generic [ref=e1142]: 1일 전
+          - generic [ref=e1143]:
+            - generic [ref=e1144]: ⚠️ 급락
+            - generic [ref=e1145]: 🔴 악재
+          - generic [ref=e1146]: 삼천당제약 셀트리온 알테오젠 한올바이오파마 바이넥스 ‘엇갈린 흐름’…미 증시 급락 여파에 바이오주 전반 약세
+          - generic [ref=e1147]:
+            - generic [ref=e1148]: "#셀트리온"
+            - generic [ref=e1149]: "#알테오젠"
+        - generic [ref=e1150] [cursor=pointer]:
+          - generic [ref=e1151]:
+            - generic [ref=e1152]: COIN
+            - generic [ref=e1153]: 1일 전
+          - generic [ref=e1154]: 비트코인·이더리움 '장중 낙폭 축소'...향후 전망은?
+          - generic [ref=e1155]:
+            - generic [ref=e1156]: "#비트코인"
+            - generic [ref=e1157]: "#이더리움"
+```

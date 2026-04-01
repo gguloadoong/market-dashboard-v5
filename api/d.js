@@ -30,8 +30,8 @@
 //   pc = pcr            (Put/Call Ratio)
 //   fr = funding-rate   (펀딩비 + OI)
 //   of = order-flow     (주문장 불균형)
-//   social = social     (소셜 감성)
-//   debate = ai-debate  (AI 종목토론)
+//   sc = social         (소셜 감성)
+//   db = ai-debate      (AI 종목토론)
 
 export const config = { runtime: 'edge' };
 
@@ -262,11 +262,11 @@ export default async function handler(request) {
         const sym = body.s || 'BTCUSDT';
         return orderFlowHandler(makeEdgeRequest(baseUrl, `/api/order-flow?symbol=${sym}`));
       }
-      case 'social': {
+      case 'sc': {
         const sym = body.s || 'AAPL';
         return socialHandler(makeEdgeRequest(baseUrl, `/api/social?symbol=${encodeURIComponent(sym)}`));
       }
-      case 'debate': {
+      case 'db': {
         // ai-debate는 POST body를 그대로 전달
         return aiDebateHandler(new Request(`${baseUrl}/api/ai-debate`, {
           method: 'POST',

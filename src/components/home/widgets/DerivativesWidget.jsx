@@ -2,6 +2,19 @@
 import { useState, useEffect } from 'react';
 import { fetchPCR, fetchFundingRate } from '../../../api/_gateway';
 
+function FundingBadge({ data, label }) {
+  if (!data?.ratePercent) return null;
+  const r = data.ratePercent;
+  const color = r > 0.05 ? '#F04452' : r < -0.05 ? '#2AC769' : '#8B95A1';
+  const sign = r > 0 ? '+' : '';
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[11px] text-[#8B95A1]">{label} 펀딩비</span>
+      <span className="text-[11px] font-bold" style={{ color }}>{sign}{r.toFixed(3)}%</span>
+    </div>
+  );
+}
+
 export default function DerivativesWidget() {
   const [pcr, setPcr] = useState(null);
   const [btcFunding, setBtcFunding] = useState(null);
@@ -34,19 +47,6 @@ export default function DerivativesWidget() {
   const pcrColor = pcr?.pcr > 1.2 ? '#2AC769' : pcr?.pcr < 0.7 ? '#F04452' : '#8B95A1';
   const pcrLabel = pcr?.pcr > 1.2 ? '공포' : pcr?.pcr < 0.7 ? '탐욕' : '중립';
 
-  function FundingBadge({ data, label }) {
-    if (!data?.ratePercent) return null;
-    const r = data.ratePercent;
-    const color = r > 0.05 ? '#F04452' : r < -0.05 ? '#2AC769' : '#8B95A1';
-    const sign = r > 0 ? '+' : '';
-    return (
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-[#8B95A1]">{label} 펀딩비</span>
-        <span className="text-[11px] font-bold" style={{ color }}>{sign}{r.toFixed(3)}%</span>
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
@@ -56,7 +56,7 @@ export default function DerivativesWidget() {
     );
   }
 
-  if (!pcr?.pcr && !btcFunding?.ratePercent) return null;
+  if (!pcr?.pcr && !btcFunding?.ratePercent && !ethFunding?.ratePercent) return null;
 
   return (
     <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
