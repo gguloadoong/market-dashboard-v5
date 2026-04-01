@@ -1,10 +1,10 @@
-// AI 종목토론 — Gemini API (Edge, 무료 tier 활용)
-// primary: gemini-2.5-flash-lite, fallback: gemini-2.5-flash
+// AI 종목토론 — Groq API (Edge, 무료 tier, 초고속)
+// primary: llama-3.3-70b-versatile, fallback: llama-3.1-8b-instant
 export const config = { runtime: 'edge' };
 
-const GEMINI_MODELS = [
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
 ];
 
 export default async function handler(request) {
@@ -18,9 +18,9 @@ export default async function handler(request) {
     return new Response(JSON.stringify({ error: 'POST only' }), { status: 405 });
   }
 
-  const apiKey = process.env.GEMINI_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'GEMINI_KEY not configured' }), {
+    return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
     });
@@ -46,24 +46,29 @@ export default async function handler(request) {
 
 이 종목에 대해 강세론과 약세론을 각각 3줄로 제시하고, 종합 의견을 1줄로 작성해주세요.
 
-JSON 형식으로만 응답:
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
 {
-  "bull": "강세 근거 (3줄, 각 근거를 • 로 구분)",
-  "bear": "약세 근거 (3줄, 각 근거를 • 로 구분)",
+  "bull": "강세 근거 • 근거1 • 근거2 • 근거3",
+  "bear": "약세 근거 • 근거1 • 근거2 • 근거3",
   "verdict": "종합 의견 1줄",
-  "confidence": 0.0~1.0 숫자 (강세 확신도)
+  "confidence": 0.6
 }`;
 
-  for (const modelUrl of GEMINI_MODELS) {
+  for (const model of GROQ_MODELS) {
     try {
-      const res = await fetch(`${modelUrl}?key=${apiKey}`, {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 512,
+          temperature: 0.7,
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(15000),
       });
 
       // rate limit → 다음 모델 시도
@@ -71,16 +76,15 @@ JSON 형식으로만 응답:
 
       if (!res.ok) {
         const errText = await res.text();
-        return new Response(JSON.stringify({ error: `gemini_api: ${res.status}`, detail: errText }), {
+        return new Response(JSON.stringify({ error: `groq_api: ${res.status}`, detail: errText }), {
           status: 502,
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
         });
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const text = data.choices?.[0]?.message?.content ?? '';
 
-      // JSON 파싱 시도
       let parsed;
       try {
         const match = text.match(/\{[\s\S]*\}/);
@@ -89,7 +93,7 @@ JSON 형식으로만 응답:
         parsed = { bull: text, bear: '', verdict: '', confidence: 0.5 };
       }
 
-      return new Response(JSON.stringify({ symbol, ...parsed }), {
+      return new Response(JSON.stringify({ symbol, model, ...parsed }), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
@@ -98,8 +102,7 @@ JSON 형식으로만 응답:
         },
       });
     } catch (e) {
-      // 타임아웃 등 → 다음 모델 시도
-      if (GEMINI_MODELS.indexOf(modelUrl) === GEMINI_MODELS.length - 1) {
+      if (model === GROQ_MODELS[GROQ_MODELS.length - 1]) {
         return new Response(JSON.stringify({ error: e.message }), {
           status: 502,
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
