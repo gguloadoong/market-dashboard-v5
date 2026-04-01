@@ -148,13 +148,13 @@ export async function fetchCandles(item, periodKey = '5분') {
   const config = PERIOD_CONFIG[periodKey] ?? PERIOD_CONFIG['일'];
   const { interval, range, coinType, coinCount, isIntraday } = config;
 
-  if (item.id) {
+  if (item.id || item._market === 'COIN') {
     // 코인: Upbit 우선 (분봉/시봉/일봉/주봉/월봉 모두 지원)
     try {
       return await fetchUpbitCandles(item.symbol, coinType, coinCount);
     } catch {
-      // Upbit 실패 시 일봉만 CoinGecko fallback
-      if (!isIntraday) {
+      // Upbit 실패 시 일봉만 CoinGecko fallback (id가 있는 경우에만)
+      if (!isIntraday && item.id) {
         const coinDays = { '일': 90, '주': 180, '월': 365 }[periodKey] ?? 90;
         return fetchCoinCandles(item.id, coinDays);
       }
