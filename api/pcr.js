@@ -1,76 +1,47 @@
-// Put/Call Ratio — Yahoo Finance 옵션 데이터 (무료, 키 없음)
+// Put/Call Ratio — Deribit BTC 옵션 (무료, 키 없음)
 export const config = { runtime: 'edge' };
 
 export default async function handler(request) {
   try {
-    // SPY 옵션 체인 조회 (S&P500 ETF — 가장 유동성 높은 옵션)
     const res = await fetch(
-      'https://query2.finance.yahoo.com/v7/finance/options/SPY',
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MarketBot/1.0)',
-          'Accept': 'application/json',
-        },
-        signal: AbortSignal.timeout(8000),
-      },
+      'https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option',
+      { signal: AbortSignal.timeout(8000) },
     );
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ pcr: null, error: 'yahoo_fetch_failed' }), {
+      return new Response(JSON.stringify({ pcr: null, error: 'deribit_fetch_failed' }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
     const data = await res.json();
-    const chain = data?.optionChain?.result?.[0];
-    if (!chain) {
-      return new Response(JSON.stringify({ pcr: null, error: 'no_chain' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const items = data?.result ?? [];
+
+    let putVolume = 0;
+    let callVolume = 0;
+
+    for (const item of items) {
+      const name = item.instrument_name ?? '';
+      const vol = item.volume ?? 0;
+      if (name.endsWith('-P')) putVolume += vol;
+      else if (name.endsWith('-C')) callVolume += vol;
     }
 
-    // 전체 만기 옵션 합산
-    let totalPutVolume = 0;
-    let totalCallVolume = 0;
-
-    const options = chain.options ?? [];
-    for (const exp of options) {
-      for (const put of (exp.puts ?? [])) {
-        totalPutVolume += put.volume ?? 0;
-      }
-      for (const call of (exp.calls ?? [])) {
-        totalCallVolume += call.volume ?? 0;
-      }
-    }
-
-    // 거래량 없으면 OI 사용
-    if (totalPutVolume === 0 && totalCallVolume === 0) {
-      for (const exp of options) {
-        for (const put of (exp.puts ?? [])) {
-          totalPutVolume += put.openInterest ?? 0;
-        }
-        for (const call of (exp.calls ?? [])) {
-          totalCallVolume += call.openInterest ?? 0;
-        }
-      }
-    }
-
-    if (totalCallVolume === 0) {
+    if (callVolume === 0) {
       return new Response(JSON.stringify({ pcr: null, error: 'no_call_volume' }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
-    const pcr = totalPutVolume / totalCallVolume;
+    const pcr = putVolume / callVolume;
     let signal = 'neutral';
     if (pcr > 1.2) signal = 'bullish';
     else if (pcr < 0.7) signal = 'bearish';
 
     return new Response(
-      JSON.stringify({ pcr: parseFloat(pcr.toFixed(4)), totalPuts: totalPutVolume, totalCalls: totalCallVolume, signal }),
+      JSON.stringify({ pcr: parseFloat(pcr.toFixed(4)), totalPuts: parseFloat(putVolume.toFixed(2)), totalCalls: parseFloat(callVolume.toFixed(2)), signal, source: 'deribit_btc' }),
       {
         status: 200,
         headers: {

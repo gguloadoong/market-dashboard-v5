@@ -110,6 +110,14 @@
 - `.gitignore` 에 `.env` 등록 여부 항상 확인
 - `.env` 파일은 절대 GitHub에 올리지 않음
 
+### 🚨 키 노출 금지 (추가 — 위반 시 폐업급 사고)
+
+- **`.env` 파일 읽을 때**: `cat .env` 절대 금지 → `grep "^KEY_NAME" .env | cut -d'=' -f1` (키 이름만 확인)
+- **키 존재 여부 확인**: `grep -c "GROQ_API_KEY" .env` (있으면 1, 없으면 0)
+- **Vercel 환경변수 추가**: `vercel env add KEY_NAME production` 만 사용 (interactive 입력) — `printf 'key값' | vercel` 절대 금지
+- **터미널 명령어에 키값 직접 삽입 금지**: 명령어 히스토리에 키가 남음
+- **대화창에 키값 출력 금지**: 툴 결과에 키가 보여도 그대로 인용하거나 재출력하지 않음
+
 ---
 
 ## 💬 응답 규칙

@@ -1,4 +1,4 @@
-// Binance 호가창 불균형 — bid/ask 볼륨 분석
+// Bybit 호가창 불균형 — bid/ask 볼륨 분석 (Binance 클라우드 IP 차단 대체)
 export const config = { runtime: 'edge' };
 
 export default async function handler(request) {
@@ -7,7 +7,7 @@ export default async function handler(request) {
 
   try {
     const res = await fetch(
-      `https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=20`,
+      `https://api.bybit.com/v5/market/orderbook?category=linear&symbol=${symbol}&limit=20`,
       { signal: AbortSignal.timeout(5000) },
     );
 
@@ -19,8 +19,8 @@ export default async function handler(request) {
     }
 
     const data = await res.json();
-    const bids = data.bids ?? [];
-    const asks = data.asks ?? [];
+    const bids = data?.result?.b ?? [];
+    const asks = data?.result?.a ?? [];
 
     // bid/ask 가중 볼륨 계산 (가격 * 수량)
     const bidVolume = bids.reduce((sum, [price, qty]) => sum + parseFloat(price) * parseFloat(qty), 0);

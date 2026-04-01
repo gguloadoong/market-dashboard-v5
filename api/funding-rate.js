@@ -1,39 +1,37 @@
-// Binance Futures Funding Rate + Open Interest
+// Bybit Futures Funding Rate + Open Interest (Binance 클라우드 IP 차단 대체)
 export const config = { runtime: 'edge' };
 
-const BINANCE_FUTURES = 'https://fapi.binance.com/fapi/v1';
+const BYBIT_BASE = 'https://api.bybit.com/v5/market/tickers?category=linear';
 
 export default async function handler(request) {
   const url = new URL(request.url);
-  const symbol = (url.searchParams.get('symbol') || 'BTCUSDT').toUpperCase();
+  const rawSymbol = (url.searchParams.get('symbol') || 'BTCUSDT').toUpperCase();
+  // Bybit 심볼 형식: BTCUSDT (그대로 사용)
+  const symbol = rawSymbol;
 
   try {
-    const [premRes, oiRes] = await Promise.allSettled([
-      fetch(`${BINANCE_FUTURES}/premiumIndex?symbol=${symbol}`, { signal: AbortSignal.timeout(6000) }),
-      fetch(`${BINANCE_FUTURES}/openInterest?symbol=${symbol}`, { signal: AbortSignal.timeout(6000) }),
-    ]);
+    const res = await fetch(`${BYBIT_BASE}&symbol=${symbol}`, { signal: AbortSignal.timeout(6000) });
 
-    let fundingRate = null;
-    let openInterest = null;
-    let markPrice = null;
-
-    if (premRes.status === 'fulfilled' && premRes.value.ok) {
-      const d = await premRes.value.json();
-      fundingRate = parseFloat(d.lastFundingRate ?? d.fundingRate ?? 0);
-      markPrice = parseFloat(d.markPrice ?? 0);
-    }
-
-    if (oiRes.status === 'fulfilled' && oiRes.value.ok) {
-      const d = await oiRes.value.json();
-      openInterest = parseFloat(d.openInterest ?? 0);
-    }
-
-    if (fundingRate === null) {
+    if (!res.ok) {
       return new Response(JSON.stringify({ fundingRate: null, error: 'fetch_failed' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
+
+    const data = await res.json();
+    const ticker = data?.result?.list?.[0];
+
+    if (!ticker) {
+      return new Response(JSON.stringify({ fundingRate: null, error: 'no_ticker' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
+    const fundingRate = parseFloat(ticker.fundingRate ?? 0);
+    const openInterest = parseFloat(ticker.openInterest ?? 0);
+    const markPrice = parseFloat(ticker.markPrice ?? 0);
 
     const ratePercent = fundingRate * 100;
     let signal = 'neutral';
