@@ -346,22 +346,35 @@ export function createFearGreedSignal(current, previous, market) {
   return addSignal(signal);
 }
 
-/** PCR 역발상 시그널 — PCR>1.2 극도공포→매수, PCR<0.7 탐욕→매도 */
+import { THRESHOLDS } from '../constants/signalThresholds';
+
+/** PCR 역발상 시그널 — 경계 구간 포함 */
 export function createPCRSignal(pcr, totalPuts, totalCalls) {
   if (pcr == null) return null;
   let direction = DIRECTIONS.NEUTRAL;
   let strength = 2;
   let hint = '';
-  if (pcr > 1.2) {
+  const T = THRESHOLDS.PCR;
+  if (pcr > T.BULLISH) {
     direction = DIRECTIONS.BULLISH;
-    strength = pcr > 1.5 ? 4 : 3;
+    strength = pcr > T.BULLISH_STRONG ? 4 : 3;
     hint = '역발상 매수 구간';
-  } else if (pcr < 0.7) {
+  } else if (pcr > T.CAUTION_HIGH) {
+    // 1.0~1.2: 경계 상단 — 공포 징후
+    direction = DIRECTIONS.BULLISH;
+    strength = 2;
+    hint = '공포 징후 — 주목';
+  } else if (pcr < T.BEARISH) {
     direction = DIRECTIONS.BEARISH;
-    strength = pcr < 0.5 ? 4 : 3;
+    strength = pcr < T.BEARISH_STRONG ? 4 : 3;
     hint = '역발상 매도 구간';
+  } else if (pcr < T.CAUTION_LOW) {
+    // 0.7~0.85: 경계 하단 — 탐욕 징후
+    direction = DIRECTIONS.BEARISH;
+    strength = 2;
+    hint = '탐욕 징후 — 주의';
   } else {
-    return null;
+    return null; // 0.85~1.0: 완전 중립
   }
   const title = `S&P500 PCR ${pcr.toFixed(2)} — ${hint}`;
   return addSignal(createSignal({
@@ -372,18 +385,27 @@ export function createPCRSignal(pcr, totalPuts, totalCalls) {
   }));
 }
 
-/** 펀딩비 과열 시그널 */
+/** 펀딩비 과열 시그널 — 경고 구간 포함 */
 export function createFundingRateSignal(symbol, fundingRate, openInterest) {
   if (fundingRate == null) return null;
   const ratePercent = fundingRate * 100;
   let direction = DIRECTIONS.NEUTRAL;
   let strength = 2;
-  if (ratePercent > 0.05) {
+  const T = THRESHOLDS.FUNDING;
+  if (ratePercent > T.BEARISH) {
     direction = DIRECTIONS.BEARISH;
-    strength = ratePercent > 0.1 ? 4 : 3;
-  } else if (ratePercent < -0.05) {
+    strength = ratePercent > T.BEARISH_STRONG ? 4 : 3;
+  } else if (ratePercent > T.CAUTION_BULL) {
+    // 0.03%~0.05%: 과열 징후
+    direction = DIRECTIONS.BEARISH;
+    strength = 2;
+  } else if (ratePercent < T.BULLISH) {
     direction = DIRECTIONS.BULLISH;
-    strength = ratePercent < -0.1 ? 4 : 3;
+    strength = ratePercent < T.BULLISH_STRONG ? 4 : 3;
+  } else if (ratePercent < T.CAUTION_BEAR) {
+    // -0.05%~-0.03%: 숏 과열 징후
+    direction = DIRECTIONS.BULLISH;
+    strength = 2;
   } else {
     return null;
   }
@@ -397,16 +419,18 @@ export function createFundingRateSignal(symbol, fundingRate, openInterest) {
   }));
 }
 
-/** 주문장 불균형 시그널 */
+/** 주문장 불균형 시그널 — 경고 구간 포함 */
 export function createOrderFlowSignal(symbol, bidVolume, askVolume) {
   if (!bidVolume || !askVolume) return null;
   const total = bidVolume + askVolume;
   if (total === 0) return null;
   const imbalance = (bidVolume - askVolume) / total;
-  if (Math.abs(imbalance) < 0.3) return null;
+  const T = THRESHOLDS.ORDER_FLOW;
+  if (Math.abs(imbalance) < T.CAUTION) return null;
   const direction = imbalance > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
-  const strength = Math.abs(imbalance) > 0.5 ? 4 : 3;
-  const label = imbalance > 0 ? '매수벽 형성' : '매도벽 형성';
+  const isStrong = Math.abs(imbalance) >= T.STRONG;
+  const strength = Math.abs(imbalance) > 0.5 ? 4 : isStrong ? 3 : 2;
+  const label = imbalance > 0 ? (isStrong ? '매수벽 형성' : '매수세 우세') : (isStrong ? '매도벽 형성' : '매도세 우세');
   const title = `${symbol} 호가 ${label} (${(Math.abs(imbalance) * 100).toFixed(0)}% 불균형)`;
   return addSignal(createSignal({
     type: SIGNAL_TYPES.ORDER_FLOW_IMBALANCE,
@@ -432,17 +456,19 @@ export function createVWAPSignal(symbol, name, market, currentPrice, vwap) {
   }));
 }
 
-/** 소셜 감성 시그널 — bullRatio > 0.7 → BULLISH, < 0.3 → BEARISH */
+/** 소셜 감성 시그널 — 최소 표본 5건 (완화), 상수 기반 임계값 */
 export function createSocialSentimentSignal(symbol, name, market, bullRatio, totalMessages) {
-  if (bullRatio == null || totalMessages < 10) return null;
+  const T = THRESHOLDS.SOCIAL;
+  if (bullRatio == null || totalMessages < T.MIN_MESSAGES) return null;
   let direction = DIRECTIONS.NEUTRAL;
   let strength = 2;
-  if (bullRatio > 0.7) {
+  if (bullRatio > T.BULLISH) {
     direction = DIRECTIONS.BULLISH;
-    strength = bullRatio > 0.85 ? 4 : 3;
-  } else if (bullRatio < 0.3) {
+    // 표본 5~9건은 신뢰도 한 단계 낮춤
+    strength = bullRatio > T.BULLISH_STRONG ? (totalMessages >= 10 ? 4 : 3) : (totalMessages >= 10 ? 3 : 2);
+  } else if (bullRatio < T.BEARISH) {
     direction = DIRECTIONS.BEARISH;
-    strength = bullRatio < 0.15 ? 4 : 3;
+    strength = bullRatio < T.BEARISH_STRONG ? (totalMessages >= 10 ? 4 : 3) : (totalMessages >= 10 ? 3 : 2);
   } else {
     return null;
   }
@@ -453,4 +479,35 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
     symbol, name, market, direction, strength,
     title, meta: { bullRatio, totalMessages },
   }));
+}
+
+/** 마켓 온도계 — 활성 시그널 가중합 → -1(극도약세) ~ +1(극도강세) */
+export function getMarketTemperature() {
+  const signals = getActiveSignals();
+  if (!signals.length) return { score: 0, label: '중립', count: 0, bullCount: 0, bearCount: 0, neutralCount: 0 };
+  let bullWeight = 0;
+  let bearWeight = 0;
+  let neutralCount = 0;
+  for (const sig of signals) {
+    const w = sig.strength || 1;
+    if (sig.direction === DIRECTIONS.BULLISH) bullWeight += w;
+    else if (sig.direction === DIRECTIONS.BEARISH) bearWeight += w;
+    else neutralCount++;
+  }
+  const total = bullWeight + bearWeight;
+  const score = total === 0 ? 0 : (bullWeight - bearWeight) / total;
+  let label;
+  if (score <= -0.5) label = '강한 경계';
+  else if (score <= -0.15) label = '약세 우위';
+  else if (score < 0.15) label = '중립';
+  else if (score < 0.5) label = '강세 징후';
+  else label = '강한 강세';
+  return {
+    score,
+    label,
+    count: signals.length,
+    bullCount: signals.filter(s => s.direction === DIRECTIONS.BULLISH).length,
+    bearCount: signals.filter(s => s.direction === DIRECTIONS.BEARISH).length,
+    neutralCount,
+  };
 }

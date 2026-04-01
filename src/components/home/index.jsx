@@ -17,6 +17,7 @@ import MarketTimeline from './MarketTimeline';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import DerivativesWidget from './widgets/DerivativesWidget';
+import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
 import AiDebateSection from './AiDebateSection';
 
 // ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
@@ -281,6 +282,9 @@ export default function HomeDashboard({
 
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
+
+      {/* ─── 마켓 온도계 (시그널 종합 스코어) ──────────────── */}
+      <MarketTemperatureWidget />
 
       {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
       <SignalSummaryWidget onItemClick={handleSignalItemClick} />

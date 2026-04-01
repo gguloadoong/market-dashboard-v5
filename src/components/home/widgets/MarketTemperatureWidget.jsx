@@ -1,0 +1,110 @@
+// 마켓 온도계 — 활성 시그널 종합 스코어 (-1 ~ +1)
+import { useMemo } from 'react';
+import { useSignals } from '../../../hooks/useSignals';
+
+const ZONE = {
+  '강한 경계':  { bar: '#F04452', text: '#C0392B', bg: '#FFF0F0', icon: '🔴' },
+  '약세 우위':  { bar: '#FF6B35', text: '#C04A2A', bg: '#FFF4EE', icon: '🟠' },
+  '중립':       { bar: '#B0B8C1', text: '#4E5968', bg: '#F2F4F6', icon: '🟡' },
+  '강세 징후':  { bar: '#2AC769', text: '#1A7A45', bg: '#F0FFF4', icon: '🟢' },
+  '강한 강세':  { bar: '#1764ED', text: '#1249B3', bg: '#EDF4FF', icon: '🔵' },
+};
+
+function calcTemperature(signals) {
+  if (!signals.length) return { score: 0, label: '중립', count: 0, bullCount: 0, bearCount: 0, neutralCount: 0 };
+  let bullWeight = 0, bearWeight = 0, neutralCount = 0;
+  for (const sig of signals) {
+    const w = sig.strength || 1;
+    if (sig.direction === 'bullish') bullWeight += w;
+    else if (sig.direction === 'bearish') bearWeight += w;
+    else neutralCount++;
+  }
+  const total = bullWeight + bearWeight;
+  const score = total === 0 ? 0 : (bullWeight - bearWeight) / total;
+  let label;
+  if (score <= -0.5) label = '강한 경계';
+  else if (score <= -0.15) label = '약세 우위';
+  else if (score < 0.15) label = '중립';
+  else if (score < 0.5) label = '강세 징후';
+  else label = '강한 강세';
+  return { score, label, count: signals.length,
+    bullCount: signals.filter(s => s.direction === 'bullish').length,
+    bearCount: signals.filter(s => s.direction === 'bearish').length,
+    neutralCount };
+}
+
+export default function MarketTemperatureWidget() {
+  const signals = useSignals();
+  const temp = useMemo(() => calcTemperature(signals), [signals]);
+
+  // 시그널 없으면 대기 상태
+  if (temp.count === 0) {
+    return (
+      <div
+        data-testid="market-temperature"
+        className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[13px] font-bold text-[#191F28]">마켓 온도계</span>
+          <span className="text-[10px] text-[#B0B8C1]">시그널 분석 중...</span>
+        </div>
+        <div className="text-[11px] text-[#B0B8C1]">시장 시그널을 수집하고 있어요</div>
+      </div>
+    );
+  }
+
+  const zone = ZONE[temp.label] || ZONE['중립'];
+  // -1 ~ +1 → 0% ~ 100% 게이지 변환
+  const gaugeWidth = Math.round(((temp.score + 1) / 2) * 100);
+
+  return (
+    <div
+      data-testid="market-temperature"
+      className="rounded-2xl border shadow-sm p-4"
+      style={{ background: zone.bg, borderColor: zone.bar + '30' }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[16px]">{zone.icon}</span>
+          <span className="text-[13px] font-bold text-[#191F28]">마켓 온도계</span>
+        </div>
+        <span
+          className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          style={{ background: zone.bar + '20', color: zone.text }}
+        >
+          {temp.label}
+        </span>
+      </div>
+
+      {/* 게이지 바 */}
+      <div className="relative h-2 bg-[#E5E8EB] rounded-full mb-3 overflow-hidden">
+        {/* 중간 구분선 */}
+        <div className="absolute left-1/2 top-0 w-0.5 h-full bg-white z-10" />
+        <div
+          className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
+          style={{ width: `${gaugeWidth}%`, background: zone.bar }}
+        />
+      </div>
+
+      {/* 시그널 카운트 요약 */}
+      <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center gap-3">
+          {temp.bullCount > 0 && (
+            <span className="flex items-center gap-1 text-[#2AC769]">
+              <span>▲</span><span>{temp.bullCount}건 강세</span>
+            </span>
+          )}
+          {temp.bearCount > 0 && (
+            <span className="flex items-center gap-1 text-[#F04452]">
+              <span>▼</span><span>{temp.bearCount}건 약세</span>
+            </span>
+          )}
+          {temp.neutralCount > 0 && (
+            <span className="text-[#8B95A1]">{temp.neutralCount}건 중립</span>
+          )}
+        </div>
+        <span className="text-[10px] text-[#B0B8C1]">총 {temp.count}개 시그널</span>
+      </div>
+    </div>
+  );
+}
