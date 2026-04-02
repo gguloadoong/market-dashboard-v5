@@ -8,7 +8,6 @@ import {
   stopWhaleAlertPolling,
 } from '../api/whale';
 import { fetchWhaleChain } from '../api/_gateway';
-import EtfFlowWidget from './home/widgets/EtfFlowWidget';
 import { pushWhaleEvent } from '../state/whaleBus';
 import { detectWhalePatterns } from '../engine/whalePattern';
 import { createSignal, addSignal } from '../engine/signalEngine';
@@ -656,10 +655,6 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         </div>
       </div>
 
-      {/* ETF 자금 흐름 위젯 */}
-      <div className="p-4 border-t border-[#F2F4F6]">
-        <EtfFlowWidget />
-      </div>
     </div>
   );
 }
