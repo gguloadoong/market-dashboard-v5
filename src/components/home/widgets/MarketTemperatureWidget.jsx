@@ -37,8 +37,21 @@ export default function MarketTemperatureWidget() {
   const signals = useSignals();
   const temp = useMemo(() => calcTemperature(signals), [signals]);
 
-  // 시그널 없으면 렌더 안 함 — 빈 상태가 홈 최상단 차지하는 것 방지
-  if (temp.count === 0) return null;
+  // 시그널 없으면 수집 중 스켈레톤
+  if (temp.count === 0) return (
+    <div
+      data-testid="market-temperature"
+      className="rounded-2xl border border-[#F2F4F6] shadow-sm p-3 bg-white"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-4 h-4 rounded-full bg-[#F2F4F6] animate-pulse" />
+        <span className="text-[13px] font-bold text-[#191F28]">마켓 온도계</span>
+        <span className="text-[10px] text-[#B0B8C1]">수집 중...</span>
+      </div>
+      <div className="h-2 bg-[#F2F4F6] rounded-full animate-pulse mb-2" />
+      <div className="h-3 w-24 bg-[#F2F4F6] rounded animate-pulse" />
+    </div>
+  );
 
   const zone = ZONE[temp.label] || ZONE['중립'];
   // -1 ~ +1 → 0% ~ 100% 게이지 변환
@@ -47,12 +60,12 @@ export default function MarketTemperatureWidget() {
   return (
     <div
       data-testid="market-temperature"
-      className="rounded-2xl border shadow-sm p-4"
+      className="rounded-2xl border shadow-sm p-3"
       style={{ background: zone.bg, borderColor: zone.bar + '30' }}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-[16px]">{zone.icon}</span>
+          <span className="text-[14px]">{zone.icon}</span>
           <span className="text-[13px] font-bold text-[#191F28]">마켓 온도계</span>
         </div>
         <span
@@ -64,7 +77,7 @@ export default function MarketTemperatureWidget() {
       </div>
 
       {/* 게이지 바 */}
-      <div className="relative h-2 bg-[#E5E8EB] rounded-full mb-3 overflow-hidden">
+      <div className="relative h-2 bg-[#E5E8EB] rounded-full mb-2 overflow-hidden">
         {/* 중간 구분선 */}
         <div className="absolute left-1/2 top-0 w-0.5 h-full bg-white z-10" />
         <div
@@ -73,24 +86,13 @@ export default function MarketTemperatureWidget() {
         />
       </div>
 
-      {/* 시그널 카운트 요약 */}
-      <div className="flex items-center justify-between text-[11px]">
-        <div className="flex items-center gap-3">
-          {temp.bullCount > 0 && (
-            <span className="flex items-center gap-1 text-[#2AC769]">
-              <span>▲</span><span>{temp.bullCount}건 강세</span>
-            </span>
-          )}
-          {temp.bearCount > 0 && (
-            <span className="flex items-center gap-1 text-[#F04452]">
-              <span>▼</span><span>{temp.bearCount}건 약세</span>
-            </span>
-          )}
-          {temp.neutralCount > 0 && (
-            <span className="text-[#8B95A1]">{temp.neutralCount}건 중립</span>
-          )}
-        </div>
-        <span className="text-[10px] text-[#B0B8C1]">총 {temp.count}개 시그널</span>
+      {/* 시그널 카운트 요약 — 한 줄 */}
+      <div className="text-[11px] text-[#4E5968]">
+        {temp.bullCount > 0 && <span className="text-[#2AC769]">▲{temp.bullCount}건 강세</span>}
+        {temp.bullCount > 0 && temp.bearCount > 0 && <span className="text-[#B0B8C1]"> · </span>}
+        {temp.bearCount > 0 && <span className="text-[#F04452]">▼{temp.bearCount}건 약세</span>}
+        {(temp.bullCount > 0 || temp.bearCount > 0) && <span className="text-[#B0B8C1]"> · </span>}
+        <span className="text-[#B0B8C1]">총 {temp.count}개 시그널</span>
       </div>
     </div>
   );

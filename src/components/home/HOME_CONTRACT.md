@@ -5,23 +5,26 @@
 
 ---
 
-## 현재 활성 렌더 구조 (2026-04-01 기준)
+## 현재 활성 렌더 구조 (2026-04-02 기준)
 
 `src/components/home/index.jsx`의 `HomeDashboard` 렌더 순서:
 
 ```
-1. MorningBriefing      — 모닝 브리핑
-2. MarketPulseWidget    — 지수 6개 + 환율
-3. SignalSummaryWidget  — 투자 시그널 요약 (강도순 TOP 3~20)
-4. NotableMoversSection — 수급 이상 종목
-5. FearGreedWidget      — Fear & Greed 지수
-6. EventTicker          — 경제 이벤트 롤링 티커
-7. WatchlistWidget      — 관심종목 실시간 등락률
-8. SectorMiniWidget     — 섹터 HOT/COLD 칩 (index.jsx 인라인 정의)
-9. TopMoversWidget      — 급등/급락 (KR/US/COIN 탭)
-10. NewsFeedWidget      — 투자 뉴스 최신 (가격영향 필터 적용)
-11. MarketTimeline      — 오늘의 타임라인
-12. MarketInvestorSection— 외국인/기관 수급 (모바일 숨김)
+1. MorningBriefing         — 모닝 브리핑
+2. MarketPulseWidget       — 지수 6개 + 환율
+3. MarketTemperatureWidget — 마켓 온도계 (컴팩트)
+4. SeoulForceSection       — 세력 포착: 외국인·기관 연속 매수매도 (index.jsx 인라인 정의)
+5. SignalSummaryWidget     — 투자 시그널 (스코어 + TOP 카드 + 칩)
+6. AiDebateSection         — AI 종목토론 (채팅 버블 UI)
+7. NotableMoversSection    — 수급 이상 종목
+8. FearGreedWidget         — Fear & Greed 지수
+9. DerivativesWidget       — 파생 시그널
+10. EventTicker            — 경제 이벤트 롤링 티커
+11. WatchlistWidget + SectorMiniWidget — 관심종목 + 섹터 (2열, 모바일 세로)
+12. TopMoversWidget        — 급등/급락 (KR/US/COIN 탭)
+13. NewsFeedWidget         — 투자 뉴스 최신 (가격영향 필터 적용)
+14. MarketTimeline         — 오늘의 타임라인
+15. MarketInvestorSection  — 외국인/기관 수급 (모바일 숨김)
 ```
 
 ---
@@ -53,7 +56,9 @@
 | `TopMoversWidget.jsx` | 급등/급락 랭킹 (HotListSection 래퍼) | `krStocks`, `usStocks`, `coins` |
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
-| `SignalSummaryWidget.jsx` | 투자 시그널 요약 (상위 3개) | `useTopSignals` |
+| `SignalSummaryWidget.jsx` | 투자 시그널 (스코어 + TOP 카드 + 칩) | `useTopSignals` |
+| `MarketTemperatureWidget.jsx` | 마켓 온도계 (컴팩트) | `useSignals` |
+| `DerivativesWidget.jsx` | 파생 시그널 | 파생/소셜 데이터 |
 
 ### 섹션 (src/components/home/)
 
@@ -64,6 +69,8 @@
 | `MarketInvestorSection.jsx` | 외국인/기관 수급 | ✅ 활성 |
 | `HotListSection.jsx` | HotList UI (TopMoversWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
 | `MarketIndexSection.jsx` | 지수 UI (MarketPulseWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
+| `AiDebateSection.jsx` | AI 종목토론 (채팅 버블 UI, Bull vs Bear 3라운드) | ✅ 활성 |
+| `SeoulForceSection` | 세력 포착 (index.jsx 인라인, 외국인·기관 연속 매수매도) | ✅ 활성 |
 
 ---
 

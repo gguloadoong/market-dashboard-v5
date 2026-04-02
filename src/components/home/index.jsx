@@ -19,6 +19,50 @@ import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import DerivativesWidget from './widgets/DerivativesWidget';
 import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
 import AiDebateSection from './AiDebateSection';
+import { useSignals } from '../../hooks/useSignals';
+
+// ─── 세력 포착 (외국인·기관 연속 매수매도) ──
+function SeoulForceSection({ signals, onItemClick }) {
+  const forceSignals = signals.filter(s =>
+    ['foreign_consecutive_buy','foreign_consecutive_sell',
+     'institutional_consecutive_buy','institutional_consecutive_sell'].includes(s.type)
+    && s.strength >= 3
+  );
+  if (!forceSignals.length) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[12px] font-bold text-[#191F28]">세력 포착</span>
+        <span className="text-[10px] text-[#B0B8C1]">외국인·기관 연속 매수매도</span>
+      </div>
+      <div className="space-y-1.5">
+        {forceSignals.slice(0, 3).map(sig => {
+          const isBull = sig.direction === 'bullish';
+          const typeLabel = sig.type.includes('foreign') ? '외국인' : '기관';
+          const dirLabel = isBull ? '연속 매수' : '연속 매도';
+          return (
+            <button
+              key={sig.symbol + sig.type}
+              onClick={() => onItemClick?.({ symbol: sig.symbol, name: sig.name, market: sig.market })}
+              className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-left"
+              style={{ background: isBull ? '#F0FFF6' : '#FFF0F1' }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold" style={{ color: isBull ? '#2AC769' : '#F04452' }}>
+                  {typeLabel}
+                </span>
+                <span className="text-[12px] font-bold text-[#191F28]">{sig.name}</span>
+                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.strength}일+</span>
+              </div>
+              <span className="text-[10px] text-[#B0B8C1]">차트 →</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
 function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, onItemClick }) {
@@ -215,6 +259,9 @@ export default function HomeDashboard({
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
 
+  // 세력 포착용 시그널 — 전체 시그널에서 필터 (top-20 슬라이스 전에 투자자 시그널 놓치지 않도록)
+  const allSignals = useSignals();
+
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
   // 시그널 클릭 → allItems에서 full item 조회 후 ChartSidePanel 오픈
@@ -283,13 +330,16 @@ export default function HomeDashboard({
       {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
 
-      {/* ─── 마켓 온도계 (시그널 종합 스코어) ──────────────── */}
+      {/* ─── 마켓 온도계 (시그널 종합 스코어, 컴팩트) ─────── */}
       <MarketTemperatureWidget />
 
-      {/* ─── 투자 시그널 요약 ─────────────────────────────── */}
+      {/* ─── 세력 포착 (외국인·기관 연속 매수매도) ──────── */}
+      <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
+
+      {/* ─── 투자 시그널 요약 (UX 개편) ──────────────────── */}
       <SignalSummaryWidget onItemClick={handleSignalItemClick} />
 
-      {/* ─── AI 종목토론 (Bull vs Bear) ───────────────────── */}
+      {/* ─── AI 종목토론 (채팅 버블) ─────────────────────── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
 
       {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
