@@ -19,7 +19,7 @@ import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import DerivativesWidget from './widgets/DerivativesWidget';
 import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
 import AiDebateSection from './AiDebateSection';
-import { useTopSignals } from '../../hooks/useSignals';
+import { useSignals } from '../../hooks/useSignals';
 
 // ─── 세력 포착 (외국인·기관 연속 매수매도) ──
 function SeoulForceSection({ signals, onItemClick }) {
@@ -259,8 +259,8 @@ export default function HomeDashboard({
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
 
-  // 세력 포착용 시그널
-  const forceSignals = useTopSignals(20);
+  // 세력 포착용 시그널 — 전체 시그널에서 필터 (top-20 슬라이스 전에 투자자 시그널 놓치지 않도록)
+  const allSignals = useSignals();
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
@@ -334,7 +334,7 @@ export default function HomeDashboard({
       <MarketTemperatureWidget />
 
       {/* ─── 세력 포착 (외국인·기관 연속 매수매도) ──────── */}
-      <SeoulForceSection signals={forceSignals} onItemClick={handleSignalItemClick} />
+      <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
 
       {/* ─── 투자 시그널 요약 (UX 개편) ──────────────────── */}
       <SignalSummaryWidget onItemClick={handleSignalItemClick} />
