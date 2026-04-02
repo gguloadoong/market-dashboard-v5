@@ -130,7 +130,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
           value={selected?.symbol || ''}
           onChange={e => {
             const item = symbolList.find(s => s.symbol === e.target.value);
-            if (item) setSelected(item);
+            if (item) { setSelected(item); setResult(null); setVisibleCount(0); }
           }}
           className="text-[11px] border border-[#F2F4F6] rounded-lg px-2 py-1 text-[#191F28] bg-white"
         >
