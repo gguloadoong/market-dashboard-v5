@@ -66,6 +66,10 @@ function buildRouteTitle(event) {
   if (event.source === 'binance') {
     return `바이낸스 ${event.symbol || ''} ${event.side || '체결'} ${event.tradeUsd ? `$${(event.tradeUsd / 1e6).toFixed(1)}M` : ''}`;
   }
+  if (event.side === '온체인' || event.chain === 'bitcoin') {
+    // Blockchain.com WS 온체인 이동 (source 없음)
+    return `BTC 온체인 이동 ${event.volume ? `${event.volume} BTC` : ''}`;
+  }
   if (event.source !== 'whale-alert' && event.source !== 'blockchair') {
     // Upbit 체결: 거래소명 없음 — 종목 + 매수/매도 방향 표시
     return `업비트 ${event.symbol || ''} ${event.side || '체결'}`;
@@ -250,6 +254,13 @@ function buildInsightText(event) {
       default:
         break;
     }
+  }
+
+  // Blockchain.com WS 온체인 이동 (movementType 없음)
+  if (event.side === '온체인' || event.chain === 'bitcoin') {
+    const btc = event.volume || 0;
+    if (btc >= 50) return `대형 BTC 온체인 이동 ${btc} BTC — 고래 활동 주시`;
+    return `BTC 온체인 이동 ${btc} BTC 감지`;
   }
 
   switch (event.movementType) {

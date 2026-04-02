@@ -13,7 +13,7 @@ function formatFlow(n) {
 function FlowBar({ value }) {
   if (value == null) return null;
   const isPositive = value >= 0;
-  const pct = Math.min(Math.abs(value) / 500 * 100, 100); // 500M 기준 100%
+  const pct = Math.min(Math.abs(value) / 500 * 50, 50); // 500M = 컨테이너 절반(50%), 중앙 기준
   return (
     <div className="relative h-1.5 bg-[#F2F4F6] rounded-full overflow-hidden">
       <div
@@ -54,7 +54,7 @@ export default function EtfFlowWidget() {
   if (!hasData) return (
     <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-3">
       <div className="text-[12px] font-bold text-[#191F28] mb-1">ETF 자금 흐름</div>
-      <div className="text-[11px] text-[#B0B8C1]">데이터를 가져오는 중입니다</div>
+      <div className="text-[11px] text-[#B0B8C1]">데이터 없음 (API 미설정 또는 응답 없음)</div>
     </div>
   );
 

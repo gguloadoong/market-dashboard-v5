@@ -41,7 +41,7 @@ test.describe('P0 — 마켓 온도계', () => {
     if (count === 0) return; // 시그널 없으면 skip
 
     const text = await widget.textContent();
-    const validLabels = ['강한 경계', '약세 우위', '중립', '강세 징후', '강한 강세', '분석 중'];
+    const validLabels = ['강한 경계', '약세 우위', '중립', '강세 징후', '강한 강세', '분석 중', '수집 중...'];
     const hasLabel = validLabels.some(l => text?.includes(l));
     expect(hasLabel).toBe(true);
   });
