@@ -49,7 +49,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       .slice(0, 5),
   ];
 
-  const messages = result?.messages || [];
+  const messages = Array.isArray(result?.messages) ? result.messages : [];
 
   // 메시지 애니메이션: visibleCount < messages.length 이면 700ms 후 +1
   useEffect(() => {
