@@ -1,6 +1,6 @@
 // 고래 알림 패널 — 온체인 자금 이동 전용
 // 소스: Blockchain.com BTC WS + Whale Alert REST + Blockchair 폴링
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   subscribeBtcWhales,
   unsubscribeBtcWhales,
@@ -412,10 +412,10 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   }, {}), [coins]);
 
   // 이벤트 추가 — 온체인만
-  const addEvent = (evt) => {
+  const addEvent = useCallback((evt) => {
     pushWhaleEvent(evt);
     setOnchainEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
-  };
+  }, []); // functional setState — stale closure 안전
 
   useEffect(() => {
     if (!isVisible) return;
