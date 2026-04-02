@@ -542,14 +542,19 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       const amt = e.tradeAmt || 0;
       const stable = isStablecoin(e.symbol);
 
+      // Blockchair 별칭 정규화 (wallet_to_exchange = exchange_deposit, exchange_to_wallet = exchange_withdrawal)
+      const mType = e.movementType === 'wallet_to_exchange' ? 'exchange_deposit'
+                  : e.movementType === 'exchange_to_wallet' ? 'exchange_withdrawal'
+                  : e.movementType;
+
       if (stable) {
         // 스테이블코인: 입금 = 유입(bullish), 출금 = 이탈
-        if (e.movementType === 'exchange_deposit') totalOutflow += amt;
-        else if (e.movementType === 'exchange_withdrawal') totalInflow += amt;
+        if (mType === 'exchange_deposit') totalOutflow += amt;
+        else if (mType === 'exchange_withdrawal') totalInflow += amt;
       } else {
         // 일반 코인: 입금 = 유입(inflow, bearish), 출금 = 유출(outflow, bullish)
-        if (e.movementType === 'exchange_deposit' || e.side === '매도') totalInflow += amt;
-        else if (e.movementType === 'exchange_withdrawal' || e.side === '매수') totalOutflow += amt;
+        if (mType === 'exchange_deposit' || e.side === '매도') totalInflow += amt;
+        else if (mType === 'exchange_withdrawal' || e.side === '매수') totalOutflow += amt;
         else continue; // 방향 불명확한 이벤트는 통계 제외
       }
     }
