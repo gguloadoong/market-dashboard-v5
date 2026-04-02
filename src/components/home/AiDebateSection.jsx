@@ -71,7 +71,17 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
   const runDebate = useCallback(async (item) => {
     if (!item) return;
     const cached = getCached(item.symbol);
-    if (cached) { startAnimation(cached); return; }
+    if (cached) {
+      // 구 형식(bull/bear 문자열) → messages 배열로 정규화 (캐시 호환성)
+      if (!cached.messages && (cached.bull || cached.bear)) {
+        cached.messages = [
+          ...(cached.bull ? [{ side: 'bull', text: cached.bull }] : []),
+          ...(cached.bear ? [{ side: 'bear', text: cached.bear }] : []),
+        ];
+      }
+      startAnimation(cached);
+      return;
+    }
 
     setLoading(true);
     setError(null);
