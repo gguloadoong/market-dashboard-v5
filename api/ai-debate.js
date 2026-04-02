@@ -58,7 +58,7 @@ export default async function handler(request) {
     {"side": "bear", "text": "약세 마지막 반론"}
   ],
   "verdict": "한국어 종합 의견 1줄",
-  "confidence": 0.0~1.0 사이 숫자 (0.5=중립, 1.0=강한 강세)
+  "confidence": 0.65
 }`;
 
   for (const model of GROQ_MODELS) {
