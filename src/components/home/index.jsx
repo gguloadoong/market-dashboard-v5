@@ -53,7 +53,7 @@ function SeoulForceSection({ signals, onItemClick }) {
                   {typeLabel}
                 </span>
                 <span className="text-[12px] font-bold text-[#191F28]">{sig.name}</span>
-                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.strength}일+</span>
+                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.meta?.consecutiveDays || sig.strength}일+</span>
               </div>
               <span className="text-[10px] text-[#B0B8C1]">차트 →</span>
             </button>

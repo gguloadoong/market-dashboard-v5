@@ -22,16 +22,7 @@ export default {
         mono: ['"Roboto Mono"', '"SF Mono"', 'monospace'],
       },
       // CDS 토큰 (ADR-002: Coinbase Design System 구조 차용)
-      spacing: {
-        '0.5': '4px',
-        '1': '8px',
-        '1.5': '12px',
-        '2': '16px',
-        '3': '24px',
-        '4': '32px',
-        '5': '40px',
-        '6': '48px',
-      },
+      // spacing은 Tailwind 기본값 유지 (오버라이드 시 기존 유틸리티 깨짐)
       borderRadius: {
         'sm': '4px',
         'DEFAULT': '8px',
