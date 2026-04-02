@@ -1,20 +1,14 @@
-// 고래 알림 패널 — 멀티소스 실시간 대량 체결 감지
-// 소스 1: Upbit WebSocket (2000만원+ 단일 체결)
-// 소스 2: Blockchain.com WebSocket (10 BTC+ 온체인 이동)
-// 소스 3: Whale Alert REST 폴링 (Vercel 프록시, 60초 간격)
+// 고래 알림 패널 — 온체인 자금 이동 전용
+// 소스: Blockchain.com BTC WS + Whale Alert REST + Blockchair 폴링
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  subscribeUpbitWhaleTrades,
-  unsubscribeUpbitWhaleTrades,
-  subscribeBithumbWhaleTrades,
-  unsubscribeBithumbWhaleTrades,
   subscribeBtcWhales,
   unsubscribeBtcWhales,
   startWhaleAlertPolling,
   stopWhaleAlertPolling,
 } from '../api/whale';
-import { fetchUpbitAllSymbols } from '../api/coins';
-import { fetchWhaleChain, fetchBinanceWhale } from '../api/_gateway';
+import { fetchWhaleChain } from '../api/_gateway';
+import EtfFlowWidget from './home/widgets/EtfFlowWidget';
 import { pushWhaleEvent } from '../state/whaleBus';
 import { detectWhalePatterns } from '../engine/whalePattern';
 import { createSignal, addSignal } from '../engine/signalEngine';
@@ -407,29 +401,9 @@ function EventRow({ event, onItemClick, coinMap }) {
   );
 }
 
-// ─── 이벤트 분류 헬퍼 ────────────────────────────────────────────
-// onchain: Whale Alert REST + Blockchain.com BTC WS
-// exchange: Upbit 실시간 체결
-function isOnchainEvent(evt) {
-  return evt.source === 'whale-alert' || evt.source === 'blockchair' || evt.chain === 'bitcoin';
-}
-
-// 폴백: Upbit KRW 마켓 기본 20개 (동적 로딩 전 사용)
-const FALLBACK_SYMBOLS = [
-  'BTC','ETH','XRP','SOL','ADA','DOGE','AVAX','DOT','LINK','UNI',
-  'NEAR','APT','ARB','SUI','OP','PEPE','XLM','TON','ATOM','INJ',
-];
-
 export default function WhalePanel({ isVisible = true, coins = [], onItemClick }) {
-  const [exchangeEvents, setExchangeEvents] = useState([]); // 거래소 대량 체결
   const [onchainEvents,  setOnchainEvents]  = useState([]); // 온체인 자금 이동
-  const [activeTab,      setActiveTab]      = useState('exchange'); // 'exchange' | 'onchain'
-  const [connected,        setConnected]        = useState(false);
-  const [bithumbConnected, setBithumbConnected] = useState(false);
   const [btcConnected,     setBtcConnected]     = useState(false);
-  const [binanceActive,    setBinanceActive]    = useState(false);
-  const [msgCount,       setMsgCount]       = useState(0);
-  const [watchSymbols,   setWatchSymbols]   = useState(FALLBACK_SYMBOLS);
 
   // 심볼 → 코인 빠른 조회 맵
   const coinMap = useMemo(() => coins.reduce((m, c) => {
@@ -437,78 +411,42 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     return m;
   }, {}), [coins]);
 
-  // Upbit 전체 KRW 마켓 심볼 동적 로딩 (1회)
-  useEffect(() => {
-    fetchUpbitAllSymbols()
-      .then(symbols => { if (symbols.length > 0) setWatchSymbols(symbols); })
-      .catch(() => {});
-  }, []);
-
-  // 이벤트 추가 — 타입별 분류
+  // 이벤트 추가 — 온체인만
   const addEvent = (evt) => {
     pushWhaleEvent(evt);
-    if (isOnchainEvent(evt)) {
-      setOnchainEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
-    } else {
-      setExchangeEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
-    }
+    setOnchainEvents(prev => [evt, ...prev].slice(0, MAX_EVENTS));
   };
 
   useEffect(() => {
     if (!isVisible) return;
 
-    setConnected(false);
-    setBithumbConnected(false);
     setBtcConnected(false);
-    setMsgCount(0);
 
-    // ── 소스 1: Upbit WebSocket (거래소 대량 체결) ────────────────
-    subscribeUpbitWhaleTrades(watchSymbols, (evt) => {
-      if (evt._connected) { setConnected(true); return; }
-      if (evt._tick)      { setConnected(true); setMsgCount(p => p + 1); return; }
-      setConnected(true);
-      setMsgCount(p => p + 1);
-      addEvent(evt);
-    });
-
-    // ── 소스 2: Bithumb WebSocket (거래소 대량 체결) ──────────────
-    subscribeBithumbWhaleTrades(watchSymbols, (evt) => {
-      if (evt._connected) { setBithumbConnected(true); return; }
-      setBithumbConnected(true);
-      setMsgCount(p => p + 1);
-      addEvent(evt);
-    });
-
-    // ── 소스 3: Blockchain.com BTC 온체인 WebSocket ──────────────
+    // ── Blockchain.com BTC 온체인 WebSocket ──────────────────────
     subscribeBtcWhales((evt) => {
       if (evt._connected) { setBtcConnected(true); return; }
       setBtcConnected(true);
       addEvent(evt);
     });
 
-    // ── 소스 4: Whale Alert REST 폴링 (온체인 자금 이동) ─────────
+    // ── Whale Alert REST 폴링 (온체인 자금 이동) ─────────────────
     startWhaleAlertPolling((evt) => {
       addEvent(evt);
     });
 
     return () => {
-      unsubscribeUpbitWhaleTrades();
-      unsubscribeBithumbWhaleTrades();
       unsubscribeBtcWhales();
       stopWhaleAlertPolling();
-      setConnected(false);
-      setBithumbConnected(false);
       setBtcConnected(false);
     };
-  }, [isVisible, watchSymbols]);
+  }, [isVisible]);
 
   // 고래 연속 패턴 감지 → 시그널 엔진에 추가 (60초 간격)
   useEffect(() => {
     if (!isVisible) return;
     const detectAndPush = () => {
-      const allEvents = [...exchangeEvents, ...onchainEvents];
-      if (allEvents.length === 0) return;
-      const patterns = detectWhalePatterns(allEvents);
+      if (onchainEvents.length === 0) return;
+      const patterns = detectWhalePatterns(onchainEvents);
       for (const p of patterns) {
         // 패턴 타입 → 시그널 타입 매핑
         const typeMap = {
@@ -533,7 +471,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     detectAndPush();
     const iv = setInterval(detectAndPush, PATTERN_SCAN_INTERVAL_MS);
     return () => clearInterval(iv);
-  }, [isVisible, exchangeEvents, onchainEvents]);
+  }, [isVisible, onchainEvents]);
 
   // ── 소스 6: Blockchair 온체인 폴링 (BTC/ETH $1M+, 5분 간격) ──
   const seenChainIds = useRef(new Set()).current;
@@ -586,49 +524,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     return () => clearInterval(timer);
   }, [isVisible]);
 
-  // ── 소스 4b: Binance Edge Function 폴링 (서버사이드, 30초 간격) ──
-  const seenBinanceIds = useRef(new Set()).current;
-  useEffect(() => {
-    if (!isVisible) return;
-    const poll = async () => {
-      try {
-        const data = await fetchBinanceWhale();
-        setBinanceActive(true);
-        for (const tx of (data.trades || [])) {
-          if (seenBinanceIds.has(tx.id)) continue;
-          seenBinanceIds.add(tx.id);
-          if (seenBinanceIds.size > 200) {
-            const iter = seenBinanceIds.values();
-            for (let i = 0; i < 100; i++) seenBinanceIds.delete(iter.next().value);
-          }
-          const side = tx.side === 'buy' ? '매수' : '매도';
-          const krwAmt = Math.round(tx.usdAmt * DEFAULT_KRW_RATE);
-          addEvent({
-            id:        tx.id,
-            symbol:    tx.symbol,
-            chain:     'binance',
-            side,
-            tradeAmt:  krwAmt,
-            tradeUsd:  tx.usdAmt,
-            volume:    tx.qty,
-            severity:  tx.usdAmt >= 2_000_000 ? 'high' : 'medium',
-            timestamp: tx.time || Date.now(),
-            source:    'binance',
-            signal:    side === '매수' ? 'bullish' : 'bearish',
-            insight:   `[Binance] ${tx.symbol} ${side} $${(tx.usdAmt / 1e6).toFixed(1)}M`,
-            label:     `Binance ${tx.symbol}`,
-            message:   `${tx.symbol} ${side} $${(tx.usdAmt / 1e6).toFixed(1)}M (Binance)`,
-          });
-        }
-      } catch (e) { console.warn('[WhalePanel] Binance poll fail:', e.message); }
-    };
-    poll();
-    const timer = setInterval(poll, 30 * 1000);
-    return () => clearInterval(timer);
-  }, [isVisible]);
-
-  const isAnyConnected = connected || bithumbConnected || btcConnected || binanceActive;
-  const currentEvents  = activeTab === 'exchange' ? exchangeEvents : onchainEvents;
+  const isAnyConnected = btcConnected;
 
   // ─── 일간 고래 통계 요약 계산 ─────────────────────────────────
   const dailySummary = useMemo(() => {
@@ -636,9 +532,8 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     todayStart.setHours(0, 0, 0, 0);
     const todayTs = todayStart.getTime();
 
-    // 거래소 + 온체인 전체 이벤트 중 오늘 이벤트 필터
-    const allEvents = [...exchangeEvents, ...onchainEvents];
-    const todayEvents = allEvents.filter(e => e.timestamp >= todayTs);
+    // 온체인 이벤트 중 오늘 이벤트 필터
+    const todayEvents = onchainEvents.filter(e => e.timestamp >= todayTs);
 
     let totalInflow = 0;  // 거래소 입금(매도 압력) 합산
     let totalOutflow = 0; // 거래소 출금(HODLing) 합산
@@ -649,13 +544,13 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
 
       if (stable) {
         // 스테이블코인: 입금 = 유입(bullish), 출금 = 이탈
-        if (e.movementType === 'exchange_deposit') totalOutflow += amt; // 유입이지만 outflow 칸 재활용
+        if (e.movementType === 'exchange_deposit') totalOutflow += amt;
         else if (e.movementType === 'exchange_withdrawal') totalInflow += amt;
       } else {
         // 일반 코인: 입금 = 유입(inflow, bearish), 출금 = 유출(outflow, bullish)
         if (e.movementType === 'exchange_deposit' || e.side === '매도') totalInflow += amt;
         else if (e.movementType === 'exchange_withdrawal' || e.side === '매수') totalOutflow += amt;
-        else totalInflow += amt; // 분류 불명 — 보수적으로 유입 처리
+        else continue; // 방향 불명확한 이벤트는 통계 제외
       }
     }
 
@@ -663,7 +558,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
     const inflowPct = total > 0 ? Math.round((totalInflow / total) * 100) : 0;
 
     return { todayCount: todayEvents.length, totalInflow, totalOutflow, inflowPct };
-  }, [exchangeEvents, onchainEvents]);
+  }, [onchainEvents]);
 
   // 원화 금액 단축 포맷 (일간 요약 전용)
   function fmtKrw(n) {
@@ -679,55 +574,13 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[15px]">🐋</span>
-        <span className="text-[14px] font-bold text-[#191F28]">고래 알림</span>
+        <span className="text-[14px] font-bold text-[#191F28]">고래 알림 · 온체인</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAnyConnected ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#B0B8C1]">
-            {[
-              connected && '업비트',
-              bithumbConnected && '빗썸',
-              binanceActive && '바이낸스',
-              btcConnected && 'BTC온체인',
-            ].filter(Boolean).join(' · ') || '연결 중...'}
+            {btcConnected ? 'BTC온체인' : '연결 중...'}
           </span>
-          {connected && msgCount > 0 && (
-            <span className="text-[10px] text-[#C9CDD2] font-mono">{msgCount.toLocaleString()}건 수신</span>
-          )}
         </div>
-      </div>
-
-      {/* ── 탭 — 거래소 체결 / 온체인 이동 ──────────────────────── */}
-      <div className="flex border-b border-[#F2F4F6]">
-        <button
-          onClick={() => setActiveTab('exchange')}
-          className={`flex-1 py-2.5 text-[12px] font-semibold transition-colors ${
-            activeTab === 'exchange'
-              ? 'text-[#3182F6] border-b-2 border-[#3182F6] bg-white'
-              : 'text-[#B0B8C1] bg-[#FAFBFC] hover:text-[#4E5968]'
-          }`}
-        >
-          거래소 대량 체결
-          {exchangeEvents.length > 0 && (
-            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'exchange' ? 'bg-[#EDF4FF] text-[#3182F6]' : 'bg-[#F2F4F6] text-[#8B95A1]'}`}>
-              {exchangeEvents.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('onchain')}
-          className={`flex-1 py-2.5 text-[12px] font-semibold transition-colors ${
-            activeTab === 'onchain'
-              ? 'text-[#FF9500] border-b-2 border-[#FF9500] bg-white'
-              : 'text-[#B0B8C1] bg-[#FAFBFC] hover:text-[#4E5968]'
-          }`}
-        >
-          온체인 자금 이동
-          {onchainEvents.length > 0 && (
-            <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === 'onchain' ? 'bg-[#FFF4E6] text-[#FF9500]' : 'bg-[#F2F4F6] text-[#8B95A1]'}`}>
-              {onchainEvents.length}
-            </span>
-          )}
-        </button>
       </div>
 
       {/* 일간 고래 요약 — 오늘 이벤트 집계 */}
@@ -748,31 +601,25 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         </div>
       </div>
 
-      {/* 탭별 설명 */}
-      <div className={`px-4 py-2 text-[10px] ${activeTab === 'exchange' ? 'text-[#3182F6] bg-[#F8FBFF]' : 'text-[#FF9500] bg-[#FFFBF5]'}`}>
-        {activeTab === 'exchange'
-          ? '업비트 · 빗썸 · 바이낸스 대량 체결 — 매수/매도 방향성 포착'
-          : '블록체인 15 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름'}
+      {/* 설명 */}
+      <div className="px-4 py-2 text-[10px] text-[#FF9500] bg-[#FFFBF5]">
+        블록체인 15 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름
       </div>
 
       {/* 이벤트 목록 */}
       <div className="max-h-[400px] overflow-y-auto">
-        {currentEvents.length === 0 ? (
+        {onchainEvents.length === 0 ? (
           <div className="px-4 py-8 text-center">
-            <div className="text-[22px] mb-2">{activeTab === 'exchange' ? '📊' : '🔗'}</div>
+            <div className="text-[22px] mb-2">🔗</div>
             <div className="text-[13px] text-[#B0B8C1] mb-1">
-              {!isAnyConnected
-                ? '연결 중...'
-                : activeTab === 'exchange'
-                ? '대량 체결 감지 중...'
-                : '온체인 자금 이동 감지 중...'}
+              {!isAnyConnected ? '연결 중...' : '온체인 자금 이동 감지 중...'}
             </div>
             <div className="text-[11px] text-[#C9CDD2]">
-              {activeTab === 'exchange' ? '2억원+ / $500K+ 단일 체결 발생 시 표시' : '15 BTC 이상 이동 / 대형 자금 흐름 발생 시 표시'}
+              15 BTC 이상 이동 / 대형 자금 흐름 발생 시 표시
             </div>
           </div>
         ) : (
-          currentEvents.map((evt, i) => (
+          onchainEvents.map((evt, i) => (
             <EventRow
               key={`${evt.id || evt.symbol}-${evt.timestamp}-${i}`}
               event={evt}
@@ -783,17 +630,20 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
         )}
       </div>
 
-      {/* 온체인 탭 범례 */}
-      {activeTab === 'onchain' && (
-        <div className="px-4 py-2.5 border-t border-[#F2F4F6] bg-[#FAFBFC]">
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="text-[10px] text-[#C9CDD2]">🔴 거래소 입금 = 매도 압력</span>
-            <span className="text-[10px] text-[#C9CDD2]">🟢 거래소 출금 = HODLing</span>
-            <span className="text-[10px] text-[#C9CDD2]">🟡 거래소간 이동 = 차익거래?</span>
-            <span className="text-[10px] text-[#C9CDD2]">⚪ 지갑간 이동 = OTC</span>
-          </div>
+      {/* 온체인 범례 */}
+      <div className="px-4 py-2.5 border-t border-[#F2F4F6] bg-[#FAFBFC]">
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span className="text-[10px] text-[#C9CDD2]">🔴 거래소 입금 = 매도 압력</span>
+          <span className="text-[10px] text-[#C9CDD2]">🟢 거래소 출금 = HODLing</span>
+          <span className="text-[10px] text-[#C9CDD2]">🟡 거래소간 이동 = 차익거래?</span>
+          <span className="text-[10px] text-[#C9CDD2]">⚪ 지갑간 이동 = OTC</span>
         </div>
-      )}
+      </div>
+
+      {/* ETF 자금 흐름 위젯 */}
+      <div className="p-4 border-t border-[#F2F4F6]">
+        <EtfFlowWidget />
+      </div>
     </div>
   );
 }
