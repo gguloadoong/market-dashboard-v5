@@ -107,7 +107,7 @@ export default function EtfFlowWidget() {
           <div className="pt-1 border-t border-[#F2F4F6]">
             <div className="text-[10px] text-[#8B95A1] mb-1">BTC ETF 최근 5일</div>
             <div className="flex items-end gap-1 h-8">
-              {(data.btc.slice(-5)).map((d, i) => {
+              {data.btc.slice(-5).map((d, i, arr) => {
                 const isPos = (d.netFlow ?? 0) >= 0;
                 const h = Math.min(Math.abs(d.netFlow ?? 0) / 300 * 100, 100);
                 return (
@@ -117,7 +117,7 @@ export default function EtfFlowWidget() {
                       style={{
                         height: `${Math.max(h, 4)}%`,
                         background: isPos ? '#2AC769' : '#F04452',
-                        opacity: i === 4 ? 1 : 0.4 + i * 0.15,
+                        opacity: i === arr.length - 1 ? 1 : 0.4 + i * 0.15,
                       }}
                     />
                   </div>
