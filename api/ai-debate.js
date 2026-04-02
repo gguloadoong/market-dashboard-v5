@@ -44,14 +44,21 @@ export default async function handler(request) {
 
   const prompt = `종목: ${name} (${symbol})${priceStr ? ', ' + priceStr : ''}${changeStr}
 
-이 종목에 대해 강세론과 약세론을 각각 3줄로 제시하고, 종합 의견을 1줄로 작성해주세요.
+이 종목에 대해 강세파와 약세파가 실제 토론처럼 3라운드 주고받으세요.
+강세파가 먼저 1~2문장 주장 → 약세파가 반론. 총 6개 메시지.
 
-반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
+반드시 아래 JSON만 반환하세요 (다른 텍스트 절대 없이):
 {
-  "bull": "강세 근거 • 근거1 • 근거2 • 근거3",
-  "bear": "약세 근거 • 근거1 • 근거2 • 근거3",
-  "verdict": "종합 의견 1줄",
-  "confidence": 0.6
+  "messages": [
+    {"side": "bull", "text": "강세 주장 (1~2문장, 구체적 수치나 이유 포함)"},
+    {"side": "bear", "text": "약세 반론 (1~2문장, 구체적 반론)"},
+    {"side": "bull", "text": "강세 재반론"},
+    {"side": "bear", "text": "약세 재반론"},
+    {"side": "bull", "text": "강세 마지막 주장"},
+    {"side": "bear", "text": "약세 마지막 반론"}
+  ],
+  "verdict": "한국어 종합 의견 1줄",
+  "confidence": 0.0~1.0 사이 숫자 (0.5=중립, 1.0=강한 강세)
 }`;
 
   for (const model of GROQ_MODELS) {
@@ -89,8 +96,15 @@ export default async function handler(request) {
       try {
         const match = text.match(/\{[\s\S]*\}/);
         parsed = JSON.parse(match?.[0] ?? text);
+        // 구 형식(bull/bear 문자열) → messages 배열로 변환
+        if (!parsed.messages && (parsed.bull || parsed.bear)) {
+          parsed.messages = [
+            ...(parsed.bull ? [{ side: 'bull', text: parsed.bull }] : []),
+            ...(parsed.bear ? [{ side: 'bear', text: parsed.bear }] : []),
+          ];
+        }
       } catch {
-        parsed = { bull: text, bear: '', verdict: '', confidence: 0.5 };
+        parsed = { messages: [{ side: 'bull', text }, { side: 'bear', text: '' }], verdict: '', confidence: 0.5 };
       }
 
       return new Response(JSON.stringify({ symbol, model, ...parsed }), {
