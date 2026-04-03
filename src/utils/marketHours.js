@@ -79,8 +79,8 @@ export function isKoreanMarketOpen() {
 }
 
 // 미국 주식 (ET 09:30~16:00, 조기종료일 09:30~13:00)
-export function isUsMarketOpen() {
-  const est = nowEST();
+// est 파라미터: getUsMarketStatus에서 단일 스냅샷 전달 시 경계 흔들림 방지
+export function isUsMarketOpen(est = nowEST()) {
   if (!isWeekday(est) || isNyseHoliday(est)) return false;
   const h = est.getHours(), m = est.getMinutes();
   const minutes = h * 60 + m;
@@ -89,8 +89,7 @@ export function isUsMarketOpen() {
 }
 
 // 프리마켓 (ET 04:00~09:30) — 휴장일 제외
-export function isUsPreMarket() {
-  const est = nowEST();
+export function isUsPreMarket(est = nowEST()) {
   if (!isWeekday(est) || isNyseHoliday(est)) return false;
   const h = est.getHours(), m = est.getMinutes();
   const minutes = h * 60 + m;
@@ -98,8 +97,7 @@ export function isUsPreMarket() {
 }
 
 // 애프터마켓 (ET 16:00~20:00) — 조기종료일은 13:00부터, 휴장일 제외
-export function isUsAfterMarket() {
-  const est = nowEST();
+export function isUsAfterMarket(est = nowEST()) {
   if (!isWeekday(est) || isNyseHoliday(est)) return false;
   const h = est.getHours(), m = est.getMinutes();
   const minutes = h * 60 + m;
@@ -118,13 +116,14 @@ export function getKoreanMarketStatus() {
 }
 
 export function getUsMarketStatus() {
+  // 단일 스냅샷으로 모든 판정 — 경계 시점 흔들림 방지
   const est = nowEST();
   if (!isWeekday(est) || isNyseHoliday(est)) return { status: 'closed', label: '휴장', color: 'neutral' };
-  if (isUsMarketOpen()) {
+  if (isUsMarketOpen(est)) {
     if (isNyseEarlyClose(est)) return { status: 'open', label: '거래중(조기종료)', color: 'up' };
     return { status: 'open', label: '거래중', color: 'up' };
   }
-  if (isUsPreMarket()) return { status: 'pre', label: '프리마켓', color: 'neutral' };
-  if (isUsAfterMarket()) return { status: 'after', label: '애프터', color: 'neutral' };
+  if (isUsPreMarket(est)) return { status: 'pre', label: '프리마켓', color: 'neutral' };
+  if (isUsAfterMarket(est)) return { status: 'after', label: '애프터', color: 'neutral' };
   return { status: 'closed', label: '장마감', color: 'neutral' };
 }
