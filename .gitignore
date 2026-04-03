@@ -38,3 +38,4 @@ dist-ssr
 # e2e / playwright
 e2e-report/
 test-results/
+.last-deployed-commit

@@ -22,14 +22,18 @@
    - 대표님이 명시적으로 "배포해줘" / "배포하자"고 말할 때 → 즉시 실행
    - Claude가 배포 필요하다고 판단 시 → "XX, XX가 머지된 상태입니다. 배포할까요?" 제안 후 대표님 확인 받고 실행
 
-   **배포 방법:** GitHub Actions → "Deploy to Vercel" → Run workflow 클릭
+   **배포 방법 (단 하나):** `npm run deploy`
+   - GA 트리거 → 성공 시 완료
+   - GA 실패 + 토큰 만료 감지 시 → `vercel --prod` 자동 fallback
+   - 이중 배포 자동 방지 (`.last-deployed-commit` 커밋 해시 추적)
+   - 토큰 만료는 매주 월요일 자동 검사 → 만료 전 GitHub Issue 생성
 
    **절대 금지:**
    - PR 머지 후 자동/임의 배포
    - 확인 없이 혼자 판단해서 배포 실행
    - PR 건건이 즉시 머지 (작업 단위 완료 시 일괄 머지)
    - 로컬 확인 없이 머지
-   - `vercel --prod` CLI (긴급 시에만 허용)
+   - `vercel --prod` 직접 호출 (`npm run deploy`가 자동으로 fallback 처리)
 
    **배포 제안 기준 (이 조건 충족 시에만 제안):**
    - P0/P1 버그 수정이 머지된 상태, 또는

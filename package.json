@@ -16,7 +16,8 @@
     "review:gate": "bash scripts/codex-review-gate.sh strict origin/main",
     "ship": "npm run lint && npm run test && npm run build && npm run review:gate",
     "pr": "bash scripts/create-pr.sh",
-    "setup:hooks": "git config core.hooksPath .githooks"
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.21",
