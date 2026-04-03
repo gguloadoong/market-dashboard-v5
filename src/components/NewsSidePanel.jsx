@@ -210,8 +210,9 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     const allMap = Object.fromEntries(all.map(item => [item.symbol, item]));
 
     const newsCategory = news.category;
-    // 코인 기사라도 코스피/코스닥 언급 시 KR 시장 허용 (혼합 기사 대응)
-    const mentionsKrMarket = /코스피|코스닥|kospi|kosdaq/i.test(text);
+    // 코인 기사라도 KR 시장 언급 시 KR 허용 (혼합 기사 대응)
+    // newsTopicMap kr_stock_market 키워드와 동기화 유지
+    const mentionsKrMarket = /코스피|코스닥|kospi|kosdaq|한국증시|국내증시|국장|코스피지수|코스닥지수/i.test(text);
     const allowedMarkets = new Set(
       newsCategory === 'coin' && !mentionsKrMarket ? ['COIN', 'US']
       : newsCategory === 'kr'  ? ['KR', 'US']
