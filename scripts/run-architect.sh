@@ -113,8 +113,9 @@ if [ -z "$REVIEW_OUTPUT" ]; then
   done
 fi
 
-# VERDICT 추출
-VERDICT=$(echo "$REVIEW_OUTPUT" | grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' | awk '{print $2}' | head -1 || echo "UNKNOWN")
+# VERDICT 추출 — head -1은 항상 exit 0이므로 || echo "UNKNOWN" 대신 명시적 빈값 검사
+VERDICT=$(echo "$REVIEW_OUTPUT" | grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' | awk '{print $2}' | head -1)
+if [ -z "$VERDICT" ]; then VERDICT="UNKNOWN"; fi
 
 if [ "$VERDICT" = "UNKNOWN" ]; then
   echo -e "${RED}[architect] VERDICT를 파싱할 수 없습니다. 'VERDICT: PASS' 또는 'VERDICT: BLOCK'을 포함해야 합니다.${NC}"

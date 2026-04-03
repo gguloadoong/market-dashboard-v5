@@ -70,7 +70,12 @@ if [ -n "$ALGO_FILES_CHANGED" ]; then
     exit 1
   fi
 
-  ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)' "$ARCHITECT_FILE" | head -1 || echo "VERDICT: PASS")
+  # [CRITICAL FIX] fallback PASS 하드코딩 제거 — VERDICT 없으면 명시적 차단
+  ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)' "$ARCHITECT_FILE" | head -1)
+  if [ -z "$ARCHITECT_VERDICT" ]; then
+    echo -e "${RED}[pr] architect artifact에 유효한 VERDICT 없음 — npm run architect 재실행${NC}"
+    exit 1
+  fi
   echo -e "${GREEN}[pr] architect 리뷰 ${ARCHITECT_VERDICT} ✓${NC}"
 else
   echo -e "${GREEN}[pr] 알고리즘 파일 변경 없음 — architect 게이트 스킵${NC}"
