@@ -12,6 +12,12 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# claude CLI 확인
+if ! command -v claude &>/dev/null; then
+  echo -e "${RED}[architect] claude CLI 미설치 — brew install claude-code 또는 npm i -g @anthropic-ai/claude-code${NC}"
+  exit 1
+fi
+
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 # [HIGH FIX] 브랜치명 / → - 치환 (artifact 경로 오류 방지)
 SAFE_BRANCH="${BRANCH//\//-}"
@@ -34,6 +40,7 @@ MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
 DIFF_FILE=$(mktemp)
 trap 'rm -f "$DIFF_FILE"' EXIT
 
+# [HIGH FIX] || true 제거 — git diff 실패 시 명시적 오류
 git diff "$MERGE_BASE" HEAD -- \
   'src/engine/' \
   'src/constants/signalThresholds.js' \
@@ -46,12 +53,16 @@ git diff "$MERGE_BASE" HEAD -- \
   'src/hooks/useSignals.js' \
   'src/hooks/useDerivativeSignals.js' \
   'src/hooks/useInvestorSignals.js' \
-  > "$DIFF_FILE" 2>/dev/null || true
+  > "$DIFF_FILE" 2>&1 || {
+  echo -e "${RED}[architect] git diff 실패 — git 상태 확인 필요${NC}"
+  exit 1
+}
 
 DIFF_LINES=$(wc -l < "$DIFF_FILE" | tr -d ' ')
 echo -e "${GREEN}[architect] 알고리즘 diff: ${DIFF_LINES}줄${NC}"
 
-if [ "$DIFF_LINES" -lt 3 ]; then
+# [HIGH FIX] 임계값 0으로 하향 — 1줄 변경도 리뷰 필수
+if [ "$DIFF_LINES" -eq 0 ]; then
   echo -e "${YELLOW}[architect] 알고리즘 파일 변경 없음 — 리뷰 불필요${NC}"
   {
     echo "VERDICT: NOT_REQUIRED"
@@ -65,50 +76,45 @@ fi
 echo -e "${GREEN}[architect] claude Opus 설계 리뷰 시작${NC}"
 echo ""
 
-PROMPT=$(cat <<'PROMPT_EOF'
-당신은 시니어 소프트웨어 아키텍트입니다.
+# [CRITICAL FIX] claude --print 방식으로 통일 (run-code-reviewer.sh 와 동일)
+# [PERF FIX] max-tokens 4000으로 상향
+REVIEW_OUTPUT=$(claude --print "당신은 시니어 소프트웨어 아키텍트입니다.
 아래 diff를 보고 설계 관점에서 리뷰하세요.
 
 ## 리뷰 기준
-1. **설계 일관성**: 변경이 기존 아키텍처 패턴과 일관성이 있는가?
-2. **엣지 케이스**: 커버 안 된 시나리오가 있는가?
-3. **데이터 흐름**: 변경이 연결된 시스템에 예상치 못한 영향을 주는가?
-4. **동기화 문제**: 여러 파일/상수가 동기화되어야 하는데 누락된 게 있는가?
-5. **성능**: 반복 계산, 불필요한 재렌더링 가능성이 있는가?
+1. 설계 일관성: 변경이 기존 아키텍처 패턴과 일관성이 있는가?
+2. 엣지 케이스: 커버 안 된 시나리오가 있는가?
+3. 데이터 흐름: 변경이 연결된 시스템에 예상치 못한 영향을 주는가?
+4. 동기화 문제: 여러 파일/상수가 동기화되어야 하는데 누락된 게 있는가?
+5. 성능: 반복 계산, 불필요한 재렌더링 가능성이 있는가?
 
-## 출력 형식
+## 출력 형식 (반드시 준수)
 - 첫 줄 반드시: VERDICT: PASS 또는 VERDICT: BLOCK
 - [BLOCK] 항목: 반드시 수정 후 진행
 - [WARN] 항목: 권고사항 (PR 진행 가능)
 - 각 항목에 구체적 파일명·라인 번호 명시
 
 ## Diff
-PROMPT_EOF
-)
+$(cat "$DIFF_FILE")" 2>&1 || true)
 
-# Claude CLI로 Opus 호출 (diff는 파일에서 stdin으로)
-REVIEW=$(cat - "$DIFF_FILE" <<STDIN_EOF | claude --model claude-opus-4-6 --max-tokens 2000 -p "" 2>/dev/null || echo ""
-${PROMPT}
-
-\`\`\`diff
-STDIN_EOF
-)
-
-if [ -z "$REVIEW" ]; then
-  # [CRITICAL FIX] 수동 입력 시 VERDICT 하드코딩 제거 — 사용자가 직접 VERDICT 포함해 입력
-  echo -e "${YELLOW}[architect] Claude CLI 호출 실패 — 수동 리뷰 입력${NC}"
+if [ -z "$REVIEW_OUTPUT" ]; then
+  # [HIGH FIX] 수동 입력 — VERDICT 하드코딩 제거, 사용자가 직접 VERDICT 포함해 입력
+  echo -e "${YELLOW}[architect] Claude 응답 없음 — 수동 리뷰 입력${NC}"
   echo -e "${YELLOW}[architect] diff 요약 (상위 50줄):${NC}"
   head -50 "$DIFF_FILE"
   echo ""
   echo -e "${YELLOW}[architect] 설계 검토 후 리뷰를 입력하세요.${NC}"
-  echo -e "${YELLOW}[architect] 반드시 'VERDICT: PASS' 또는 'VERDICT: BLOCK' 포함:${NC}"
-  echo -n "[architect] 리뷰 입력: "
-  read -r MANUAL_REVIEW
-  REVIEW="${MANUAL_REVIEW}"
+  echo -e "${YELLOW}[architect] 반드시 'VERDICT: PASS' 또는 'VERDICT: BLOCK' 포함 후 Enter 두 번:${NC}"
+  REVIEW_OUTPUT=""
+  while IFS= read -r line; do
+    [ -z "$line" ] && break
+    REVIEW_OUTPUT="${REVIEW_OUTPUT}${line}
+"
+  done
 fi
 
 # VERDICT 추출
-VERDICT=$(echo "$REVIEW" | grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' | awk '{print $2}' | head -1 || echo "UNKNOWN")
+VERDICT=$(echo "$REVIEW_OUTPUT" | grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' | awk '{print $2}' | head -1 || echo "UNKNOWN")
 
 if [ "$VERDICT" = "UNKNOWN" ]; then
   echo -e "${RED}[architect] VERDICT를 파싱할 수 없습니다. 'VERDICT: PASS' 또는 'VERDICT: BLOCK'을 포함해야 합니다.${NC}"
@@ -119,7 +125,7 @@ fi
   echo "VERDICT: ${VERDICT}"
   echo "commit: ${HEAD_COMMIT}"
   echo ""
-  echo "$REVIEW"
+  echo "$REVIEW_OUTPUT"
 } > "$ARTIFACT_FILE"
 
 echo ""
