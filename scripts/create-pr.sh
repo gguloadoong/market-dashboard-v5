@@ -64,14 +64,14 @@ if [ -n "$ALGO_FILES_CHANGED" ]; then
     exit 1
   fi
 
-  # BLOCK 체크
-  if grep -qiE 'VERDICT:[[:space:]]*BLOCK' "$ARCHITECT_FILE"; then
+  # BLOCK 체크 — 첫 줄만 검사 (본문 내 BLOCK 언급 오탐 방지)
+  if head -1 "$ARCHITECT_FILE" | grep -qiE 'VERDICT:[[:space:]]*BLOCK'; then
     echo -e "${RED}[pr] architect VERDICT: BLOCK — 설계 이슈 수정 후 재실행${NC}"
     exit 1
   fi
 
-  # [CRITICAL FIX] fallback PASS 하드코딩 제거 — VERDICT 없으면 명시적 차단
-  ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)' "$ARCHITECT_FILE" | head -1)
+  # [CRITICAL FIX] fallback PASS 하드코딩 제거 — VERDICT 없으면 명시적 차단 (첫 줄만)
+  ARCHITECT_VERDICT=$(head -1 "$ARCHITECT_FILE" | grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)')
   if [ -z "$ARCHITECT_VERDICT" ]; then
     echo -e "${RED}[pr] architect artifact에 유효한 VERDICT 없음 — npm run architect 재실행${NC}"
     exit 1
