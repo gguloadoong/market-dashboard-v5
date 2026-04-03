@@ -80,11 +80,12 @@
 
 **알고리즘 파일 목록 (수정 시 `npm run architect` 필수 — PR 자동 차단):**
 ```
-src/engine/          src/constants/signalThresholds.js
-src/utils/marketHours.js    src/utils/newsAlias.js
-src/utils/newsTopicMap.js   src/utils/newsSignal.js
-src/data/relatedAssets.js   src/hooks/useSignals.js
-src/hooks/useDerivativeSignals.js  src/hooks/useInvestorSignals.js
+src/engine/                         src/constants/signalThresholds.js
+src/utils/marketHours.js            src/utils/newsAlias.js
+src/utils/newsTopicMap.js           src/utils/newsSignal.js
+src/utils/signalCardRenderer.js     src/data/relatedAssets.js
+src/hooks/useSignals.js             src/hooks/useDerivativeSignals.js
+src/hooks/useInvestorSignals.js
 ```
 
 **절대 금지:**

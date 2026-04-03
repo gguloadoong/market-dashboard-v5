@@ -2,7 +2,7 @@
 # run-architect.sh — architect(Claude Opus) 설계 리뷰
 #
 # 알고리즘/비즈니스로직 파일 수정 전 설계 단계 강제 실행
-# 결과: .tmp/architect-review-{BRANCH}.md 저장
+# 결과: .tmp/architect-review-{SAFE_BRANCH}.md 저장
 # create-pr.sh가 이 artifact를 체크해 없으면 PR 차단
 
 set -euo pipefail
@@ -13,17 +13,28 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# [HIGH FIX] 브랜치명 / → - 치환 (artifact 경로 오류 방지)
+SAFE_BRANCH="${BRANCH//\//-}"
 HEAD_COMMIT=$(git rev-parse HEAD)
 ARTIFACT_DIR=".tmp"
 mkdir -p "$ARTIFACT_DIR"
-ARTIFACT_FILE="${ARTIFACT_DIR}/architect-review-${BRANCH}.md"
+ARTIFACT_FILE="${ARTIFACT_DIR}/architect-review-${SAFE_BRANCH}.md"
 
 echo -e "${GREEN}[architect] branch: ${BRANCH}${NC}"
 echo -e "${GREEN}[architect] commit: ${HEAD_COMMIT:0:8}${NC}"
 echo ""
 
-# diff 생성 (origin/main 대비)
-DIFF=$(git diff "$(git merge-base origin/main HEAD)" HEAD -- \
+# [HIGH FIX] merge-base 실패 시 명시적 오류 (silent pass 방지)
+MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
+  echo -e "${RED}[architect] origin/main fetch 필요: git fetch origin main${NC}"
+  exit 1
+}
+
+# diff를 임시 파일로 (PERF: 대형 diff 변수 적재 회피)
+DIFF_FILE=$(mktemp)
+trap 'rm -f "$DIFF_FILE"' EXIT
+
+git diff "$MERGE_BASE" HEAD -- \
   'src/engine/' \
   'src/constants/signalThresholds.js' \
   'src/utils/marketHours.js' \
@@ -35,14 +46,13 @@ DIFF=$(git diff "$(git merge-base origin/main HEAD)" HEAD -- \
   'src/hooks/useSignals.js' \
   'src/hooks/useDerivativeSignals.js' \
   'src/hooks/useInvestorSignals.js' \
-  2>/dev/null || true)
+  > "$DIFF_FILE" 2>/dev/null || true
 
-DIFF_LINES=$(echo "$DIFF" | wc -l | tr -d ' ')
+DIFF_LINES=$(wc -l < "$DIFF_FILE" | tr -d ' ')
 echo -e "${GREEN}[architect] 알고리즘 diff: ${DIFF_LINES}줄${NC}"
 
 if [ "$DIFF_LINES" -lt 3 ]; then
   echo -e "${YELLOW}[architect] 알고리즘 파일 변경 없음 — 리뷰 불필요${NC}"
-  # artifact에 "불필요" 기록
   {
     echo "VERDICT: NOT_REQUIRED"
     echo "commit: ${HEAD_COMMIT}"
@@ -55,7 +65,6 @@ fi
 echo -e "${GREEN}[architect] claude Opus 설계 리뷰 시작${NC}"
 echo ""
 
-# Claude Opus architect 프롬프트
 PROMPT=$(cat <<'PROMPT_EOF'
 당신은 시니어 소프트웨어 아키텍트입니다.
 아래 diff를 보고 설계 관점에서 리뷰하세요.
@@ -68,7 +77,7 @@ PROMPT=$(cat <<'PROMPT_EOF'
 5. **성능**: 반복 계산, 불필요한 재렌더링 가능성이 있는가?
 
 ## 출력 형식
-- VERDICT: PASS | BLOCK
+- 첫 줄 반드시: VERDICT: PASS 또는 VERDICT: BLOCK
 - [BLOCK] 항목: 반드시 수정 후 진행
 - [WARN] 항목: 권고사항 (PR 진행 가능)
 - 각 항목에 구체적 파일명·라인 번호 명시
@@ -77,30 +86,34 @@ PROMPT=$(cat <<'PROMPT_EOF'
 PROMPT_EOF
 )
 
-FULL_PROMPT="${PROMPT}
+# Claude CLI로 Opus 호출 (diff는 파일에서 stdin으로)
+REVIEW=$(cat - "$DIFF_FILE" <<STDIN_EOF | claude --model claude-opus-4-6 --max-tokens 2000 -p "" 2>/dev/null || echo ""
+${PROMPT}
 
 \`\`\`diff
-${DIFF}
-\`\`\`"
-
-# Claude CLI로 Opus 호출
-REVIEW=$(echo "$FULL_PROMPT" | claude --model claude-opus-4-6 --max-tokens 2000 -p "" 2>/dev/null || echo "")
+STDIN_EOF
+)
 
 if [ -z "$REVIEW" ]; then
-  # claude CLI 없거나 실패 시 수동 입력 요청
+  # [CRITICAL FIX] 수동 입력 시 VERDICT 하드코딩 제거 — 사용자가 직접 VERDICT 포함해 입력
   echo -e "${YELLOW}[architect] Claude CLI 호출 실패 — 수동 리뷰 입력${NC}"
-  echo -e "${YELLOW}[architect] diff를 보고 설계 이슈를 직접 입력 (VERDICT: PASS/BLOCK 포함):${NC}"
-  echo "$DIFF" | head -50
+  echo -e "${YELLOW}[architect] diff 요약 (상위 50줄):${NC}"
+  head -50 "$DIFF_FILE"
   echo ""
-  echo -n "[architect] 리뷰 입력 (한 줄): "
+  echo -e "${YELLOW}[architect] 설계 검토 후 리뷰를 입력하세요.${NC}"
+  echo -e "${YELLOW}[architect] 반드시 'VERDICT: PASS' 또는 'VERDICT: BLOCK' 포함:${NC}"
+  echo -n "[architect] 리뷰 입력: "
   read -r MANUAL_REVIEW
-  REVIEW="VERDICT: PASS
-commit: ${HEAD_COMMIT}
-(수동 리뷰) ${MANUAL_REVIEW}"
+  REVIEW="${MANUAL_REVIEW}"
 fi
 
 # VERDICT 추출
 VERDICT=$(echo "$REVIEW" | grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' | awk '{print $2}' | head -1 || echo "UNKNOWN")
+
+if [ "$VERDICT" = "UNKNOWN" ]; then
+  echo -e "${RED}[architect] VERDICT를 파싱할 수 없습니다. 'VERDICT: PASS' 또는 'VERDICT: BLOCK'을 포함해야 합니다.${NC}"
+  exit 1
+fi
 
 {
   echo "VERDICT: ${VERDICT}"

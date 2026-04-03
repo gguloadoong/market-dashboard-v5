@@ -29,13 +29,21 @@ echo ""
 echo -e "${GREEN}[pr] === 1.5/5 architect 게이트 ===${NC}"
 
 ALGO_PATTERN="src/engine/|src/constants/signalThresholds|src/utils/marketHours|src/utils/newsAlias|src/utils/newsTopicMap|src/utils/newsSignal|src/utils/signalCardRenderer|src/data/relatedAssets|src/hooks/useSignals|src/hooks/useDerivativeSignals|src/hooks/useInvestorSignals"
-ALGO_FILES_CHANGED=$(git diff "$(git merge-base origin/main HEAD 2>/dev/null || echo 'HEAD')" HEAD --name-only 2>/dev/null | grep -E "$ALGO_PATTERN" || true)
+
+# [HIGH FIX] merge-base 실패 시 명시적 오류 (silent pass 방지)
+MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
+  echo -e "${RED}[pr] origin/main fetch 필요: git fetch origin main${NC}"
+  exit 1
+}
+ALGO_FILES_CHANGED=$(git diff "$MERGE_BASE" HEAD --name-only 2>/dev/null | grep -E "$ALGO_PATTERN" || true)
 
 if [ -n "$ALGO_FILES_CHANGED" ]; then
   echo -e "${YELLOW}[pr] 알고리즘 파일 변경 감지:${NC}"
   echo "$ALGO_FILES_CHANGED" | sed 's/^/    /'
 
-  ARCHITECT_FILE=".tmp/architect-review-${BRANCH}.md"
+  # [HIGH FIX] 브랜치명 / → - 치환 (run-architect.sh와 동일 규칙)
+  SAFE_BRANCH="${BRANCH//\//-}"
+  ARCHITECT_FILE=".tmp/architect-review-${SAFE_BRANCH}.md"
 
   if [ ! -f "$ARCHITECT_FILE" ]; then
     echo ""
