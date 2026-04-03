@@ -40,20 +40,21 @@ MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
 DIFF_FILE=$(mktemp)
 trap 'rm -f "$DIFF_FILE"' EXIT
 
+# .algo-files에서 대상 경로 로드 — create-pr.sh와 단일 소스 유지
+ALGO_FILES_CONFIG="$(dirname "$0")/../.algo-files"
+if [ ! -f "$ALGO_FILES_CONFIG" ]; then
+  echo -e "${RED}[architect] .algo-files 없음: ${ALGO_FILES_CONFIG}${NC}"
+  exit 1
+fi
+# 각 경로를 git diff -- 인수로 변환
+ALGO_PATHS=()
+while IFS= read -r line; do
+  [[ -z "$line" || "$line" == \#* ]] && continue
+  ALGO_PATHS+=("$line")
+done < "$ALGO_FILES_CONFIG"
+
 # [HIGH FIX] || true 제거 — git diff 실패 시 명시적 오류
-git diff "$MERGE_BASE" HEAD -- \
-  'src/engine/' \
-  'src/constants/signalThresholds.js' \
-  'src/utils/marketHours.js' \
-  'src/utils/newsAlias.js' \
-  'src/utils/newsTopicMap.js' \
-  'src/utils/newsSignal.js' \
-  'src/utils/signalCardRenderer.js' \
-  'src/data/relatedAssets.js' \
-  'src/hooks/useSignals.js' \
-  'src/hooks/useDerivativeSignals.js' \
-  'src/hooks/useInvestorSignals.js' \
-  > "$DIFF_FILE" 2>&1 || {
+git diff "$MERGE_BASE" HEAD -- "${ALGO_PATHS[@]}" > "$DIFF_FILE" 2>&1 || {
   echo -e "${RED}[architect] git diff 실패 — git 상태 확인 필요${NC}"
   exit 1
 }
@@ -76,8 +77,6 @@ fi
 echo -e "${GREEN}[architect] claude Opus 설계 리뷰 시작${NC}"
 echo ""
 
-# [CRITICAL FIX] claude --print 방식으로 통일 (run-code-reviewer.sh 와 동일)
-# [PERF FIX] max-tokens 4000으로 상향
 REVIEW_OUTPUT=$(claude --print "당신은 시니어 소프트웨어 아키텍트입니다.
 아래 diff를 보고 설계 관점에서 리뷰하세요.
 

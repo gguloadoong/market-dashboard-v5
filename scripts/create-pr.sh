@@ -30,14 +30,24 @@ npm run build || { echo -e "${RED}[pr] 빌드 실패${NC}"; exit 1; }
 echo ""
 echo -e "${GREEN}[pr] === 1.5/5 architect 게이트 ===${NC}"
 
-ALGO_PATTERN="src/engine/|src/constants/signalThresholds|src/utils/marketHours|src/utils/newsAlias|src/utils/newsTopicMap|src/utils/newsSignal|src/utils/signalCardRenderer|src/data/relatedAssets|src/hooks/useSignals|src/hooks/useDerivativeSignals|src/hooks/useInvestorSignals"
+# .algo-files에서 패턴 동적 로드 — run-architect.sh와 단일 소스 유지
+ALGO_FILES_CONFIG="$(dirname "$0")/../.algo-files"
+if [ ! -f "$ALGO_FILES_CONFIG" ]; then
+  echo -e "${RED}[pr] .algo-files 없음: ${ALGO_FILES_CONFIG}${NC}"
+  exit 1
+fi
+ALGO_PATTERN=$(grep -v '^#' "$ALGO_FILES_CONFIG" | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
 
 # [HIGH FIX] merge-base 실패 시 명시적 오류 (silent pass 방지)
 MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
   echo -e "${RED}[pr] origin/main fetch 필요: git fetch origin main${NC}"
   exit 1
 }
-ALGO_FILES_CHANGED=$(git diff "$MERGE_BASE" HEAD --name-only 2>/dev/null | grep -E "$ALGO_PATTERN" || true)
+# 테스트·스펙 파일 제외 — signalThresholds.test.js 등 오탐 방지
+ALGO_FILES_CHANGED=$(git diff "$MERGE_BASE" HEAD --name-only 2>/dev/null \
+  | grep -E "$ALGO_PATTERN" \
+  | grep -vE '\.(test|spec)\.(js|ts|jsx|tsx)$' \
+  || true)
 
 if [ -n "$ALGO_FILES_CHANGED" ]; then
   echo -e "${YELLOW}[pr] 알고리즘 파일 변경 감지:${NC}"
