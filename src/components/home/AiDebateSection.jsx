@@ -87,7 +87,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       };
       const data = await fetchAiDebate(item.symbol, ctx);
       if (data?.error) {
-        setError(data.error === 'ANTHROPIC_API_KEY not configured' ? 'AI 기능 미설정 (ANTHROPIC_API_KEY 필요)' : data.error);
+        setError(data.error === 'GROQ_API_KEY not configured' ? 'AI 기능 미설정 (GROQ_API_KEY 필요)' : data.error);
       } else {
         setCached(item.symbol, data);
         startAnimation(data);
