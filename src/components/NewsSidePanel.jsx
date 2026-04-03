@@ -18,6 +18,10 @@ const TOPIC_TO_ASSET_SECTORS = {
   'AI':      ['빅테크', '소프트웨어', '클라우드'],
   '은행':    ['금융'],
   '바이오':  ['바이오', '제약', '헬스케어'],
+  // 코스피/코스닥 언급 시 → KR 대표 섹터 연결 (newsTopicMap kr_stock_market 토픽 연계)
+  '금융':    ['금융'],
+  '자동차':  ['자동차'],
+  '배터리':  ['배터리'],
 };
 
 const CAT_COLOR = {
@@ -206,8 +210,10 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     const allMap = Object.fromEntries(all.map(item => [item.symbol, item]));
 
     const newsCategory = news.category;
+    // 코인 기사라도 코스피/코스닥 언급 시 KR 시장 허용 (혼합 기사 대응)
+    const mentionsKrMarket = /코스피|코스닥|kospi|kosdaq/i.test(text);
     const allowedMarkets = new Set(
-      newsCategory === 'coin' ? ['COIN', 'US']
+      newsCategory === 'coin' && !mentionsKrMarket ? ['COIN', 'US']
       : newsCategory === 'kr'  ? ['KR', 'US']
       : ['US', 'COIN', 'KR']
     );
