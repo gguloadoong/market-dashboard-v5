@@ -1,7 +1,9 @@
 // 뉴스 주제 → 섹터 매핑 (규칙 기반, AI 없음)
 // 종목명 직접 매칭 없이도 뉴스 맥락으로 관련 섹터·종목을 추론
 
-export const KR_STOCK_MARKET_KEYWORDS = ['코스피','코스닥','kospi','kosdaq','한국증시','국내증시','국장','코스피지수','코스닥지수'];
+// '국장' 제외 — '미국장' 부분 매칭 오탐 위험 (Copilot 지적)
+// '코스피','코스닥','한국증시','국내증시'로 충분히 커버 가능
+export const KR_STOCK_MARKET_KEYWORDS = ['코스피','코스닥','kospi','kosdaq','한국증시','국내증시','코스피지수','코스닥지수'];
 
 export const NEWS_TOPIC_MAP = [
   {
