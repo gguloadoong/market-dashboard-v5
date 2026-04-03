@@ -7,7 +7,7 @@ const _summaryCache = new Map();
 const _CACHE_MAX = 50;
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 import { RELATED_ASSETS } from '../data/relatedAssets';
-import { detectNewsSectors } from '../utils/newsTopicMap';
+import { detectNewsSectors, KR_STOCK_MARKET_KEYWORDS } from '../utils/newsTopicMap';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
 import { fetchNewsSummary } from '../api/_gateway.js';
 
@@ -212,7 +212,8 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
     const newsCategory = news.category;
     // 코인 기사라도 KR 시장 언급 시 KR 허용 (혼합 기사 대응)
     // newsTopicMap kr_stock_market 키워드와 동기화 유지
-    const mentionsKrMarket = /코스피|코스닥|kospi|kosdaq|한국증시|국내증시|국장|코스피지수|코스닥지수/i.test(text);
+    const lowerText = text.toLowerCase();
+    const mentionsKrMarket = KR_STOCK_MARKET_KEYWORDS.some(kw => lowerText.includes(kw));
     const allowedMarkets = new Set(
       newsCategory === 'coin' && !mentionsKrMarket ? ['COIN', 'US']
       : newsCategory === 'kr'  ? ['KR', 'US']
