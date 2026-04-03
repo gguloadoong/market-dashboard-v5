@@ -30,7 +30,7 @@ export default {
         'lg': '16px',
         'xl': '20px',
         '2xl': '24px',
-        '2.5xl': '20px',
+        '2.5xl': '20px', // legacy alias: xl(20px)과 동일 값, 하위 호환 유지용
         'full': '9999px',
       },
       boxShadow: {

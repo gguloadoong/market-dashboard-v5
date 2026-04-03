@@ -24,9 +24,9 @@ const TYPE_META = {
 };
 
 const DIR_COLOR = {
-  bullish: { bg: '#F0FFF4', dot: '#2AC769', text: '#1A7A45', label: '상승' },
-  bearish: { bg: '#FFF0F0', dot: '#F04452', text: '#C0392B', label: '하락' },
-  neutral: { bg: '#FFFBF0', dot: '#FF9500', text: '#A05C00', label: '주목' },
+  bullish: { bg: '#F0FFF4', dot: '#2AC769', text: '#1A7A45', label: '상승', emoji: '🟢' },
+  bearish: { bg: '#FFF0F0', dot: '#F04452', text: '#C0392B', label: '하락', emoji: '🔴' },
+  neutral: { bg: '#FFFBF0', dot: '#FF9500', text: '#A05C00', label: '주목', emoji: '🟡' },
 };
 
 function extractName(signal) {
@@ -37,8 +37,14 @@ export default function SignalSummaryWidget({ onItemClick }) {
   const [expanded, setExpanded] = useState(false);
   const allSignals = useTopSignals(20);
 
-  const bullCount = useMemo(() => allSignals.filter(s => s.direction === 'bullish').length, [allSignals]);
-  const bearCount = useMemo(() => allSignals.filter(s => s.direction === 'bearish').length, [allSignals]);
+  const { bullCount, bearCount } = useMemo(() => {
+    let bull = 0, bear = 0;
+    for (const s of allSignals) {
+      if (s.direction === 'bullish') bull++;
+      else if (s.direction === 'bearish') bear++;
+    }
+    return { bullCount: bull, bearCount: bear };
+  }, [allSignals]);
 
   // 강도 기준 정렬, 가장 강한 시그널이 TOP
   const sorted = useMemo(() =>
@@ -156,7 +162,7 @@ export default function SignalSummaryWidget({ onItemClick }) {
                   className="flex items-center gap-1 text-[11px] font-medium px-2 py-1.5 rounded-lg transition-colors hover:opacity-80"
                   style={{ background: dir.bg, color: dir.text }}
                 >
-                  <span>{dir.dot === '#2AC769' ? '🟢' : dir.dot === '#F04452' ? '🔴' : '🟡'}</span>
+                  <span>{dir.emoji}</span>
                   <span className="truncate max-w-[80px]">{name}</span>
                   <span className="text-[10px] opacity-70">{meta.tag}</span>
                 </button>

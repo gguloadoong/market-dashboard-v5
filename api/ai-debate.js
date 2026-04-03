@@ -105,7 +105,7 @@ confidence 값 범위: 0.0(강한 약세)~1.0(강한 강세), 0.5=중립`;
           ];
         }
       } catch {
-        parsed = { messages: [{ side: 'bull', text }, { side: 'bear', text: '' }], verdict: '', confidence: 0.5 };
+        parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };
       }
 
       return new Response(JSON.stringify({ symbol, model, ...parsed }), {

@@ -169,7 +169,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
 
           {/* 채팅 버블 영역 */}
           <div className="space-y-2">
-            {messages.slice(0, visibleCount).map((msg, i) => {
+            {messages.filter(msg => msg.text?.trim()).slice(0, visibleCount).map((msg, i) => {
               const isBull = msg.side === 'bull';
               return (
                 <div
