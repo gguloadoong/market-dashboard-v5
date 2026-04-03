@@ -16,6 +16,8 @@ if [ -z "$TITLE" ]; then
 fi
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# 브랜치명 / → - 치환 (artifact 경로 오류 방지, feature/xxx 대응)
+SAFE_BRANCH="${BRANCH//\//-}"
 if [ "$BRANCH" = "main" ]; then
   echo -e "${RED}[pr] main 브랜치에서는 PR을 생성할 수 없습니다.${NC}"
   exit 1
@@ -41,8 +43,6 @@ if [ -n "$ALGO_FILES_CHANGED" ]; then
   echo -e "${YELLOW}[pr] 알고리즘 파일 변경 감지:${NC}"
   echo "$ALGO_FILES_CHANGED" | sed 's/^/    /'
 
-  # [HIGH FIX] 브랜치명 / → - 치환 (run-architect.sh와 동일 규칙)
-  SAFE_BRANCH="${BRANCH//\//-}"
   ARCHITECT_FILE=".tmp/architect-review-${SAFE_BRANCH}.md"
 
   if [ ! -f "$ARCHITECT_FILE" ]; then
@@ -85,7 +85,7 @@ fi
 echo ""
 echo -e "${GREEN}[pr] === 2/5 code-reviewer 검증 ===${NC}"
 
-REVIEW_FILE=".tmp/code-review-${BRANCH}.md"
+REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
 
 if [ ! -f "$REVIEW_FILE" ]; then
   echo -e "${RED}[pr] code-review artifact 없음: ${REVIEW_FILE}${NC}"
@@ -203,7 +203,7 @@ REPO="gguloadoong/market-dashboard-v2"
 echo ""
 echo -e "${GREEN}[pr] === 5/5 봇 리뷰 폴링 (최대 15분) ===${NC}"
 echo -e "${YELLOW}[pr] 필수 조건: Copilot 도착 + Gemini·CodeRabbit 중 1명${NC}"
-echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${BRANCH}.md${NC}"
+echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${SAFE_BRANCH}.md${NC}"
 
 MAX_ITER=30
 INTERVAL=30
