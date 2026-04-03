@@ -24,6 +24,50 @@ fi
 echo -e "${GREEN}[pr] === 1/5 빌드 확인 ===${NC}"
 npm run build || { echo -e "${RED}[pr] 빌드 실패${NC}"; exit 1; }
 
+# ─── 1.5/5 architect 게이트 — 알고리즘 파일 변경 시 설계 리뷰 필수 ────────
+echo ""
+echo -e "${GREEN}[pr] === 1.5/5 architect 게이트 ===${NC}"
+
+ALGO_PATTERN="src/engine/|src/constants/signalThresholds|src/utils/marketHours|src/utils/newsAlias|src/utils/newsTopicMap|src/utils/newsSignal|src/utils/signalCardRenderer|src/data/relatedAssets|src/hooks/useSignals|src/hooks/useDerivativeSignals|src/hooks/useInvestorSignals"
+ALGO_FILES_CHANGED=$(git diff "$(git merge-base origin/main HEAD 2>/dev/null || echo 'HEAD')" HEAD --name-only 2>/dev/null | grep -E "$ALGO_PATTERN" || true)
+
+if [ -n "$ALGO_FILES_CHANGED" ]; then
+  echo -e "${YELLOW}[pr] 알고리즘 파일 변경 감지:${NC}"
+  echo "$ALGO_FILES_CHANGED" | sed 's/^/    /'
+
+  ARCHITECT_FILE=".tmp/architect-review-${BRANCH}.md"
+
+  if [ ! -f "$ARCHITECT_FILE" ]; then
+    echo ""
+    echo -e "${RED}[pr] ⛔ architect 리뷰 artifact 없음${NC}"
+    echo -e "${RED}[pr]    알고리즘 파일 변경 시 설계 리뷰 필수${NC}"
+    echo -e "${YELLOW}[pr]    실행: npm run architect${NC}"
+    exit 1
+  fi
+
+  # commit 일치 확인
+  ARCHITECT_COMMIT=$(grep -oE 'commit: [a-f0-9]+' "$ARCHITECT_FILE" | awk '{print $2}' | head -1 || echo "")
+  HEAD_COMMIT_CHECK=$(git rev-parse HEAD)
+  if [ "$ARCHITECT_COMMIT" != "$HEAD_COMMIT_CHECK" ]; then
+    echo -e "${RED}[pr] architect 리뷰가 현재 HEAD와 불일치${NC}"
+    echo -e "${YELLOW}[pr]    리뷰 기준: ${ARCHITECT_COMMIT:-없음}${NC}"
+    echo -e "${YELLOW}[pr]    현재 HEAD: ${HEAD_COMMIT_CHECK}${NC}"
+    echo -e "${YELLOW}[pr]    재실행: npm run architect${NC}"
+    exit 1
+  fi
+
+  # BLOCK 체크
+  if grep -qiE 'VERDICT:[[:space:]]*BLOCK' "$ARCHITECT_FILE"; then
+    echo -e "${RED}[pr] architect VERDICT: BLOCK — 설계 이슈 수정 후 재실행${NC}"
+    exit 1
+  fi
+
+  ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)' "$ARCHITECT_FILE" | head -1 || echo "VERDICT: PASS")
+  echo -e "${GREEN}[pr] architect 리뷰 ${ARCHITECT_VERDICT} ✓${NC}"
+else
+  echo -e "${GREEN}[pr] 알고리즘 파일 변경 없음 — architect 게이트 스킵${NC}"
+fi
+
 # ─── 2/5 code-reviewer artifact 검증 ──────────────────────────────────────
 echo ""
 echo -e "${GREEN}[pr] === 2/5 code-reviewer 검증 ===${NC}"
