@@ -10,7 +10,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-국장 52종목 + 미장 60종목 + 코인 250종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
+국장 61종목 + 미장 250종목 + ETF 38종목 + 코인 250종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
 
 [Live Demo](https://market-dashboard-v5.vercel.app) · [버그 리포트](https://github.com/gguloadoong/market-dashboard-v5/issues) · [기능 요청](https://github.com/gguloadoong/market-dashboard-v5/issues)
 
@@ -20,7 +20,7 @@
 
 ## Overview
 
-Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **빠른 의사결정**을 돕는 실시간 대시보드입니다. 한국투자증권, Yahoo Finance, Upbit, CoinPaprika 등 **10개 이상의 데이터 소스**를 통합하고, Google Gemini AI로 뉴스를 자동 요약합니다.
+Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **매수 결정 직전 5분**을 돕는 실시간 대시보드입니다. 한국투자증권, Yahoo Finance, Upbit, Stooq 등 **10개 이상의 데이터 소스**를 통합하고, Google Gemini AI로 뉴스를 자동 요약합니다.
 
 ---
 
@@ -28,14 +28,17 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **빠른 의
 
 | | 기능 | 설명 |
 |---|------|------|
-| **[실시간 시세]** | Market Pulse | KOSPI/KOSDAQ/BTC/환율 실시간 지수 + 개별 종목 가격 |
+| **[실시간 시세]** | Market Pulse | KOSPI/KOSDAQ/BTC/환율 실시간 지수 + 공포탐욕지수(코인/미장/국장) |
+| **[시그널]** | 핵심 시그널 | 외국인·기관 연속매수, 거래량 이상치, 뉴스 임팩트 복합 신호 |
 | **[스마트 추천]** | 주목할 종목 | 변동폭 + 거래량 + 뉴스 매칭 복합 점수 기반 히어로 카드 |
-| **[워치리스트]** | 관심종목 관리 | 크로스에셋(주식/코인) 워치리스트 + 가격 알림 |
-| **[랭킹]** | 급등/급락 | KR/US/COIN 마켓별 TOP 5 실시간 랭킹 |
-| **[AI 뉴스]** | 투자 뉴스 | RSS 기반 뉴스 + Gemini AI 요약 + 종목 연결 뱃지 |
-| **[차트]** | 캔들 차트 | lightweight-charts 일/주/월봉 + 거래량 + 투자자 동향 |
-| **[자금 흐름]** | 섹터 로테이션 | HOT/COLD MONEY 시각화 — 자금 유입/유출 섹터 |
-| **[공지]** | 거래소 공지 | Upbit/Bithumb 신규 상장 모니터링 |
+| **[워치리스트]** | 관심종목 관리 | 크로스에셋(주식/코인) 워치리스트 + 매수가 입력 → 평가손익 실시간 표시 |
+| **[알림]** | 조건부 알림 | 목표가·거래량 조건 설정 + PWA Push + 관심종목 뉴스 알림 |
+| **[랭킹]** | 급등/급락 | KR/US/COIN 마켓별 TOP 5 실시간 랭킹 + 조건 스크리너 |
+| **[AI 뉴스]** | 투자 뉴스 | RSS 기반 뉴스 + Gemini AI 요약 + 임팩트 스코어(🟢호재/🔴악재) |
+| **[차트]** | 캔들 차트 | lightweight-charts 일/주/월봉 + 거래량 + 투자자 동향 + "왜 지금?" |
+| **[자금 흐름]** | 섹터 로테이션 | HOT/COLD MONEY 시각화 — 국장·미장·코인 통합 섹터 자금 흐름 |
+| **[이벤트]** | 경제 캘린더 | FOMC, CPI, 실업률 등 이번 주/다음 주 주요 일정 |
+| **[다크모드]** | 테마 전환 | 야간 트레이딩 지원 — 빨강=상승/파랑=하락 한국 증권 컨벤션 유지 |
 
 ---
 
@@ -61,15 +64,19 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **빠른 의
 
 | 데이터 | 소스 | 키 |
 |--------|------|:---:|
-| 국내 주식 (52종목) | 한국투자증권 Open API | 필요 |
-| 미국 주식 (60종목) | Yahoo Finance v8 + Stooq | 불필요 |
-| 코인 가격 KRW (250종목) | Upbit REST + WebSocket | 불필요 |
-| 코인 가격 USD | CoinPaprika + Binance | 불필요 |
-| 코인 스파크라인 | CoinGecko | 불필요 |
-| 시장 지수 | Vercel Edge + 한투 API | 필요 |
-| 환율 | Binance + Upbit BTC 교차 계산 | 불필요 |
-| 뉴스 | RSS (Investing.com, 연합뉴스 등) | 불필요 |
-| AI 요약 | Google Gemini 2.5 Flash Lite | 필요 |
+| 국내 주식 (61종목) | 한국투자증권 Open API (KIS WebSocket) | 필요 |
+| 미국 주식 (~250종목) | Yahoo Finance v8 → Stooq → Alpaca → Naver 6단계 fallback | 불필요 |
+| ETF (38종목) | Yahoo Finance (국내/해외 ETF) | 불필요 |
+| 코인 가격 KRW (~250종목) | Upbit REST + WebSocket | 불필요 |
+| 코인 시총/스파크라인 | CoinGecko | 불필요 |
+| 시장 지수 | 한투 API + Stooq + Yahoo Finance | 필요 |
+| 환율 | Yahoo Finance KRW=X | 불필요 |
+| 뉴스 (국내) | 한경·매경·연합뉴스·이데일리·머니투데이 RSS | 불필요 |
+| 뉴스 (코인) | CoinDesk·Decrypt·CoinTelegraph RSS | 불필요 |
+| 뉴스 (미장) | Yahoo Finance·MarketWatch RSS | 불필요 |
+| 공포탐욕지수 | Alternative.me (코인) + CNN Money (미장) + VKOSPI (국장) | 불필요 |
+| 고래 추적 | Whale Alert API | 필요 |
+| AI 요약 | Google Gemini 2.5 Flash | 필요 |
 
 > 필수 키 없이도 코인/미장 데이터는 정상 작동합니다.
 
@@ -143,6 +150,22 @@ market-dashboard-v5/
 │   └── run-code-reviewer.sh     Claude Opus 코드 리뷰
 └── .github/workflows/           CI/CD + PR 자동 리뷰 (Gemini, CodeRabbit, Copilot)
 ```
+
+---
+
+## Environment Variables
+
+| 변수 | 필수 | 설명 |
+|------|:----:|------|
+| `HANTOO_APP_KEY` | O | 한국투자증권 앱 키 |
+| `HANTOO_APP_SECRET` | O | 한국투자증권 앱 시크릿 |
+| `GEMINI_API_KEY` | - | Google Gemini (뉴스 AI 요약) |
+| `GROQ_API_KEY` | - | Groq AI (고속 추론) |
+| `POLYGON_API_KEY` | - | Polygon.io (미장 보조 데이터) |
+| `WHALE_ALERT_KEY` | - | Whale Alert (고래 추적) |
+| `KRX_API_KEY` | - | KRX ETF 데이터 |
+| `KV_REST_API_URL` | - | Vercel KV (Upstash Redis) — 스냅샷 캐시 URL |
+| `KV_REST_API_TOKEN` | - | Vercel KV (Upstash Redis) — 스냅샷 캐시 토큰 |
 
 ---
 

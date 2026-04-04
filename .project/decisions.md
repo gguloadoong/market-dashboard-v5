@@ -123,7 +123,7 @@
 - **적용**: `src/components/home/HOME_CONTRACT.md` + `src/__tests__/home-layout.test.js` + `src/__tests__/news-filter.test.js` (#180 → PR #181)
 - **다른 프로젝트 적용**: `.project/templates/` 참고
 
-## ADR-013: 서비스 현황 딥다이브 — 완료 기준 재정의 + P0 액션 2개
+## ADR-014: 서비스 현황 딥다이브 — 완료 기준 재정의 + P0 액션 2개
 - **날짜**: 2026-03-26
 - **컨텍스트**: Sprint 6 종료 시점 팀 전체 딥다이브 회의
 - **핵심 발견**:

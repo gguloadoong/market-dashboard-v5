@@ -193,6 +193,19 @@ src/hooks/useInvestorSignals.js
 
 **`gh pr create` 직접 호출 금지. 반드시 `npm run pr`을 사용한다.**
 
+### 이슈-PR 자동 연결 (시스템 강제)
+
+`create-pr.sh`가 브랜치명에서 이슈번호를 자동 추출하여 PR 본문에 `Closes #이슈번호`를 주입한다.
+
+| 상황 | 동작 |
+|------|------|
+| `feature/#36-설명` → 이슈 #36 OPEN | PR 본문에 `Closes #36` 자동 삽입 → 머지 시 이슈 자동 닫힘 |
+| `feature/#36-설명` → 이슈 #36 CLOSED | PR 본문에 `Refs #36` 참조만 |
+| `feat:`/`fix:` PR인데 브랜치에 이슈번호 없음 | **PR 생성 차단** (이슈 먼저 생성 강제) |
+| `refactor:`/`docs:`/`chore:` PR | 이슈 연결 없어도 허용 |
+
+**수동으로 `Closes #이슈번호`를 넣을 필요 없음 — 브랜치명만 규칙대로 만들면 자동 처리.**
+
 ### PR 생성 전 독립 리뷰 (2단계 필수)
 
 ```
