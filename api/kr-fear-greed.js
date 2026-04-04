@@ -74,6 +74,9 @@ async function fetchVkospiNaver() {
   throw new Error('Naver VKOSPI 값 없음');
 }
 
+// ─── 공통 유틸 ──────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
+
 // ─── Naver 외국인 순매수 fallback 제거 ──────────────────────────
 // 주말/공휴일 대응은 fetchForeignNet()의 날짜 범위 7일 확장으로 해결.
 // Naver /investor 응답 단위(억 vs 백만원) 검증 불가(지역 차단) → fallback 삭제.
@@ -116,9 +119,6 @@ async function fetchForeignNet(token, iscd, today) {
   if (!latest) return 0;
   return toWon(latest.frgn_ntby_tr_pbmn);
 }
-
-// ─── 공통 유틸 ──────────────────────────────────────────────────
-const pad = n => String(n).padStart(2, '0');
 
 // ─── 점수 산출 ──────────────────────────────────────────────────
 // 합성 가중치
