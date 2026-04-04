@@ -4,11 +4,11 @@ import { Redis } from '@upstash/redis';
 
 let redis = null;
 try {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    redis = new Redis({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
-    });
+  // Vercel KV 통합(KV_REST_API_*) 또는 Upstash 직접 통합(UPSTASH_REDIS_REST_*) 둘 다 지원
+  const kvUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (kvUrl && kvToken) {
+    redis = new Redis({ url: kvUrl, token: kvToken });
   }
 } catch (e) {
   console.error('[price-cache] Redis 연결 실패:', e);
