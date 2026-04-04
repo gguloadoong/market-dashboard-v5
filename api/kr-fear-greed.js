@@ -75,8 +75,9 @@ async function fetchVkospiNaver() {
 }
 
 // ─── Naver 외국인 순매수 fallback ────────────────────────────────
-// /investor: 당일 외인/기관/개인 순매수 (단위: 백만원)
-// 단위 검증: hantoo-market-investor.js fetchMarketFromNaver()도 동일 엔드포인트에 * 1_000_000 사용 확인
+// /investor: 당일 외인/기관/개인 순매수
+// 단위: 백만원 (frgNetAmt 필드 — KIS API frgn_ntby_tr_pbmn "pbmn=포백만" 관례와 동일)
+// 교차 검증: hantoo-market-investor.js fetchMarketFromNaver()가 동일 URL·동일 필드에 * 1_000_000 적용 (기존 코드, 리뷰 통과)
 async function fetchForeignNetNaver() {
   const res = await fetch('https://m.stock.naver.com/api/index/KOSPI/investor', {
     headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' },
@@ -97,10 +98,14 @@ async function fetchForeignNetNaver() {
 // DATE_1 ~ DATE_2 범위 조회 후 output[0](최근 거래일) 사용
 // → 주말/공휴일에도 마지막 거래일 데이터 반환
 async function fetchForeignNet(token, iscd, today) {
-  // 7일 전 날짜 계산 — today(YYYYMMDD, Seoul 기준)에서 직접 파싱하여 timezone 불일치 방지
-  const fromDate = new Date(`${today.slice(0,4)}-${today.slice(4,6)}-${today.slice(6,8)}`);
-  fromDate.setDate(fromDate.getDate() - 7);
-  const fromStr = fromDate.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+  // 7일 전 날짜 계산 — new Date(y,m,d) 로컬 타임존 생성자 사용 (하이픈 ISO는 UTC 파싱됨)
+  const y = parseInt(today.slice(0,4), 10);
+  const m = parseInt(today.slice(4,6), 10) - 1; // 0-based month
+  const d = parseInt(today.slice(6,8), 10);
+  const fromDate = new Date(y, m, d - 7); // 로컬 타임존 기준 7일 전
+  const pad = n => String(n).padStart(2, '0');
+  const fromStr = `${fromDate.getFullYear()}${pad(fromDate.getMonth()+1)}${pad(fromDate.getDate())}`;
+
 
   const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor`);
   url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'U');
