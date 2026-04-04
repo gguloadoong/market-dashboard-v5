@@ -46,7 +46,7 @@ fi
 # verdict 추출
 OPUS_VERDICT=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | head -1 | cut -d' ' -f2 || echo "UNKNOWN")
 # 주요 소견: HIGH/CRITICAL 태그 줄 또는 요약 첫 줄
-OPUS_SUMMARY=$(grep -m1 "PASS\|수정 완료\|이상 없음\|지적사항 없음" "$REVIEW_FILE" \
+OPUS_SUMMARY=$(grep -m1 "VERDICT: PASS\|지적사항 없음\|이상 없음" "$REVIEW_FILE" \
   | sed 's/\*\*//g' | head -c 100 || echo "세부 내용은 artifact 참조")
 if [ "$OPUS_VERDICT" = "PASS" ]; then
   OPUS_LINE="✅ PASS${OPUS_SUMMARY:+ — ${OPUS_SUMMARY}}"

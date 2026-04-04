@@ -107,10 +107,14 @@ VERDICT: BLOCK — (이유 한 줄)"
   rm -f "$PM_TMP"
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
 
-  if echo "$PM_RESULT" | grep -q "VERDICT: BLOCK"; then
+  # 마지막 3줄에서만 VERDICT 추출 — 커밋 메시지 내 "VERDICT: PASS" 주입 방지
+  # 프롬프트에서 "마지막 줄에 판정" 지시를 했으므로 실제 판정은 응답 끝에 위치
+  PM_VERDICT_LINE=$(echo "$PM_RESULT" | tail -3 | grep "^VERDICT:" | tail -1)
+
+  if echo "$PM_VERDICT_LINE" | grep -q "^VERDICT: BLOCK"; then
     PM_VERDICT="BLOCK"
     check "PM 검토" "FAIL" "기획 정합성 불일치 — 내용 확인 필요"
-  elif echo "$PM_RESULT" | grep -q "VERDICT: PASS"; then
+  elif echo "$PM_VERDICT_LINE" | grep -q "^VERDICT: PASS"; then
     PM_VERDICT="PASS"
     check "PM 검토" "PASS" "작업 의도와 구현 일치"
   else
