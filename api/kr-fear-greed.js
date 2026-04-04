@@ -87,13 +87,13 @@ async function fetchForeignNet(token, iscd, today) {
   const y = parseInt(today.slice(0,4), 10);
   const m = parseInt(today.slice(4,6), 10) - 1; // 0-based month
   const d = parseInt(today.slice(6,8), 10);
-  const fromDate = new Date(y, m, d - 7); // 로컬 타임존 기준 7일 전
+  const fromDate = new Date(y, m, d - 14); // 로컬 타임존 기준 14일 전 (추석/설 최대 10일 연휴 대응)
   const fromStr = `${fromDate.getFullYear()}${pad(fromDate.getMonth()+1)}${pad(fromDate.getDate())}`;
 
   const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor`);
   url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'U');
   url.searchParams.set('FID_INPUT_ISCD',   iscd);
-  url.searchParams.set('FID_INPUT_DATE_1', fromStr); // 7일 전 (Seoul 기준)
+  url.searchParams.set('FID_INPUT_DATE_1', fromStr); // 14일 전 (Seoul 기준)
   url.searchParams.set('FID_INPUT_DATE_2', today);   // 오늘
 
   const r = await fetch(url.toString(), {
