@@ -36,7 +36,7 @@ echo -e "${GREEN}[review-summary] PR #${PR_NUMBER} 감지${NC}"
 
 # ── 2. code-reviewer (Opus) 재실행 ───────────────────────────────────────────
 echo -e "${BLUE}[review-summary] code-reviewer (Opus) 실행 중...${NC}"
-bash scripts/run-code-reviewer.sh
+bash scripts/run-code-reviewer.sh || true  # BLOCK 시에도 artifact는 저장됨 — 스크립트 중단 방지
 
 if [ ! -f "$REVIEW_FILE" ]; then
   echo -e "${RED}[review-summary] 리뷰 artifact 없음: ${REVIEW_FILE}${NC}"
@@ -64,7 +64,8 @@ if command -v codex &>/dev/null; then
   echo -e "${BLUE}[review-summary] Codex gate 실행 중...${NC}"
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
-    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK"; then
+    # DECISION: BLOCK 명시 또는 [P0]/[P1] findings 존재 시 BLOCK
+    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|\[P0\]|\[P1\]"; then
       CODEX_VERDICT="BLOCK"
       CODEX_LINE="🚫 BLOCK"
     else

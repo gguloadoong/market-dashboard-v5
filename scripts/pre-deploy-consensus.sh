@@ -52,15 +52,20 @@ fi
 
 # ── Gate 2: P0/P1 이슈 없음 ──────────────────────────────────────────────────
 echo -e "${BLUE}[2/6] P0/P1 오픈 이슈 확인${NC}"
-P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null || echo "0")
-P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null || echo "0")
-CRITICAL=$((P0_ISSUES + P1_ISSUES))
-if [ "$CRITICAL" -eq 0 ]; then
-  check "P0/P1 이슈" "PASS" "오픈 없음"
+P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null)
+P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null)
+# gh 실패(인증 오류, 네트워크 등) 시 FAIL — 알 수 없는 상태를 PASS로 처리 금지
+if [ -z "$P0_ISSUES" ] || [ -z "$P1_ISSUES" ]; then
+  check "P0/P1 이슈" "FAIL" "GitHub API 오류 — gh 인증 또는 네트워크 확인 후 재실행"
 else
-  check "P0/P1 이슈" "FAIL" "P0: ${P0_ISSUES}건, P1: ${P1_ISSUES}건 — 해결 후 배포"
-  gh issue list --label "P0,P1" --state open --json number,title \
-    --jq '.[] | "    #\(.number) \(.title)"' 2>/dev/null || true
+  CRITICAL=$((P0_ISSUES + P1_ISSUES))
+  if [ "$CRITICAL" -eq 0 ]; then
+    check "P0/P1 이슈" "PASS" "오픈 없음"
+  else
+    check "P0/P1 이슈" "FAIL" "P0: ${P0_ISSUES}건, P1: ${P1_ISSUES}건 — 해결 후 배포"
+    gh issue list --label "P0,P1" --state open --json number,title \
+      --jq '.[] | "    #\(.number) \(.title)"' 2>/dev/null || true
+  fi
 fi
 
 # ── Gate 3: PM 검토 — 이준혁 (기획 정합성) ──────────────────────────────────
