@@ -1,6 +1,10 @@
 // 뉴스 주제 → 섹터 매핑 (규칙 기반, AI 없음)
 // 종목명 직접 매칭 없이도 뉴스 맥락으로 관련 섹터·종목을 추론
 
+// '국장' 제외 — '미국장' 부분 매칭 오탐 위험 (Copilot 지적)
+// '코스피','코스닥','한국증시','국내증시'로 충분히 커버 가능
+export const KR_STOCK_MARKET_KEYWORDS = ['코스피','코스닥','kospi','kosdaq','한국증시','국내증시','코스피지수','코스닥지수'];
+
 export const NEWS_TOPIC_MAP = [
   {
     id: 'semiconductor',
@@ -84,6 +88,12 @@ export const NEWS_TOPIC_MAP = [
     id: 'defense',
     keywords: ['방산','방위산업','k방산','군수','무기수출','국방예산'],
     sectors: ['방산'],
+  },
+  {
+    // 코스피/코스닥 시장 전체 언급 → KR 대표 섹터 연결
+    id: 'kr_stock_market',
+    keywords: KR_STOCK_MARKET_KEYWORDS,
+    sectors: ['반도체', '금융', '자동차', '배터리', '바이오'],
   },
 ];
 
