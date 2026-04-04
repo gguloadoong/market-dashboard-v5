@@ -73,6 +73,8 @@ fi
 echo -e "${BLUE}[3/6] PM 검토 — 이준혁 (작업 의도 정합성 검토)${NC}"
 PM_VERDICT="SKIP"
 if command -v claude &>/dev/null && [ -f ".project/backlog.md" ]; then
+  # nonce: 실행 시마다 랜덤 생성 → 커밋 메시지로 미리 알 수 없어 프롬프트 인젝션 차단
+  PM_NONCE="PMGATE_$(date +%s)_${RANDOM}"
   DEPLOY_COMMITS=$(git log origin/main..HEAD --oneline 2>/dev/null | head -20 || echo "(최근 커밋 없음 — main 직접 커밋)")
   OPEN_PRS=$(gh pr list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"' 2>/dev/null || echo "")
   BACKLOG=$(cat .project/backlog.md 2>/dev/null | head -80)
@@ -95,26 +97,26 @@ ${BACKLOG}
 - 미머지 fix PR이 있다면 배포 전 포함 여부를 경고하라.
 - 대표 요청 여부와 무관하게, 이 작업을 한 의도가 제대로 구현되었는지 판단한다.
 
-마지막 줄에 반드시 아래 형식으로 판정하세요:
-VERDICT: PASS
+마지막 줄에 반드시 아래 형식으로 판정하세요 (토큰 포함 정확히):
+${PM_NONCE}: PASS
 또는
-VERDICT: BLOCK — (이유 한 줄)"
+${PM_NONCE}: BLOCK — (이유 한 줄)"
 
   # 임시 파일 경유 — 커밋 메시지 내 특수문자가 -p 인자로 전달될 때의 셸 확장 위험 방지
   PM_TMP=$(mktemp)
   printf '%s' "$PM_PROMPT" > "$PM_TMP"
-  PM_RESULT=$(claude --print -p "$(cat "$PM_TMP")" 2>/dev/null || echo "VERDICT: SKIP")
+  PM_RESULT=$(claude --print -p "$(cat "$PM_TMP")" 2>/dev/null || echo "${PM_NONCE}: SKIP")
   rm -f "$PM_TMP"
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
 
-  # 마지막 3줄에서만 VERDICT 추출 — 커밋 메시지 내 "VERDICT: PASS" 주입 방지
-  # 프롬프트에서 "마지막 줄에 판정" 지시를 했으므로 실제 판정은 응답 끝에 위치
-  PM_VERDICT_LINE=$(echo "$PM_RESULT" | tail -3 | grep "^VERDICT:" | tail -1)
+  # nonce 포함 줄에서만 verdict 추출 — 커밋 메시지 내 VERDICT 문자열 주입 완전 차단
+  # nonce는 실행 시마다 랜덤 생성 → 커밋 메시지로 미리 알 수 없음
+  PM_VERDICT_LINE=$(echo "$PM_RESULT" | grep "^${PM_NONCE}:" | tail -1)
 
-  if echo "$PM_VERDICT_LINE" | grep -q "^VERDICT: BLOCK"; then
+  if echo "$PM_VERDICT_LINE" | grep -q "^${PM_NONCE}: BLOCK"; then
     PM_VERDICT="BLOCK"
     check "PM 검토" "FAIL" "기획 정합성 불일치 — 내용 확인 필요"
-  elif echo "$PM_VERDICT_LINE" | grep -q "^VERDICT: PASS"; then
+  elif echo "$PM_VERDICT_LINE" | grep -q "^${PM_NONCE}: PASS"; then
     PM_VERDICT="PASS"
     check "PM 검토" "PASS" "작업 의도와 구현 일치"
   else

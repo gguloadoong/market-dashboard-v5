@@ -43,15 +43,17 @@ if [ ! -f "$REVIEW_FILE" ]; then
   exit 1
 fi
 
-# verdict 추출
-OPUS_VERDICT=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | head -1 | cut -d' ' -f2 || echo "UNKNOWN")
-# 주요 소견: HIGH/CRITICAL 태그 줄 또는 요약 첫 줄
-OPUS_SUMMARY=$(grep -m1 "VERDICT: PASS\|지적사항 없음\|이상 없음" "$REVIEW_FILE" \
-  | sed 's/\*\*//g' | head -c 100 || echo "세부 내용은 artifact 참조")
+# verdict 추출: tail -1 로 최종 판정 기준 (파일에 BLOCK 후 PASS 순서 보장 안 됨)
+OPUS_VERDICT=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | tail -1 | cut -d' ' -f2 || echo "UNKNOWN")
+# 주요 소견: PASS 시 성공 메시지, BLOCK 시 첫 번째 CRITICAL/HIGH 지적사항
 if [ "$OPUS_VERDICT" = "PASS" ]; then
+  OPUS_SUMMARY=$(grep -m1 "VERDICT: PASS\|지적사항 없음\|이상 없음" "$REVIEW_FILE" \
+    | sed 's/\*\*//g' | head -c 100 || echo "")
   OPUS_LINE="✅ PASS${OPUS_SUMMARY:+ — ${OPUS_SUMMARY}}"
 else
-  OPUS_LINE="🚫 BLOCK — 재수정 필요"
+  OPUS_SUMMARY=$(grep -m1 "\[CRITICAL\]\|\[HIGH\]" "$REVIEW_FILE" \
+    | sed 's/\*\*//g' | head -c 120 || echo "세부 내용은 artifact 참조")
+  OPUS_LINE="🚫 BLOCK — ${OPUS_SUMMARY:-재수정 필요}"
 fi
 
 # ── 3. Codex gate 재실행 ─────────────────────────────────────────────────────
