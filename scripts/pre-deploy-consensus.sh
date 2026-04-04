@@ -109,9 +109,10 @@ VERDICT: BLOCK — (이유 한 줄)"
     PM_VERDICT="PASS"
     check "PM 검토" "PASS" "작업 의도와 구현 일치"
   else
+    # SKIP: claude 응답 파싱 불가 시 게이트 카운트에서 제외 (soft gate — 인프라 없으면 graceful degrade)
     PM_VERDICT="SKIP"
-    echo -e "${YELLOW}    ⚠️  PM 검토 응답 파싱 실패 — 수동 확인 권장${NC}"
-    PASS=$((PASS + 1))
+    echo -e "${YELLOW}    ⚠️  PM 검토 SKIP (응답 파싱 실패) — 배포 전 수동 확인 권장${NC}"
+    # SKIP은 PASS/FAIL 카운트 모두 제외 — 게이트 총 수(TOTAL)에서도 빠짐
   fi
 else
   echo -e "${YELLOW}    ⚠️  claude CLI 없거나 backlog.md 없음 — PM 게이트 건너뜀${NC}"
@@ -149,6 +150,7 @@ echo -e "${BLUE}[5/6] 개발팀 승인 — FE(박서연) / BE(김민준)${NC}"
 ALGO_CHANGED=0
 if [ ! -f ".algo-files" ]; then
   echo -e "${YELLOW}    ⚠️  .algo-files 없음 — 알고리즘 파일 목록 정의 필요 (scripts/run-architect.sh 참조)${NC}"
+  # .algo-files 없으면 검사 대상 없음 → PASS (파일 생성은 별도 작업, 배포 차단 사유 아님)
 fi
 if [ -f ".algo-files" ]; then
   while IFS= read -r pattern; do

@@ -62,6 +62,7 @@ CODEX_LINE="⏭️ SKIP (codex CLI 미설치)"
 
 if command -v codex &>/dev/null; then
   echo -e "${BLUE}[review-summary] Codex gate 실행 중...${NC}"
+  # 플래그 검증: --output-last-message(-o), --full-auto 모두 codex exec review --help에서 확인됨
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
     # DECISION: BLOCK 명시 또는 [P0]/[P1] findings 존재 시 BLOCK
