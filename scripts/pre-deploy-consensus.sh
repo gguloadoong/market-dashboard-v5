@@ -178,7 +178,24 @@ if [ -f ".algo-files" ]; then
 fi
 
 if [ "$ALGO_CHANGED" -gt 0 ]; then
-  check "알고리즘 파일" "FAIL" "알고리즘 파일 변경 ${ALGO_CHANGED}건 — npm run architect 결과 확인 필요"
+  # architect 승인 artifact 확인 — PASS/NOT_REQUIRED + 현재 커밋 일치 시 통과
+  BRANCH_NOW=$(git rev-parse --abbrev-ref HEAD)
+  SAFE_BRANCH_NOW="${BRANCH_NOW//\//-}"
+  ARCHITECT_ARTIFACT=".tmp/architect-review-${SAFE_BRANCH_NOW}.md"
+  HEAD_NOW=$(git rev-parse HEAD)
+  ARCHITECT_VERDICT=""
+  ARCHITECT_COMMIT=""
+  if [ -f "$ARCHITECT_ARTIFACT" ]; then
+    ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' "$ARCHITECT_ARTIFACT" | awk '{print $2}' | head -1 || true)
+    ARCHITECT_COMMIT=$(grep -m1 "^commit:" "$ARCHITECT_ARTIFACT" | awk '{print $2}' || true)
+  fi
+
+  if { [ "$ARCHITECT_VERDICT" = "PASS" ] || [ "$ARCHITECT_VERDICT" = "NOT_REQUIRED" ]; } \
+      && [ "$ARCHITECT_COMMIT" = "$HEAD_NOW" ]; then
+    check "개발팀 승인" "PASS" "architect 승인 완료 (${ARCHITECT_VERDICT}) — 커밋 일치"
+  else
+    check "알고리즘 파일" "FAIL" "알고리즘 파일 변경 ${ALGO_CHANGED}건 — npm run architect 실행 후 재확인"
+  fi
 else
   check "개발팀 승인" "PASS" "알고리즘 파일 변경 없음"
 fi
