@@ -207,6 +207,28 @@ src/hooks/useInvestorSignals.js
 
 **리뷰 종합 코멘트 필수 → 머지**
 
+### 리뷰 종합 코멘트 (자동화)
+
+```bash
+npm run review:summary   # Opus + Codex 재실행 → PR 코멘트 자동 게시
+```
+
+- 봇 리뷰(Gemini/Copilot/CodeRabbit) 채택/기각 처리 완료 후 실행
+- CodeRabbit 한도 초과 시에도 Opus + Codex 결과로 대체 가능
+- BLOCK 있으면 종료코드 1 → 머지 전 재수정 필수
+
+**코멘트 포맷 (자동 생성됨):**
+```markdown
+## 리뷰 종합
+### 봇 리뷰 채택/기각
+| 봇 | 지적 | 판단 | 처리 |
+|---|---|---|---|
+
+### 최종 검토
+> 🤖 code-reviewer (Claude Opus): PASS/BLOCK
+> 🔍 Codex Gate: PASS/BLOCK
+```
+
 ### 기획 리뷰
 
 - PR 본문을 기준으로 CLAUDE.md의 프로젝트 목표/타겟 유저/핵심 가치와 방향이 맞는지 판단
