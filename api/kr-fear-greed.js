@@ -39,25 +39,31 @@ async function fetchVkospiKis(token) {
 
 // ─── Naver 증권 VKOSPI fallback (장 마감/주말에도 전일 종가 반환) ─
 async function fetchVkospiNaver() {
+  const NAVER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Referer': 'https://m.stock.naver.com/',
+    'Accept': 'application/json',
+  };
+
+  // /prices?pageSize=1 → 최신 종가 포함 (basic보다 안정적)
   const NAVER_URLS = [
+    'https://m.stock.naver.com/api/index/VKOSPI/prices?pageSize=1',
     'https://m.stock.naver.com/api/index/VKOSPI/basic',
-    'https://m.stock.naver.com/api/index/VKOSPI200/basic', // 대안
   ];
+
   for (const url of NAVER_URLS) {
     try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-          'Referer': 'https://m.stock.naver.com/',
-          'Accept': 'application/json',
-        },
-        signal: AbortSignal.timeout(6000),
-      });
+      const res = await fetch(url, { headers: NAVER_HEADERS, signal: AbortSignal.timeout(6000) });
       if (!res.ok) continue;
       const data = await res.json();
+
+      // /prices 응답: 배열이면 첫 번째 항목에서 closePrice 추출
+      const item = Array.isArray(data) ? data[0] : data;
+      if (!item) continue;
+
       // 다양한 필드명 시도 (Naver API 응답 구조 변경 대응)
-      const rawVal = data.closePrice ?? data.indexNowVal ?? data.nvsValueClose
-        ?? data.compareToPreviousClosePrice ?? data.stockEndPrice ?? null;
+      const rawVal = item.closePrice ?? item.indexNowVal ?? item.nvsValueClose
+        ?? item.compareToPreviousClosePrice ?? item.stockEndPrice ?? null;
       if (rawVal == null) continue;
       const val = parseFloat(String(rawVal).replace(/,/g, ''));
       if (!isNaN(val) && val > 0) return val;
@@ -67,27 +73,39 @@ async function fetchVkospiNaver() {
 }
 
 // ─── Naver 외국인 순매수 fallback ────────────────────────────────
+// /investor: 당일 외인/기관/개인 순매수 (단위: 백만원)
 async function fetchForeignNetNaver() {
-  const res = await fetch('https://m.stock.naver.com/api/index/KOSPI/investorTrend', {
+  const res = await fetch('https://m.stock.naver.com/api/index/KOSPI/investor', {
     headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' },
     signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) throw new Error(`Naver KOSPI investor HTTP ${res.status}`);
   const data = await res.json();
-  const list = Array.isArray(data) ? data : (data.list ?? []);
-  const latest = list[0];
-  if (!latest) return null;
-  const amt = parseFloat(String(latest.foreignNetBuyAmount ?? latest.frgnNetAmt ?? '0').replace(/,/g, ''));
-  return isNaN(amt) ? null : amt * 100_000_000; // 억 → 원
+  // 배열(일별 목록) 또는 단일 객체 모두 대응
+  const item = Array.isArray(data) ? data[0] : data;
+  if (!item) return null;
+  // 백만원 단위 → 원 변환
+  const toNum = v => parseInt((String(v || '0')).replace(/,/g, ''), 10) || 0;
+  const amt = toNum(item.frgNetAmt ?? item.frgnNetAmt ?? item.foreignNetBuyAmount ?? 0);
+  return amt * 1_000_000; // 백만원 → 원
 }
 
 // ─── 외국인 순매수 조회 ─────────────────────────────────────────
+// DATE_1 ~ DATE_2 범위 조회 후 output[0](최근 거래일) 사용
+// → 주말/공휴일에도 마지막 거래일 데이터 반환
 async function fetchForeignNet(token, iscd, today) {
+  // 7일 전 날짜 계산 (Seoul 기준)
+  const seoulStr = d => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d).replace(/-/g, '');
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - 7);
+
   const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor`);
   url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'U');
   url.searchParams.set('FID_INPUT_ISCD',   iscd);
-  url.searchParams.set('FID_INPUT_DATE_1', today);
-  url.searchParams.set('FID_INPUT_DATE_2', today);
+  url.searchParams.set('FID_INPUT_DATE_1', seoulStr(fromDate)); // 7일 전
+  url.searchParams.set('FID_INPUT_DATE_2', today);              // 오늘
 
   const r = await fetch(url.toString(), {
     headers: {
