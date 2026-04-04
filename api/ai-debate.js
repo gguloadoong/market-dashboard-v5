@@ -104,6 +104,38 @@ export default async function handler(request) {
             ...(parsed.bear ? [{ side: 'bear', text: parsed.bear }] : []),
           ];
         }
+        // LLM이 메시지 text 안에 전체 JSON을 삽입한 경우 감지 → 재파싱 (단일 depth)
+        // inner JSON이 실제 응답이므로 messages/verdict/confidence 모두 복구
+        let innerResult = null;
+        for (const msg of (parsed.messages ?? [])) {
+          const innerText = (msg?.text ?? '').trim();
+          if (!innerText.startsWith('{')) continue;
+          try {
+            let inner;
+            try {
+              inner = JSON.parse(innerText);
+            } catch {
+              const m = innerText.match(/\{[\s\S]*\}/);
+              if (!m) continue;
+              inner = JSON.parse(m[0]);
+            }
+            if (Array.isArray(inner?.messages) && inner.messages.length >= 2) {
+              innerResult = inner;
+              break;
+            }
+          } catch (e) {
+            console.warn('[ai-debate] inner JSON reparse failed:', e?.message);
+          }
+        }
+        if (innerResult) {
+          // 화이트리스트 필드만 병합 — prototype 오염 방지
+          parsed = {
+            ...parsed,
+            messages: innerResult.messages,
+            ...(innerResult.verdict  != null && { verdict:    innerResult.verdict }),
+            ...(innerResult.confidence != null && { confidence: innerResult.confidence }),
+          };
+        }
       } catch {
         parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };
       }
