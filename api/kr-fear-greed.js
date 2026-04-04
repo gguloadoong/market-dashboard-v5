@@ -77,17 +77,9 @@ async function fetchVkospiNaver() {
 // ─── 공통 유틸 ──────────────────────────────────────────────────
 const pad = n => String(n).padStart(2, '0');
 
-// ─── Naver 외국인 순매수 fallback 제거 ──────────────────────────
-// 주말/공휴일 대응은 fetchForeignNet()의 날짜 범위 7일 확장으로 해결.
-// Naver /investor 응답 단위(억 vs 백만원) 검증 불가(지역 차단) → fallback 삭제.
-// KIS가 실패할 경우 외국인 성분 없이 VKOSPI만으로 점수 산출 (foreignScore = null).
-async function fetchForeignNetNaver() {
-  // 항상 throw — handler의 Promise.allSettled([..., fetchForeignNetNaver(), ...])에서 rejected로 처리됨
-  // 호출부: kr-fear-greed.js handler() 내 naverForeignRes = Promise.allSettled([..., fetchForeignNetNaver()])
-  throw new Error('Naver 외국인 fallback 비활성화 — KIS 날짜 범위 확장으로 대체');
-}
-
 // ─── 외국인 순매수 조회 ─────────────────────────────────────────
+// 외국인 Naver fallback 없음 — 단위(억 vs 백만원) 검증 불가(지역 차단).
+// KIS가 실패하면 외국인 성분 없이 VKOSPI만으로 점수 산출 (foreignScore = null).
 // DATE_1 ~ DATE_2 범위 조회 후 output[0](최근 거래일) 사용
 // → 주말/공휴일에도 마지막 거래일 데이터 반환
 async function fetchForeignNet(token, iscd, today) {
@@ -168,23 +160,14 @@ export default async function handler(req, res) {
       + (kosdaqRes.status === 'fulfilled' ? kosdaqRes.value : 0)
       : null;
 
-    // 한투 실패 시 Naver fallback (장 마감/주말에도 전일 종가 반환)
+    // 한투 VKOSPI 실패 시 Naver fallback (장 마감/주말에도 전일 종가 반환)
+    // 외국인 데이터는 Naver fallback 없음 — KIS 7일 날짜 범위 확장으로 주말 대응
     let vkospiFinal = vkospi;
-    let foreignNetFinal = foreignNet;
-    let foreignAvailableFinal = foreignAvailable;
+    const foreignNetFinal = foreignNet;
+    const foreignAvailableFinal = foreignAvailable;
 
-    if (vkospiFinal == null || !foreignAvailableFinal) {
-      const [naverVkospiRes, naverForeignRes] = await Promise.allSettled([
-        vkospiFinal == null ? fetchVkospiNaver() : Promise.resolve(vkospiFinal),
-        !foreignAvailableFinal ? fetchForeignNetNaver() : Promise.resolve(foreignNet),
-      ]);
-      if (vkospiFinal == null && naverVkospiRes.status === 'fulfilled') {
-        vkospiFinal = naverVkospiRes.value;
-      }
-      if (!foreignAvailableFinal && naverForeignRes.status === 'fulfilled' && naverForeignRes.value != null) {
-        foreignNetFinal = naverForeignRes.value;
-        foreignAvailableFinal = true;
-      }
+    if (vkospiFinal == null) {
+      try { vkospiFinal = await fetchVkospiNaver(); } catch {}
     }
 
     // 모두 실패 = Redis 캐시 → 그것도 없으면 closed

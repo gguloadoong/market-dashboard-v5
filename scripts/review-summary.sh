@@ -44,7 +44,10 @@ if [ ! -f "$REVIEW_FILE" ]; then
 fi
 
 # verdict 추출: tail -1 로 최종 판정 기준 (파일에 BLOCK 후 PASS 순서 보장 안 됨)
-OPUS_VERDICT=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | tail -1 | cut -d' ' -f2 || echo "UNKNOWN")
+# grep 매칭 성공 시 cut도 exit 0 → || echo "UNKNOWN" 미도달 → 빈값 체크 필요
+_opus_verdict_raw=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | tail -1 || true)
+OPUS_VERDICT=$(echo "$_opus_verdict_raw" | cut -d' ' -f2)
+[ -z "$OPUS_VERDICT" ] && OPUS_VERDICT="UNKNOWN"
 # 주요 소견: PASS 시 성공 메시지, BLOCK 시 첫 번째 CRITICAL/HIGH 지적사항
 if [ "$OPUS_VERDICT" = "PASS" ]; then
   OPUS_SUMMARY=$(grep -m1 "VERDICT: PASS\|지적사항 없음\|이상 없음" "$REVIEW_FILE" \

@@ -102,10 +102,12 @@ ${PM_NONCE}: PASS
 또는
 ${PM_NONCE}: BLOCK — (이유 한 줄)"
 
-  # 임시 파일 경유 — 커밋 메시지 내 특수문자가 -p 인자로 전달될 때의 셸 확장 위험 방지
+  # stdin redirect로 프롬프트 전달 — "$(cat ...)" 셸 확장 완전 회피
+  # claude --print < file: 파일 내용을 stdin으로 직접 전달 (이중 셸 해석 없음)
+  # 실패 시 SKIP fallback (soft gate — claude 미설치/stdin 미지원 환경에서도 배포 차단 안 함)
   PM_TMP=$(mktemp)
   printf '%s' "$PM_PROMPT" > "$PM_TMP"
-  PM_RESULT=$(claude --print -p "$(cat "$PM_TMP")" 2>/dev/null || echo "${PM_NONCE}: SKIP")
+  PM_RESULT=$(claude --print < "$PM_TMP" 2>/dev/null || echo "${PM_NONCE}: SKIP")
   rm -f "$PM_TMP"
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
 
