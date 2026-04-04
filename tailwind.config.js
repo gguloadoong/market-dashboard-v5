@@ -21,8 +21,6 @@ export default {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', '"Noto Sans KR"', 'sans-serif'],
         mono: ['"Roboto Mono"', '"SF Mono"', 'monospace'],
       },
-      // CDS 토큰 (ADR-002: Coinbase Design System 구조 차용)
-      // spacing은 Tailwind 기본값 유지 (오버라이드 시 기존 유틸리티 깨짐)
       borderRadius: {
         'sm': '4px',
         'DEFAULT': '8px',

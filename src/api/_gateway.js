@@ -79,6 +79,15 @@ export function fetchWhaleProxy(cursor, timeoutMs = 8000) {
   return gwJson({ t: 'w', ...(cursor ? { cr: cursor } : {}) }, timeoutMs);
 }
 
+// ─── BTC · ETH ETF 순유입/유출 ───────────────────────────────
+export async function fetchBtcEtfFlow() {
+  try {
+    const res = await fetch('/api/btc-etf-flow', { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
 // ─── 온체인 고래 (Blockchair, 키 불필요) ─────────────────────
 // whale-chain.js Edge Function 직접 호출 (d.js 우회 — 응답 크기 때문에 별도)
 export async function fetchWhaleChain(chain = 'all', minUsd = 1_000_000, timeoutMs = 10000) {

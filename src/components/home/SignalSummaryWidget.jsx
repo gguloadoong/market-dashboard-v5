@@ -16,11 +16,11 @@ const TYPE_META = {
   fear_greed_shift:              { tag: '심리 전환',   action: '분위기 바뀌고 있어', icon: '😱' },
   news_sentiment_cluster:        { tag: '뉴스 집중',   action: '이슈 몰리는 중', icon: '📰' },
   sector_rotation:               { tag: '섹터 이동',   action: '자금 흐름 변화', icon: '🔄' },
-  PUT_CALL_RATIO:                { tag: '옵션 시그널', action: '풋/콜 비율 이상', icon: '📈' },
-  FUNDING_RATE_EXTREME:          { tag: '선물 과열',   action: '롱/숏 과열 주의', icon: '🔥' },
-  ORDER_FLOW_IMBALANCE:          { tag: '매수 집중',   action: '매수세가 매도를 압도 중', icon: '⚡' },
-  VWAP_DEVIATION:                { tag: '평균가 이탈', action: '평균 매입가보다 싸게 살 기회', icon: '💡' },
-  SOCIAL_SENTIMENT:              { tag: 'SNS 화제',    action: 'SNS에서 달아오르는 중', icon: '💬' },
+  put_call_ratio:                { tag: '옵션 시그널', action: '풋/콜 비율 이상', icon: '📈' },
+  funding_rate_extreme:          { tag: '선물 과열',   action: '롱/숏 과열 주의', icon: '🔥' },
+  order_flow_imbalance:          { tag: '매수 집중',   action: '매수세가 매도를 압도 중', icon: '⚡' },
+  vwap_deviation:                { tag: '평균가 이탈', action: '평균 매입가보다 싸게 살 기회', icon: '💡' },
+  social_sentiment:              { tag: 'SNS 화제',    action: 'SNS에서 달아오르는 중', icon: '💬' },
 };
 
 const DIR_COLOR = {

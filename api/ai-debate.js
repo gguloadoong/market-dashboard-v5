@@ -59,8 +59,7 @@ export default async function handler(request) {
   ],
   "verdict": "한국어 종합 의견 1줄",
   "confidence": 0.65
-}
-confidence 값 범위: 0.0(강한 약세)~1.0(강한 강세), 0.5=중립`;
+}`;
 
   for (const model of GROQ_MODELS) {
     try {

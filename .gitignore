@@ -32,6 +32,10 @@ dist-ssr
 # OMC 플러그인 상태 (로컬 전용)
 .omc/
 
+# 코드 리뷰 artifact (로컬 전용)
+.tmp/
+
 # e2e / playwright
 e2e-report/
 test-results/
+.last-deployed-commit

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# .githooks/pre-push — code-review artifact 존재/최신성 경고
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# main, refactor, docs, chore 브랜치는 스킵
+if [[ "$BRANCH" == "main" ]]; then
+  exit 0
+fi
+
+REVIEW_FILE=".tmp/code-review-${BRANCH}.md"
+
+if [ ! -f "$REVIEW_FILE" ]; then
+  echo ""
+  echo "⚠️  [pre-push] code-review artifact 없음: ${REVIEW_FILE}"
+  echo "    npm run review:code 실행 권장 (PR 생성 시 필수)"
+  echo ""
+  exit 0  # soft warning — 블로킹 안 함
+fi
+
+REVIEW_COMMIT=$(grep -oE 'commit: [a-f0-9]+' "$REVIEW_FILE" | awk '{print $2}' || echo "")
+HEAD_COMMIT=$(git rev-parse HEAD)
+
+if [ "$REVIEW_COMMIT" != "$HEAD_COMMIT" ]; then
+  echo ""
+  echo "⚠️  [pre-push] code-review가 현재 HEAD와 불일치"
+  echo "    리뷰 기준: ${REVIEW_COMMIT:-없음}"
+  echo "    현재 HEAD: ${HEAD_COMMIT}"
+  echo "    npm run review:code 재실행 권장"
+  echo ""
+fi
+
+exit 0
