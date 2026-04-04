@@ -2,7 +2,7 @@
 // Upbit REST + CoinPaprika 병렬 호출 → Redis 저장
 export const config = { runtime: 'edge' };
 
-import { SNAP_KEYS, SNAP_TTL, setSnap } from '../_price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache.js';
 
 // Upbit 전종목 KRW 마켓 목록 조회
 async function fetchUpbitMarkets() {
@@ -135,6 +135,8 @@ export default async function handler(request) {
       },
     });
   } catch (err) {
+    // Cron 실패 기록 (모니터링용)
+    await recordCronFailure('coins', err.message);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: {

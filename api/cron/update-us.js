@@ -2,7 +2,7 @@
 // Yahoo Finance v8 chart per-symbol + query1/query2 rotation → Redis 저장
 export const config = { runtime: 'edge' };
 
-import { SNAP_KEYS, SNAP_TTL, setSnap } from '../_price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache.js';
 
 // 주요 S&P500 + 기존 88개 종목 통합 심볼 목록
 const US_SYMBOLS = [
@@ -31,7 +31,7 @@ const US_SYMBOLS = [
   'ACN','IBM','CSCO','TXN','NEE','PG','KO','PEP','PM','MO',
 ];
 
-const CONCURRENCY = 10; // Yahoo v8 동시 요청 수
+const CONCURRENCY = 25; // Yahoo v8 동시 요청 수 (10→25 성능 개선)
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 let _hostIdx = 0;
 function nextHost() {
@@ -39,12 +39,12 @@ function nextHost() {
 }
 
 // Yahoo v8 chart 단일 심볼 — v7 batch 대비 Vercel Edge에서 안정적
-async function fetchYahooV8Single(symbol) {
+async function fetchYahooV8Single(symbol, timeoutMs = 8000) {
   const host = nextHost();
   const url = `https://${host}/v8/finance/chart/${symbol}?interval=1d&range=5d&includePrePost=false`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`Yahoo v8 ${symbol} ${res.status}`);
   const data   = await res.json();
@@ -74,20 +74,24 @@ async function fetchYahooV8Single(symbol) {
   };
 }
 
-// 동시성 제한 배치 실행
-async function fetchYahooBatch(symbols) {
+// 동시성 제한 배치 실행 (타임아웃 커스텀 지원)
+async function fetchYahooBatch(symbols, timeoutMs = 8000) {
   const results = [];
-  let failCount = 0;
+  const failedSymbols = [];
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
     const chunk = symbols.slice(i, i + CONCURRENCY);
-    const settled = await Promise.allSettled(chunk.map(fetchYahooV8Single));
-    for (const r of settled) {
-      if (r.status === 'fulfilled') results.push(r.value);
-      else failCount++;
+    const settled = await Promise.allSettled(
+      chunk.map(sym => fetchYahooV8Single(sym, timeoutMs))
+    );
+    for (let j = 0; j < settled.length; j++) {
+      if (settled[j].status === 'fulfilled') results.push(settled[j].value);
+      else failedSymbols.push(chunk[j]);
     }
   }
-  if (failCount > 0) console.warn(`[update-us] Yahoo v8 실패 ${failCount}/${symbols.length}개`);
-  return results;
+  if (failedSymbols.length > 0) {
+    console.warn(`[update-us] Yahoo v8 실패 ${failedSymbols.length}/${symbols.length}개`);
+  }
+  return { results, failedSymbols };
 }
 
 export default async function handler(request) {
@@ -103,14 +107,33 @@ export default async function handler(request) {
   }
 
   try {
-    const items = await fetchYahooBatch(US_SYMBOLS);
+    // 1차 실행
+    const { results: firstResults, failedSymbols } = await fetchYahooBatch(US_SYMBOLS);
+
+    // 2단계 재시도 — 실패 비율 50% 이상이면 서버 문제로 판단하여 스킵
+    let retryResults = [];
+    const failRatio = failedSymbols.length / US_SYMBOLS.length;
+    if (failedSymbols.length > 0 && failRatio < 0.5) {
+      console.log(`[update-us] 2차 재시도: ${failedSymbols.length}개 (타임아웃 5초)`);
+      const { results: retried } = await fetchYahooBatch(failedSymbols, 5000);
+      retryResults = retried;
+    } else if (failRatio >= 0.5) {
+      console.warn(`[update-us] 실패 비율 ${(failRatio * 100).toFixed(0)}% — 서버 문제로 판단, 재시도 스킵`);
+    }
+
+    const items = [...firstResults, ...retryResults];
 
     // Redis 저장
     if (items.length > 0) {
       await setSnap(SNAP_KEYS.US, items, SNAP_TTL.US);
     }
 
-    return new Response(JSON.stringify({ ok: true, count: items.length }), {
+    return new Response(JSON.stringify({
+      ok: true,
+      count: items.length,
+      retried: retryResults.length,
+      failed: failedSymbols.length - retryResults.length,
+    }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -118,6 +141,8 @@ export default async function handler(request) {
       },
     });
   } catch (err) {
+    // Cron 실패 기록 (모니터링용)
+    await recordCronFailure('us', err.message);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: {

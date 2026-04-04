@@ -34,11 +34,11 @@
   }
 
   /* ── 섹션 카드 ── */
-  .sc { @apply bg-white rounded-2xl overflow-hidden; }
+  .sc { @apply bg-white rounded-xl overflow-hidden border border-[#ECEEF1]; }
   .sc-header {
-    @apply flex items-center justify-between px-5 pt-5 pb-3;
+    @apply flex items-center justify-between px-5 pt-4 pb-2;
   }
-  .sc-title { @apply text-[16px] font-bold text-text1; }
+  .sc-title { @apply text-[15px] font-semibold text-text1; }
   .sc-more  { @apply text-[13px] text-text2 hover:text-primary transition-colors; }
 
   /* ── 종목 행 ── */
@@ -82,7 +82,7 @@
     animation: fadeIn 0.15s ease;
   }
   .modal-panel {
-    @apply bg-white w-full sm:max-w-md rounded-t-[28px] sm:rounded-[24px]
+    @apply bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-xl
            max-h-[92vh] overflow-y-auto;
     animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     box-shadow: 0 -4px 40px rgba(0,0,0,0.12);
@@ -90,10 +90,11 @@
 
   /* ── 지수 카드 ── */
   .index-card {
-    @apply bg-white rounded-2xl px-4 py-3.5 flex-shrink-0 cursor-pointer select-none
-           transition-all duration-150 active:scale-[0.98];
+    @apply bg-white rounded-lg px-4 py-3 flex-shrink-0 cursor-pointer select-none
+           transition-all duration-150 border border-[#ECEEF1];
     min-width: 120px;
   }
+  .index-card:hover { border-color: #D1D5DB; }
 
   /* ── 뉴스 행 ── */
   .news-row {
@@ -104,27 +105,25 @@
 
   /* ── 종목 카드 ── */
   .card {
-    @apply bg-white rounded-2xl cursor-pointer select-none transition-all duration-200;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    @apply bg-white rounded-lg cursor-pointer select-none transition-all duration-150 border border-[#ECEEF1];
   }
   .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-color: #D1D5DB;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
   .card-surge {
-    @apply rounded-2xl cursor-pointer select-none transition-all duration-200;
-    background: #FFF8F8;
-    border-left: 4px solid #D63031;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    @apply rounded-lg cursor-pointer select-none transition-all duration-150;
+    background: #FEFCFC;
+    border: 1px solid #FCA5A5;
+    border-left: 3px solid #EF4444;
   }
   .card-surge:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(214,48,49,0.15);
+    box-shadow: 0 2px 8px rgba(239,68,68,0.1);
   }
 
   /* ── section-card (탭 내부 섹션) ── */
   .section-card {
-    @apply bg-white rounded-2xl overflow-hidden;
+    @apply bg-white rounded-xl overflow-hidden border border-[#ECEEF1];
   }
 
   /* ── 배지 추가 ── */

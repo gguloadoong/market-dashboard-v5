@@ -122,7 +122,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
   const allShown = visibleCount >= messages.length && messages.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       {/* 헤더: 선택된 종목 이름 + 드롭다운 */}
       <div className="flex items-center justify-between mb-3">
         <div>

@@ -63,7 +63,7 @@ export default function MarketTimeline() {
   if (items.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[13px] font-bold text-[#191F28]">오늘의 타임라인</span>
         <span className="text-[11px] text-[#B0B8C1]">시간순</span>

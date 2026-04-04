@@ -100,7 +100,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
       {/* ─── SECTION 3: 3열 HOT 리스트 ───────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* 국내 급등 */}
-        <div className={`bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm ${!krOpen ? 'opacity-60' : ''}`}>
+        <div className={`bg-white rounded-xl overflow-hidden border border-[#ECEEF1] ${!krOpen ? 'opacity-60' : ''}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇰🇷</span>
@@ -129,7 +129,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
         </div>
 
         {/* 미장 급등 */}
-        <div className={`bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm ${!usOpen ? 'opacity-60' : ''}`}>
+        <div className={`bg-white rounded-xl overflow-hidden border border-[#ECEEF1] ${!usOpen ? 'opacity-60' : ''}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇺🇸</span>
@@ -158,7 +158,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
         </div>
 
         {/* 코인 급등 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🪙</span>
@@ -188,7 +188,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
       {/* ─── SECTION 3b: 3열 DROP 리스트 ───── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* 국내 급락 */}
-        <div className={`bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm ${!krOpen ? 'opacity-60' : ''}`}>
+        <div className={`bg-white rounded-xl overflow-hidden border border-[#ECEEF1] ${!krOpen ? 'opacity-60' : ''}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇰🇷</span>
@@ -215,7 +215,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
         </div>
 
         {/* 미장 급락 */}
-        <div className={`bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm ${!usOpen ? 'opacity-60' : ''}`}>
+        <div className={`bg-white rounded-xl overflow-hidden border border-[#ECEEF1] ${!usOpen ? 'opacity-60' : ''}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇺🇸</span>
@@ -242,7 +242,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
         </div>
 
         {/* 코인 급락 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🪙</span>

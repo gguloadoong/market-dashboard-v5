@@ -95,7 +95,7 @@ function SuggestRow({ item, krwRate, onItemClick, onAdd }) {
 export default function WatchlistWidget({ watchedItems, popularItems = [], toggle, onItemClick, krwRate = 1466 }) {
   if (!watchedItems.length) {
     return (
-      <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+      <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
           <span className="text-[13px] font-bold text-[#191F28]">관심종목</span>
           <span className="text-[11px] text-[#B0B8C1]">/ 검색</span>
@@ -128,7 +128,7 @@ export default function WatchlistWidget({ watchedItems, popularItems = [], toggl
   }
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+    <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[13px] font-bold text-[#191F28]">관심종목</span>
         <span className="text-[11px] text-[#B0B8C1]">{watchedItems.length}개</span>

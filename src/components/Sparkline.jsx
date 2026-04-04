@@ -1,6 +1,7 @@
 // SVG 스파크라인 컴포넌트
+import React from 'react';
 
-export default function Sparkline({ data = [], width = 80, height = 32, positive }) {
+function Sparkline({ data = [], width = 80, height = 32, positive }) {
   if (!data || data.length < 2) {
     return <svg width={width} height={height} />;
   }
@@ -47,3 +48,6 @@ export default function Sparkline({ data = [], width = 80, height = 32, positive
     </svg>
   );
 }
+
+// React.memo로 래핑 — data/positive가 같으면 리렌더 스킵
+export default React.memo(Sparkline);

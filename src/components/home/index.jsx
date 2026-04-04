@@ -34,7 +34,7 @@ function SeoulForceSection({ signals, onItemClick }) {
   if (!forceSignals.length) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-3">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <span className="text-[12px] font-bold text-[#191F28]">세력 포착</span>
         <span className="text-[10px] text-[#B0B8C1]">외국인·기관 연속 매수매도</span>
@@ -106,7 +106,7 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, on
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-[#191F28]">섹터 자금 흐름</span>

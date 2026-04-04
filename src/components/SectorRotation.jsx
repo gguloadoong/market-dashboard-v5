@@ -70,7 +70,7 @@ export default function SectorRotation({ krStocks = [], usStocks = [], coins = [
   const showFlag    = activeMarket === 'all';
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+    <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
         <div className="flex items-center gap-2">

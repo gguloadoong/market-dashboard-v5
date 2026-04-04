@@ -3,7 +3,7 @@
 // Vercel 서버에서 KRX LOGOUT 시 Naver marketValue API로 KOSPI+KOSDAQ ~4000종목 수집
 
 import { createRequire } from 'module';
-import { SNAP_KEYS, SNAP_TTL, setSnap } from '../_price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache.js';
 
 const require = createRequire(import.meta.url);
 const KR_STOCK_NAMES = require('../kr-stock-names.json');
@@ -352,6 +352,11 @@ export default async function handler(req, res) {
   // Redis 저장
   if (items.length > 0) {
     await setSnap(SNAP_KEYS.KR, items, SNAP_TTL.KR);
+  }
+
+  // 모든 소스 실패 시 Cron 실패 기록
+  if (items.length === 0) {
+    await recordCronFailure('kr', '모든 데이터 소스 실패 (KRX → Naver → 한투 → Naver 개별)');
   }
 
   return res.status(200).json({

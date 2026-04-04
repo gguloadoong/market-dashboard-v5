@@ -31,6 +31,9 @@ export const SNAP_TTL = {
   ETF: 600,   // 10분
 };
 
+// 백업 키 TTL (초) — 1시간
+const BACKUP_TTL = 3600;
+
 // 단일 키 조회
 export async function getSnap(key) {
   if (!redis) return null;
@@ -42,10 +45,33 @@ export async function getSnap(key) {
   }
 }
 
-// 단일 키 저장 (TTL 포함)
+// 단일 키 조회 + 실패 시 백업 키에서 복구
+export async function getSnapWithFallback(key) {
+  const data = await getSnap(key);
+  if (data !== null) return data;
+  // 원본 키 실패/만료 → 백업 키에서 복구 시도
+  if (!redis) return null;
+  try {
+    const backup = await redis.get(`${key}:prev`);
+    if (backup !== null) {
+      console.warn(`[price-cache] ${key} 캐시 미스 → 백업(${key}:prev)에서 복구`);
+    }
+    return backup;
+  } catch (e) {
+    console.error(`[price-cache] 백업 조회 실패 (${key}:prev):`, e);
+    return null;
+  }
+}
+
+// 단일 키 저장 (TTL 포함) — 기존 데이터를 :prev 백업 키에 보존
 export async function setSnap(key, data, ex) {
   if (!redis) return false;
   try {
+    // 기존 데이터를 백업 키에 저장 (TTL 1시간)
+    const existing = await redis.get(key);
+    if (existing !== null) {
+      await redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+    }
     await redis.set(key, data, { ex });
     return true;
   } catch (e) {
@@ -54,18 +80,66 @@ export async function setSnap(key, data, ex) {
   }
 }
 
-// 전체 마켓 스냅샷 일괄 조회 (ETF는 cron 없음 — 클라이언트 직접 폴링)
+// 전체 마켓 스냅샷 일괄 조회 (백업 fallback 포함)
+// ETF는 cron 없음 — 클라이언트 직접 폴링
 export async function getAllSnaps() {
   if (!redis) return null;
   try {
     const [kr, us, coins] = await Promise.all([
-      redis.get(SNAP_KEYS.KR),
-      redis.get(SNAP_KEYS.US),
-      redis.get(SNAP_KEYS.COINS),
+      getSnapWithFallback(SNAP_KEYS.KR),
+      getSnapWithFallback(SNAP_KEYS.US),
+      getSnapWithFallback(SNAP_KEYS.COINS),
     ]);
     return { kr, us, coins };
   } catch (e) {
     console.error('[price-cache] getAllSnaps 실패:', e);
+    return null;
+  }
+}
+
+// ─── Cron 실패 모니터링 ───
+
+// Cron 실패 기록 — 실패 카운터 incr + 마지막 에러 JSON 저장
+export async function recordCronFailure(cronName, errorMessage) {
+  if (!redis) return;
+  try {
+    const countKey = `cron:fail:${cronName}`;
+    const errorKey = `cron:lastError:${cronName}`;
+    await Promise.all([
+      // 실패 카운터 증가 (TTL 1시간 — 1시간 내 실패 횟수 추적)
+      redis.incr(countKey).then(() => redis.expire(countKey, 3600)),
+      // 마지막 에러 정보 저장
+      redis.set(errorKey, JSON.stringify({
+        error: errorMessage,
+        ts: Date.now(),
+      }), { ex: 3600 }),
+    ]);
+  } catch (e) {
+    console.error(`[price-cache] recordCronFailure 실패 (${cronName}):`, e);
+  }
+}
+
+// Cron 헬스 체크 — 3개 마켓의 실패 카운터 + 마지막 에러 반환
+export async function getCronHealth() {
+  if (!redis) return null;
+  const markets = ['kr', 'us', 'coins'];
+  try {
+    const results = await Promise.all(
+      markets.map(async (m) => {
+        const [failCount, lastError] = await Promise.all([
+          redis.get(`cron:fail:${m}`),
+          redis.get(`cron:lastError:${m}`),
+        ]);
+        return {
+          market: m,
+          failCount: parseInt(failCount || '0', 10),
+          lastError: lastError ? (typeof lastError === 'string' ? JSON.parse(lastError) : lastError) : null,
+        };
+      }),
+    );
+    return results;
+  } catch (e) {
+    console.error('[price-cache] getCronHealth 실패:', e);
     return null;
   }
 }

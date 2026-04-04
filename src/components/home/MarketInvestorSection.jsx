@@ -83,7 +83,7 @@ function SignalBadge({ marketData }) {
 // ─── 스켈레톤 로딩 UI ─────────────────────────────────────────
 function Skeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] overflow-hidden">
       {/* 헤더 스켈레톤 */}
       <div className="px-4 py-3 border-b border-[#F2F4F6] bg-[#FAFBFC]">
         <div className="h-3 bg-[#F2F4F6] rounded w-28 animate-pulse" />
@@ -169,7 +169,7 @@ export default function MarketInvestorSection() {
   const bars = calcBars(marketData);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] overflow-hidden">
 
       {/* ─── 헤더 ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6] bg-[#FAFBFC]">

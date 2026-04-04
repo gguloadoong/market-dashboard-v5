@@ -23,7 +23,9 @@
     "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
+    "@coinbase/cds-web": "^8.62.1",
     "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-virtual": "^3.13.23",
     "@upstash/redis": "^1.37.0",
     "framer-motion": "^10.18.0",
     "lightweight-charts": "^5.1.0",
