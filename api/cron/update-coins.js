@@ -57,14 +57,8 @@ async function fetchCoinPaprika() {
 }
 
 export default async function handler(request) {
-  // Vercel Cron Bearer 인증 — CRON_SECRET 미설정 시 프로덕션 거부
+  // Vercel Cron Bearer 인증 — CRON_SECRET 설정 시에만 검증, 미설정 시 허용
   const secret = process.env.CRON_SECRET;
-  const isProd = process.env.VERCEL_ENV === 'production';
-  if (isProd && !secret) {
-    return new Response(JSON.stringify({ error: 'CRON_SECRET 환경변수 미설정' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
-    });
-  }
   if (secret) {
     const auth = request.headers.get('authorization');
     if (auth !== `Bearer ${secret}`) {
