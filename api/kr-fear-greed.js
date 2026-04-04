@@ -74,24 +74,12 @@ async function fetchVkospiNaver() {
   throw new Error('Naver VKOSPI 값 없음');
 }
 
-// ─── Naver 외국인 순매수 fallback ────────────────────────────────
-// /investor: 당일 외인/기관/개인 순매수
-// 단위: 백만원 (frgNetAmt 필드 — KIS API frgn_ntby_tr_pbmn "pbmn=포백만" 관례와 동일)
-// 교차 검증: hantoo-market-investor.js fetchMarketFromNaver()가 동일 URL·동일 필드에 * 1_000_000 적용 (기존 코드, 리뷰 통과)
+// ─── Naver 외국인 순매수 fallback 제거 ──────────────────────────
+// 주말/공휴일 대응은 fetchForeignNet()의 날짜 범위 7일 확장으로 해결.
+// Naver /investor 응답 단위(억 vs 백만원) 검증 불가(지역 차단) → fallback 삭제.
+// KIS가 실패할 경우 외국인 성분 없이 VKOSPI만으로 점수 산출 (foreignScore = null).
 async function fetchForeignNetNaver() {
-  const res = await fetch('https://m.stock.naver.com/api/index/KOSPI/investor', {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`Naver KOSPI investor HTTP ${res.status}`);
-  const data = await res.json();
-  // 배열(일별 목록) 또는 단일 객체 모두 대응
-  const item = Array.isArray(data) ? data[0] : data;
-  if (!item) return null;
-  // 백만원 단위 → 원 변환
-  const toNum = v => parseInt((String(v || '0')).replace(/,/g, ''), 10) || 0;
-  const amt = toNum(item.frgNetAmt ?? item.frgnNetAmt ?? item.foreignNetBuyAmount ?? 0);
-  return amt * 1_000_000; // 백만원 → 원
+  throw new Error('Naver 외국인 fallback 비활성화 — KIS 날짜 범위 확장으로 대체');
 }
 
 // ─── 외국인 순매수 조회 ─────────────────────────────────────────
