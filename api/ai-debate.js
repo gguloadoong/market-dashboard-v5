@@ -78,15 +78,16 @@ export default async function handler(request) {
         signal: AbortSignal.timeout(15000),
       });
 
-      // rate limit → 다음 모델 시도
-      if (res.status === 429) continue;
+      // 429(레이트 리밋)·5xx(서버 일시 오류) → 다음 모델 fallback
+      if (res.status === 429 || res.status >= 500) continue;
 
+      // 4xx(인증·요청 오류) → 재시도 무의미, 에러 컨텍스트 보존 후 즉시 반환
       if (!res.ok) {
         const errText = await res.text();
-        return new Response(JSON.stringify({ error: `groq_api: ${res.status}`, detail: errText }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
-        });
+        return new Response(
+          JSON.stringify({ error: `groq_api: ${res.status}`, detail: errText }),
+          { status: 502, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' } }
+        );
       }
 
       const data = await res.json();
