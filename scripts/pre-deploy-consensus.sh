@@ -115,8 +115,8 @@ VERDICT: BLOCK — (이유 한 줄)"
     # SKIP은 PASS/FAIL 카운트 모두 제외 — 게이트 총 수(TOTAL)에서도 빠짐
   fi
 else
-  echo -e "${YELLOW}    ⚠️  claude CLI 없거나 backlog.md 없음 — PM 게이트 건너뜀${NC}"
-  PASS=$((PASS + 1))
+  # claude CLI 미설치 또는 backlog.md 없음 — SKIP (카운트 제외, 배포 차단 안 함)
+  echo -e "${YELLOW}    ⚠️  claude CLI 없거나 backlog.md 없음 — PM 게이트 SKIP (배포 전 수동 확인 권장)${NC}"
 fi
 
 # ── Gate 4: QA 승인 (장성민) ─────────────────────────────────────────────────
