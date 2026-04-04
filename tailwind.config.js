@@ -28,7 +28,7 @@ export default {
         'lg': '16px',
         'xl': '20px',
         '2xl': '24px',
-        '2.5xl': '20px',
+        '2.5xl': '20px', // legacy alias: xl(20px)과 동일 값, 하위 호환 유지용
         'full': '9999px',
       },
       boxShadow: {
@@ -44,6 +44,15 @@ export default {
         'base': ['14px', { lineHeight: '20px' }],
         'lg': ['16px', { lineHeight: '24px' }],
         'xl': ['20px', { lineHeight: '28px' }],
+      },
+      keyframes: {
+        fadeIn: {
+          '0%':   { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.3s ease-out',
       },
     },
   },

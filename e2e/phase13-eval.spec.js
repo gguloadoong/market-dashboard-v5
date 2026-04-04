@@ -28,8 +28,7 @@ test.describe('P0 — 마켓 온도계', () => {
     if (count > 0) {
       await expect(widget).toBeVisible({ timeout: 3000 });
     }
-    // count === 0 → 시그널 없는 상태, 정상 동작
-    expect(count >= 0).toBe(true);
+    // count === 0이어도 정상 (시그널 미수집 상태)
   });
 
   test('마켓 온도계에 5개 구간 중 하나가 표시된다 (시그널 있는 경우)', async ({ page }) => {

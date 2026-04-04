@@ -20,14 +20,17 @@ import DerivativesWidget from './widgets/DerivativesWidget';
 import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
 import AiDebateSection from './AiDebateSection';
 import { useSignals } from '../../hooks/useSignals';
+import { SIGNAL_TYPES } from '../../engine/signalTypes';
 
 // ─── 세력 포착 (외국인·기관 연속 매수매도) ──
 function SeoulForceSection({ signals, onItemClick }) {
-  const forceSignals = signals.filter(s =>
-    ['foreign_consecutive_buy','foreign_consecutive_sell',
-     'institutional_consecutive_buy','institutional_consecutive_sell'].includes(s.type)
-    && s.strength >= 3
-  );
+  const FORCE_TYPES = [
+    SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
+    SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL,
+    SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY,
+    SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
+  ];
+  const forceSignals = signals.filter(s => FORCE_TYPES.includes(s.type) && s.strength >= 3);
   if (!forceSignals.length) return null;
 
   return (
@@ -43,7 +46,7 @@ function SeoulForceSection({ signals, onItemClick }) {
           const dirLabel = isBull ? '연속 매수' : '연속 매도';
           return (
             <button
-              key={sig.symbol + sig.type}
+              key={sig.symbol + sig.type + (sig.timestamp || '')}
               onClick={() => onItemClick?.({ symbol: sig.symbol, name: sig.name, market: sig.market })}
               className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-left"
               style={{ background: isBull ? '#F0FFF6' : '#FFF0F1' }}
@@ -53,7 +56,7 @@ function SeoulForceSection({ signals, onItemClick }) {
                   {typeLabel}
                 </span>
                 <span className="text-[12px] font-bold text-[#191F28]">{sig.name}</span>
-                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.strength}일+</span>
+                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.meta?.consecutiveDays || sig.strength}일+</span>
               </div>
               <span className="text-[10px] text-[#B0B8C1]">차트 →</span>
             </button>

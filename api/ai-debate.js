@@ -104,7 +104,7 @@ export default async function handler(request) {
           ];
         }
       } catch {
-        parsed = { messages: [{ side: 'bull', text }, { side: 'bear', text: '' }], verdict: '', confidence: 0.5 };
+        parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };
       }
 
       return new Response(JSON.stringify({ symbol, model, ...parsed }), {

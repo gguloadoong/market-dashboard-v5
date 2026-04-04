@@ -49,7 +49,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       .slice(0, 5),
   ];
 
-  const messages = result?.messages || [];
+  const messages = Array.isArray(result?.messages) ? result.messages : [];
 
   // 메시지 애니메이션: visibleCount < messages.length 이면 700ms 후 +1
   useEffect(() => {
@@ -97,7 +97,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       };
       const data = await fetchAiDebate(item.symbol, ctx);
       if (data?.error) {
-        setError(data.error === 'ANTHROPIC_API_KEY not configured' ? 'AI 기능 미설정 (ANTHROPIC_API_KEY 필요)' : data.error);
+        setError(data.error === 'GROQ_API_KEY not configured' ? 'AI 기능 미설정 (GROQ_API_KEY 필요)' : data.error);
       } else {
         setCached(item.symbol, data);
         startAnimation(data);
@@ -179,7 +179,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
 
           {/* 채팅 버블 영역 */}
           <div className="space-y-2">
-            {messages.slice(0, visibleCount).map((msg, i) => {
+            {messages.filter(msg => msg.text?.trim()).slice(0, visibleCount).map((msg, i) => {
               const isBull = msg.side === 'bull';
               return (
                 <div
