@@ -113,7 +113,7 @@ export default async function handler(request) {
             if (!innerMatch) continue;
             const reparsed = JSON.parse(innerMatch[0]);
             if (Array.isArray(reparsed?.messages) && reparsed.messages.length >= 2) {
-              parsed = reparsed;
+              parsed = { ...parsed, ...reparsed };
               break;
             }
           } catch (e) {
