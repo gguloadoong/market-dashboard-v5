@@ -103,22 +103,31 @@ export default async function handler(request) {
             ...(parsed.bear ? [{ side: 'bear', text: parsed.bear }] : []),
           ];
         }
-        // LLM이 메시지 text 안에 전체 JSON을 삽입한 경우 감지 → 재파싱
-        // 모든 메시지를 순회해 JSON 형식의 text 발견 시 재파싱 시도
+        // LLM이 메시지 text 안에 전체 JSON을 삽입한 경우 감지 → 재파싱 (단일 depth)
+        // verdict/confidence는 원본 유지, messages만 교체
+        let reparsedMessages = null;
         for (const msg of (parsed.messages ?? [])) {
           const innerText = (msg?.text ?? '').trim();
           if (!innerText.startsWith('{')) continue;
           try {
-            const innerMatch = innerText.match(/\{[\s\S]*\}/);
-            if (!innerMatch) continue;
-            const reparsed = JSON.parse(innerMatch[0]);
-            if (Array.isArray(reparsed?.messages) && reparsed.messages.length >= 2) {
-              parsed = { ...parsed, ...reparsed };
+            let inner;
+            try {
+              inner = JSON.parse(innerText);
+            } catch {
+              const m = innerText.match(/\{[\s\S]*\}/);
+              if (!m) continue;
+              inner = JSON.parse(m[0]);
+            }
+            if (Array.isArray(inner?.messages) && inner.messages.length >= 2) {
+              reparsedMessages = inner.messages;
               break;
             }
           } catch (e) {
             console.warn('[ai-debate] inner JSON reparse failed:', e?.message);
           }
+        }
+        if (reparsedMessages) {
+          parsed = { ...parsed, messages: reparsedMessages };
         }
       } catch {
         parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };
