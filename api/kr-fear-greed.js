@@ -91,9 +91,7 @@ async function fetchForeignNet(token, iscd, today) {
   const m = parseInt(today.slice(4,6), 10) - 1; // 0-based month
   const d = parseInt(today.slice(6,8), 10);
   const fromDate = new Date(y, m, d - 7); // 로컬 타임존 기준 7일 전
-  const pad = n => String(n).padStart(2, '0');
   const fromStr = `${fromDate.getFullYear()}${pad(fromDate.getMonth()+1)}${pad(fromDate.getDate())}`;
-
 
   const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor`);
   url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'U');
@@ -118,6 +116,9 @@ async function fetchForeignNet(token, iscd, today) {
   if (!latest) return 0;
   return toWon(latest.frgn_ntby_tr_pbmn);
 }
+
+// ─── 공통 유틸 ──────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
 
 // ─── 점수 산출 ──────────────────────────────────────────────────
 // 합성 가중치

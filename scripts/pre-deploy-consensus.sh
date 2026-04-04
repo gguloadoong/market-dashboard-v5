@@ -99,7 +99,7 @@ VERDICT: PASS
 또는
 VERDICT: BLOCK — (이유 한 줄)"
 
-  PM_RESULT=$(echo "$PM_PROMPT" | claude --print 2>/dev/null || echo "VERDICT: SKIP")
+  PM_RESULT=$(claude --print -p "$PM_PROMPT" 2>/dev/null || echo "VERDICT: SKIP")
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
 
   if echo "$PM_RESULT" | grep -q "VERDICT: BLOCK"; then
@@ -147,6 +147,9 @@ fi
 echo -e "${BLUE}[5/6] 개발팀 승인 — FE(박서연) / BE(김민준)${NC}"
 # 최근 커밋에 리뷰되지 않은 알고리즘 파일 변경 없는지 확인
 ALGO_CHANGED=0
+if [ ! -f ".algo-files" ]; then
+  echo -e "${YELLOW}    ⚠️  .algo-files 없음 — 알고리즘 파일 목록 정의 필요 (scripts/run-architect.sh 참조)${NC}"
+fi
 if [ -f ".algo-files" ]; then
   while IFS= read -r pattern; do
     [ -z "$pattern" ] && continue
