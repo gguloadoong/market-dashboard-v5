@@ -78,15 +78,16 @@ export default async function handler(request) {
         signal: AbortSignal.timeout(15000),
       });
 
-      // rate limit → 다음 모델 시도
-      if (res.status === 429) continue;
+      // 429(레이트 리밋)·5xx(서버 일시 오류) → 다음 모델 fallback
+      if (res.status === 429 || res.status >= 500) continue;
 
+      // 4xx(인증·요청 오류) → 재시도 무의미, 에러 컨텍스트 보존 후 즉시 반환
       if (!res.ok) {
         const errText = await res.text();
-        return new Response(JSON.stringify({ error: `groq_api: ${res.status}`, detail: errText }), {
-          status: 502,
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' },
-        });
+        return new Response(
+          JSON.stringify({ error: `groq_api: ${res.status}`, detail: errText }),
+          { status: 502, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' } }
+        );
       }
 
       const data = await res.json();
@@ -102,6 +103,38 @@ export default async function handler(request) {
             ...(parsed.bull ? [{ side: 'bull', text: parsed.bull }] : []),
             ...(parsed.bear ? [{ side: 'bear', text: parsed.bear }] : []),
           ];
+        }
+        // LLM이 메시지 text 안에 전체 JSON을 삽입한 경우 감지 → 재파싱 (단일 depth)
+        // inner JSON이 실제 응답이므로 messages/verdict/confidence 모두 복구
+        let innerResult = null;
+        for (const msg of (parsed.messages ?? [])) {
+          const innerText = (msg?.text ?? '').trim();
+          if (!innerText.startsWith('{')) continue;
+          try {
+            let inner;
+            try {
+              inner = JSON.parse(innerText);
+            } catch {
+              const m = innerText.match(/\{[\s\S]*\}/);
+              if (!m) continue;
+              inner = JSON.parse(m[0]);
+            }
+            if (Array.isArray(inner?.messages) && inner.messages.length >= 2) {
+              innerResult = inner;
+              break;
+            }
+          } catch (e) {
+            console.warn('[ai-debate] inner JSON reparse failed:', e?.message);
+          }
+        }
+        if (innerResult) {
+          // 화이트리스트 필드만 병합 — prototype 오염 방지
+          parsed = {
+            ...parsed,
+            messages: innerResult.messages,
+            ...(innerResult.verdict  != null && { verdict:    innerResult.verdict }),
+            ...(innerResult.confidence != null && { confidence: innerResult.confidence }),
+          };
         }
       } catch {
         parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };

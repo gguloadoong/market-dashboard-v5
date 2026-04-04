@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // GitHub Pages는 /market-dashboard-v2/ 경로에서 서빙 — Vercel은 / 유지
   base: process.env.GITHUB_PAGES === 'true' ? '/market-dashboard-v2/' : '/',
   server: {
@@ -92,6 +92,11 @@ export default defineConfig({
       },
     }),
   ],
+  // 프로덕션 빌드: console.log/warn/info/debug를 dead code로 처리해 번들에서 제거
+  // console.error는 보존 — React 런타임 오류·미처리 Promise rejection 디버깅 필요
+  esbuild: {
+    pure: mode === 'production' ? ['console.log', 'console.warn', 'console.info', 'console.debug'] : [],
+  },
   test: {
     environment: 'node',
     globals: true,
@@ -110,4 +115,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

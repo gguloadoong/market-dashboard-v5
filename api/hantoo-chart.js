@@ -21,13 +21,16 @@ export default async function handler(req, res) {
   const validPeriod = ['D', 'W', 'M'].includes(period) ? period : 'D';
 
   // 기간 계산 — 일봉 5개월, 주봉 1년, 월봉 5년
-  const endDate = new Date();
+  // KIS API는 서울 시간(KST) 기준 날짜를 사용 → Asia/Seoul 타임존으로 통일
+  const seoulStr = d => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d).replace(/-/g, '');
+
+  const now = new Date();
   const startDate = new Date();
   if (validPeriod === 'D') startDate.setMonth(startDate.getMonth() - 5);
   else if (validPeriod === 'W') startDate.setFullYear(startDate.getFullYear() - 1);
   else startDate.setFullYear(startDate.getFullYear() - 5);
-
-  const fmt = d => d.toISOString().slice(0, 10).replace(/-/g, '');
 
   try {
     const token = await getHantooToken();
@@ -35,8 +38,8 @@ export default async function handler(req, res) {
     const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice`);
     url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'J');
     url.searchParams.set('FID_INPUT_ISCD', symbol);
-    url.searchParams.set('FID_INPUT_DATE_1', fmt(startDate));
-    url.searchParams.set('FID_INPUT_DATE_2', fmt(endDate));
+    url.searchParams.set('FID_INPUT_DATE_1', seoulStr(startDate));
+    url.searchParams.set('FID_INPUT_DATE_2', seoulStr(now));
     url.searchParams.set('FID_PERIOD_DIV_CODE', validPeriod);
 
     const apiRes = await fetch(url.toString(), {
