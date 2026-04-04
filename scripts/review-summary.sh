@@ -36,6 +36,8 @@ echo -e "${GREEN}[review-summary] PR #${PR_NUMBER} 감지${NC}"
 
 # ── 2. code-reviewer (Opus) 재실행 ───────────────────────────────────────────
 echo -e "${BLUE}[review-summary] code-reviewer (Opus) 실행 중...${NC}"
+# 구 artifact 삭제 — 이전 실행 결과(다른 커밋)가 남아 있을 경우 스테일 PASS/BLOCK 방지
+rm -f "$REVIEW_FILE"
 bash scripts/run-code-reviewer.sh || true  # BLOCK 시에도 artifact는 저장됨 — 스크립트 중단 방지
 
 if [ ! -f "$REVIEW_FILE" ]; then

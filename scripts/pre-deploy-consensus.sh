@@ -53,9 +53,10 @@ fi
 
 # ── Gate 2: P0/P1 이슈 없음 ──────────────────────────────────────────────────
 echo -e "${BLUE}[2/6] P0/P1 오픈 이슈 확인${NC}"
-P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null)
-P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null)
-# gh 실패(인증 오류, 네트워크 등) 시 FAIL — 알 수 없는 상태를 PASS로 처리 금지
+# || true: set -e 환경에서 gh 인증/네트워크 실패 시 스크립트 전체 종료 방지
+# 빈 문자열 결과 → 하단 empty-string 체크에서 FAIL 처리 (알 수 없는 상태를 PASS로 처리 금지)
+P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null || true)
+P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null || true)
 if [ -z "$P0_ISSUES" ] || [ -z "$P1_ISSUES" ]; then
   check "P0/P1 이슈" "FAIL" "GitHub API 오류 — gh 인증 또는 네트워크 확인 후 재실행"
 else
