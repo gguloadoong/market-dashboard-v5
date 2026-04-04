@@ -9,8 +9,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+SAFE_BRANCH="${BRANCH//\//-}"
 REVIEW_DIR=".tmp"
-REVIEW_FILE="${REVIEW_DIR}/code-review-${BRANCH}.md"
+REVIEW_FILE="${REVIEW_DIR}/code-review-${SAFE_BRANCH}.md"
 DIFF_FILE="$(mktemp)"
 trap 'rm -f "$DIFF_FILE"' EXIT
 

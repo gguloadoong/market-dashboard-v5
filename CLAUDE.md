@@ -72,13 +72,26 @@
 **Opus 자동 트리거 조건:**
 - 시그널 알고리즘 설계/구현 → `architect (opus)` → `executor (opus)`
 - 3개 이상 파일 연동하는 신규 기능 → `architect (opus)` 먼저
+- **기존 알고리즘 로직 수정 (파일 수 무관)** → `architect (opus)` 먼저
+- **버그 수정이라도 필터·분기·스코어링 변경 포함 시** → `architect (opus)` 먼저
 - 수학적 계산/통계 로직 → `executor (opus)`
 - Phase 단위 작업 시작 시 → `architect (opus)` 설계 → 구현
 - PR 전 최종 검토 → `code-reviewer (opus)`
 
+**알고리즘 파일 목록 (수정 시 `npm run architect` 필수 — PR 자동 차단):**
+```
+src/engine/                         src/constants/signalThresholds.js
+src/utils/marketHours.js            src/utils/newsAlias.js
+src/utils/newsTopicMap.js           src/utils/newsSignal.js
+src/utils/signalCardRenderer.js     src/data/relatedAssets.js
+src/hooks/useSignals.js             src/hooks/useDerivativeSignals.js
+src/hooks/useInvestorSignals.js
+```
+
 **절대 금지:**
 - 복잡한 알고리즘을 설계 없이 바로 코딩하는 것
 - Opus가 필요한 작업에 Sonnet만 사용하는 것
+- `npm run architect` 없이 위 알고리즘 파일 수정 후 PR 생성 시도 (자동 차단됨)
 
 ---
 

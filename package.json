@@ -12,6 +12,7 @@
     "review:base": "node scripts/ai-pr-review.mjs --mode=local",
     "test": "vitest run",
     "test:watch": "vitest",
+    "architect": "bash scripts/run-architect.sh",
     "review:code": "bash scripts/run-code-reviewer.sh",
     "review:gate": "bash scripts/codex-review-gate.sh strict origin/main",
     "ship": "npm run lint && npm run test && npm run build && npm run review:gate",

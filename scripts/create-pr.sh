@@ -16,6 +16,8 @@ if [ -z "$TITLE" ]; then
 fi
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# 브랜치명 / → - 치환 (artifact 경로 오류 방지, feature/xxx 대응)
+SAFE_BRANCH="${BRANCH//\//-}"
 if [ "$BRANCH" = "main" ]; then
   echo -e "${RED}[pr] main 브랜치에서는 PR을 생성할 수 없습니다.${NC}"
   exit 1
@@ -24,11 +26,76 @@ fi
 echo -e "${GREEN}[pr] === 1/5 빌드 확인 ===${NC}"
 npm run build || { echo -e "${RED}[pr] 빌드 실패${NC}"; exit 1; }
 
+# ─── 1.5/5 architect 게이트 — 알고리즘 파일 변경 시 설계 리뷰 필수 ────────
+echo ""
+echo -e "${GREEN}[pr] === 1.5/5 architect 게이트 ===${NC}"
+
+# .algo-files에서 패턴 동적 로드 — run-architect.sh와 단일 소스 유지
+ALGO_FILES_CONFIG="$(dirname "$0")/../.algo-files"
+if [ ! -f "$ALGO_FILES_CONFIG" ]; then
+  echo -e "${RED}[pr] .algo-files 없음: ${ALGO_FILES_CONFIG}${NC}"
+  exit 1
+fi
+ALGO_PATTERN=$(grep -v '^#' "$ALGO_FILES_CONFIG" | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
+
+# [HIGH FIX] merge-base 실패 시 명시적 오류 (silent pass 방지)
+MERGE_BASE=$(git merge-base origin/main HEAD 2>/dev/null) || {
+  echo -e "${RED}[pr] origin/main fetch 필요: git fetch origin main${NC}"
+  exit 1
+}
+# 테스트·스펙 파일 제외 — signalThresholds.test.js 등 오탐 방지
+ALGO_FILES_CHANGED=$(git diff "$MERGE_BASE" HEAD --name-only 2>/dev/null \
+  | grep -E "$ALGO_PATTERN" \
+  | grep -vE '\.(test|spec)\.(js|ts|jsx|tsx)$' \
+  || true)
+
+if [ -n "$ALGO_FILES_CHANGED" ]; then
+  echo -e "${YELLOW}[pr] 알고리즘 파일 변경 감지:${NC}"
+  echo "$ALGO_FILES_CHANGED" | sed 's/^/    /'
+
+  ARCHITECT_FILE=".tmp/architect-review-${SAFE_BRANCH}.md"
+
+  if [ ! -f "$ARCHITECT_FILE" ]; then
+    echo ""
+    echo -e "${RED}[pr] ⛔ architect 리뷰 artifact 없음${NC}"
+    echo -e "${RED}[pr]    알고리즘 파일 변경 시 설계 리뷰 필수${NC}"
+    echo -e "${YELLOW}[pr]    실행: npm run architect${NC}"
+    exit 1
+  fi
+
+  # commit 일치 확인
+  ARCHITECT_COMMIT=$(grep -oE 'commit: [a-f0-9]+' "$ARCHITECT_FILE" | awk '{print $2}' | head -1 || echo "")
+  HEAD_COMMIT_CHECK=$(git rev-parse HEAD)
+  if [ "$ARCHITECT_COMMIT" != "$HEAD_COMMIT_CHECK" ]; then
+    echo -e "${RED}[pr] architect 리뷰가 현재 HEAD와 불일치${NC}"
+    echo -e "${YELLOW}[pr]    리뷰 기준: ${ARCHITECT_COMMIT:-없음}${NC}"
+    echo -e "${YELLOW}[pr]    현재 HEAD: ${HEAD_COMMIT_CHECK}${NC}"
+    echo -e "${YELLOW}[pr]    재실행: npm run architect${NC}"
+    exit 1
+  fi
+
+  # BLOCK 체크 — 첫 줄만 검사 (본문 내 BLOCK 언급 오탐 방지)
+  if head -1 "$ARCHITECT_FILE" | grep -qiE 'VERDICT:[[:space:]]*BLOCK'; then
+    echo -e "${RED}[pr] architect VERDICT: BLOCK — 설계 이슈 수정 후 재실행${NC}"
+    exit 1
+  fi
+
+  # [CRITICAL FIX] fallback PASS 하드코딩 제거 — VERDICT 없으면 명시적 차단 (첫 줄만)
+  ARCHITECT_VERDICT=$(head -1 "$ARCHITECT_FILE" | grep -oE 'VERDICT:[[:space:]]*(PASS|NOT_REQUIRED)')
+  if [ -z "$ARCHITECT_VERDICT" ]; then
+    echo -e "${RED}[pr] architect artifact에 유효한 VERDICT 없음 — npm run architect 재실행${NC}"
+    exit 1
+  fi
+  echo -e "${GREEN}[pr] architect 리뷰 ${ARCHITECT_VERDICT} ✓${NC}"
+else
+  echo -e "${GREEN}[pr] 알고리즘 파일 변경 없음 — architect 게이트 스킵${NC}"
+fi
+
 # ─── 2/5 code-reviewer artifact 검증 ──────────────────────────────────────
 echo ""
 echo -e "${GREEN}[pr] === 2/5 code-reviewer 검증 ===${NC}"
 
-REVIEW_FILE=".tmp/code-review-${BRANCH}.md"
+REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
 
 if [ ! -f "$REVIEW_FILE" ]; then
   echo -e "${RED}[pr] code-review artifact 없음: ${REVIEW_FILE}${NC}"
@@ -146,7 +213,7 @@ REPO="gguloadoong/market-dashboard-v2"
 echo ""
 echo -e "${GREEN}[pr] === 5/5 봇 리뷰 폴링 (최대 15분) ===${NC}"
 echo -e "${YELLOW}[pr] 필수 조건: Copilot 도착 + Gemini·CodeRabbit 중 1명${NC}"
-echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${BRANCH}.md${NC}"
+echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${SAFE_BRANCH}.md${NC}"
 
 MAX_ITER=30
 INTERVAL=30
