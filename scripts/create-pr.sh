@@ -224,9 +224,9 @@ for i in $(seq 1 $MAX_ITER); do
   sleep $INTERVAL
   ELAPSED=$((i * INTERVAL))
 
-  # Copilot
+  # Copilot — 실제 login: "copilot-pull-request-reviewer[bot]" (test로 매칭)
   COPILOT_COUNT=$(gh api "repos/${REPO}/pulls/${PR_NUM}/reviews" \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer")] | length' \
+    --jq '[.[] | select(.user.login | test("copilot-pull-request-reviewer"; "i"))] | length' \
     2>/dev/null || echo "0")
 
   # Gemini (review)
