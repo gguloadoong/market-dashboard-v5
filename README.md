@@ -4,7 +4,7 @@
 
 **국내주식 / 미국주식 / 암호화폐 통합 실시간 투자 대시보드**
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-00C853?style=for-the-badge&logo=vercel&logoColor=white)](https://market-dashboard-v2-mu.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-00C853?style=for-the-badge&logo=vercel&logoColor=white)](https://market-dashboard-v5.vercel.app)
 [![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
@@ -12,7 +12,7 @@
 
 국장 52종목 + 미장 60종목 + 코인 250종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
 
-[Live Demo](https://market-dashboard-v2-mu.vercel.app) · [버그 리포트](https://github.com/gguloadoong/market-dashboard-v2/issues) · [기능 요청](https://github.com/gguloadoong/market-dashboard-v2/issues)
+[Live Demo](https://market-dashboard-v5.vercel.app) · [버그 리포트](https://github.com/gguloadoong/market-dashboard-v5/issues) · [기능 요청](https://github.com/gguloadoong/market-dashboard-v5/issues)
 
 </div>
 
@@ -85,8 +85,8 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **빠른 의
 
 ```bash
 # 레포 클론
-git clone https://github.com/gguloadoong/market-dashboard-v2.git
-cd market-dashboard-v2
+git clone https://github.com/gguloadoong/market-dashboard-v5.git
+cd market-dashboard-v5
 
 # 의존성 설치
 npm install
@@ -109,34 +109,39 @@ npm run build
 | `HANTOO_APP_KEY` | O | 한국투자증권 앱 키 |
 | `HANTOO_APP_SECRET` | O | 한국투자증권 앱 시크릿 |
 | `GEMINI_API_KEY` | - | Google Gemini (뉴스 AI 요약) |
+| `GROQ_API_KEY` | - | Groq AI (고속 추론) |
+| `POLYGON_API_KEY` | - | Polygon.io (미장 보조 데이터) |
 | `WHALE_ALERT_KEY` | - | Whale Alert (고래 추적) |
 | `KRX_API_KEY` | - | KRX ETF 데이터 |
+| `KV_REST_API_URL` | - | Vercel KV — Redis 캐시 URL |
+| `KV_REST_API_TOKEN` | - | Vercel KV — Redis 캐시 토큰 |
 
 ---
 
 ## Architecture
 
 ```
-market-dashboard-v2/
-├── api/                        Vercel Serverless / Edge Functions
-│   ├── hantoo-*.js              한투 API 프록시 (가격, 지수, 투자자)
+market-dashboard-v5/
+├── api/                        Vercel Serverless Functions
+│   ├── hantoo-*.js              한투 API 프록시 (가격, 지수, 투자자, 차트)
+│   ├── kr-fear-greed.js         국장 공포탐욕지수 (VKOSPI + 외국인 순매수)
 │   ├── us-price.js              미장 Yahoo v8 프록시
 │   ├── market-indices.js        글로벌 지수 프록시
-│   ├── news-summary.js          Gemini AI 뉴스 요약
-│   └── rss.js                   RSS 뉴스 프록시
+│   ├── news-summary.js          Gemini/Groq AI 뉴스 요약
+│   └── _price-cache.js          Vercel KV Redis 캐시 공통 모듈
 ├── src/
-│   ├── api/                     클라이언트 API 모듈
-│   │   ├── coins.js              코인 (CoinPaprika + Binance + Upbit)
-│   │   └── stocks.js             주식 (한투 + Yahoo + Stooq)
 │   ├── components/
 │   │   ├── home/                 홈 대시보드 위젯
 │   │   ├── ChartSidePanel.jsx    캔들 차트 패널
-│   │   ├── WatchlistTable.jsx    워치리스트 테이블
-│   │   └── BreakingNewsPanel.jsx 뉴스 슬라이드 패널
-│   ├── hooks/                   커스텀 훅 (usePrices, useCoins, useIndices)
-│   └── utils/                   유틸리티 (뉴스 매칭, 시장 시간, 알림)
-├── .github/workflows/           CI/CD + PR 자동 리뷰
-└── .pr_agent.toml               Qodo PR Agent 설정
+│   │   └── WatchlistTable.jsx    워치리스트 테이블
+│   ├── engine/                  시그널 엔진 (알고리즘 핵심)
+│   ├── hooks/                   커스텀 훅 (useSignals, useDerivativeSignals 등)
+│   └── utils/                   유틸리티 (뉴스 매칭, 시장 시간, 시그널 렌더링)
+├── scripts/
+│   ├── pre-deploy-consensus.sh  배포 전 6단계 컨센서스 게이트
+│   ├── create-pr.sh             PR 생성 자동화 (Opus+Codex 리뷰 포함)
+│   └── run-code-reviewer.sh     Claude Opus 코드 리뷰
+└── .github/workflows/           CI/CD + PR 자동 리뷰 (Gemini, CodeRabbit, Copilot)
 ```
 
 ---
@@ -147,8 +152,9 @@ market-dashboard-v2/
 
 | 리뷰어 | 역할 |
 |--------|------|
-| **Gemini Code Assist** | Google AI 코드 리뷰 |
-| **Qodo PR Agent** | 보안/품질/개선 제안 (Gemini 2.5 Flash) |
+| **Claude Opus** | 코드 리뷰 (로컬 — `npm run review:code`) |
+| **OpenAI Codex** | 정확성/버그 게이트 (`npm run review:gate`) |
+| **Gemini Code Assist** | Google AI 자동 PR 리뷰 |
 | **CodeRabbit** | 변경 요약 + 코드 리뷰 |
 | **GitHub Copilot** | Copilot 코드 리뷰 |
 
