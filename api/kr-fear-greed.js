@@ -167,7 +167,7 @@ export default async function handler(req, res) {
     const foreignAvailableFinal = foreignAvailable;
 
     if (vkospiFinal == null) {
-      try { vkospiFinal = await fetchVkospiNaver(); } catch {}
+      try { vkospiFinal = await fetchVkospiNaver(); } catch (e) { console.warn('[kr-fear-greed] Naver VKOSPI fallback failed:', e.message); }
     }
 
     // 모두 실패 = Redis 캐시 → 그것도 없으면 closed
