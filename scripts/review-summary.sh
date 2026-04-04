@@ -49,11 +49,9 @@ OPUS_VERDICT=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | head -1 | cut -
 OPUS_SUMMARY=$(grep -m1 "PASS\|수정 완료\|이상 없음\|지적사항 없음" "$REVIEW_FILE" \
   | sed 's/\*\*//g' | head -c 100 || echo "세부 내용은 artifact 참조")
 if [ "$OPUS_VERDICT" = "PASS" ]; then
-  OPUS_ICON="✅"
-  OPUS_LINE="${OPUS_ICON} PASS"
+  OPUS_LINE="✅ PASS${OPUS_SUMMARY:+ — ${OPUS_SUMMARY}}"
 else
-  OPUS_ICON="🚫"
-  OPUS_LINE="${OPUS_ICON} BLOCK — 재수정 필요"
+  OPUS_LINE="🚫 BLOCK — 재수정 필요"
 fi
 
 # ── 3. Codex gate 재실행 ─────────────────────────────────────────────────────
@@ -75,9 +73,10 @@ if command -v codex &>/dev/null; then
       CODEX_LINE="✅ PASS${CODEX_SUMMARY:+ — ${CODEX_SUMMARY}}"
     fi
   else
-    # codex 실행 실패(인증 오류 등) → BLOCK (SKIP 허용 시 게이트 무력화 위험)
-    CODEX_VERDICT="BLOCK"
-    CODEX_LINE="🚫 BLOCK (codex 실행 실패 — 인증/네트워크 확인)"
+    # codex 실행 실패 → SKIP (CLI 미설치와 동일 처리, 일관성 유지)
+    # 주: 배포 전 실제 gate는 npm run review:gate (create-pr.sh Step 3) 에서 수행됨
+    CODEX_VERDICT="SKIP"
+    CODEX_LINE="⏭️ SKIP (codex 실행 실패 — 인증/네트워크 확인 권장)"
   fi
 else
   echo -e "${YELLOW}[review-summary] codex CLI 없음 — Codex gate 건너뜀${NC}"

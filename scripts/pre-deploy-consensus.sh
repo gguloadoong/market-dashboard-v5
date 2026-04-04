@@ -22,6 +22,7 @@ NC='\033[0m'
 
 PASS=0
 FAIL=0
+SKIP=0
 
 check() {
   local name="$1"
@@ -111,11 +112,12 @@ VERDICT: BLOCK — (이유 한 줄)"
   else
     # SKIP: claude 응답 파싱 불가 시 게이트 카운트에서 제외 (soft gate — 인프라 없으면 graceful degrade)
     PM_VERDICT="SKIP"
+    SKIP=$((SKIP + 1))
     echo -e "${YELLOW}    ⚠️  PM 검토 SKIP (응답 파싱 실패) — 배포 전 수동 확인 권장${NC}"
-    # SKIP은 PASS/FAIL 카운트 모두 제외 — 게이트 총 수(TOTAL)에서도 빠짐
   fi
 else
   # claude CLI 미설치 또는 backlog.md 없음 — SKIP (카운트 제외, 배포 차단 안 함)
+  SKIP=$((SKIP + 1))
   echo -e "${YELLOW}    ⚠️  claude CLI 없거나 backlog.md 없음 — PM 게이트 SKIP (배포 전 수동 확인 권장)${NC}"
 fi
 
@@ -123,8 +125,9 @@ fi
 echo -e "${BLUE}[4/6] QA 승인 — 장성민 (품질 기준 검증)${NC}"
 QUALITY_FILE=".project/quality-baseline.md"
 QA_ISSUES=0
+# 파일 존재 확인 수준의 소프트 게이트 — 실제 기준 충족 여부는 PR 리뷰 단계에서 검증
+# (빌드 에러는 Gate 1에서, 알고리즘 변경은 Gate 5에서 하드 차단)
 if [ -f "$QUALITY_FILE" ]; then
-  # 품질 기준 파일 존재 확인
   check "품질 기준 파일" "PASS" "quality-baseline.md 존재"
 else
   check "품질 기준 파일" "FAIL" ".project/quality-baseline.md 없음"
@@ -191,9 +194,14 @@ fi
 # ── 최종 판정 ────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BLUE}────────────────────────────────────────────${NC}"
-TOTAL=$((PASS + FAIL))
+TOTAL=$((PASS + FAIL + SKIP))
 if [ "$FAIL" -eq 0 ]; then
-  echo -e "${GREEN}✅ 컨센서스 PASS (${PASS}/${TOTAL}) — 배포 가능${NC}"
+  if [ "$SKIP" -gt 0 ]; then
+    SKIP_MSG=", SKIP ${SKIP}건 수동 확인 권장"
+  else
+    SKIP_MSG=""
+  fi
+  echo -e "${GREEN}✅ 컨센서스 PASS (${PASS}/${TOTAL}${SKIP_MSG}) — 배포 가능${NC}"
   echo ""
   exit 0
 else
