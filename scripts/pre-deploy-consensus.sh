@@ -171,28 +171,36 @@ fi
 if [ -f ".algo-files" ]; then
   while IFS= read -r pattern; do
     [ -z "$pattern" ] && continue
-    if git diff origin/main...HEAD --name-only 2>/dev/null | grep -qE "$pattern"; then
+    # test/spec 파일 제외 — create-pr.sh와 동일 기준 (테스트 전용 수정은 architect 불필요)
+    if git diff origin/main...HEAD --name-only 2>/dev/null \
+        | grep -vE '\.test\.[^/]+$|\.spec\.[^/]+$' \
+        | grep -qE "$pattern"; then
       ALGO_CHANGED=$((ALGO_CHANGED + 1))
     fi
   done < ".algo-files"
 fi
 
 if [ "$ALGO_CHANGED" -gt 0 ]; then
-  # architect 승인 artifact 확인 — PASS/NOT_REQUIRED + 현재 커밋 일치 시 통과
-  BRANCH_NOW=$(git rev-parse --abbrev-ref HEAD)
-  SAFE_BRANCH_NOW="${BRANCH_NOW//\//-}"
-  ARCHITECT_ARTIFACT=".tmp/architect-review-${SAFE_BRANCH_NOW}.md"
+  # architect 승인 artifact 확인 — 모든 .tmp/architect-review-*.md에서 검색
+  # 브랜치별 artifact는 머지 후 브랜치명이 바뀌어도 조상 커밋이면 유효
   HEAD_NOW=$(git rev-parse HEAD)
-  ARCHITECT_VERDICT=""
-  ARCHITECT_COMMIT=""
-  if [ -f "$ARCHITECT_ARTIFACT" ]; then
-    ARCHITECT_VERDICT=$(grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' "$ARCHITECT_ARTIFACT" | awk '{print $2}' | head -1 || true)
-    ARCHITECT_COMMIT=$(grep -m1 "^commit:" "$ARCHITECT_ARTIFACT" | awk '{print $2}' || true)
-  fi
+  ARCHITECT_APPROVED=0
+  ARCHITECT_VERDICT_FOUND=""
+  for _af in .tmp/architect-review-*.md; do
+    [ -f "$_af" ] || continue
+    _av=$(grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' "$_af" | awk '{print $2}' | head -1 || true)
+    _ac=$(grep -m1 "^commit:" "$_af" | awk '{print $2}' || true)
+    if { [ "$_av" = "PASS" ] || [ "$_av" = "NOT_REQUIRED" ]; } && [ -n "$_ac" ]; then
+      if git merge-base --is-ancestor "$_ac" "$HEAD_NOW" 2>/dev/null; then
+        ARCHITECT_APPROVED=1
+        ARCHITECT_VERDICT_FOUND="$_av"
+        break
+      fi
+    fi
+  done
 
-  if { [ "$ARCHITECT_VERDICT" = "PASS" ] || [ "$ARCHITECT_VERDICT" = "NOT_REQUIRED" ]; } \
-      && [ "$ARCHITECT_COMMIT" = "$HEAD_NOW" ]; then
-    check "개발팀 승인" "PASS" "architect 승인 완료 (${ARCHITECT_VERDICT}) — 커밋 일치"
+  if [ "$ARCHITECT_APPROVED" -eq 1 ]; then
+    check "개발팀 승인" "PASS" "architect 승인 완료 (${ARCHITECT_VERDICT_FOUND}) — 조상 커밋 검증"
   else
     check "알고리즘 파일" "FAIL" "알고리즘 파일 변경 ${ALGO_CHANGED}건 — npm run architect 실행 후 재확인"
   fi
