@@ -63,8 +63,10 @@ if command -v codex &>/dev/null; then
   # 플래그 검증: --output-last-message(-o), --full-auto 모두 codex exec review --help에서 확인됨
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
-    # BLOCK 판정: DECISION:BLOCK, [P0]/[P1] 태그, JSON "patch is incorrect" 패턴 모두 감지
-    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|\[P0\]|\[P1\]|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)"; then
+    # BLOCK 판정: DECISION:BLOCK, 줄 시작 [P0]/[P1] 태그, JSON "patch is incorrect" 패턴 감지
+    # [P0]/[P1]은 줄 시작(^[[:space:]]*-)에서만 매칭 — 본문 내 "P1 이슈" 등 오탐 방지
+    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)" \
+      || echo "$CODEX_TEXT" | grep -qE "^[[:space:]]*-[[:space:]]*\[P[01]\]"; then
       CODEX_VERDICT="BLOCK"
       CODEX_LINE="🚫 BLOCK"
     else

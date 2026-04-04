@@ -82,7 +82,8 @@ const pad = n => String(n).padStart(2, '0');
 // Naver /investor 응답 단위(억 vs 백만원) 검증 불가(지역 차단) → fallback 삭제.
 // KIS가 실패할 경우 외국인 성분 없이 VKOSPI만으로 점수 산출 (foreignScore = null).
 async function fetchForeignNetNaver() {
-  // 항상 throw — 호출부(handler)에서 Promise.allSettled로 감싸므로 안전
+  // 항상 throw — handler의 Promise.allSettled([..., fetchForeignNetNaver(), ...])에서 rejected로 처리됨
+  // 호출부: kr-fear-greed.js handler() 내 naverForeignRes = Promise.allSettled([..., fetchForeignNetNaver()])
   throw new Error('Naver 외국인 fallback 비활성화 — KIS 날짜 범위 확장으로 대체');
 }
 

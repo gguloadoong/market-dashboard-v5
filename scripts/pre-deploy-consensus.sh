@@ -100,7 +100,11 @@ VERDICT: PASS
 또는
 VERDICT: BLOCK — (이유 한 줄)"
 
-  PM_RESULT=$(claude --print -p "$PM_PROMPT" 2>/dev/null || echo "VERDICT: SKIP")
+  # 임시 파일 경유 — 커밋 메시지 내 특수문자가 -p 인자로 전달될 때의 셸 확장 위험 방지
+  PM_TMP=$(mktemp)
+  printf '%s' "$PM_PROMPT" > "$PM_TMP"
+  PM_RESULT=$(claude --print -p "$(cat "$PM_TMP")" 2>/dev/null || echo "VERDICT: SKIP")
+  rm -f "$PM_TMP"
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
 
   if echo "$PM_RESULT" | grep -q "VERDICT: BLOCK"; then
