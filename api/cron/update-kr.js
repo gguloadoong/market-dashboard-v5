@@ -263,12 +263,9 @@ async function fetchNaverFallback() {
 }
 
 export default async function handler(req, res) {
-  // Vercel Cron Bearer 인증 — CRON_SECRET 미설정 시 프로덕션 거부
+  // Vercel Cron Bearer 인증 — CRON_SECRET 설정 시에만 검증, 미설정 시 허용
+  // (Vercel 자동 Cron은 CRON_SECRET을 Authorization 헤더로 자동 전송)
   const secret = process.env.CRON_SECRET;
-  const isProd = process.env.VERCEL_ENV === 'production';
-  if (isProd && !secret) {
-    return res.status(500).json({ error: 'CRON_SECRET 환경변수 미설정' });
-  }
   if (secret) {
     const auth = req.headers['authorization'];
     if (auth !== `Bearer ${secret}`) {
