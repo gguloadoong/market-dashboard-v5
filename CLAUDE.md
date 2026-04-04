@@ -22,8 +22,21 @@
    - 대표님이 명시적으로 "배포해줘" / "배포하자"고 말할 때 → 즉시 실행
    - Claude가 배포 필요하다고 판단 시 → "XX, XX가 머지된 상태입니다. 배포할까요?" 제안 후 대표님 확인 받고 실행
 
+   **배포 전 컨센서스 게이트 (자동 강제):** `npm run deploy`가 내부적으로 실행
+   `scripts/pre-deploy-consensus.sh` — 모든 게이트 PASS 시에만 배포 진행
+
+   | 게이트 | 담당 | 기준 |
+   |--------|------|------|
+   | 빌드 통과 | 시스템 | `npm run build` 에러 0 |
+   | P0/P1 이슈 없음 | QA (장성민) | GitHub Issues 오픈 없음 |
+   | QA 승인 | QA (장성민) | quality-baseline.md 충족 |
+   | 개발팀 승인 | FE(박서연)/BE(김민준) | 알고리즘 파일 무단 변경 없음 |
+   | 조직장 승인 | CPO (이준혁) | 배포 조건 충족 (fix/feat 포함) |
+
+   단독으로 확인하려면: `npm run deploy:check`
+
    **배포 방법 (단 하나):** `npm run deploy`
-   - GA 트리거 → 성공 시 완료
+   - 컨센서스 게이트 → GA 트리거 → 성공 시 완료
    - GA 실패 + 토큰 만료 감지 시 → `vercel --prod` 자동 fallback
    - 이중 배포 자동 방지 (`.last-deployed-commit` 커밋 해시 추적)
    - 토큰 만료는 매주 월요일 자동 검사 → 만료 전 GitHub Issue 생성

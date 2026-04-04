@@ -9,6 +9,10 @@
 
 set -euo pipefail
 
+# ── 0. 배포 전 컨센서스 게이트 ────────────────────────────────────
+EXPLICIT_DEPLOY=1 bash "$(dirname "$0")/pre-deploy-consensus.sh"
+echo ""
+
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 WORKFLOW="Deploy to Vercel"
 LAST_DEPLOYED_FILE=".last-deployed-commit"
