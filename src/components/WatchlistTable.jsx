@@ -293,7 +293,7 @@ const LogoAvatar = React.memo(function LogoAvatar({ item, size = 32 }) {
 });
 
 // ─── 행 플래시 애니메이션 ────────────────────────────────────
-const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange, style }) {
+const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange }) {
   const rowRef  = useRef(null);
   const prevPct = useRef(getPct(item));
   const pct     = getPct(item);
@@ -334,7 +334,6 @@ const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, se
     <TableRow
       ref={rowRef}
       onClick={() => onClick?.(item)}
-      style={style}
       className={`border-b border-[#F2F4F6] cursor-pointer group transition-colors duration-75
         hover:bg-[#F7F8FA] active:bg-[#F2F4F6]
         ${isHot ? 'bg-[#FFFBFB] hover:bg-[#FFF5F5]' : ''}`}
@@ -849,44 +848,51 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
               <TableCell as="th" scope="col" className="w-8" />
             </TableRow>
           </TableHeader>
-          {/* 가상 스크롤 tbody — 전체 높이를 확보하고 보이는 행만 렌더 */}
+          {/* 가상 스크롤 tbody — 패딩으로 스크롤 영역 확보, 보이는 행만 렌더 */}
           <TableBody>
-            {/* 전체 스크롤 영역 확보용 빈 행 */}
-            <tr style={{ height: `${rowVirtualizer.getTotalSize()}px`, display: 'block', position: 'relative', width: 0, padding: 0, margin: 0, border: 'none' }}>
-              <td style={{ padding: 0, border: 'none' }} />
-            </tr>
-            {isInitialLoad
-              ? rowVirtualizer.getVirtualItems().map((virtualRow) => (
-                  <SkeletonRow key={virtualRow.key} />
-                ))
-              : rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const item = flatSorted[virtualRow.index];
-                  return (
-                    <FlashRow
-                      key={item.id || item.symbol}
-                      item={item}
-                      rank={virtualRow.index + 1}
-                      krwRate={krwRate}
-                      onClick={onRowClick}
-                      searchTerm={debouncedSearch}
-                      toggle={toggle}
-                      isWatched={isWatched}
-                      buyPrice={buyPrices[item.id || item.symbol] ?? null}
-                      onBuyPriceChange={handleBuyPriceChange}
-                      targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}
-                      targetDir={targetPrices[item.id || item.symbol]?.direction ?? 'above'}
-                      onTargetChange={handleTargetPriceChange}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    />
-                  );
-                })
-            }
+            {(() => {
+              const virtualItems = rowVirtualizer.getVirtualItems();
+              // 첫 번째 가상 아이템 위 / 마지막 가상 아이템 아래 여백으로 스크롤 높이 유지
+              const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+              const paddingBottom = virtualItems.length > 0
+                ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+                : 0;
+              return (
+                <>
+                  {/* 상단 여백 — 스크롤 위치 유지용 */}
+                  {paddingTop > 0 && (
+                    <tr><td colSpan={12} style={{ height: `${paddingTop}px`, padding: 0, border: 'none' }} /></tr>
+                  )}
+                  {isInitialLoad
+                    ? virtualItems.map((vRow) => <SkeletonRow key={vRow.key} />)
+                    : virtualItems.map((vRow) => {
+                        const item = flatSorted[vRow.index];
+                        return (
+                          <FlashRow
+                            key={item.id || item.symbol}
+                            item={item}
+                            rank={vRow.index + 1}
+                            krwRate={krwRate}
+                            onClick={onRowClick}
+                            searchTerm={debouncedSearch}
+                            toggle={toggle}
+                            isWatched={isWatched}
+                            buyPrice={buyPrices[item.id || item.symbol] ?? null}
+                            onBuyPriceChange={handleBuyPriceChange}
+                            targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}
+                            targetDir={targetPrices[item.id || item.symbol]?.direction ?? 'above'}
+                            onTargetChange={handleTargetPriceChange}
+                          />
+                        );
+                      })
+                  }
+                  {/* 하단 여백 — 전체 스크롤 높이 유지용 */}
+                  {paddingBottom > 0 && (
+                    <tr><td colSpan={12} style={{ height: `${paddingBottom}px`, padding: 0, border: 'none' }} /></tr>
+                  )}
+                </>
+              );
+            })()}
           </TableBody>
         </Table>
 
