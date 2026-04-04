@@ -17,6 +17,8 @@
     "review:gate": "bash scripts/codex-review-gate.sh strict origin/main",
     "ship": "npm run lint && npm run test && npm run build && npm run review:gate",
     "pr": "bash scripts/create-pr.sh",
+    "review:summary": "bash scripts/review-summary.sh",
+    "deploy:check": "bash scripts/pre-deploy-consensus.sh",
     "setup:hooks": "git config core.hooksPath .githooks",
     "deploy": "bash scripts/deploy.sh"
   },

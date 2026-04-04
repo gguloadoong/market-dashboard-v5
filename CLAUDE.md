@@ -22,8 +22,22 @@
    - 대표님이 명시적으로 "배포해줘" / "배포하자"고 말할 때 → 즉시 실행
    - Claude가 배포 필요하다고 판단 시 → "XX, XX가 머지된 상태입니다. 배포할까요?" 제안 후 대표님 확인 받고 실행
 
+   **배포 전 컨센서스 게이트 (자동 강제):** `npm run deploy`가 내부적으로 실행
+   `scripts/pre-deploy-consensus.sh` — 모든 게이트 PASS 시에만 배포 진행
+
+   | 게이트 | 담당 | 기준 |
+   |--------|------|------|
+   | 빌드 통과 | 시스템 | `npm run build` 에러 0 |
+   | P0/P1 이슈 없음 | QA (장성민) | GitHub Issues 오픈 없음 |
+   | PM 기획 검토 | PM (이준혁) | 작업 의도와 구현 결과가 일치, 서비스 방향 부합 |
+   | QA 승인 | QA (장성민) | quality-baseline.md 충족 |
+   | 개발팀 승인 | FE(박서연)/BE(김민준) | 알고리즘 파일 무단 변경 없음 |
+   | 조직장 승인 | CPO (이준혁) | 배포 조건 충족 (fix/feat 포함) |
+
+   단독으로 확인하려면: `npm run deploy:check`
+
    **배포 방법 (단 하나):** `npm run deploy`
-   - GA 트리거 → 성공 시 완료
+   - 컨센서스 게이트 → GA 트리거 → 성공 시 완료
    - GA 실패 + 토큰 만료 감지 시 → `vercel --prod` 자동 fallback
    - 이중 배포 자동 방지 (`.last-deployed-commit` 커밋 해시 추적)
    - 토큰 만료는 매주 월요일 자동 검사 → 만료 전 GitHub Issue 생성
@@ -206,6 +220,28 @@ src/hooks/useInvestorSignals.js
 ```
 
 **리뷰 종합 코멘트 필수 → 머지**
+
+### 리뷰 종합 코멘트 (자동화)
+
+```bash
+npm run review:summary   # Opus + Codex 재실행 → PR 코멘트 자동 게시
+```
+
+- 봇 리뷰(Gemini/Copilot/CodeRabbit) 채택/기각 처리 완료 후 실행
+- CodeRabbit 한도 초과 시에도 Opus + Codex 결과로 대체 가능
+- BLOCK 있으면 종료코드 1 → 머지 전 재수정 필수
+
+**코멘트 포맷 (자동 생성됨):**
+```markdown
+## 리뷰 종합
+### 봇 리뷰 채택/기각
+| 봇 | 지적 | 판단 | 처리 |
+|---|---|---|---|
+
+### 최종 검토
+> 🤖 code-reviewer (Claude Opus): PASS/BLOCK
+> 🔍 Codex Gate: PASS/BLOCK
+```
 
 ### 기획 리뷰
 

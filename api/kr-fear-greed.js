@@ -39,25 +39,33 @@ async function fetchVkospiKis(token) {
 
 // ─── Naver 증권 VKOSPI fallback (장 마감/주말에도 전일 종가 반환) ─
 async function fetchVkospiNaver() {
+  const NAVER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Referer': 'https://m.stock.naver.com/',
+    'Accept': 'application/json',
+  };
+
+  // /prices?pageSize=1 → 최신 종가 포함 (basic보다 안정적)
+  // VKOSPI200은 VKOSPI 대비 대안 지수 (KOSPI200 옵션 기반)
   const NAVER_URLS = [
+    'https://m.stock.naver.com/api/index/VKOSPI/prices?pageSize=1',
     'https://m.stock.naver.com/api/index/VKOSPI/basic',
-    'https://m.stock.naver.com/api/index/VKOSPI200/basic', // 대안
+    'https://m.stock.naver.com/api/index/VKOSPI200/basic',
   ];
+
   for (const url of NAVER_URLS) {
     try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-          'Referer': 'https://m.stock.naver.com/',
-          'Accept': 'application/json',
-        },
-        signal: AbortSignal.timeout(6000),
-      });
+      const res = await fetch(url, { headers: NAVER_HEADERS, signal: AbortSignal.timeout(6000) });
       if (!res.ok) continue;
       const data = await res.json();
+
+      // /prices 응답: 배열이면 첫 번째 항목에서 closePrice 추출
+      const item = Array.isArray(data) ? data[0] : data;
+      if (!item) continue;
+
       // 다양한 필드명 시도 (Naver API 응답 구조 변경 대응)
-      const rawVal = data.closePrice ?? data.indexNowVal ?? data.nvsValueClose
-        ?? data.compareToPreviousClosePrice ?? data.stockEndPrice ?? null;
+      const rawVal = item.closePrice ?? item.indexNowVal ?? item.nvsValueClose
+        ?? item.compareToPreviousClosePrice ?? item.stockEndPrice ?? null;
       if (rawVal == null) continue;
       const val = parseFloat(String(rawVal).replace(/,/g, ''));
       if (!isNaN(val) && val > 0) return val;
@@ -66,28 +74,27 @@ async function fetchVkospiNaver() {
   throw new Error('Naver VKOSPI 값 없음');
 }
 
-// ─── Naver 외국인 순매수 fallback ────────────────────────────────
-async function fetchForeignNetNaver() {
-  const res = await fetch('https://m.stock.naver.com/api/index/KOSPI/investorTrend', {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://m.stock.naver.com/' },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) throw new Error(`Naver KOSPI investor HTTP ${res.status}`);
-  const data = await res.json();
-  const list = Array.isArray(data) ? data : (data.list ?? []);
-  const latest = list[0];
-  if (!latest) return null;
-  const amt = parseFloat(String(latest.foreignNetBuyAmount ?? latest.frgnNetAmt ?? '0').replace(/,/g, ''));
-  return isNaN(amt) ? null : amt * 100_000_000; // 억 → 원
-}
+// ─── 공통 유틸 ──────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, '0');
 
 // ─── 외국인 순매수 조회 ─────────────────────────────────────────
+// 외국인 Naver fallback 없음 — 단위(억 vs 백만원) 검증 불가(지역 차단).
+// KIS가 실패하면 외국인 성분 없이 VKOSPI만으로 점수 산출 (foreignScore = null).
+// DATE_1 ~ DATE_2 범위 조회 후 output[0](최근 거래일) 사용
+// → 주말/공휴일에도 마지막 거래일 데이터 반환
 async function fetchForeignNet(token, iscd, today) {
+  // 7일 전 날짜 계산 — new Date(y,m,d) 로컬 타임존 생성자 사용 (하이픈 ISO는 UTC 파싱됨)
+  const y = parseInt(today.slice(0,4), 10);
+  const m = parseInt(today.slice(4,6), 10) - 1; // 0-based month
+  const d = parseInt(today.slice(6,8), 10);
+  const fromDate = new Date(y, m, d - 14); // 로컬 타임존 기준 14일 전 (추석/설 최대 10일 연휴 대응)
+  const fromStr = `${fromDate.getFullYear()}${pad(fromDate.getMonth()+1)}${pad(fromDate.getDate())}`;
+
   const url = new URL(`${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-investor`);
   url.searchParams.set('FID_COND_MRKT_DIV_CODE', 'U');
   url.searchParams.set('FID_INPUT_ISCD',   iscd);
-  url.searchParams.set('FID_INPUT_DATE_1', today);
-  url.searchParams.set('FID_INPUT_DATE_2', today);
+  url.searchParams.set('FID_INPUT_DATE_1', fromStr); // 14일 전 (Seoul 기준)
+  url.searchParams.set('FID_INPUT_DATE_2', today);   // 오늘
 
   const r = await fetch(url.toString(), {
     headers: {
@@ -153,23 +160,14 @@ export default async function handler(req, res) {
       + (kosdaqRes.status === 'fulfilled' ? kosdaqRes.value : 0)
       : null;
 
-    // 한투 실패 시 Naver fallback (장 마감/주말에도 전일 종가 반환)
+    // 한투 VKOSPI 실패 시 Naver fallback (장 마감/주말에도 전일 종가 반환)
+    // 외국인 데이터는 Naver fallback 없음 — KIS 7일 날짜 범위 확장으로 주말 대응
     let vkospiFinal = vkospi;
-    let foreignNetFinal = foreignNet;
-    let foreignAvailableFinal = foreignAvailable;
+    const foreignNetFinal = foreignNet;
+    const foreignAvailableFinal = foreignAvailable;
 
-    if (vkospiFinal == null || !foreignAvailableFinal) {
-      const [naverVkospiRes, naverForeignRes] = await Promise.allSettled([
-        vkospiFinal == null ? fetchVkospiNaver() : Promise.resolve(vkospiFinal),
-        !foreignAvailableFinal ? fetchForeignNetNaver() : Promise.resolve(foreignNet),
-      ]);
-      if (vkospiFinal == null && naverVkospiRes.status === 'fulfilled') {
-        vkospiFinal = naverVkospiRes.value;
-      }
-      if (!foreignAvailableFinal && naverForeignRes.status === 'fulfilled' && naverForeignRes.value != null) {
-        foreignNetFinal = naverForeignRes.value;
-        foreignAvailableFinal = true;
-      }
+    if (vkospiFinal == null) {
+      try { vkospiFinal = await fetchVkospiNaver(); } catch (e) { console.warn('[kr-fear-greed] Naver VKOSPI fallback failed:', e.message); }
     }
 
     // 모두 실패 = Redis 캐시 → 그것도 없으면 closed
