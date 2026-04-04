@@ -23,12 +23,12 @@ export const SNAP_KEYS = {
   ETF: 'snap:etf',
 };
 
-// TTL (초) — 각 마켓 데이터 갱신 주기 기반
+// TTL (초) — 크론 주기의 2배 (크론 지연/실패 시 데이터 유지 보장)
 export const SNAP_TTL = {
-  KR: 300,    // 5분 (KRX 갱신주기)
-  US: 120,    // 2분 (Yahoo 갱신주기)
-  COINS: 90,  // 1.5분 (Upbit REST 갱신주기)
-  ETF: 300,   // 5분
+  KR: 600,    // 10분 (크론 5분 × 2)
+  US: 300,    // 5분 (크론 2분 × 2.5)
+  COINS: 180, // 3분 (크론 1분 × 3)
+  ETF: 600,   // 10분
 };
 
 // 단일 키 조회
