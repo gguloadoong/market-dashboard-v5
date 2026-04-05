@@ -17,7 +17,7 @@ export default async function handler(request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   }
@@ -37,12 +37,13 @@ export default async function handler(request) {
         }
       }
       const health = await getCronHealth();
+      const isHealthy = health !== null;
       return new Response(JSON.stringify({
-        ok: health !== null,
+        ok: isHealthy,
         crons: health,
         ts: Date.now(),
       }), {
-        status: 200,
+        status: isHealthy ? 200 : 503,
         headers: CORS_HEADERS,
       });
     }

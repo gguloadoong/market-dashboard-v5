@@ -128,21 +128,26 @@ export default async function handler(request) {
       await setSnap(SNAP_KEYS.US, items, SNAP_TTL.US);
     }
 
+    // 전량 실패 시 모니터링 기록 (Promise.allSettled가 개별 실패를 삼키므로 catch로 안 감)
+    if (items.length === 0) {
+      try { await recordCronFailure('us', `전량 실패: ${US_SYMBOLS.length}개 심볼 모두 응답 없음`); } catch (_) { /* 무시 */ }
+    }
+
     return new Response(JSON.stringify({
-      ok: true,
+      ok: items.length > 0,
       count: items.length,
       retried: retryResults.length,
       failed: failedSymbols.length - retryResults.length,
     }), {
-      status: 200,
+      status: items.length > 0 ? 200 : 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (err) {
-    // Cron 실패 기록 (모니터링용)
-    await recordCronFailure('us', err.message);
+    // Cron 실패 기록 — 기록 실패가 에러 응답을 덮어쓰지 않도록 방어
+    try { await recordCronFailure('us', String(err?.message || err)); } catch (_) { /* 무시 */ }
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: {
