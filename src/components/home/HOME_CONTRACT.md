@@ -12,7 +12,7 @@
 ```
 1. WatchlistWidget         — 관심종목 (최상단 승격)
 2. MarketPulseWidget       — 지수 6개 + 환율
-3. MarketTemperatureWidget — 마켓 온도계 (컴팩트)
+3. MarketSentimentWidget   — 통합 시장 심리 (온도계 + 공포탐욕)
 4. SeoulForceSection       — 세력 포착 (index.jsx 인라인 정의)
 5. SignalSummaryWidget     — 투자 시그널
 6. AiDebateSection         — AI 종목토론
@@ -63,7 +63,8 @@
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
 | `SignalSummaryWidget.jsx` | 투자 시그널 (스코어 + TOP 카드 + 칩) | `useTopSignals` |
-| `MarketTemperatureWidget.jsx` | 마켓 온도계 (컴팩트) | `useSignals` |
+| `MarketSentimentWidget.jsx` | 통합 시장 심리 (온도계 + 공포탐욕) | `useSignals`, `useFearGreed`, `allItems` |
+| `MarketTemperatureWidget.jsx` | (비활성) 마켓 온도계 단독 — MarketSentimentWidget에 통합됨 | `useSignals` |
 | `DerivativesWidget.jsx` | 파생 시그널 | 파생/소셜 데이터 |
 
 ### 섹션 (src/components/home/)
