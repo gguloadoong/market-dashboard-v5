@@ -4,18 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        up:      '#F04452',   // 토스 빨강 (상승)
-        down:    '#1764ED',   // 토스 파랑 (하락)
-        neutral: '#6B7684',
-        bg:      '#F2F4F6',   // 토스 배경 회색
-        surface: '#FFFFFF',
-        border:  '#E5E8EB',
-        text1:   '#191F28',   // 토스 primary text
-        text2:   '#6B7684',   // 토스 secondary text
-        text3:   '#B0B8C1',   // 토스 tertiary text
-        primary: '#3182F6',   // 토스 blue
-        blue50:  '#EBF3FE',
-        red50:   '#FEF0F1',
+        /* CSS 변수 참조 — tokens.css에서 라이트/다크 자동 전환 */
+        up:      'var(--fg-positive)',   // 상승
+        down:    'var(--fg-negative)',   // 하락
+        neutral: 'var(--fg-neutral)',
+        bg:      'var(--bg)',            // 앱 배경
+        surface: 'var(--bg-surface)',    // 카드/패널 배경
+        border:  'var(--border)',        // 기본 구분선
+        text1:   'var(--fg)',            // 기본 텍스트
+        text2:   'var(--fg-muted)',      // 보조 텍스트
+        text3:   'var(--fg-disabled)',   // 비활성 텍스트
+        primary: 'var(--primary)',       // CTA/링크
+        blue50:  'var(--bg-negative)',   // 하락 배경 (라이트: #EBF3FE)
+        red50:   'var(--bg-positive)',   // 상승 배경 (라이트: #FEF0F1)
       },
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', '"Noto Sans KR"', 'sans-serif'],

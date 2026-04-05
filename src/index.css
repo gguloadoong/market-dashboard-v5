@@ -8,8 +8,8 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { font-size: 14px; -webkit-tap-highlight-color: transparent; }
   body {
-    background: #F2F4F6;
-    color: #191F28;
+    background: var(--bg);
+    color: var(--fg);
     font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -34,7 +34,7 @@
   }
 
   /* ── 섹션 카드 ── */
-  .sc { @apply bg-white rounded-xl overflow-hidden border border-[#ECEEF1]; }
+  .sc { @apply bg-white rounded-xl overflow-hidden; border: 1px solid var(--border); }
   .sc-header {
     @apply flex items-center justify-between px-5 pt-4 pb-2;
   }
@@ -44,15 +44,16 @@
   /* ── 종목 행 ── */
   .stock-row {
     @apply flex items-center gap-3 px-5 py-3.5 bg-white cursor-pointer select-none
-           transition-colors duration-100 active:bg-[#F7F8FA];
+           transition-colors duration-100;
+    &:active { background: var(--bg-alt); }
   }
-  .stock-row:not(:last-child) { border-bottom: 1px solid #F2F4F6; }
-  .stock-row:hover { @apply bg-[#F9FAFB]; }
+  .stock-row:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .stock-row:hover { background: var(--bg-hover); }
 
   /* ── 등락 배지 ── */
-  .badge-up   { @apply bg-[#FEF0F1] text-up   rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
-  .badge-down { @apply bg-[#EBF3FE] text-down rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
-  .badge-flat { @apply bg-[#F2F4F6] text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
+  .badge-up   { @apply text-up   rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; background: var(--bg-positive); }
+  .badge-down { @apply text-down rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; background: var(--bg-negative); }
+  .badge-flat { @apply text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; background: var(--bg-alt); }
 
   /* ── 색상 유틸 ── */
   .c-up      { @apply text-up; }
@@ -61,17 +62,21 @@
 
   /* ── 필터 칩 ── */
   .chip {
-    @apply px-3.5 py-1.5 text-[13px] rounded-full border border-border text-text2
-           bg-white cursor-pointer transition-all duration-150 whitespace-nowrap flex-shrink-0 font-medium;
+    @apply px-3.5 py-1.5 text-[13px] rounded-full text-text2
+           cursor-pointer transition-all duration-150 whitespace-nowrap flex-shrink-0 font-medium;
+    background: var(--bg-surface); border: 1px solid var(--border);
   }
-  .chip.active { @apply bg-text1 border-text1 text-white; }
-  .chip:not(.active):hover { @apply border-text2; }
+  .chip.active { background: var(--fg); border-color: var(--fg); color: var(--bg-surface); }
+  .chip:not(.active):hover { border-color: var(--fg-muted); }
 
   /* ── 단위 토글 ── */
-  .unit-btn { @apply px-3 py-1.5 text-[13px] border border-border bg-white text-text2 cursor-pointer transition-all duration-150 font-medium; }
+  .unit-btn {
+    @apply px-3 py-1.5 text-[13px] text-text2 cursor-pointer transition-all duration-150 font-medium;
+    background: var(--bg-surface); border: 1px solid var(--border);
+  }
   .unit-btn:first-child { @apply rounded-l-xl; }
   .unit-btn:last-child  { @apply rounded-r-xl; }
-  .unit-btn.active { @apply bg-text1 border-text1 text-white; }
+  .unit-btn.active { background: var(--fg); border-color: var(--fg); color: var(--bg-surface); }
 
   /* ── 모달 ── */
   .modal-overlay {
@@ -91,31 +96,33 @@
   /* ── 지수 카드 ── */
   .index-card {
     @apply bg-white rounded-lg px-4 py-3 flex-shrink-0 cursor-pointer select-none
-           transition-all duration-150 border border-[#ECEEF1];
-    min-width: 120px;
+           transition-all duration-150;
+    border: 1px solid var(--border); min-width: 120px;
   }
-  .index-card:hover { border-color: #D1D5DB; }
+  .index-card:hover { border-color: var(--border-heavy); }
 
   /* ── 뉴스 행 ── */
   .news-row {
-    @apply flex gap-3 px-5 py-4 cursor-pointer hover:bg-[#F9FAFB] active:bg-[#F2F4F6]
-           transition-colors duration-100;
+    @apply flex gap-3 px-5 py-4 cursor-pointer transition-colors duration-100;
+    &:hover { background: var(--bg-hover); }
+    &:active { background: var(--bg-alt); }
   }
-  .news-row:not(:last-child) { border-bottom: 1px solid #F2F4F6; }
+  .news-row:not(:last-child) { border-bottom: 1px solid var(--border); }
 
   /* ── 종목 카드 ── */
   .card {
-    @apply bg-white rounded-lg cursor-pointer select-none transition-all duration-150 border border-[#ECEEF1];
+    @apply bg-white rounded-lg cursor-pointer select-none transition-all duration-150;
+    border: 1px solid var(--border);
   }
   .card:hover {
-    border-color: #D1D5DB;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: var(--border-heavy);
+    box-shadow: var(--elevation-1);
   }
   .card-surge {
     @apply rounded-lg cursor-pointer select-none transition-all duration-150;
-    background: #FEFCFC;
-    border: 1px solid #FCA5A5;
-    border-left: 3px solid #EF4444;
+    background: var(--bg-positive);
+    border: 1px solid var(--fg-positive);
+    border-left: 3px solid var(--fg-positive);
   }
   .card-surge:hover {
     box-shadow: 0 2px 8px rgba(239,68,68,0.1);
@@ -123,12 +130,13 @@
 
   /* ── section-card (탭 내부 섹션) ── */
   .section-card {
-    @apply bg-white rounded-xl overflow-hidden border border-[#ECEEF1];
+    @apply bg-white rounded-xl overflow-hidden;
+    border: 1px solid var(--border);
   }
 
   /* ── 배지 추가 ── */
-  .badge-neutral { @apply bg-[#F2F4F6] text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; }
-  .badge-vol { @apply bg-[#FFF3E0] text-[#FF9500] rounded-full px-1.5 py-0.5 text-[10px] font-bold; }
+  .badge-neutral { @apply text-text2 rounded-lg px-2 py-1 text-[13px] font-semibold tabular-nums; background: var(--bg-alt); }
+  .badge-vol { @apply rounded-full px-1.5 py-0.5 text-[10px] font-bold; background: var(--bg-warning); color: var(--fg-warning); }
 }
 
 @layer utilities {

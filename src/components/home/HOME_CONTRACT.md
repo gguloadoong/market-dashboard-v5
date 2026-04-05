@@ -5,27 +5,33 @@
 
 ---
 
-## 현재 활성 렌더 구조 (2026-04-02 기준)
+## 현재 활성 렌더 구조 (2026-04-05 기준 — Phase 8A 축소)
 
 `src/components/home/index.jsx`의 `HomeDashboard` 렌더 순서:
 
 ```
-1. MorningBriefing         — 모닝 브리핑
+1. WatchlistWidget         — 관심종목 (최상단 승격)
 2. MarketPulseWidget       — 지수 6개 + 환율
 3. MarketTemperatureWidget — 마켓 온도계 (컴팩트)
-4. SeoulForceSection       — 세력 포착: 외국인·기관 연속 매수매도 (index.jsx 인라인 정의)
-5. SignalSummaryWidget     — 투자 시그널 (스코어 + TOP 카드 + 칩)
-6. AiDebateSection         — AI 종목토론 (채팅 버블 UI)
-7. NotableMoversSection    — 수급 이상 종목
-8. FearGreedWidget         — Fear & Greed 지수
-9. DerivativesWidget       — 파생 시그널
-10. EventTicker            — 경제 이벤트 롤링 티커
-11. WatchlistWidget + SectorMiniWidget — 관심종목 + 섹터 (2열, 모바일 세로)
-12. TopMoversWidget        — 급등/급락 (KR/US/COIN 탭)
-13. NewsFeedWidget         — 투자 뉴스 최신 (가격영향 필터 적용)
-14. MarketTimeline         — 오늘의 타임라인
-15. MarketInvestorSection  — 외국인/기관 수급 (모바일 숨김)
+4. SeoulForceSection       — 세력 포착 (index.jsx 인라인 정의)
+5. SignalSummaryWidget     — 투자 시그널
+6. AiDebateSection         — AI 종목토론
+7. TopMoversWidget         — 급등/급락 (KR/US/COIN 탭)
+8. NewsFeedWidget          — 투자 뉴스
+9. EventTicker             — 경제 이벤트 롤링 티커
 ```
+
+### Phase 8A에서 홈에서 제거된 컴포넌트 (삭제 아닌 비표시)
+
+| 컴포넌트 | 제거 이유 |
+|---------|---------|
+| MorningBriefing | "5분 안에 파악" 목표와 충돌 — 읽기 행위. 시그널 푸시로 전환 예정 |
+| NotableMoversSection | TopMoversWidget과 데이터/기능 중복 |
+| FearGreedWidget | MarketTemperatureWidget과 역할 중복. 고급 설정 이동 예정 |
+| DerivativesWidget | 전문 트레이더 전용. 고급 설정 토글로 이동 예정 |
+| MarketTimeline | EventTicker 롤링으로 충분 |
+| MarketInvestorSection | SeoulForceSection과 데이터 중복 (외국인/기관 수급) |
+| SectorMiniWidget | 섹터 탭으로 이동 |
 
 ---
 

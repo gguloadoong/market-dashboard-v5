@@ -146,9 +146,10 @@ export default async function handler(req) {
       },
     });
   } catch (err) {
+    // 에러 응답에도 CORS 헤더 포함 — 브라우저가 에러 본문을 읽을 수 있도록
     return new Response(JSON.stringify({ error: 'Failed to fetch market data' }), {
       status: 502,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 }

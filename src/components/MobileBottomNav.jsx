@@ -48,9 +48,9 @@ const MobileBottomNav = memo(function MobileBottomNav({ activeTab, onTabChange, 
               {/* 급등 배지 */}
               {surge && !active && (
                 <span
-                  className="absolute top-1 right-[calc(50%-14px)] text-[9px] leading-none"
+                  className="absolute top-1.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[#F04452]"
                   aria-hidden="true"
-                >🔥</span>
+                />
               )}
 
               {/* Lucide 아이콘 */}

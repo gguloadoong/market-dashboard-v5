@@ -3,20 +3,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
-import MorningBriefing from './MorningBriefing';
 import MarketPulseWidget from './widgets/MarketPulseWidget';
 import WatchlistWidget from './widgets/WatchlistWidget';
 import TopMoversWidget from './widgets/TopMoversWidget';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
-import FearGreedWidget from './widgets/FearGreedWidget';
-import NotableMoversSection from './NotableMoversSection';
-import MarketInvestorSection from './MarketInvestorSection';
 import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
-import MarketTimeline from './MarketTimeline';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
-import DerivativesWidget from './widgets/DerivativesWidget';
 import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
 import AiDebateSection from './AiDebateSection';
 import { useSignals } from '../../hooks/useSignals';
@@ -327,54 +321,27 @@ export default function HomeDashboard({
         </div>
       )}
 
-      {/* ─── 모닝 브리핑 ─────────────────────────────────── */}
-      <MorningBriefing />
+      {/* ─── 1. 관심종목 (최상단 승격 — "내 종목" 가장 먼저) ── */}
+      <WatchlistWidget
+        watchedItems={watchedItems}
+        popularItems={popularItems}
+        toggle={toggle}
+        onItemClick={onItemClick}
+        krwRate={krwRate}
+      />
 
-      {/* ─── WIDGET 1: Market Pulse ───────────────────────── */}
+      {/* ─── 2. 시장 현황 (지수 + 온도계) ────────────────── */}
       <MarketPulseWidget indices={indices} krwRate={krwRate} />
-
-      {/* ─── 마켓 온도계 (시그널 종합 스코어, 컴팩트) ─────── */}
       <MarketTemperatureWidget />
 
-      {/* ─── 세력 포착 (외국인·기관 연속 매수매도) ──────── */}
+      {/* ─── 3. 시그널 통합 (세력 포착 + 투자 시그널) ──────── */}
       <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
-
-      {/* ─── 투자 시그널 요약 (UX 개편) ──────────────────── */}
       <SignalSummaryWidget onItemClick={handleSignalItemClick} />
 
-      {/* ─── AI 종목토론 (채팅 버블) ─────────────────────── */}
+      {/* ─── 4. AI 종목토론 ──────────────────────────────── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
 
-      {/* ─── 주목할 종목 (히어로 영역) ───────────────────── */}
-      {hasData && (
-        <NotableMoversSection
-          allItems={allItems}
-          recentNews={recentNews}
-          krwRate={krwRate}
-          onItemClick={onItemClick}
-        />
-      )}
-
-      {/* ─── 공포탐욕 지수 + 파생 시그널 + 경제 이벤트 티커 ── */}
-      <FearGreedWidget />
-      <DerivativesWidget />
-      <EventTicker />
-
-      {/* ─── 관심종목 + 섹터 흐름 (2열 나란히, 모바일은 세로) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <WatchlistWidget
-          watchedItems={watchedItems}
-          popularItems={popularItems}
-          toggle={toggle}
-          onItemClick={onItemClick}
-          krwRate={krwRate}
-        />
-        {(krStocks.length > 0 || usStocks.length > 0 || coins.length > 0) && (
-          <SectorMiniWidget krStocks={krStocks} usStocks={usStocks} coins={coins} onTabChange={onTabChange} allItems={allItems} onItemClick={onItemClick} />
-        )}
-      </div>
-
-      {/* ─── 급등/급락 6박스 (첫 화면에 걸치도록 승격) ──── */}
+      {/* ─── 5. 급등/급락 ────────────────────────────────── */}
       <TopMoversWidget
         hasData={hasData}
         krHot={krHot} usHot={usHot} coinHot={coinHot}
@@ -383,16 +350,11 @@ export default function HomeDashboard({
         onItemClick={onItemClick}
       />
 
-      {/* ─── 시장을 움직이는 뉴스 (종목 연결 카드) ──────────── */}
+      {/* ─── 6. 뉴스 ────────────────────────────────────── */}
       <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
 
-      {/* ─── 오늘의 타임라인 ────────────────────────────────── */}
-      <MarketTimeline />
-
-      {/* ─── 시장 투자자 동향 (모바일 숨김) ────────────────── */}
-      <div className="hidden md:block">
-        <MarketInvestorSection />
-      </div>
+      {/* ─── 7. 경제 이벤트 티커 ─────────────────────────── */}
+      <EventTicker />
 
     </div>
   );

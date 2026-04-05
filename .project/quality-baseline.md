@@ -104,3 +104,15 @@
 | 2026-03-28 | API 게이트웨이 /api/d 난독화 + 한투 토큰 Redis 캐시 기준 추가 (PR #193) | 장성민 |
 | 2026-03-28 | Vercel Pro 전환 + ignoreCommand 정상화 기준 추가 (PR #194) | 장성민 |
 | 2026-03-28 | PR 리뷰 체계 5중 구조 수립 (code-reviewer + Codex + Gemini + CodeRabbit + Copilot) | 장성민 |
+
+---
+
+## 인프라 헬스
+
+| 항목 | 기준 | 위반 시 우선순위 |
+|------|------|----------------|
+| Redis 연결 상태 | ping 응답 정상 | P0 |
+| 크론 데이터 freshness | coins < 3분, kr < 10분, us < 5분 | P0 |
+| 배포 후 smoke test | snapshot API 200 + 비어있지 않은 배열 | P0 |
+| API 5xx 에러율 | < 1% (24시간 기준) | P1 |
+| 환경변수 필수 목록 | UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN 존재 | P1 |

@@ -133,6 +133,9 @@ function foreignToScore(net) {
 export default async function handler(req, res) {
   const hantooReady = !!(process.env.HANTOO_APP_KEY && process.env.HANTOO_APP_SECRET);
 
+  // 모든 응답에 CORS 헤더 공통 적용 — 에러 응답 포함
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
   try {
     const today = todayStr();
 
