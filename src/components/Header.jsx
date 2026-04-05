@@ -1,5 +1,4 @@
-// 데스크탑 헤더 — CDS TabNavigation + 장 상태 + 환율 + 다크모드
-import { TabNavigation } from '@coinbase/cds-web/tabs';
+// 데스크탑 헤더 — CDS 스타일 탭 + 장 상태 + 환율 + 다크모드
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
 
@@ -60,16 +59,28 @@ export default function Header({
             </span>
           </div>
 
-          {/* CDS TabNavigation — 데스크탑만 표시 */}
-          <div className="hidden lg:block">
-            <TabNavigation
-              tabs={TABS}
-              value={activeTab === 'news' ? 'home' : activeTab}
-              onChange={onTabChange}
-              variant="primary"
-              gap={1}
-            />
-          </div>
+          {/* 탭 — CDS 스타일 언더라인 (데스크탑만 표시) */}
+          <nav className="hidden lg:flex items-center h-12">
+            {TABS.map(tab => {
+              const isActive = (activeTab === 'news' ? 'home' : activeTab) === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange(tab.id)}
+                  className={`relative h-full flex items-center px-4 text-[14px] transition-colors ${
+                    isActive
+                      ? 'text-[#191F28] font-semibold'
+                      : 'text-[#8B95A1] hover:text-[#4E5968]'
+                  }`}
+                >
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#191F28]" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
         {/* 우: 장 상태 + 환율 + 시각 + 새로고침 — 모바일에서 숨김 */}
