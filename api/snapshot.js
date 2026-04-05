@@ -26,7 +26,7 @@ export default async function handler(request) {
     // ?health=1 파라미터 — Cron 실패 모니터링 헬스 체크 (CRON_SECRET 인증)
     const url = new URL(request.url);
     if (url.searchParams.get('health') === '1') {
-      // 인증: CRON_SECRET 설정 시 Bearer 토큰 필수
+      // 인증: CRON_SECRET 설정 시 Bearer 토큰 필수 (미설정 시 인증 없이 허용 — 개발 환경 대응)
       const secret = process.env.CRON_SECRET;
       if (secret) {
         const auth = request.headers.get('authorization');

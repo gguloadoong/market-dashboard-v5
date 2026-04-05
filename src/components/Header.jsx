@@ -25,14 +25,6 @@ const TABS = [
   { id: 'sector', label: '섹터' },
 ];
 
-// 모바일 전용 뉴스 탭 (MobileBottomNav에서 처리)
-const MOBILE_TABS = [
-  ...TABS,
-  { id: 'news', label: '뉴스' },
-];
-
-export { MOBILE_TABS };
-
 export default function Header({
   krwRate, lastUpdated, onRefresh, loading, activeTab, onTabChange,
   krStocks = [], usStocks = [], coins = [],

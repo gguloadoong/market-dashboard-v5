@@ -109,7 +109,7 @@ export async function recordCronFailure(cronName, errorMessage) {
   try {
     const countKey = `cron:fail:${cronName}`;
     const errorKey = `cron:lastError:${cronName}`;
-    // 카운터: get→+1→set으로 원자적 TTL 보장 (incr+expire 분리 시 TTL 누락 위험)
+    // 카운터: get→+1→set — TTL이 set에 포함되어 누락 불가 (동시 실패 시 카운터 부정확 가능, 모니터링 용도 허용)
     const prev = parseInt(await redis.get(countKey) || '0', 10);
     await Promise.all([
       redis.set(countKey, prev + 1, { ex: 3600 }),

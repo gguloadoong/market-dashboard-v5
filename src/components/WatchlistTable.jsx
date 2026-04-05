@@ -810,8 +810,8 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
       {/* 테이블 — 가상 스크롤 적용 */}
       <div
         ref={scrollContainerRef}
-        className="overflow-y-auto overflow-x-auto"
-        style={{ height: 'calc(100vh - 200px)' }}
+        className="overflow-y-auto overflow-x-auto flex-1 min-h-0"
+        style={{ maxHeight: 'calc(100vh - 160px)' }}
       >
         <Table className="w-full">
           <TableCaption className="sr-only">종목 워치리스트 테이블</TableCaption>

@@ -114,8 +114,8 @@ export default async function handler(request) {
     let retryResults = [];
     const failRatio = failedSymbols.length / US_SYMBOLS.length;
     if (failedSymbols.length > 0 && failRatio < 0.5) {
-      console.log(`[update-us] 2차 재시도: ${failedSymbols.length}개 (타임아웃 5초)`);
-      const { results: retried } = await fetchYahooBatch(failedSymbols, 5000);
+      console.log(`[update-us] 2차 재시도: ${failedSymbols.length}개 (타임아웃 10초)`);
+      const { results: retried } = await fetchYahooBatch(failedSymbols, 10000);
       retryResults = retried;
     } else if (failRatio >= 0.5) {
       console.warn(`[update-us] 실패 비율 ${(failRatio * 100).toFixed(0)}% — 서버 문제로 판단, 재시도 스킵`);
