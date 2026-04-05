@@ -127,7 +127,7 @@ export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick,
   if (!topNews.length) return null;
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[13px] font-bold text-[#191F28]">시장을 움직이는 뉴스</span>
         <span className="text-[11px] text-[#B0B8C1]">24시간 이내</span>

@@ -83,7 +83,7 @@ export default function DerivativesWidget() {
   }, []);
 
   if (loading) return (
-    <div data-testid="derivatives-widget" className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       <div className="text-[12px] font-bold text-[#191F28] mb-3">파생 시그널</div>
       <div className="text-[11px] text-[#B0B8C1]">로딩 중...</div>
     </div>
@@ -92,7 +92,7 @@ export default function DerivativesWidget() {
   const hasData = pcr?.pcr != null || btcFunding?.ratePercent != null || ethFunding?.ratePercent != null;
   // API 없는 환경(로컬 dev)에서도 data-testid 유지 — 빈 상태로 표시
   if (!hasData) return (
-    <div data-testid="derivatives-widget" className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[13px] font-bold text-[#191F28]">파생 시그널</span>
       </div>
@@ -103,7 +103,7 @@ export default function DerivativesWidget() {
   const pcrInterp = getPcrInterpretation(pcr?.pcr);
 
   return (
-    <div data-testid="derivatives-widget" className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-[#191F28]">파생 시그널</span>

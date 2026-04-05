@@ -83,7 +83,13 @@ export function usePrices() {
               // sector/nameEn 메타 보존 — API가 새 값을 주면 업데이트, null/undefined일 때만 기존 유지
               const sector = u.sector ?? old.sector ?? US_META_MAP.get(u.symbol)?.sector;
               const nameEn = u.nameEn ?? old.nameEn ?? US_META_MAP.get(u.symbol)?.nameEn;
-              map.set(u.symbol, { ...old, ...u, sector, nameEn, sparkline: u.sparkline?.length ? u.sparkline : old.sparkline });
+              // sparkline 배열 참조 안정화 — 마지막 값이 같으면 기존 참조 유지 (Sparkline memo 최적화)
+              const newSparkline = u.sparkline?.length ? u.sparkline : old.sparkline;
+              const oldSparkline = old.sparkline;
+              const stableSparkline = (oldSparkline?.length === newSparkline?.length &&
+                oldSparkline?.[oldSparkline.length - 1] === newSparkline?.[newSparkline.length - 1])
+                ? oldSparkline : newSparkline;
+              map.set(u.symbol, { ...old, ...u, sector, nameEn, sparkline: stableSparkline });
             } else {
               // 신규 심볼 — US_STOCK_LIST 메타(sector, nameEn) 반영
               const meta = US_META_MAP.get(u.symbol) ?? {};

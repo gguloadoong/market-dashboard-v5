@@ -595,7 +595,7 @@ export default function HomeDashboard({
       </div>
 
       {/* ─── SECTION 1: 급등 스포트라이트 ─────────────────── */}
-      <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+      <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
         {/* 섹션 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
           <div className="flex items-center gap-2">
@@ -644,7 +644,7 @@ export default function HomeDashboard({
 
       {/* ─── 관심종목 섹션 (등록된 종목 있을 때만 표시) ─────── */}
       {watchedItems.length > 0 && (
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-2">
               <span className="text-[14px]">⭐</span>
@@ -695,7 +695,7 @@ export default function HomeDashboard({
 
       {/* ─── 관심종목 × 뉴스 매칭 인사이트 (Job 3) ─────────── */}
       {watchlistInsights.length > 0 && (
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
             <span className="text-[14px]">📋</span>
             <span className="text-[14px] font-bold text-[#191F28]">내 종목 뉴스</span>
@@ -741,7 +741,7 @@ export default function HomeDashboard({
       {/* ─── SECTION 3: 3열 HOT 리스트 ───────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* 국내 급등 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇰🇷</span>
@@ -768,7 +768,7 @@ export default function HomeDashboard({
         </div>
 
         {/* 미장 급등 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇺🇸</span>
@@ -795,7 +795,7 @@ export default function HomeDashboard({
         </div>
 
         {/* 코인 급등 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🪙</span>
@@ -825,7 +825,7 @@ export default function HomeDashboard({
       {/* ─── SECTION 3b: 3열 DROP 리스트 (급락 TOP5) ──────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* 국내 급락 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇰🇷</span>
@@ -850,7 +850,7 @@ export default function HomeDashboard({
         </div>
 
         {/* 미장 급락 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🇺🇸</span>
@@ -875,7 +875,7 @@ export default function HomeDashboard({
         </div>
 
         {/* 코인 급락 */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px]">🪙</span>
@@ -901,7 +901,7 @@ export default function HomeDashboard({
       </div>
 
       {/* ─── SECTION 4: 인사이트 카드 (가로 스크롤) ─────── */}
-      <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+      <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
           <span className="text-[14px]">💡</span>
           <span className="text-[14px] font-bold text-[#191F28]">인사이트</span>
@@ -945,7 +945,7 @@ export default function HomeDashboard({
       )}
 
       {/* ─── SECTION 6: 코인 시장 요약 (접기/펼치기) ─────── */}
-      <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+      <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
         <button
           onClick={() => setCoinCardOpen(prev => !prev)}
           className="w-full flex items-center gap-2 px-4 py-3.5 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors"

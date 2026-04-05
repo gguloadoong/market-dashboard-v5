@@ -51,6 +51,13 @@ else
   check "빌드" "FAIL" "빌드 실패 — npm run build 오류 확인"
 fi
 
+# 테스트 스크립트가 있으면 실행, 없으면 스킵 (테스트 실패는 경고만, 배포 차단 안 함)
+if npm run test --if-present 2>/dev/null; then
+  echo "  ✅ 테스트 — 통과"
+else
+  echo "  ⚠️ 테스트 — 실패 (배포 계속)"
+fi
+
 # ── Gate 2: P0/P1 이슈 없음 ──────────────────────────────────────────────────
 echo -e "${BLUE}[2/6] P0/P1 오픈 이슈 확인${NC}"
 # || true: set -e 환경에서 gh 인증/네트워크 실패 시 스크립트 전체 종료 방지

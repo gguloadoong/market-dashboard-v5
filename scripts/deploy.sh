@@ -66,6 +66,34 @@ if [ "$CONCLUSION" = "success" ]; then
   echo "✅ GitHub Actions 배포 성공!"
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
   echo ""
+
+  # ── Smoke Test ──────────────────────────────────────────────────
+  echo "🔍 배포 후 Smoke Test 시작 (30초 대기)..."
+  sleep 30
+
+  SMOKE_URL="https://market-dashboard-v5.vercel.app/api/snapshot"
+  SMOKE_RESP=$(curl -s "$SMOKE_URL" || echo "")
+
+  if [ -n "$SMOKE_RESP" ]; then
+    # kr, us, coins 배열 중 하나라도 비어있지 않으면 PASS
+    KR_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('kr',[])))" 2>/dev/null || echo "0")
+    US_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('us',[])))" 2>/dev/null || echo "0")
+    COINS_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('coins',[])))" 2>/dev/null || echo "0")
+
+    if [ "$KR_LEN" -gt 0 ] || [ "$US_LEN" -gt 0 ] || [ "$COINS_LEN" -gt 0 ]; then
+      echo "  ✅ Smoke Test PASS — kr:${KR_LEN} us:${US_LEN} coins:${COINS_LEN}"
+    else
+      echo "  ⚠️  CRITICAL: Smoke Test 실패 — 모든 마켓 데이터 비어있음 (장외시간 가능성 있음)"
+      echo "  kr:${KR_LEN} us:${US_LEN} coins:${COINS_LEN}"
+      echo "  수동 확인: curl -s $SMOKE_URL | python3 -m json.tool"
+      # exit 1 하지 않음 — 장외시간에는 정상적으로 비어있을 수 있음
+    fi
+  else
+    echo "  ⚠️  CRITICAL: Smoke Test 실패 — API 응답 없음"
+    echo "  수동 확인: curl -s $SMOKE_URL"
+  fi
+
+  echo ""
   echo "🌐 https://market-dashboard-v5.vercel.app"
   exit 0
 fi
@@ -84,6 +112,30 @@ if echo "$FAIL_LOG" | grep -q "token provided via.*argument is not valid\|The to
   echo ""
   echo "✅ vercel --prod 배포 완료"
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
+  echo ""
+
+  # ── Smoke Test (fallback 배포) ─────────────────────────────────
+  echo "🔍 배포 후 Smoke Test 시작 (30초 대기)..."
+  sleep 30
+
+  SMOKE_URL="https://market-dashboard-v5.vercel.app/api/snapshot"
+  SMOKE_RESP=$(curl -s "$SMOKE_URL" || echo "")
+
+  if [ -n "$SMOKE_RESP" ]; then
+    KR_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('kr',[])))" 2>/dev/null || echo "0")
+    US_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('us',[])))" 2>/dev/null || echo "0")
+    COINS_LEN=$(echo "$SMOKE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('coins',[])))" 2>/dev/null || echo "0")
+
+    if [ "$KR_LEN" -gt 0 ] || [ "$US_LEN" -gt 0 ] || [ "$COINS_LEN" -gt 0 ]; then
+      echo "  ✅ Smoke Test PASS — kr:${KR_LEN} us:${US_LEN} coins:${COINS_LEN}"
+    else
+      echo "  ⚠️  CRITICAL: Smoke Test 실패 — 모든 마켓 데이터 비어있음 (장외시간 가능성 있음)"
+      echo "  kr:${KR_LEN} us:${US_LEN} coins:${COINS_LEN}"
+    fi
+  else
+    echo "  ⚠️  CRITICAL: Smoke Test 실패 — API 응답 없음"
+  fi
+
   echo ""
   echo "⚠️  VERCEL_TOKEN을 무기한 토큰으로 교체하세요:"
   echo "   1. https://vercel.com/account/tokens → 새 토큰 (No Expiration)"

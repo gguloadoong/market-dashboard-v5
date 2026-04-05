@@ -41,7 +41,7 @@ export default function MarketTemperatureWidget() {
   if (temp.count === 0) return (
     <div
       data-testid="market-temperature"
-      className="rounded-2xl border border-[#F2F4F6] shadow-sm p-3 bg-white"
+      className="rounded-xl border border-[#ECEEF1] p-3 bg-white"
     >
       <div className="flex items-center gap-2 mb-2">
         <div className="w-4 h-4 rounded-full bg-[#F2F4F6] animate-pulse" />

@@ -65,7 +65,7 @@ export default function FearGreedWidget() {
   if (crypto.isError && us.isError && kr.isError) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#F2F4F6] shadow-sm p-4">
+    <div className="bg-white rounded-xl border border-[#ECEEF1] p-4">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-[13px] font-bold text-[#191F28]">공포 &amp; 탐욕 지수</span>
         <span className="text-[10px] text-[#B0B8C1]">Fear &amp; Greed Index</span>

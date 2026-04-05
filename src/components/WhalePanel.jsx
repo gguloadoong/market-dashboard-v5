@@ -585,7 +585,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[15px]">🐋</span>

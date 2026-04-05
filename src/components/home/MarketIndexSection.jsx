@@ -29,7 +29,7 @@ export function CoinSummarySection({ coins, krwRate }) {
   const [coinCardOpen, setCoinCardOpen] = useState(true);
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-[#F2F4F6] shadow-sm">
+    <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
       <button
         onClick={() => setCoinCardOpen(prev => !prev)}
         className="w-full flex items-center gap-2 px-4 py-3.5 border-b border-[#F2F4F6] hover:bg-[#FAFBFC] transition-colors"

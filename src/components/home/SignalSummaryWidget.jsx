@@ -63,7 +63,7 @@ export default function SignalSummaryWidget({ onItemClick }) {
   // 빈 상태: pulse skeleton
   if (allSignals.length === 0) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F2F4F6]">
+      <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
         <div className="px-4 py-3 border-b border-[#F2F4F6]">
           <span className="text-[13px] font-bold text-[#191F28]">투자 시그널</span>
         </div>
@@ -85,7 +85,7 @@ export default function SignalSummaryWidget({ onItemClick }) {
   const topDir = topSignal ? (DIR_COLOR[topSignal.direction] || DIR_COLOR.neutral) : null;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F2F4F6]">
+    <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">
       {/* 헤더: 스코어 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#F2F4F6]">
         <div className="flex items-center gap-3">

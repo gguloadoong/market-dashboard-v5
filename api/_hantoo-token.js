@@ -18,10 +18,14 @@ const REDIS_TTL = 23 * 60 * 60; // 23시간 (토큰 유효기간 24시간보다 
 // Upstash Redis 클라이언트 (환경변수 없으면 null → /tmp fallback)
 let redis = null;
 try {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Vercel KV 통합(KV_REST_API_*) 또는 Upstash 직접 통합(UPSTASH_REDIS_REST_*) 둘 다 지원
+  // _price-cache.js와 동일한 이중 fallback 패턴
+  const kvUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (kvUrl && kvToken) {
     redis = new Redis({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
+      url: kvUrl,
+      token: kvToken,
     });
   }
 } catch {}

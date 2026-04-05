@@ -55,11 +55,13 @@ export default async function handler() {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=15',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (e) {
+    // 에러 응답에도 CORS 헤더 포함 — 브라우저가 에러 본문을 읽을 수 있도록
     return new Response(JSON.stringify({ trades: [], error: e.message }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 }

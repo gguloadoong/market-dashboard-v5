@@ -1,6 +1,8 @@
 // 워치리스트 테이블 — 로고 + 섹션 구분 + 티커 심볼 + 클릭 시 차트
+// 가상 스크롤: 4,000+ 종목 DOM 성능 최적화 (@tanstack/react-virtual)
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import React from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { setTargetPrice, removeTargetPrice, getTargetPrices } from '../utils/priceAlert';
 import Sparkline from './Sparkline';
@@ -517,8 +519,15 @@ const RELIABILITY = {
 export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466, onRowClick, loading = false, initializing = false, dataError = null, onRetry }) {
   const [sortKey, setSortKey] = useState('changePct');
   const [sortDir, setSortDir] = useState('desc');
-  const [search,  setSearch]  = useState('');
+  const [searchInput, setSearchInput] = useState('');       // 즉시 반영 (입력 UI용)
+  const [debouncedSearch, setDebouncedSearch] = useState(''); // 300ms 디바운스 (필터용)
   const [filter,  setFilter]  = useState('all');
+
+  // 검색 디바운스 300ms — 외부 라이브러리 없이 useEffect + setTimeout
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [sector,  setSector]  = useState(null);
   const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
   const [buyPrices, setBuyPrices] = useState(() => {
@@ -546,10 +555,9 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
       setTargetPrices(prev => ({ ...prev, [symbol]: { price, direction } }));
     }
   }, []);
-  // 코인 탭: 100개씩 표시 (250개 한번에 렌더링 성능 방지)
-  const PAGE_SIZE   = 100;
-  const [pageLimit, setPageLimit] = useState(PAGE_SIZE);
   const { toggle, isWatched } = useWatchlist();
+  // 가상 스크롤 컨테이너 ref
+  const scrollContainerRef = useRef(null);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
@@ -577,8 +585,8 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
 
   const filtered = useMemo(() => {
     let list = [...items];
-    if (search) {
-      const q = search.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       list = list.filter(i =>
         (i.name || '').toLowerCase().includes(q) ||
         (i.symbol || '').toLowerCase().includes(q)
@@ -599,7 +607,7 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
     // ★ 관심종목만 보기 토글
     if (showWatchlistOnly)      list = list.filter(i => isWatched(i.id || i.symbol));
     return list;
-  }, [items, search, filter, sector, showWatchlistOnly, isWatched]);
+  }, [items, debouncedSearch, filter, sector, showWatchlistOnly, isWatched]);
 
   // items에서 고유 섹터 목록 동적 추출 (kr/us 탭에서만 의미있음)
   const availableSectors = useMemo(() => {
@@ -636,39 +644,22 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
   );
 
   const totalCount = flatSorted.length;
-  // 코인 탭은 pageLimit만큼만 렌더링, 나머지는 "더 보기"로
-  const displayedRows = type === 'coin' ? flatSorted.slice(0, pageLimit) : flatSorted;
-  const hasMore       = type === 'coin' && flatSorted.length > pageLimit;
 
-  const renderRows = () => {
-    // 초기 로딩: 데이터 없거나, 코인 탭에서 데이터 수신 전 + 로딩 중이면 스켈레톤
-    const isInitialLoad = (loading || initializing) && (items.length === 0 || (type === 'coin' && items.length <= 30));
-    if (isInitialLoad) {
-      return Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />);
-    }
-    return displayedRows.map((item, i) => (
-      <FlashRow
-        key={item.id || item.symbol}
-        item={item}
-        rank={i + 1}
-        krwRate={krwRate}
-        onClick={onRowClick}
-        searchTerm={search}
-        toggle={toggle}
-        isWatched={isWatched}
-        buyPrice={buyPrices[item.id || item.symbol] ?? null}
-        onBuyPriceChange={handleBuyPriceChange}
-        targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}
-        targetDir={targetPrices[item.id || item.symbol]?.direction ?? 'above'}
-        onTargetChange={handleTargetPriceChange}
-      />
-    ));
-  };
+  // 초기 로딩 상태 판별
+  const isInitialLoad = (loading || initializing) && (items.length === 0 || (type === 'coin' && items.length <= 30));
+
+  // 가상 스크롤 — 화면에 보이는 행만 렌더링 (4,000+ 종목 성능 최적화)
+  const rowVirtualizer = useVirtualizer({
+    count: isInitialLoad ? 8 : totalCount,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 64, // FlashRow 높이 기준 (px)
+    overscan: 10,           // 화면 밖 10행 사전 렌더
+  });
 
   const reliability = RELIABILITY[type];
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-white rounded-xl overflow-hidden">
       {/* 데이터 신뢰도 + 에러 상태 배너 */}
       {(reliability || dataError) && (
         <div className={`flex items-center justify-between px-4 py-2 border-b border-[#F2F4F6] ${dataError ? 'bg-[#FFF8E1]' : 'bg-[#FAFBFC]'}`}>
@@ -753,8 +744,8 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
             placeholder="종목명·티커 검색"
             className="pl-8 pr-3 py-1.5 text-[13px] bg-[#F7F8FA] rounded-lg outline-none placeholder:text-[#C9CDD2] w-32 sm:w-44 focus:w-44 sm:focus:w-56 transition-all duration-200 border border-transparent focus:border-[#E5E8EB]"
           />
@@ -764,12 +755,11 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
           <SimpleTabs
             tabs={[
               { id: 'all',   label: '전체' },
-              { id: 'hot',   label: hotCount  > 0 ? `🔥 ${hotCount}` : '🔥' },
-              { id: 'hot5',  label: hot5Count > 0 ? `🚀 ${hot5Count}` : '🚀' },
-              { id: 'up',    label: '▲' },
-              { id: 'down',  label: '▼' },
-              { id: 'drop3', label: drop3Count > 0 ? `📉 ${drop3Count}` : '📉' },
-              { id: 'vol',   label: volSpikeCount > 0 ? `📦 ${volSpikeCount}` : '📦' },
+              { id: 'hot',   label: hotCount  > 0 ? `급등 ${hotCount}` : '급등' },
+              { id: 'up',    label: '상승' },
+              { id: 'down',  label: '하락' },
+              { id: 'drop3', label: drop3Count > 0 ? `급락 ${drop3Count}` : '급락' },
+              { id: 'vol',   label: volSpikeCount > 0 ? `거래량 ${volSpikeCount}` : '거래량' },
             ]}
             activeTab={filter}
             onChange={setFilter}
@@ -817,11 +807,15 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
         </div>
       )}
 
-      {/* 테이블 — CDS Table 컴포넌트 사용 */}
-      <div className="overflow-x-auto">
+      {/* 테이블 — 가상 스크롤 적용 */}
+      <div
+        ref={scrollContainerRef}
+        className="overflow-y-auto overflow-x-auto flex-1 min-h-0"
+        style={{ maxHeight: 'calc(100vh - 160px)' }}
+      >
         <Table className="w-full">
           <TableCaption className="sr-only">종목 워치리스트 테이블</TableCaption>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10">
             <TableRow className="bg-[#F8F9FA] border-b border-[#F2F4F6]">
               {/* ★ 관심종목 버튼 헤더 - 빈 컬럼 */}
               <TableCell as="th" scope="col" className="pl-2 pr-0 w-7" />
@@ -854,26 +848,57 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466
               <TableCell as="th" scope="col" className="w-8" />
             </TableRow>
           </TableHeader>
+          {/* 가상 스크롤 tbody — 패딩으로 스크롤 영역 확보, 보이는 행만 렌더 */}
           <TableBody>
-            {renderRows()}
+            {(() => {
+              const virtualItems = rowVirtualizer.getVirtualItems();
+              // 첫 번째 가상 아이템 위 / 마지막 가상 아이템 아래 여백으로 스크롤 높이 유지
+              const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+              const paddingBottom = virtualItems.length > 0
+                ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+                : 0;
+              return (
+                <>
+                  {/* 상단 여백 — 스크롤 위치 유지용 */}
+                  {paddingTop > 0 && (
+                    <tr><td colSpan={12} style={{ height: `${paddingTop}px`, padding: 0, border: 'none' }} /></tr>
+                  )}
+                  {isInitialLoad
+                    ? virtualItems.map((vRow) => <SkeletonRow key={vRow.key} />)
+                    : virtualItems.map((vRow) => {
+                        const item = flatSorted[vRow.index];
+                        return (
+                          <FlashRow
+                            key={item.id || item.symbol}
+                            item={item}
+                            rank={vRow.index + 1}
+                            krwRate={krwRate}
+                            onClick={onRowClick}
+                            searchTerm={debouncedSearch}
+                            toggle={toggle}
+                            isWatched={isWatched}
+                            buyPrice={buyPrices[item.id || item.symbol] ?? null}
+                            onBuyPriceChange={handleBuyPriceChange}
+                            targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}
+                            targetDir={targetPrices[item.id || item.symbol]?.direction ?? 'above'}
+                            onTargetChange={handleTargetPriceChange}
+                          />
+                        );
+                      })
+                  }
+                  {/* 하단 여백 — 전체 스크롤 높이 유지용 */}
+                  {paddingBottom > 0 && (
+                    <tr><td colSpan={12} style={{ height: `${paddingBottom}px`, padding: 0, border: 'none' }} /></tr>
+                  )}
+                </>
+              );
+            })()}
           </TableBody>
         </Table>
 
-        {totalCount === 0 && (
+        {totalCount === 0 && !isInitialLoad && (
           <div className="py-16 text-center text-[14px] text-[#B0B8C1]">
-            {search ? `"${search}" 검색 결과가 없습니다.` : '데이터 없음'}
-          </div>
-        )}
-
-        {/* 코인 탭 더 보기 버튼 */}
-        {hasMore && (
-          <div className="py-4 text-center border-t border-[#F2F4F6]">
-            <button
-              onClick={() => setPageLimit(l => l + PAGE_SIZE)}
-              className="px-5 py-2 text-[13px] font-medium text-[#3182F6] bg-[#F0F5FF] hover:bg-[#DCE8FF] rounded-lg transition-colors"
-            >
-              더 보기 ({flatSorted.length - pageLimit}개 남음)
-            </button>
+            {debouncedSearch ? `"${debouncedSearch}" 검색 결과가 없습니다.` : '데이터 없음'}
           </div>
         )}
       </div>
