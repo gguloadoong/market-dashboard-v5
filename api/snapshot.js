@@ -23,9 +23,19 @@ export default async function handler(request) {
   }
 
   try {
-    // ?health=1 파라미터 — Cron 실패 모니터링 헬스 체크
+    // ?health=1 파라미터 — Cron 실패 모니터링 헬스 체크 (CRON_SECRET 인증)
     const url = new URL(request.url);
     if (url.searchParams.get('health') === '1') {
+      // 인증: CRON_SECRET 설정 시 Bearer 토큰 필수
+      const secret = process.env.CRON_SECRET;
+      if (secret) {
+        const auth = request.headers.get('authorization');
+        if (auth !== `Bearer ${secret}`) {
+          return new Response(JSON.stringify({ error: 'unauthorized' }), {
+            status: 401, headers: CORS_HEADERS,
+          });
+        }
+      }
       const health = await getCronHealth();
       return new Response(JSON.stringify({
         ok: health !== null,
@@ -44,20 +54,15 @@ export default async function handler(request) {
     const us = snaps?.us ?? [];
     const coins = snaps?.coins ?? [];
 
-    // Redis null이거나 3개 배열 모두 비어있으면 503 반환
-    // (데이터 소스 전체 장애 — 클라이언트가 skeleton/재시도 표시)
-    if (!fromCache || (kr.length === 0 && us.length === 0 && coins.length === 0)) {
+    // Redis 연결 자체가 안 되면 503 (인프라 장애)
+    // 코인은 24시간 거래 → coins가 비어있으면 실제 장애
+    // KR/US는 장외시간에 빈 배열일 수 있으므로 503 조건에서 제외
+    if (!fromCache) {
       return new Response(JSON.stringify({
-        error: 'Service Unavailable — 캐시 데이터 없음',
-        kr: [],
-        us: [],
-        coins: [],
-        ts: Date.now(),
-        _fromCache: fromCache,
-      }), {
-        status: 503,
-        headers: CORS_HEADERS,
-      });
+        error: 'Service Unavailable — Redis 연결 실패',
+        kr: [], us: [], coins: [],
+        ts: Date.now(), _fromCache: false,
+      }), { status: 503, headers: CORS_HEADERS });
     }
 
     const payload = {

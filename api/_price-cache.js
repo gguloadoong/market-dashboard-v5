@@ -67,10 +67,14 @@ export async function getSnapWithFallback(key) {
 export async function setSnap(key, data, ex) {
   if (!redis) return false;
   try {
-    // 기존 데이터를 백업 키에 저장 (TTL 1시간)
-    const existing = await redis.get(key);
-    if (existing !== null) {
-      await redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+    // 백업은 best-effort — 실패해도 본 데이터 저장은 진행
+    try {
+      const existing = await redis.get(key);
+      if (existing !== null) {
+        await redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+      }
+    } catch (backupErr) {
+      console.warn(`[price-cache] 백업 저장 실패 (${key}:prev):`, backupErr.message);
     }
     await redis.set(key, data, { ex });
     return true;
@@ -105,13 +109,14 @@ export async function recordCronFailure(cronName, errorMessage) {
   try {
     const countKey = `cron:fail:${cronName}`;
     const errorKey = `cron:lastError:${cronName}`;
+    // 카운터: get→+1→set으로 원자적 TTL 보장 (incr+expire 분리 시 TTL 누락 위험)
+    const prev = parseInt(await redis.get(countKey) || '0', 10);
     await Promise.all([
-      // 실패 카운터 증가 (TTL 1시간 — 1시간 내 실패 횟수 추적)
-      redis.incr(countKey).then(() => redis.expire(countKey, 3600)),
-      // 마지막 에러 정보 저장
+      redis.set(countKey, prev + 1, { ex: 3600 }),
       redis.set(errorKey, JSON.stringify({
-        error: errorMessage,
+        error: String(errorMessage).slice(0, 200),
         ts: Date.now(),
+        count: prev + 1,
       }), { ex: 3600 }),
     ]);
   } catch (e) {
