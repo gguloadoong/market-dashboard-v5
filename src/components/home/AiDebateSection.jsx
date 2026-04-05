@@ -1,6 +1,6 @@
 // AI 종목토론 섹션 — "살 이유 vs 조심할 이유" 2줄 요약 + 확신도 바
 // Phase 8B 개편: 3라운드 채팅 → 핵심 판단 중심 컴팩트 UI
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchAiDebate } from '../../api/_gateway';
 
 // sessionStorage 캐시 (30분)

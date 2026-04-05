@@ -2,7 +2,7 @@
 // MarketTemperatureWidget + FearGreedWidget 통합
 import { useState, useMemo } from 'react';
 import { useSignals } from '../../../hooks/useSignals';
-import { useFearGreed, getFgLabel, getFgColor } from '../../../hooks/useFearGreed';
+import { useFearGreed, getFgColor } from '../../../hooks/useFearGreed';
 import { TYPE_META } from '../../../engine/signalTypes';
 import { getPct } from '../utils';
 

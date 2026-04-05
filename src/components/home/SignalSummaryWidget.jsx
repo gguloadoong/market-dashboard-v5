@@ -4,42 +4,13 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
 import { TYPE_META as ENGINE_META } from '../../engine/signalTypes';
 
-// 한국식 색상 (빨강=상승/강세, 파랑=하락/약세)
-const DIR_STYLE = {
-  bullish: { bg: '#FFF0F1', border: '#F04452', text: '#C0392B', label: '강세' },
-  bearish: { bg: '#EDF4FF', border: '#1764ED', text: '#1249B3', label: '약세' },
-  neutral: { bg: '#FFF8E1', border: '#FF9500', text: '#A05C00', label: '주목' },
-};
-
 function extractName(signal) {
   return signal.name || signal.symbol || '';
 }
 
-// 시그널의 easyLabel 가져오기 (TYPE_META에서)
+// 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
 function getEasyLabel(signal) {
-  const meta = ENGINE_META[signal.type];
-  if (meta?.easyLabel) return meta.easyLabel;
-  // fallback
-  const fallback = {
-    foreign_consecutive_buy: '외국인이 사모으는 중 🔥',
-    foreign_consecutive_sell: '외국인이 빠지고 있어요 ⚠️',
-    institutional_consecutive_buy: '기관이 담고 있어요 🔥',
-    institutional_consecutive_sell: '기관이 빠지고 있어요 ⚠️',
-    volume_anomaly: '거래가 평소보다 폭발 💥',
-    whale_exchange_inflow: '큰손이 거래소에 입금 📥',
-    whale_exchange_outflow: '큰손이 거래소에서 출금 📤',
-    whale_stablecoin_inflow: '현금이 거래소로 들어오는 중 💰',
-    whale_large_single: '초대형 자금 이동 감지 🐋',
-    fear_greed_shift: '시장 심리가 바뀌고 있어요 🔄',
-    put_call_ratio: '하락 보험 변동 📊',
-    funding_rate_extreme: '레버리지 쏠림 ⚡',
-    order_flow_imbalance: '매수/매도 균형 깨짐 ⚖️',
-    vwap_deviation: '평균가에서 벗어남 📏',
-    social_sentiment: 'SNS 분위기 변화 📱',
-    news_sentiment_cluster: '뉴스 쏟아지는 중 📰',
-    sector_rotation: '섹터 자금 이동 🔄',
-  };
-  return fallback[signal.type] || signal.type;
+  return ENGINE_META[signal.type]?.easyLabel || signal.type;
 }
 
 export default function SignalSummaryWidget({ onItemClick }) {
