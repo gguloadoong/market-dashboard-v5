@@ -1,5 +1,5 @@
 // api/cron/update-kr.js — 국장 가격 갱신 Serverless Cron
-// KRX(전종목) → Naver 전종목 페이징 → 한투(주요 20) → Naver 개별(주요 20) 순 fallback
+// KRX(전종목) → Naver 전종목 페이징 → 한투(주요 61) → Naver 개별(주요 61) 순 fallback
 // Vercel 서버에서 KRX LOGOUT 시 Naver marketValue API로 KOSPI+KOSDAQ ~4000종목 수집
 
 import { createRequire } from 'module';
@@ -80,14 +80,20 @@ function parseKrxItems(items, exchange) {
 }
 
 // 한투 fallback 종목 정적 이름 맵 — API가 주말에 hts_kor_isnm 빈값 반환 시 보정
+// KOSPI 시총 상위 50 + KOSDAQ 주요 10 + ETF 1 = 61종목
 const HANTOO_NAME_MAP = {
+  // ── KOSPI 시총 상위 50 ──
   '005930': '삼성전자',
   '000660': 'SK하이닉스',
+  '373220': 'LG에너지솔루션',
+  '207940': '삼성바이오로직스',
+  '005380': '현대자동차',
+  '000270': '기아',
+  '068270': '셀트리온',
   '035420': 'NAVER',
   '035720': '카카오',
-  '051910': 'LG화학',
   '006400': '삼성SDI',
-  '068270': '셀트리온',
+  '051910': 'LG화학',
   '028260': '삼성물산',
   '105560': 'KB금융',
   '055550': '신한지주',
@@ -101,6 +107,45 @@ const HANTOO_NAME_MAP = {
   '015760': '한국전력',
   '017670': 'SK텔레콤',
   '316140': '우리금융지주',
+  '030200': 'KT',
+  '086790': '하나금융지주',
+  '034020': '두산에너빌리티',
+  '000810': '삼성화재',
+  '010130': '고려아연',
+  '018260': '삼성에스디에스',
+  '009150': '삼성전기',
+  '033780': 'KT&G',
+  '011200': 'HMM',
+  '010950': 'S-Oil',
+  '003490': '대한항공',
+  '402340': 'SK스퀘어',
+  '138040': '메리츠금융지주',
+  '259960': '크래프톤',
+  '352820': '하이브',
+  '090430': '아모레퍼시픽',
+  '009540': 'HD한국조선해양',
+  '329180': 'HD현대중공업',
+  '042660': '한화오션',
+  '267260': '현대일렉트릭',
+  '006800': '미래에셋증권',
+  '011170': '롯데케미칼',
+  '000720': '현대건설',
+  '047050': '포스코인터내셔널',
+  '036570': '엔씨소프트',
+  '180640': '한진칼',
+  // ── KOSDAQ 주요 10 ──
+  '247540': '에코프로비엠',
+  '086520': '에코프로',
+  '041510': 'SM',
+  '328130': '루닛',
+  '145020': '휴젤',
+  '263750': '펄어비스',
+  '196170': '알테오젠',
+  '403870': 'HPSP',
+  '058470': '리노공업',
+  '112040': '위메이드',
+  // ── 주요 ETF ──
+  '069500': 'KODEX 200',
 };
 
 // 한투 API fallback (기존 hantoo-price.js 패턴 참고)
@@ -233,7 +278,7 @@ async function fetchNaverFullMarket() {
   return allItems.length > 0 ? allItems : null;
 }
 
-// 네이버 증권 모바일 API 개별 fallback — 주요 20종목 (최후 수단)
+// 네이버 증권 모바일 API 개별 fallback — 주요 61종목 (최후 수단)
 async function fetchNaverFallback() {
   const symbols = Object.keys(HANTOO_NAME_MAP);
   const results = await Promise.allSettled(
@@ -321,7 +366,7 @@ export default async function handler(req, res) {
         throw new Error('Naver 전종목 빈 응답');
       }
     } catch (naverFullErr) {
-      // Naver 전종목 실패 → 한투 fallback (주요 20종목)
+      // Naver 전종목 실패 → 한투 fallback (주요 61종목)
       console.warn('[update-kr] Naver 전종목 실패, 한투 fallback 시도:', naverFullErr.message);
       try {
         const hantooItems = await fetchHantooFallback();
@@ -332,7 +377,7 @@ export default async function handler(req, res) {
           throw new Error('한투 fallback 빈 응답');
         }
       } catch (hantooErr) {
-        // 한투 실패 → 네이버 개별 fallback (주요 20종목 — 최후 수단)
+        // 한투 실패 → 네이버 개별 fallback (주요 61종목 — 최후 수단)
         console.warn('[update-kr] 한투 fallback 실패, 네이버 개별 fallback 시도:', hantooErr.message);
         try {
           const naverItems = await fetchNaverFallback();

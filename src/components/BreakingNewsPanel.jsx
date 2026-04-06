@@ -59,7 +59,7 @@ function getBreakingBadge(title, pubDate) {
   return { label: '속보', bg: '#FFF0F1', color: '#F04452' };
 }
 
-function NewsItem({ item, onNewsClick, relatedCount = 0 }) {
+function NewsItem({ item, onNewsClick, onStockClick, relatedCount = 0 }) {
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
   // 시그널 태그 추출 — pubDate 전달하여 속보(🔴 속보) 자동 감지, 최대 2개
   const signals = extractNewsSignals(item.title, item.pubDate);
@@ -128,11 +128,18 @@ function NewsItem({ item, onNewsClick, relatedCount = 0 }) {
           </span>
         </div>
       )}
-      {/* 종목 태그 — 제목 아래 표시 */}
+      {/* 종목 태그 — 제목 아래 표시, 클릭 시 ChartSidePanel 열기 */}
       {stockTags.length > 0 && (
         <div className="flex items-center gap-1 mt-1.5 flex-wrap">
           {stockTags.map(tag => (
-            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#6B7684] font-medium">
+            <span
+              key={tag}
+              onClick={(e) => {
+                e.stopPropagation(); // 뉴스 카드 클릭 이벤트와 분리
+                onStockClick?.({ symbol: tag, name: tag });
+              }}
+              className={`text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#6B7684] font-medium${onStockClick ? ' cursor-pointer hover:bg-[#E5E8EB] transition-colors active:scale-95' : ''}`}
+            >
               #{tag}
             </span>
           ))}
@@ -341,7 +348,7 @@ export default function BreakingNewsPanel({ coins = [], onItemClick, onNewsClick
             )}
 
             {!isLoading && !isError && clusteredNews.map(item => (
-              <NewsItem key={item.id} item={item} onNewsClick={onNewsClick} relatedCount={item._relatedCount} />
+              <NewsItem key={item.id} item={item} onNewsClick={onNewsClick} onStockClick={onItemClick} relatedCount={item._relatedCount} />
             ))}
           </>
         )}
