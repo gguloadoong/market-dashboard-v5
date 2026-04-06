@@ -33,7 +33,7 @@ function calcTemperature(signals) {
 // ── 가격 기반 fallback 온도 계산 ──
 function calcFallbackTemperature(allItems) {
   if (!allItems?.length) return null;
-  const pcts = allItems.map(i => getPct(i)).filter(p => p !== 0 && !isNaN(p));
+  const pcts = allItems.map(i => getPct(i)).filter(p => !isNaN(p));
   if (!pcts.length) return null;
   const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length;
   // 평균 등락률을 -1 ~ +1 스코어로 변환 (+-5% 기준 클램핑)

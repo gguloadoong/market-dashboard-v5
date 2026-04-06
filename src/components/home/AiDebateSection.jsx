@@ -133,22 +133,24 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
       </div>
 
       {/* 로딩 / 에러 / 시작 전 */}
-      {!result && !loading && !error && (
-        <button
-          onClick={() => runDebate(selected)}
-          className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#3182F6] hover:bg-[#2272E6] transition-colors"
-        >
-          AI에게 물어보기
-        </button>
+      {!result && !loading && (
+        <div className="space-y-2">
+          {error && (
+            <div className="text-[11px] text-[#F04452] bg-[#FFF0F1] rounded-lg p-2">{error}</div>
+          )}
+          <button
+            onClick={() => { setError(null); runDebate(selected); }}
+            className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#3182F6] hover:bg-[#2272E6] transition-colors"
+          >
+            {error ? '다시 시도하기' : 'AI에게 물어보기'}
+          </button>
+        </div>
       )}
       {loading && (
         <div className="flex items-center justify-center py-4 gap-2">
           <div className="w-4 h-4 border-2 border-[#3182F6] border-t-transparent rounded-full animate-spin" />
           <span className="text-[12px] text-[#8B95A1]">AI가 분석하고 있어요...</span>
         </div>
-      )}
-      {error && (
-        <div className="text-[11px] text-[#F04452] bg-[#FFF0F1] rounded-lg p-2">{error}</div>
       )}
 
       {/* 2줄 요약 (기본 상태) */}

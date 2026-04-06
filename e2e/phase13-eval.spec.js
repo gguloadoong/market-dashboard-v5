@@ -53,6 +53,11 @@ test.describe('P0 — 투자 시그널 위젯 구조', () => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3000);
     await expect(page.locator('text=투자 시그널')).toBeVisible({ timeout: 8000 });
+    // Phase 8B 핵심: 강세/약세 2열 분리 확인
+    const hasBull = await page.locator('text=강세 시그널').or(page.locator('text=강세 시그널 없음')).count();
+    const hasBear = await page.locator('text=약세 시그널').or(page.locator('text=약세 시그널 없음')).count();
+    expect(hasBull).toBeGreaterThan(0);
+    expect(hasBear).toBeGreaterThan(0);
   });
 });
 
@@ -61,17 +66,24 @@ test.describe('P0 — 시장 심리 위젯 (온도계+공포탐욕 통합)', () 
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     // "시장 분위기" 또는 온도계 관련 텍스트 확인
-    const sentiment = page.locator('text=시장 분위기').or(page.locator('text=시장 심리')).or(page.locator('text=시그널 수집'));
-    await expect(sentiment).toBeVisible({ timeout: 10000 });
+    // "시장 분위기" 또는 "수집 중" — 안정 상태만 허용하되 로딩도 일시적으로 허용
+    const sentiment = page.locator('text=시장 분위기').or(page.locator('text=시장 심리'));
+    const loading = page.locator('text=수집 중');
+    const eitherVisible = await sentiment.isVisible().catch(() => false) || await loading.isVisible().catch(() => false);
+    expect(eitherVisible).toBe(true);
   });
 
-  test('주목할 종목(NotableMovers)이 렌더링된다', async ({ page }) => {
+  test('주목할 종목(NotableMovers)이 렌더링되거나 데이터 없으면 숨겨진다', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     const notable = page.locator('text=주목할 종목').or(page.locator('text=WHY'));
     const isVisible = await notable.isVisible().catch(() => false);
-    // 데이터가 없을 수 있으므로 존재하거나 숨김 모두 허용
-    expect(true).toBeTruthy();
+    // 데이터가 있으면 보여야 하고, 없으면 숨겨져야 함 — 둘 다 유효
+    if (isVisible) {
+      await expect(notable.first()).toBeVisible();
+    } else {
+      expect(await notable.count()).toBe(0);
+    }
   });
 
   test('AI 종목토론이 "사도 될까?" 형식으로 표시된다', async ({ page }) => {

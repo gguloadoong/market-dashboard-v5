@@ -5,7 +5,7 @@ import { useTopSignals } from '../../hooks/useSignals';
 import { TYPE_META as ENGINE_META } from '../../engine/signalTypes';
 
 function extractName(signal) {
-  return signal.name || signal.symbol || '';
+  return signal.name || signal.symbol || signal.sector || signal.label || ENGINE_META[signal.type]?.easyLabel || signal.type || '';
 }
 
 // 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
@@ -102,10 +102,12 @@ export default function SignalSummaryWidget({ onItemClick }) {
           ) : (
             <div className="space-y-1.5">
               {displayBull.map(signal => (
-                <button
+                <div
                   key={signal.id}
+                  role={signal.symbol ? 'button' : undefined}
+                  tabIndex={signal.symbol ? 0 : undefined}
                   onClick={() => handleClick(signal)}
-                  className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors hover:bg-[#FFF0F1]"
+                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${signal.symbol ? 'cursor-pointer hover:bg-[#FFF0F1]' : ''}`}
                   style={{ background: '#FFFAFA' }}
                 >
                   <div className="flex-1 min-w-0">
@@ -117,7 +119,7 @@ export default function SignalSummaryWidget({ onItemClick }) {
                       <div key={i} className="w-1 h-3 rounded-full" style={{ background: i < (signal.strength || 0) ? '#F04452' : '#E5E8EB' }} />
                     ))}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -131,10 +133,12 @@ export default function SignalSummaryWidget({ onItemClick }) {
           ) : (
             <div className="space-y-1.5">
               {displayBear.map(signal => (
-                <button
+                <div
                   key={signal.id}
+                  role={signal.symbol ? 'button' : undefined}
+                  tabIndex={signal.symbol ? 0 : undefined}
                   onClick={() => handleClick(signal)}
-                  className="w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors hover:bg-[#EDF4FF]"
+                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${signal.symbol ? 'cursor-pointer hover:bg-[#EDF4FF]' : ''}`}
                   style={{ background: '#FAFCFF' }}
                 >
                   <div className="flex-1 min-w-0">
@@ -146,7 +150,7 @@ export default function SignalSummaryWidget({ onItemClick }) {
                       <div key={i} className="w-1 h-3 rounded-full" style={{ background: i < (signal.strength || 0) ? '#1764ED' : '#E5E8EB' }} />
                     ))}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
