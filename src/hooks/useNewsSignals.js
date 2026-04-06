@@ -37,70 +37,74 @@ function classifyNews(title) {
 export function useNewsSignals(allNews = [], allItems = []) {
   const newsRef = useRef(allNews);
   const itemsRef = useRef(allItems);
+  const hasScannedRef = useRef(false);
   newsRef.current = allNews;
   itemsRef.current = allItems;
 
-  useEffect(() => {
-    function scan() {
-      const news = newsRef.current;
-      const items = itemsRef.current;
-      if (!news?.length || !items?.length) return;
+  function scan() {
+    const news = newsRef.current;
+    const items = itemsRef.current;
+    if (!news?.length || !items?.length) return;
 
-      const now = Date.now();
-      // 4시간 이내 뉴스만 필터
-      const recentNews = news.filter(n => {
-        if (!n.pubDate) return false;
-        const pubMs = new Date(n.pubDate).getTime();
-        return !isNaN(pubMs) && (now - pubMs) < NEWS_WINDOW;
-      });
-      if (!recentNews.length) return;
+    const now = Date.now();
+    // 4시간 이내 뉴스만 필터
+    const recentNews = news.filter(n => {
+      if (!n.pubDate) return false;
+      const pubMs = new Date(n.pubDate).getTime();
+      return !isNaN(pubMs) && (now - pubMs) < NEWS_WINDOW;
+    });
+    if (!recentNews.length) return;
 
-      // 시총 상위 + 활성 종목만 검사 (성능 최적화)
-      const targets = items.slice(0, 50);
+    // 시총 상위 + 활성 종목만 검사 (성능 최적화)
+    const targets = items.slice(0, 50);
 
-      for (const item of targets) {
-        if (!item.symbol || !item.name) continue;
-        const market = (item._market || 'KR').toUpperCase();
-        const keywords = buildStockKeywords(item.symbol, item.name, market);
-        if (!keywords.length) continue;
+    for (const item of targets) {
+      if (!item.symbol || !item.name) continue;
+      const market = (item._market || 'KR').toUpperCase();
+      const keywords = buildStockKeywords(item.symbol, item.name, market);
+      if (!keywords.length) continue;
 
-        let matchCount = 0;
-        let bullCount = 0;
-        let bearCount = 0;
+      let matchCount = 0;
+      let bullCount = 0;
+      let bearCount = 0;
 
-        for (const article of recentNews) {
-          const text = article.title + ' ' + (article.summary || article.description || '');
-          if (matchesKeywords(text, keywords)) {
-            matchCount++;
-            const cls = classifyNews(article.title);
-            if (cls === 'bull') bullCount++;
-            else if (cls === 'bear') bearCount++;
-          }
-        }
-
-        if (matchCount >= MIN_CLUSTER) {
-          createNewsClusterSignal(
-            item.symbol,
-            item.name,
-            market.toLowerCase(),
-            matchCount,
-            bullCount,
-            bearCount,
-          );
+      for (const article of recentNews) {
+        const text = article.title + ' ' + (article.summary || article.description || '');
+        if (matchesKeywords(text, keywords)) {
+          matchCount++;
+          const cls = classifyNews(article.title);
+          if (cls === 'bull') bullCount++;
+          else if (cls === 'bear') bearCount++;
         }
       }
-    }
 
-    // 초기 스캔 (2초 대기 — 뉴스 데이터 로딩 여유)
-    const initTimer = setTimeout(scan, 2000);
-    // 5분 간격 재검사
+      if (matchCount >= MIN_CLUSTER) {
+        createNewsClusterSignal(
+          item.symbol,
+          item.name,
+          market.toLowerCase(),
+          matchCount,
+          bullCount,
+          bearCount,
+        );
+      }
+    }
+  }
+
+  // 데이터 도착 시 즉시 첫 스캔
+  useEffect(() => {
+    if (!hasScannedRef.current && allNews.length > 0 && allItems.length > 0) {
+      hasScannedRef.current = true;
+      scan();
+    }
+  }, [allNews.length, allItems.length]);
+
+  // 5분 간격 재검사
+  useEffect(() => {
     const interval = setInterval(() => {
       if (!document.hidden) scan();
     }, SCAN_INTERVAL);
 
-    return () => {
-      clearTimeout(initTimer);
-      clearInterval(interval);
-    };
-  }, []); // ref 패턴 — 의존성 없음
+    return () => clearInterval(interval);
+  }, []);
 }

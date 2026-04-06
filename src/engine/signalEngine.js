@@ -490,6 +490,11 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;
+  // 동일 strength여도 count/방향 변경 시 갱신 — 기존 시그널 먼저 제거
+  const existIdx = _signals.findIndex(
+    s => s.type === SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER && s.symbol === symbol,
+  );
+  if (existIdx !== -1) _signals.splice(existIdx, 1);
   return addSignal(createSignal({
     type: SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER,
     symbol, name, market, direction, strength,
