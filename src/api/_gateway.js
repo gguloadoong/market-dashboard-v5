@@ -79,6 +79,11 @@ export function fetchWhaleProxy(cursor, timeoutMs = 8000) {
   return gwJson({ t: 'w', ...(cursor ? { cr: cursor } : {}) }, timeoutMs);
 }
 
+// ─── 텔레그램 고래 알림 ──────────────────────────────────────
+export function fetchWhaleTelegram(timeoutMs = 8000) {
+  return gwJson({ t: 'wt' }, timeoutMs);
+}
+
 // ─── BTC · ETH ETF 순유입/유출 ───────────────────────────────
 export async function fetchBtcEtfFlow() {
   try {

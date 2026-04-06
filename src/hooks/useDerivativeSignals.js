@@ -1,12 +1,13 @@
 // 파생/소셜 시그널 폴링 훅 — PCR, 펀딩비, 주문장 불균형, VWAP, 소셜 감성
 import { useEffect, useRef } from 'react';
-import { fetchPCR, fetchFundingRate, fetchOrderFlow, fetchSocialSentiment } from '../api/_gateway';
+import { fetchPCR, fetchFundingRate, fetchOrderFlow, fetchSocialSentiment, fetchWhaleTelegram } from '../api/_gateway';
 import {
   createPCRSignal,
   createFundingRateSignal,
   createOrderFlowSignal,
   createVWAPSignal,
   createSocialSentimentSignal,
+  createWhaleSignal,
 } from '../engine/signalEngine';
 
 // VWAP 계산 — sparkline(가격 배열) 기반 단순 평균 (실제 거래량 없어 단순 이동평균 대체)
@@ -24,7 +25,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
   watchlistRef.current = watchlistSymbols;
 
   useEffect(() => {
-    let pcrTimer, frTimer, ofTimer, socialTimer, vwapTimer;
+    let pcrTimer, frTimer, ofTimer, socialTimer, vwapTimer, whaleTimer;
 
     // PCR 폴링 (5분)
     async function runPCR() {
@@ -75,6 +76,28 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
+    // 텔레그램 고래 알림 폴링 (5분)
+    async function runWhaleTelegram() {
+      try {
+        const data = await fetchWhaleTelegram();
+        if (data?.events?.length) {
+          // 가장 큰 금액의 이벤트만 심볼별로 전달 (addSignal 중복제거와 호환)
+          // 동일 심볼 다중 이체 중 가장 큰 건이 시그널로 표시됨
+          const bestByKey = {};
+          for (const event of data.events) {
+            const key = `${event.symbol}_${event.movementType}`;
+            const amt = event.tradeUsd || event.amount || 0;
+            if (!bestByKey[key] || amt > (bestByKey[key].tradeUsd || bestByKey[key].amount || 0)) {
+              bestByKey[key] = event;
+            }
+          }
+          for (const event of Object.values(bestByKey)) {
+            createWhaleSignal(event);
+          }
+        }
+      } catch {}
+    }
+
     // VWAP 계산 (5분, 기존 데이터 활용)
     function runVWAP() {
       try {
@@ -95,6 +118,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     runFundingRate();
     runOrderFlow();
     runSocial();
+    runWhaleTelegram();
     // VWAP 즉시 실행 (기존 30초 지연 제거 — 온도계 로딩 최적화)
     runVWAP();
 
@@ -104,6 +128,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     ofTimer = setInterval(() => { if (!document.hidden) runOrderFlow(); }, 60 * 1000);
     socialTimer = setInterval(() => { if (!document.hidden) runSocial(); }, 5 * 60 * 1000);
     vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 5 * 60 * 1000);
+    whaleTimer = setInterval(() => { if (!document.hidden) runWhaleTelegram(); }, 5 * 60 * 1000);
 
     return () => {
       clearInterval(pcrTimer);
@@ -111,6 +136,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       clearInterval(ofTimer);
       clearInterval(socialTimer);
       clearInterval(vwapTimer);
+      clearInterval(whaleTimer);
     };
   }, []); // ref 패턴 — 의존성 없음
 }
