@@ -19,12 +19,31 @@ if ! command -v codex &>/dev/null; then
   exit 0
 fi
 
-# ── Codex 리뷰 실행 ──
+# ── Codex 리뷰 실행 (최대 2회 재시도) ──
 echo "[codex-gate] ${BASE_BRANCH} 기준 Codex 리뷰 실행 중..."
 
-if ! codex exec review --base "$BASE_BRANCH" --output-last-message "$TMP_FILE" --full-auto; then
-  echo "[codex-gate] Codex 리뷰 실행 실패."
-  if [ "$MODE" = "strict" ]; then exit 1; fi
+CODEX_TIMEOUT=${CODEX_TIMEOUT:-120}  # 기본 2분 타임아웃
+CODEX_OK=false
+for attempt in 1 2; do
+  if timeout "$CODEX_TIMEOUT" codex exec review --base "$BASE_BRANCH" --output-last-message "$TMP_FILE" --full-auto; then
+    CODEX_OK=true
+    break
+  fi
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -eq 124 ]; then
+    echo "[codex-gate] Codex 타임아웃 (${CODEX_TIMEOUT}초 초과, 시도 ${attempt}/2)"
+  else
+    echo "[codex-gate] Codex 실행 실패 exit=${EXIT_CODE} (시도 ${attempt}/2)"
+  fi
+  [ "$attempt" -lt 2 ] && sleep 3
+done
+
+if [ "$CODEX_OK" = false ]; then
+  echo "[codex-gate] Codex 리뷰 2회 연속 실패."
+  if [ "$MODE" = "strict" ]; then
+    echo "[codex-gate] strict 모드 — SKIP_CODEX_REVIEW=1로 우회 가능"
+    exit 1
+  fi
   exit 0
 fi
 
