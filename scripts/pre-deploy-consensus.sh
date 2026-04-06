@@ -188,9 +188,25 @@ if [ -f ".algo-files" ]; then
 fi
 
 if [ "$ALGO_CHANGED" -gt 0 ]; then
-  # architect 승인 artifact 확인 — 모든 .tmp/architect-review-*.md에서 검색
-  # 브랜치별 artifact는 머지 후 브랜치명이 바뀌어도 조상 커밋이면 유효
+  # architect 승인 artifact 확인 — 스테일 PASS 방지 (create-pr.sh와 동일 기준)
+  # 검증 원칙: artifact의 commit이 "마지막 algo 변경 커밋" 이후여야 유효
+  #   - 조상 커밋 검증만으로는 이후 추가 algo 변경을 통과시킬 수 있음 (보안 취약점)
+  #   - 마지막 algo 변경 커밋을 기준으로, artifact commit이 그 이후(또는 동일)인지 확인
   HEAD_NOW=$(git rev-parse HEAD)
+
+  # 마지막 algo 파일 변경 커밋 해시 계산 (origin/main..HEAD 범위에서)
+  LAST_ALGO_COMMIT=""
+  if [ -f ".algo-files" ]; then
+    # .algo-files 패턴으로 변경된 파일 목록 추출 후, 관련 커밋 중 가장 최신 커밋 탐색
+    ALGO_PATTERN_GATE5=$(grep -v '^#' .algo-files | grep -v '^$' | tr '\n' '|' | sed 's/|$//')
+    # git log로 origin/main..HEAD 범위에서 algo 파일을 변경한 커밋 중 첫 번째(=가장 최신) 추출
+    LAST_ALGO_COMMIT=$(git log origin/main..HEAD --oneline --diff-filter=ACM -- \
+      $(git diff origin/main...HEAD --name-only 2>/dev/null \
+        | grep -vE '\.test\.[^/]+$|\.spec\.[^/]+$' \
+        | grep -E "$ALGO_PATTERN_GATE5" || true) 2>/dev/null \
+      | head -1 | awk '{print $1}' || true)
+  fi
+
   ARCHITECT_APPROVED=0
   ARCHITECT_VERDICT_FOUND=""
   for _af in .tmp/architect-review-*.md; do
@@ -198,7 +214,23 @@ if [ "$ALGO_CHANGED" -gt 0 ]; then
     _av=$(grep -oE 'VERDICT:[[:space:]]*(PASS|BLOCK|NOT_REQUIRED)' "$_af" | awk '{print $2}' | head -1 || true)
     _ac=$(grep -m1 "^commit:" "$_af" | awk '{print $2}' || true)
     if { [ "$_av" = "PASS" ] || [ "$_av" = "NOT_REQUIRED" ]; } && [ -n "$_ac" ]; then
-      if git merge-base --is-ancestor "$_ac" "$HEAD_NOW" 2>/dev/null; then
+      # 유효성 검증: artifact commit이 마지막 algo 변경 커밋 이후(또는 동일)인지 확인
+      # - LAST_ALGO_COMMIT이 없으면(탐색 실패) HEAD 일치 여부로 폴백
+      # - artifact commit이 LAST_ALGO_COMMIT의 조상이면 스테일 → 거부
+      _VALID=0
+      if [ -z "$LAST_ALGO_COMMIT" ]; then
+        # 마지막 algo 커밋 탐색 실패 시 HEAD 정확 일치로 폴백 (create-pr.sh 동일 기준)
+        [ "$_ac" = "$HEAD_NOW" ] && _VALID=1
+      else
+        # artifact commit이 LAST_ALGO_COMMIT 이후인지: LAST_ALGO_COMMIT이 _ac의 조상이거나 동일
+        if git merge-base --is-ancestor "$LAST_ALGO_COMMIT" "$_ac" 2>/dev/null || [ "$_ac" = "$LAST_ALGO_COMMIT" ]; then
+          # 추가로 artifact commit이 HEAD의 조상이거나 동일한지도 확인 (미래 커밋 방지)
+          if git merge-base --is-ancestor "$_ac" "$HEAD_NOW" 2>/dev/null || [ "$_ac" = "$HEAD_NOW" ]; then
+            _VALID=1
+          fi
+        fi
+      fi
+      if [ "$_VALID" -eq 1 ]; then
         ARCHITECT_APPROVED=1
         ARCHITECT_VERDICT_FOUND="$_av"
         break
@@ -207,9 +239,9 @@ if [ "$ALGO_CHANGED" -gt 0 ]; then
   done
 
   if [ "$ARCHITECT_APPROVED" -eq 1 ]; then
-    check "개발팀 승인" "PASS" "architect 승인 완료 (${ARCHITECT_VERDICT_FOUND}) — 조상 커밋 검증"
+    check "개발팀 승인" "PASS" "architect 승인 완료 (${ARCHITECT_VERDICT_FOUND}) — algo 변경 이후 발급 확인"
   else
-    check "알고리즘 파일" "FAIL" "알고리즘 파일 변경 ${ALGO_CHANGED}건 — npm run architect 실행 후 재확인"
+    check "알고리즘 파일" "FAIL" "알고리즘 파일 변경 ${ALGO_CHANGED}건 — npm run architect 재실행 필요 (스테일 artifact 거부)"
   fi
 else
   check "개발팀 승인" "PASS" "알고리즘 파일 변경 없음"
