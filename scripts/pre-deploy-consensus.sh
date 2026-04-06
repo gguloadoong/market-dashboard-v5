@@ -83,7 +83,14 @@ PM_VERDICT="SKIP"
 if command -v claude &>/dev/null && [ -f ".project/backlog.md" ]; then
   # nonce: 실행 시마다 랜덤 생성 → 커밋 메시지로 미리 알 수 없어 프롬프트 인젝션 차단
   PM_NONCE="PMGATE_$(date +%s)_${RANDOM}"
-  DEPLOY_COMMITS=$(git log origin/main..HEAD --oneline 2>/dev/null | head -20 || echo "(최근 커밋 없음 — main 직접 커밋)")
+  # .last-deployed-commit 기준으로 배포 예정 커밋 산출 (없으면 최근 10개)
+  LAST_DEPLOY=$(cat .last-deployed-commit 2>/dev/null | tr -d '[:space:]')
+  if [ -n "$LAST_DEPLOY" ] && git cat-file -t "$LAST_DEPLOY" &>/dev/null; then
+    DEPLOY_COMMITS=$(git log "${LAST_DEPLOY}..HEAD" --oneline 2>/dev/null | head -20)
+  else
+    DEPLOY_COMMITS=$(git log --oneline -10 2>/dev/null)
+  fi
+  [ -z "$DEPLOY_COMMITS" ] && DEPLOY_COMMITS="(배포 예정 커밋 없음)"
   OPEN_PRS=$(gh pr list --state open --json number,title --jq '.[] | "#\(.number) \(.title)"' 2>/dev/null || echo "")
   BACKLOG=$(cat .project/backlog.md 2>/dev/null | head -80)
 
