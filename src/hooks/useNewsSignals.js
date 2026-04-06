@@ -112,11 +112,9 @@ export function useNewsSignals(allNews = [], allItems = []) {
     prevClusteredRef.current = currentClustered;
   }, []);
 
-  // 뉴스 또는 종목 데이터 변경 시 재스캔
+  // 뉴스 또는 종목 데이터 변경 시 재스캔 (빈 데이터도 정리 위해 무조건 호출)
   useEffect(() => {
-    if (allNews.length > 0 && allItems.length > 0) {
-      scan();
-    }
+    scan();
   }, [allNews, allItems, scan]);
 
   // 5분 간격 재검사
