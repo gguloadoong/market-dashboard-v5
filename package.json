@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --open false",
+    "dev:verify": "bash -c 'PORT=${1:-5173}; for i in 1 2 3 4 5; do sleep 1; TITLE=$(curl -s http://localhost:$PORT/ 2>/dev/null | grep -o \"<title>[^<]*</title>\"); if [ -n \"$TITLE\" ]; then echo \"$TITLE\" | grep -q \"마켓레이더\" && echo \"✅ 마켓레이더 확인 (port $PORT)\" || echo \"❌ 잘못된 프로젝트: $TITLE (port $PORT)\"; exit 0; fi; done; echo \"⚠️ 서버 응답 없음 (port $PORT)\"' --",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
