@@ -488,6 +488,13 @@ export function removeSignalByTypeAndSymbol(type, symbol) {
   if (_signals.length !== before) _notify();
 }
 
+/** 특정 타입의 모든 시그널 제거 */
+export function removeAllSignalsByType(type) {
+  const before = _signals.length;
+  _signals = _signals.filter(s => s.type !== type);
+  if (_signals.length !== before) _notify();
+}
+
 /** 뉴스 클러스터 시그널 — 특정 종목에 뉴스 3건+ 집중 */
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
   if (newsCount < 3) return null;

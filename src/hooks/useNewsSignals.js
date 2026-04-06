@@ -1,13 +1,9 @@
 // 뉴스 클러스터 시그널 훅 — 특정 종목에 뉴스 3건+ 집중 시 시그널 발행
 // 4시간 이내 뉴스 대상, 5분 간격 재검사
 import { useEffect, useRef, useCallback } from 'react';
-import { createNewsClusterSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
+import { createNewsClusterSignal, removeSignalByTypeAndSymbol, removeAllSignalsByType } from '../engine/signalEngine';
 import { SIGNAL_TYPES } from '../engine/signalTypes';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
-
-function removeCluster(symbol) {
-  removeSignalByTypeAndSymbol(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER, symbol);
-}
 
 const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
 const NEWS_WINDOW = 4 * 3600000; // 4시간
@@ -42,22 +38,35 @@ function classifyNews(title) {
 export function useNewsSignals(allNews = [], allItems = []) {
   const newsRef = useRef(allNews);
   const itemsRef = useRef(allItems);
+  // 이전 스캔에서 클러스터 시그널이 있던 심볼 추적
+  const prevClusteredRef = useRef(new Set());
   newsRef.current = allNews;
   itemsRef.current = allItems;
 
   const scan = useCallback(() => {
     const news = newsRef.current;
     const items = itemsRef.current;
-    if (!news?.length || !items?.length) return;
+
+    // 데이터 없으면 기존 클러스터 전체 정리
+    if (!news?.length || !items?.length) {
+      removeAllSignalsByType(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER);
+      prevClusteredRef.current = new Set();
+      return;
+    }
 
     const now = Date.now();
-    // 4시간 이내 뉴스만 필터
     const recentNews = news.filter(n => {
       if (!n.pubDate) return false;
       const pubMs = new Date(n.pubDate).getTime();
       return !isNaN(pubMs) && (now - pubMs) < NEWS_WINDOW;
     });
-    if (!recentNews.length) return;
+
+    // 최근 뉴스 없으면 전체 정리
+    if (!recentNews.length) {
+      removeAllSignalsByType(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER);
+      prevClusteredRef.current = new Set();
+      return;
+    }
 
     // 마켓별 상위 20개씩 추출 (KR/US/COIN 균등 커버)
     const byMarket = { KR: [], US: [], COIN: [] };
@@ -67,13 +76,12 @@ export function useNewsSignals(allNews = [], allItems = []) {
     }
     const targets = [...byMarket.KR, ...byMarket.US, ...byMarket.COIN];
 
-    const scannedSymbols = new Set();
+    const currentClustered = new Set();
     for (const item of targets) {
       if (!item.symbol || !item.name) continue;
       const market = (item._market || 'KR').toUpperCase();
       const keywords = buildStockKeywords(item.symbol, item.name, market);
       if (!keywords.length) continue;
-      scannedSymbols.add(item.symbol);
 
       let matchCount = 0;
       let bullCount = 0;
@@ -90,19 +98,18 @@ export function useNewsSignals(allNews = [], allItems = []) {
       }
 
       if (matchCount >= MIN_CLUSTER) {
-        createNewsClusterSignal(
-          item.symbol,
-          item.name,
-          market.toLowerCase(),
-          matchCount,
-          bullCount,
-          bearCount,
-        );
-      } else {
-        // 임계값 미달 시 기존 클러스터 시그널 제거
-        removeCluster(item.symbol);
+        currentClustered.add(item.symbol);
+        createNewsClusterSignal(item.symbol, item.name, market.toLowerCase(), matchCount, bullCount, bearCount);
       }
     }
+
+    // 이전에 클러스터였지만 현재 아닌 심볼 정리 (스캔셋 탈락 포함)
+    for (const sym of prevClusteredRef.current) {
+      if (!currentClustered.has(sym)) {
+        removeSignalByTypeAndSymbol(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER, sym);
+      }
+    }
+    prevClusteredRef.current = currentClustered;
   }, []);
 
   // 뉴스 또는 종목 데이터 변경 시 재스캔
