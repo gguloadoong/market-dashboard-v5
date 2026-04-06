@@ -15,6 +15,7 @@
 //   r  = rss             (뉴스 RSS 프록시)
 //   c  = chart-proxy     (차트)
 //   w  = whale-proxy     (고래 알림)
+//   wt = whale-telegram  (텔레그램 고래 알림)
 //   v  = hantoo-investor (투자자 동향)
 //   m  = hantoo-market-investor (시장 투자자)
 //   f  = fear-greed      (공포탐욕 — 미장/코인)
@@ -237,6 +238,10 @@ export default async function handler(request) {
         // 고래 알림: cr = cursor
         const qs = body.cr ? `?cursor=${body.cr}` : '';
         return proxyToServerless(baseUrl, `/api/whale-proxy${qs}`);
+      }
+      case 'wt': {
+        // 텔레그램 고래 알림
+        return proxyToServerless(baseUrl, `/api/whale-telegram`);
       }
       case 'ns': {
         // 네이버 검색: q = 검색어
