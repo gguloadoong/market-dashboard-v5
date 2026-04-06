@@ -1,11 +1,16 @@
 // AI 종목토론 — Groq API (Edge, 무료 tier, 초고속)
 // primary: llama-3.3-70b-versatile, fallback: llama-3.1-8b-instant
+// Redis 서버 캐시: 동일 종목 토론은 1회만 생성, 전체 사용자 공유 (TTL 30분)
 export const config = { runtime: 'edge' };
+
+import { redis } from './_price-cache.js';
 
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
 ];
+
+const DEBATE_TTL = 1800; // 30분 — 종목별 캐시
 
 export default async function handler(request) {
   if (request.method === 'OPTIONS') {
@@ -38,24 +43,45 @@ export default async function handler(request) {
     return new Response(JSON.stringify({ error: 'symbol required' }), { status: 400 });
   }
 
+  // ── Redis 캐시 조회 — 동일 종목은 서버에서 1회만 생성, 전체 사용자 공유 ──
+  // 키에 가격을 포함하지 않음 (의도적): 토론은 정성적 분석이므로 30분 내 가격 변동이
+  // 토론 품질에 실질 영향 없음. 키에 가격대를 넣으면 캐시 히트율이 급락하여 토큰 절감 효과 소실.
+  const cacheKey = `ai:debate:${symbol}`;
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=1800',
+            'Access-Control-Allow-Origin': '*',
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('[ai-debate] Redis 조회 실패, Groq 직접 호출:', e.message);
+    }
+  }
+
   const { name = symbol, price, changePct, market = 'us' } = ctx;
   const priceStr = price ? `현재가 ${market === 'kr' ? price.toLocaleString() + '원' : '$' + price}` : '';
   const changeStr = changePct != null ? ` (${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%)` : '';
 
+  // ADR-016: 3라운드 채팅 → "살 이유 vs 조심할 이유" 2줄 요약 (토큰 60% 절감)
   const prompt = `종목: ${name} (${symbol})${priceStr ? ', ' + priceStr : ''}${changeStr}
 
-이 종목에 대해 강세파와 약세파가 실제 토론처럼 3라운드 주고받으세요.
-강세파가 먼저 1~2문장 주장 → 약세파가 반론. 총 6개 메시지.
+이 종목에 대해 "살 이유"(bull) 1~2문장, "조심할 이유"(bear) 1~2문장, 종합 의견 1줄을 작성하세요.
+구체적 수치, 이유, 리스크를 포함하세요. 쉬운 한국어로 작성하세요.
 
 반드시 아래 JSON만 반환하세요 (다른 텍스트 절대 없이):
 {
   "messages": [
-    {"side": "bull", "text": "강세 주장 (1~2문장, 구체적 수치나 이유 포함)"},
-    {"side": "bear", "text": "약세 반론 (1~2문장, 구체적 반론)"},
-    {"side": "bull", "text": "강세 재반론"},
-    {"side": "bear", "text": "약세 재반론"},
-    {"side": "bull", "text": "강세 마지막 주장"},
-    {"side": "bear", "text": "약세 마지막 반론"}
+    {"side": "bull", "text": "살 이유 1~2문장"},
+    {"side": "bear", "text": "조심할 이유 1~2문장"}
   ],
   "verdict": "한국어 종합 의견 1줄",
   "confidence": 0.65
@@ -72,7 +98,7 @@ export default async function handler(request) {
         body: JSON.stringify({
           model,
           messages: [{ role: 'user', content: prompt }],
-          max_tokens: 512,
+          max_tokens: 256,
           temperature: 0.7,
         }),
         signal: AbortSignal.timeout(15000),
@@ -140,12 +166,24 @@ export default async function handler(request) {
         parsed = { messages: [{ side: 'bull', text }], verdict: '', confidence: 0.5 };
       }
 
-      return new Response(JSON.stringify({ symbol, model, ...parsed }), {
+      const result = { symbol, model, ...parsed };
+
+      // ── Redis 캐시 저장 — 다음 요청부터 Groq 호출 없이 즉시 반환 ──
+      if (redis) {
+        try {
+          await redis.set(cacheKey, JSON.stringify(result), { ex: DEBATE_TTL });
+        } catch (e) {
+          console.warn('[ai-debate] Redis 저장 실패:', e.message);
+        }
+      }
+
+      return new Response(JSON.stringify(result), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=1800',
           'Access-Control-Allow-Origin': '*',
+          'X-Cache': 'MISS',
         },
       });
     } catch (e) {

@@ -15,7 +15,7 @@
 
 | 파일 | 내용 | 등록일 |
 |------|------|--------|
-| `api/cron/update-kr.js` | `HANTOO_NAME_MAP` 20종목 제한 — KRX/Naver Cron 실패 시 20종목만 스냅샷 저장 → v2 대비 국장 종목 수 감소 원인. `KR_STOCK_LIST` 61종목 기준으로 확장 필요 | 2026-04-04 |
+| `api/cron/update-kr.js` | 한투/Naver 개별 fallback 61종목 제한 — KRX+Naver 전종목 모두 실패 시 `HANTOO_NAME_MAP` 61종목(KOSPI 50+KOSDAQ 10+ETF 1)만 스냅샷 저장. 1~2순위 정상 시 ~4000종목 커버되므로 P1 유지 | 2026-04-04 |
 | `scripts/pre-deploy-consensus.sh` | Reviewer Loop Deadlock — Opus PASS + Codex BLOCK 충돌 시 중재 규칙 없음 (Issue #38) | 2026-04-04 |
 | `scripts/review-summary.sh` | Codex gate 재실행 시 스테일 artifact 잔존 가능 (Issue #39) | 2026-04-04 |
 | `.git/hooks/pre-push` | v5에 pre-push hook 없음 — `npm run pr` 우회 시 Codex gate/code-review 검증 전부 스킵 가능. v2에는 있었으나 v5 마이그레이션 시 누락. PR #42가 Codex gate 없이 머지된 원인 | 2026-04-06 |
