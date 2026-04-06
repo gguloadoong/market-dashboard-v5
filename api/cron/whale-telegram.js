@@ -123,7 +123,7 @@ export default async function handler(request) {
 
     // offset 저장 (TTL 없음 — 영구 보관하되 Redis 메모리 부담 미미)
     if (maxUpdateId > 0) {
-      await setSnap(OFFSET_KEY, maxUpdateId, 86400); // 24시간 TTL
+      await setSnap(OFFSET_KEY, maxUpdateId, 0); // TTL 없음 — 영구 보관 (재시작 시 중복 방지)
     }
 
     return new Response(JSON.stringify({ ok: true, newUpdates: data.result.length, totalEvents: trimmed.length }), {

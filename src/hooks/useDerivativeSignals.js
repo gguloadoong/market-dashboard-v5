@@ -81,7 +81,17 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       try {
         const data = await fetchWhaleTelegram();
         if (data?.events?.length) {
+          // 가장 큰 금액의 이벤트만 심볼별로 전달 (addSignal 중복제거와 호환)
+          // 동일 심볼 다중 이체 중 가장 큰 건이 시그널로 표시됨
+          const bestByKey = {};
           for (const event of data.events) {
+            const key = `${event.symbol}_${event.movementType}`;
+            const amt = event.tradeUsd || event.amount || 0;
+            if (!bestByKey[key] || amt > (bestByKey[key].tradeUsd || bestByKey[key].amount || 0)) {
+              bestByKey[key] = event;
+            }
+          }
+          for (const event of Object.values(bestByKey)) {
             createWhaleSignal(event);
           }
         }
