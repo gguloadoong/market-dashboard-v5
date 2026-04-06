@@ -1,36 +1,10 @@
 # 프로젝트 지침
 
 이 프로젝트는 국장·미장·코인 실시간 시세 모니터링 웹앱이다.
-
-## Session Start (새 세션 시작 시 반드시 읽기)
-
-매 새 세션마다, 코드 작성 전에 아래 파일을 순서대로 읽는다:
-1. `.project/roadmap.md` — Phase 진행 상황
-2. `.project/backlog.md` — 잔여 태스크, 우선순위
-3. `.project/decisions.md` — ADR, 이전 판단 기록
-4. `.project/quality-baseline.md` — 현재 품질 기준선
-5. `.project/handoff/` — 최신 핸드오프 문서 (있으면)
-6. `.project/checkpoint.md` — 마지막 세션 요약 (있으면)
-7. `src/components/home/HOME_CONTRACT.md` + 기타 CONTRACT.md 파일
+작업 전 `.project/backlog.md`, `.project/decisions.md`, `.project/quality-baseline.md`를 먼저 읽는다.
 
 **홈 컴포넌트를 건드리는 경우**: `src/components/home/HOME_CONTRACT.md`를 반드시 먼저 읽는다.
 이 파일에 "영구 삭제된 컴포넌트" 목록이 있다. 목록에 있는 컴포넌트는 절대 재추가하지 않는다.
-
-## Context Health Management (세션 품질 저하 방지)
-
-**Auto-Compact (60% Rule):**
-- 매 스토리 완료 후 컨텍스트 사용량 확인
-- 60% → `/compact Keep: 현재 Phase, roadmap 진행상태, 마지막 결정사항, 작업 중인 스토리, 미해결 버그`
-- 80% → checkpoint.md 저장 + CEO에게 경고
-- 95% → STOP + 새 세션 필요. 95% 전에 반드시 compact할 것
-
-**Subagent Isolation (메인 컨텍스트 보호):**
-- 무거운 작업(테스트, 파일 검색, 코드 생성) → 서브에이전트에 위임
-- 서브에이전트는 독립 컨텍스트에서 실행, 요약만 메인으로 반환
-- 메인 세션은 가볍게 유지: 방향 결정, 스토리 관리만
-
-**Checkpoint (매 10 스토리 or ~2시간):**
-- `.project/checkpoint.md`에 저장: 완료/진행중/결정/변경파일/컨텍스트상태
 
 ---
 

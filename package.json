@@ -20,8 +20,7 @@
     "review:summary": "bash scripts/review-summary.sh",
     "deploy:check": "bash scripts/pre-deploy-consensus.sh",
     "setup:hooks": "git config core.hooksPath .githooks",
-    "deploy": "bash scripts/deploy.sh",
-    "qa:validate": "bash scripts/validate-qa-evidence.sh"
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@coinbase/cds-web": "^8.62.1",

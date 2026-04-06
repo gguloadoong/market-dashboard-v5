@@ -83,16 +83,7 @@ gh pr create --title "..." --body "Closes #이슈번호\n\n---\n🤖 Generated b
 
 ---
 
-### 6. Fix-Loop Circuit Breaker (수정 무한루프 차단)
-
-**같은 에러에 대해 같은 수정을 3회 시도했는데도 해결되지 않으면 즉시 STOP.**
-1. 시도한 수정과 에러 내용을 `.project/decisions.md`에 진단 기록
-2. CEO에게 에스컬레이션: "동일 에러 3회 반복 — 다른 접근법이 필요합니다"
-3. 해당 태스크를 backlog에 `blocked` 태그로 표시하고 다음 태스크로 이동
-
----
-
-### 7. 문제 기록
+### 6. 문제 기록
 
 버그, 설계 누락, 성능 이슈, API 불안정은 즉시:
 - `.project/backlog.md`에 적절한 우선순위로 등록
@@ -100,7 +91,7 @@ gh pr create --title "..." --body "Closes #이슈번호\n\n---\n🤖 Generated b
 
 ---
 
-### 8. 자율 진화 엔진 (루프 유지)
+### 7. 자율 진화 엔진 (루프 유지)
 
 Step 1로 돌아가라. 잔여 태스크가 없어도 아래 자율 활동을 수행한다.
 
