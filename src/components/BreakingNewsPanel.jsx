@@ -7,23 +7,67 @@ import { extractNewsSignals, getNewsImpact, isBreakingNews, getNewsImpactType } 
 import { clusterNews } from '../utils/newsCluster';
 
 // ─── 종목 태그 추출 — 뉴스 제목에서 주요 종목명 감지 ──────────
-// 자주 언급되는 주요 종목명만 체크 (성능 + 정확도 균형)
-const STOCK_TAG_LIST = [
+// {keyword: 매칭용 이름, symbol: 심볼코드, name: 표시명} — 클릭 시 ChartSidePanel에 심볼 전달
+const STOCK_TAG_MAP = [
   // 국내
-  '삼성전자','SK하이닉스','LG에너지솔루션','삼성SDI','현대차','기아','LG화학',
-  '셀트리온','삼성바이오로직스','카카오','네이버','NAVER','포스코','에코프로',
-  '한화에어로스페이스','현대중공업','두산에너빌리티','삼성전기','알테오젠','한미약품',
+  { keyword: '삼성전자', symbol: '005930', name: '삼성전자' },
+  { keyword: 'SK하이닉스', symbol: '000660', name: 'SK하이닉스' },
+  { keyword: 'LG에너지솔루션', symbol: '373220', name: 'LG에너지솔루션' },
+  { keyword: '삼성SDI', symbol: '006400', name: '삼성SDI' },
+  { keyword: '현대차', symbol: '005380', name: '현대자동차' },
+  { keyword: '기아', symbol: '000270', name: '기아' },
+  { keyword: 'LG화학', symbol: '051910', name: 'LG화학' },
+  { keyword: '셀트리온', symbol: '068270', name: '셀트리온' },
+  { keyword: '삼성바이오로직스', symbol: '207940', name: '삼성바이오로직스' },
+  { keyword: '카카오', symbol: '035720', name: '카카오' },
+  { keyword: '네이버', symbol: '035420', name: 'NAVER' },
+  { keyword: 'NAVER', symbol: '035420', name: 'NAVER' },
+  { keyword: '포스코', symbol: '005490', name: 'POSCO홀딩스' },
+  { keyword: '에코프로', symbol: '086520', name: '에코프로' },
+  { keyword: '한화에어로스페이스', symbol: '012450', name: '한화에어로스페이스' },
+  { keyword: '현대중공업', symbol: '329180', name: 'HD현대중공업' },
+  { keyword: '두산에너빌리티', symbol: '034020', name: '두산에너빌리티' },
+  { keyword: '삼성전기', symbol: '009150', name: '삼성전기' },
+  { keyword: '알테오젠', symbol: '196170', name: '알테오젠' },
+  { keyword: '한미약품', symbol: '128940', name: '한미약품' },
   // 미국
-  'NVIDIA','엔비디아','애플','Apple','테슬라','Tesla','마이크로소프트','Microsoft',
-  'Meta','아마존','Amazon','구글','Google','알파벳','Alphabet',
-  'AMD','인텔','Intel','퀄컴','Qualcomm','ASML',
+  { keyword: 'NVIDIA', symbol: 'NVDA', name: 'NVIDIA' },
+  { keyword: '엔비디아', symbol: 'NVDA', name: 'NVIDIA' },
+  { keyword: '애플', symbol: 'AAPL', name: 'Apple' },
+  { keyword: 'Apple', symbol: 'AAPL', name: 'Apple' },
+  { keyword: '테슬라', symbol: 'TSLA', name: 'Tesla' },
+  { keyword: 'Tesla', symbol: 'TSLA', name: 'Tesla' },
+  { keyword: '마이크로소프트', symbol: 'MSFT', name: 'Microsoft' },
+  { keyword: 'Microsoft', symbol: 'MSFT', name: 'Microsoft' },
+  { keyword: 'Meta', symbol: 'META', name: 'Meta' },
+  { keyword: '아마존', symbol: 'AMZN', name: 'Amazon' },
+  { keyword: 'Amazon', symbol: 'AMZN', name: 'Amazon' },
+  { keyword: '구글', symbol: 'GOOGL', name: 'Alphabet' },
+  { keyword: 'Google', symbol: 'GOOGL', name: 'Alphabet' },
+  { keyword: '알파벳', symbol: 'GOOGL', name: 'Alphabet' },
+  { keyword: 'Alphabet', symbol: 'GOOGL', name: 'Alphabet' },
+  { keyword: 'AMD', symbol: 'AMD', name: 'AMD' },
+  { keyword: '인텔', symbol: 'INTC', name: 'Intel' },
+  { keyword: 'Intel', symbol: 'INTC', name: 'Intel' },
+  { keyword: '퀄컴', symbol: 'QCOM', name: 'Qualcomm' },
+  { keyword: 'Qualcomm', symbol: 'QCOM', name: 'Qualcomm' },
+  { keyword: 'ASML', symbol: 'ASML', name: 'ASML' },
   // 코인
-  '비트코인','이더리움','리플','솔라나','Bitcoin','Ethereum',
+  { keyword: '비트코인', symbol: 'BTC', name: 'Bitcoin' },
+  { keyword: 'Bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+  { keyword: '이더리움', symbol: 'ETH', name: 'Ethereum' },
+  { keyword: 'Ethereum', symbol: 'ETH', name: 'Ethereum' },
+  { keyword: '리플', symbol: 'XRP', name: 'Ripple' },
+  { keyword: '솔라나', symbol: 'SOL', name: 'Solana' },
 ];
 
 function extractStockTags(title) {
   const lower = title.toLowerCase();
-  return STOCK_TAG_LIST.filter(name => lower.includes(name.toLowerCase())).slice(0, 3);
+  const seen = new Set();
+  return STOCK_TAG_MAP
+    .filter(({ keyword }) => lower.includes(keyword.toLowerCase()))
+    .filter(({ symbol }) => { if (seen.has(symbol)) return false; seen.add(symbol); return true; })
+    .slice(0, 3);
 }
 
 // 속보 탭 제거 — 속보는 시그널 태그(🔴 속보)로 자동 표시
@@ -131,16 +175,16 @@ function NewsItem({ item, onNewsClick, onStockClick, relatedCount = 0 }) {
       {/* 종목 태그 — 제목 아래 표시, 클릭 시 ChartSidePanel 열기 */}
       {stockTags.length > 0 && (
         <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-          {stockTags.map(tag => (
+          {stockTags.map(({ symbol, name: tagName, keyword }) => (
             <span
-              key={tag}
+              key={symbol}
               onClick={(e) => {
-                e.stopPropagation(); // 뉴스 카드 클릭 이벤트와 분리
-                onStockClick?.({ symbol: tag, name: tag });
+                e.stopPropagation();
+                onStockClick?.({ symbol, name: tagName });
               }}
               className={`text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#6B7684] font-medium${onStockClick ? ' cursor-pointer hover:bg-[#E5E8EB] transition-colors active:scale-95' : ''}`}
             >
-              #{tag}
+              #{keyword}
             </span>
           ))}
         </div>

@@ -44,6 +44,8 @@ export default async function handler(request) {
   }
 
   // ── Redis 캐시 조회 — 동일 종목은 서버에서 1회만 생성, 전체 사용자 공유 ──
+  // 키에 가격을 포함하지 않음 (의도적): 토론은 정성적 분석이므로 30분 내 가격 변동이
+  // 토론 품질에 실질 영향 없음. 키에 가격대를 넣으면 캐시 히트율이 급락하여 토큰 절감 효과 소실.
   const cacheKey = `ai:debate:${symbol}`;
   if (redis) {
     try {
