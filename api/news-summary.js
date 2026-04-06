@@ -1,8 +1,20 @@
 // api/news-summary.js — Gemini 기반 뉴스 요약 Vercel Edge Function
 // GET /api/news-summary?url=<기사URL>&title=<제목>&fallback=<RSS_description>
+// Redis 서버 캐시: 동일 기사 URL은 1회만 요약, 전체 사용자 공유 (TTL 1시간)
 export const config = { runtime: 'edge' };
 
+import { redis } from './_price-cache.js';
+
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const SUMMARY_TTL = 3600; // 1시간
+
+// URL → Redis 키용 해시 (Web Crypto API, Edge 호환)
+async function hashUrl(url) {
+  const data = new TextEncoder().encode(url);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf).slice(0, 16))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
 // primary: gemini-2.5-flash-lite, fallback: gemini-1.5-flash (rate limit 시 재시도)
 const GEMINI_MODELS = [
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
@@ -144,6 +156,27 @@ export default async function handler(req) {
     });
   }
 
+  // ── Redis 캐시 조회 — 동일 기사 URL은 서버에서 1회만 요약, 전체 사용자 공유 ──
+  let cacheKey = null;
+  if (redis) {
+    try {
+      cacheKey = `ai:summary:${await hashUrl(url)}`;
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return new Response(JSON.stringify({ summary: cached }), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
+            'Access-Control-Allow-Origin': '*',
+            'X-Cache': 'HIT',
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('[news-summary] Redis 조회 실패:', e.message);
+    }
+  }
+
   try {
     // 기사 크롤 시도 → 실패 시 제목+RSS description 조합
     let articleText = '';
@@ -166,11 +199,22 @@ export default async function handler(req) {
     }
 
     const summary = await summarize(text, isFullArticle);
+
+    // ── Redis 캐시 저장 — 다음 요청부터 Gemini 호출 없이 즉시 반환 ──
+    if (redis && cacheKey && summary) {
+      try {
+        await redis.set(cacheKey, summary, { ex: SUMMARY_TTL });
+      } catch (e) {
+        console.warn('[news-summary] Redis 저장 실패:', e.message);
+      }
+    }
+
     return new Response(JSON.stringify({ summary }), {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
         'Access-Control-Allow-Origin': '*',
+        'X-Cache': 'MISS',
       },
     });
   } catch (e) {

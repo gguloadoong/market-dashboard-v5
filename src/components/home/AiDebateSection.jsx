@@ -33,20 +33,13 @@ const DEFAULT_SYMBOLS = [
 function extractSummary(result) {
   if (!result) return null;
   const messages = Array.isArray(result.messages) ? result.messages : [];
-  // Bull/Bear 각각 첫 메시지의 첫 문장만 추출
   const bullMsg = messages.find(m => m.side === 'bull')?.text || '';
   const bearMsg = messages.find(m => m.side === 'bear')?.text || '';
-  // 첫 문장 추출 (마침표/느낌표/물음표 기준)
-  const firstSentence = (text) => {
-    const match = text.match(/^[^.!?]+[.!?]/);
-    return match ? match[0].trim() : text.slice(0, 80).trim();
-  };
   return {
-    bull: firstSentence(bullMsg),
-    bear: firstSentence(bearMsg),
+    bull: bullMsg,
+    bear: bearMsg,
     verdict: result.verdict || '',
     confidence: result.confidence ?? 0.5,
-    fullMessages: messages,
   };
 }
 
@@ -55,7 +48,6 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [expanded, setExpanded] = useState(false);
 
   // watchlist + 기본 목록 합산
   const symbolList = [
@@ -122,7 +114,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
           value={selected?.symbol || ''}
           onChange={e => {
             const item = symbolList.find(s => s.symbol === e.target.value);
-            if (item) { setSelected(item); setResult(null); setExpanded(false); runDebate(item); }
+            if (item) { setSelected(item); setResult(null); runDebate(item); }
           }}
           className="text-[11px] border border-[#E5E8EB] rounded-lg px-2 py-1 text-[#191F28] bg-white"
         >
@@ -194,48 +186,12 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
             </span>
           </div>
 
-          {/* 상세 보기 토글 */}
-          {summary.fullMessages.length > 0 && (
-            <>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-[11px] text-[#8B95A1] hover:text-[#4E5968] transition-colors"
-              >
-                {expanded ? '접기 ▲' : '상세 토론 보기 ▼'}
-              </button>
-
-              {/* 펼친 상태 — 내부 스크롤, 최대 300px */}
-              {expanded && (
-                <div className="max-h-[300px] overflow-y-auto space-y-2 border-t border-[#F2F4F6] pt-2">
-                  {summary.fullMessages.filter(m => m.text?.trim()).map((msg, i) => {
-                    const isBull = msg.side === 'bull';
-                    return (
-                      <div key={i} className="flex" style={{ justifyContent: isBull ? 'flex-start' : 'flex-end' }}>
-                        <div
-                          className="max-w-[80%] rounded-lg px-3 py-2"
-                          style={{
-                            background: isBull ? '#FFF0F1' : '#EDF4FF',
-                            borderLeft: isBull ? '2px solid #F04452' : 'none',
-                            borderRight: isBull ? 'none' : '2px solid #1764ED',
-                          }}
-                        >
-                          <div className="text-[10px] font-bold mb-0.5" style={{ color: isBull ? '#F04452' : '#1764ED' }}>
-                            {isBull ? '살 이유' : '조심할 이유'}
-                          </div>
-                          <p className="text-[11px] text-[#191F28] leading-relaxed">{msg.text}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {summary.verdict && (
-                    <div className="bg-[#F7F8FA] rounded-lg p-2.5">
-                      <span className="text-[10px] text-[#8B95A1]">AI 종합: </span>
-                      <span className="text-[11px] text-[#191F28] font-medium">{summary.verdict}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+          {/* AI 종합 의견 */}
+          {summary.verdict && (
+            <div className="bg-[#F7F8FA] rounded-lg p-2.5">
+              <span className="text-[10px] text-[#8B95A1]">AI 종합: </span>
+              <span className="text-[11px] text-[#191F28] font-medium">{summary.verdict}</span>
+            </div>
           )}
         </div>
       )}
