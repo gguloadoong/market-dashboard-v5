@@ -1,6 +1,7 @@
 // 섹터 로테이션 — HOT MONEY / COLD MONEY 분리 시각화 (Job 5)
 // 국장·미장·코인 통합 섹터 자금 흐름 표시
 import { useState, useMemo } from 'react';
+import { clampPct } from '../utils/clampPct';
 
 const SECTOR_FLAG = { kr: '🇰🇷', us: '🇺🇸', coin: '🪙' };
 
@@ -48,7 +49,7 @@ export default function SectorRotation({ krStocks = [], usStocks = [], coins = [
     for (const s of items) {
       if (!s.sector) continue;
       if (!map[s.sector]) map[s.sector] = { sum: 0, count: 0, market: s.market };
-      map[s.sector].sum   += s.changePct ?? 0;
+      map[s.sector].sum   += clampPct(s.changePct ?? 0);
       map[s.sector].count += 1;
     }
     return Object.entries(map)

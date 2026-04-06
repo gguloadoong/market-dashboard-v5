@@ -5,29 +5,33 @@
 
 ---
 
-## 현재 활성 렌더 구조 (2026-04-05 기준 — Phase 8A 축소)
+## 현재 활성 렌더 구조 (2026-04-06 기준 — Phase 8B 재설계)
+
+> **핵심 원칙**: 시그널 중심. "데이터 대시보드"가 아니라 "시그널 인텔리전스".
+> **언어 원칙**: 전문용어 배제, 쉽고 위트있는 우리만의 언어.
 
 `src/components/home/index.jsx`의 `HomeDashboard` 렌더 순서:
 
 ```
-1. WatchlistWidget         — 관심종목 (최상단 승격)
-2. MarketPulseWidget       — 지수 6개 + 환율
-3. MarketTemperatureWidget — 마켓 온도계 (컴팩트)
-4. SeoulForceSection       — 세력 포착 (index.jsx 인라인 정의)
-5. SignalSummaryWidget     — 투자 시그널
-6. AiDebateSection         — AI 종목토론
-7. TopMoversWidget         — 급등/급락 (KR/US/COIN 탭)
-8. NewsFeedWidget          — 투자 뉴스
-9. EventTicker             — 경제 이벤트 롤링 티커
+1. MarketPulseWidget       — 시장 지수 + 환율
+2. MarketSentimentWidget   — 시장 심리 (온도계+공포탐욕 통합, "지금 시장 분위기" 한 줄 해석)
+3. NotableMoversSection    — 주목할 종목 (WHY 카드) ← Phase 8B에서 복원
+4. SignalSummaryWidget     — 투자 시그널 (강세/약세 2열 분리, easyLabel 적용)
+5. SeoulForceSection       — 세력 포착 (index.jsx 인라인 정의)
+6. WatchlistWidget         — 관심종목 (v2 크기, 컴팩트) ← 6번으로 하강
+7. AiDebateSection         — AI 종목토론 ("살 이유 vs 조심할 이유" 2줄 요약)
+8. TopMoversWidget         — 급등/급락 (KR/US/COIN 탭)
+9. NewsFeedWidget          — 투자 뉴스
+10. EventTicker            — 경제 이벤트 (원래 위치)
 ```
 
-### Phase 8A에서 홈에서 제거된 컴포넌트 (삭제 아닌 비표시)
+### Phase 8B에서 홈에서 비표시인 컴포넌트
 
-| 컴포넌트 | 제거 이유 |
+| 컴포넌트 | 비표시 이유 |
 |---------|---------|
-| MorningBriefing | "5분 안에 파악" 목표와 충돌 — 읽기 행위. 시그널 푸시로 전환 예정 |
-| NotableMoversSection | TopMoversWidget과 데이터/기능 중복 |
-| FearGreedWidget | MarketTemperatureWidget과 역할 중복. 고급 설정 이동 예정 |
+| MorningBriefing | "5분 안에 파악" 목표와 충돌 — 시그널 푸시로 전환 예정 |
+| FearGreedWidget (독립) | MarketSentimentWidget에 서브로 통합됨 |
+| MarketTemperatureWidget (독립) | MarketSentimentWidget으로 교체됨 |
 | DerivativesWidget | 전문 트레이더 전용. 고급 설정 토글로 이동 예정 |
 | MarketTimeline | EventTicker 롤링으로 충분 |
 | MarketInvestorSection | SeoulForceSection과 데이터 중복 (외국인/기관 수급) |
@@ -63,7 +67,8 @@
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
 | `SignalSummaryWidget.jsx` | 투자 시그널 (스코어 + TOP 카드 + 칩) | `useTopSignals` |
-| `MarketTemperatureWidget.jsx` | 마켓 온도계 (컴팩트) | `useSignals` |
+| `MarketSentimentWidget.jsx` | 통합 시장 심리 (온도계 + 공포탐욕) | `useSignals`, `useFearGreed`, `allItems` |
+| `MarketTemperatureWidget.jsx` | (비활성) 마켓 온도계 단독 — MarketSentimentWidget에 통합됨 | `useSignals` |
 | `DerivativesWidget.jsx` | 파생 시그널 | 파생/소셜 데이터 |
 
 ### 섹션 (src/components/home/)

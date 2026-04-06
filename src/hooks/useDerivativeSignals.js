@@ -95,7 +95,8 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     runFundingRate();
     runOrderFlow();
     runSocial();
-    setTimeout(() => { if (!document.hidden) runVWAP(); }, 30000);
+    // VWAP 즉시 실행 (기존 30초 지연 제거 — 온도계 로딩 최적화)
+    runVWAP();
 
     // 폴링 설정
     pcrTimer = setInterval(() => { if (!document.hidden) runPCR(); }, 5 * 60 * 1000);

@@ -64,3 +64,92 @@ export const SIGNAL_STYLE = {
   bearish: { emoji: '🔴', color: '#F04452', bg: '#FFF0F1', label: '약세' },
   neutral: { emoji: '🟡', color: '#FF9500', bg: '#FFF4E6', label: '중립' },
 };
+
+// ── "우리만의 언어" — 일반 투자자가 3초 안에 이해할 수 있는 시그널 설명 ──
+// easyLabel: 한 줄 요약 (행동 힌트 + 이모지 강도)
+// easyDesc: (meta) => string — 시그널 meta 객체를 받아 동적 메시지 생성
+export const TYPE_META = {
+  [SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY]: {
+    easyLabel: '외국인이 사모으는 중 🔥',
+    easyDesc: (m) => `${m.name || '종목'}을 ${m.consecutiveDays || m.days || '?'}일째 외국인이 사고 있어요`,
+  },
+  [SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL]: {
+    easyLabel: '외국인이 빠지고 있어요 ⚠️',
+    easyDesc: (m) => `${m.name || '종목'}에서 외국인이 ${m.consecutiveDays || m.days || '?'}일째 팔고 있어요`,
+  },
+  [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY]: {
+    easyLabel: '기관이 담고 있어요 🔥',
+    easyDesc: (m) => `기관이 ${m.name || '종목'}을 ${m.consecutiveDays || m.days || '?'}일째 매수 중`,
+  },
+  [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL]: {
+    easyLabel: '기관이 빠지고 있어요 ⚠️',
+    easyDesc: (m) => `기관이 ${m.name || '종목'}에서 ${m.consecutiveDays || m.days || '?'}일째 매도 중`,
+  },
+  [SIGNAL_TYPES.VOLUME_ANOMALY]: {
+    easyLabel: '거래가 평소보다 폭발 💥',
+    easyDesc: (m) => `${m.name || '종목'} 거래량이 평소의 ${m.ratio || '?'}배 — 뭔가 일어나고 있어요`,
+  },
+  [SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW]: {
+    easyLabel: '큰손이 거래소에 입금 📥',
+    easyDesc: () => '대규모 자금이 거래소로 이동 — 매도 준비 가능성',
+  },
+  [SIGNAL_TYPES.WHALE_EXCHANGE_OUTFLOW]: {
+    easyLabel: '큰손이 거래소에서 출금 📤',
+    easyDesc: () => '대규모 자금이 거래소 밖으로 — 장기 보유 신호',
+  },
+  [SIGNAL_TYPES.WHALE_STABLECOIN_INFLOW]: {
+    easyLabel: '현금이 거래소로 들어오는 중 💰',
+    easyDesc: () => '스테이블코인 대량 입금 — 매수 대기 자금',
+  },
+  [SIGNAL_TYPES.WHALE_LARGE_SINGLE]: {
+    easyLabel: '초대형 자금 이동 감지 🐋',
+    easyDesc: (m) => `${m.amount || '대규모'} 규모 자금이 한 번에 이동했어요`,
+  },
+  [SIGNAL_TYPES.FEAR_GREED_SHIFT]: {
+    easyLabel: '시장 심리가 바뀌고 있어요 🔄',
+    easyDesc: (m) => `시장이 ${m.from || '?'}에서 ${m.to || '?'}로 전환 중 — 역발상 기회?`,
+  },
+  [SIGNAL_TYPES.PUT_CALL_RATIO]: {
+    easyLabel: '하락 보험 변동 📊',
+    easyDesc: (m) => {
+      const pcr = m.pcr ?? m.ratio ?? 0;
+      if (pcr > 1) return '하락 보험 급증 — 큰손들이 걱정하는 신호';
+      if (pcr < 0.7) return '하락 보험 감소 — 낙관적 분위기';
+      return '풋콜비율 중립 구간';
+    },
+  },
+  [SIGNAL_TYPES.FUNDING_RATE_EXTREME]: {
+    easyLabel: '레버리지가 한쪽으로 쏠렸어요 ⚡',
+    easyDesc: (m) => {
+      const rate = m.rate ?? m.fundingRate ?? 0;
+      if (rate > 0) return '롱 포지션 과열 — 급락 주의';
+      if (rate < 0) return '숏 포지션 과열 — 반등 가능성';
+      return '펀딩비 중립';
+    },
+  },
+  [SIGNAL_TYPES.ORDER_FLOW_IMBALANCE]: {
+    easyLabel: '매수/매도 힘 균형이 깨졌어요 ⚖️',
+    easyDesc: (m) => `지금 ${m.direction === 'bullish' ? '매수' : '매도'}세가 ${m.pct || '?'}% 더 강해요`,
+  },
+  [SIGNAL_TYPES.VWAP_DEVIATION]: {
+    easyLabel: '평균가에서 벗어났어요 📏',
+    easyDesc: (m) => {
+      const above = (m.deviation ?? 0) > 0;
+      return above
+        ? '평균보다 비싸게 거래 중 — 과열?'
+        : '평균보다 싸게 거래 중 — 기회?';
+    },
+  },
+  [SIGNAL_TYPES.SOCIAL_SENTIMENT]: {
+    easyLabel: 'SNS에서 화제 📱',
+    easyDesc: (m) => `소셜에서 ${m.symbol || '종목'} 관련 ${m.direction === 'bullish' ? '긍정' : '부정'} 의견이 ${m.pct || '?'}%`,
+  },
+  [SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER]: {
+    easyLabel: '관련 뉴스가 쏟아지고 있어요 📰',
+    easyDesc: (m) => `${m.name || '종목'} 관련 뉴스 ${m.count || '다수'}건 집중 — 주목`,
+  },
+  [SIGNAL_TYPES.SECTOR_ROTATION]: {
+    easyLabel: '돈이 섹터로 몰리고 있어요 🔄',
+    easyDesc: (m) => `${m.sector || '?'} 섹터 ${m.direction === 'bullish' ? '강세' : '약세'} — 자금 흐름 변화 감지`,
+  },
+};

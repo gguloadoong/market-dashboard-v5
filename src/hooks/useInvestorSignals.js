@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { fetchInvestorTrendGateway } from '../api/_gateway';
 import { createInvestorSignal, createVolumeSignal, createSignal, addSignal, getActiveSignals } from '../engine/signalEngine';
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
+import { clampPct } from '../utils/clampPct';
 
 // 시총 상위 KR 종목 (최소 5개)
 const KR_TOP_SYMBOLS = [
@@ -122,14 +123,14 @@ export function useInvestorSignals(allItems = []) {
   }, [allItems]);
 }
 
-/** 외국인/기관 연속 매수매도 스캔 */
+/** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출 */
 async function scanInvestorTrends() {
-  // 종목별 순차 호출 (API 부하 최소화)
-  for (const { symbol, name } of KR_TOP_SYMBOLS) {
+  // Promise.allSettled로 병렬화 (기존 순차 for loop → 로딩 최적화)
+  await Promise.allSettled(KR_TOP_SYMBOLS.map(async ({ symbol, name }) => {
     try {
       const result = await fetchInvestorTrendGateway(symbol, 10);
       const data = result?.data;
-      if (!Array.isArray(data) || data.length === 0) continue;
+      if (!Array.isArray(data) || data.length === 0) return;
 
       // 외국인
       const foreign = calcConsecutive(data, 'foreign');
@@ -165,9 +166,9 @@ async function scanInvestorTrends() {
         );
       }
     } catch {
-      // 개별 종목 실패 시 다음 종목 계속
+      // 개별 종목 실패 시 무시 — 다른 종목은 계속 진행
     }
-  }
+  }));
 }
 
 /** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널 */
@@ -178,7 +179,7 @@ function detectSectorRotation(allItems) {
   const sectorPcts = {};
   for (const item of allItems) {
     if (!item.sector) continue;
-    const pct = item.changePct ?? item.change24h ?? 0;
+    const pct = clampPct(item.changePct ?? item.change24h ?? 0);
     if (!sectorPcts[item.sector]) sectorPcts[item.sector] = [];
     sectorPcts[item.sector].push(pct);
   }

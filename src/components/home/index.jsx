@@ -9,12 +9,14 @@ import TopMoversWidget from './widgets/TopMoversWidget';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import EventTicker from './EventTicker';
 import SignalSummaryWidget from './SignalSummaryWidget';
+import NotableMoversSection from './NotableMoversSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
-import MarketTemperatureWidget from './widgets/MarketTemperatureWidget';
+import MarketSentimentWidget from './widgets/MarketSentimentWidget';
 import AiDebateSection from './AiDebateSection';
 import { useSignals } from '../../hooks/useSignals';
 import { SIGNAL_TYPES } from '../../engine/signalTypes';
+import { clampPct } from '../../utils/clampPct';
 
 // ─── 세력 포착 (외국인·기관 연속 매수매도) ──
 function SeoulForceSection({ signals, onItemClick }) {
@@ -72,7 +74,7 @@ function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, on
     for (const s of items) {
       if (!s.sector) continue;
       if (!map[s.sector]) map[s.sector] = { sum: 0, count: 0 };
-      map[s.sector].sum += s.changePct ?? 0;
+      map[s.sector].sum += clampPct(s.changePct ?? 0);
       map[s.sector].count += 1;
     }
     return Object.entries(map)
@@ -321,7 +323,29 @@ export default function HomeDashboard({
         </div>
       )}
 
-      {/* ─── 1. 관심종목 (최상단 승격 — "내 종목" 가장 먼저) ── */}
+      {/* ─── 1. 시장 지수 + 환율 ──────────────────────────── */}
+      <MarketPulseWidget indices={indices} krwRate={krwRate} />
+
+      {/* ─── 2. 시장 심리 (온도계 + 공포탐욕 통합 예정) ─────── */}
+      <MarketSentimentWidget allItems={allItems} />
+
+      {/* ─── 3. 주목할 종목 (WHY 카드) ───────────────────── */}
+      {hasData && (
+        <NotableMoversSection
+          allItems={allItems}
+          recentNews={recentNews}
+          krwRate={krwRate}
+          onItemClick={onItemClick}
+        />
+      )}
+
+      {/* ─── 4. 투자 시그널 (강세/약세 분리) ─────────────── */}
+      <SignalSummaryWidget onItemClick={handleSignalItemClick} />
+
+      {/* ─── 5. 세력 포착 (외국인·기관 연속 매수매도) ──────── */}
+      <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
+
+      {/* ─── 6. 관심종목 (v2 크기, 컴팩트) ────────────────── */}
       <WatchlistWidget
         watchedItems={watchedItems}
         popularItems={popularItems}
@@ -330,18 +354,10 @@ export default function HomeDashboard({
         krwRate={krwRate}
       />
 
-      {/* ─── 2. 시장 현황 (지수 + 온도계) ────────────────── */}
-      <MarketPulseWidget indices={indices} krwRate={krwRate} />
-      <MarketTemperatureWidget />
-
-      {/* ─── 3. 시그널 통합 (세력 포착 + 투자 시그널) ──────── */}
-      <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
-      <SignalSummaryWidget onItemClick={handleSignalItemClick} />
-
-      {/* ─── 4. AI 종목토론 ──────────────────────────────── */}
+      {/* ─── 7. AI 종목토론 ("살 이유 vs 조심할 이유") ───── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
 
-      {/* ─── 5. 급등/급락 ────────────────────────────────── */}
+      {/* ─── 8. 급등/급락 ────────────────────────────────── */}
       <TopMoversWidget
         hasData={hasData}
         krHot={krHot} usHot={usHot} coinHot={coinHot}
@@ -350,10 +366,10 @@ export default function HomeDashboard({
         onItemClick={onItemClick}
       />
 
-      {/* ─── 6. 뉴스 ────────────────────────────────────── */}
+      {/* ─── 9. 뉴스 ────────────────────────────────────── */}
       <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
 
-      {/* ─── 7. 경제 이벤트 티커 ─────────────────────────── */}
+      {/* ─── 10. 경제 이벤트 (원래 위치) ──────────────────── */}
       <EventTicker />
 
     </div>
