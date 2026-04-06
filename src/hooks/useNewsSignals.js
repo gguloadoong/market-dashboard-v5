@@ -1,6 +1,6 @@
 // 뉴스 클러스터 시그널 훅 — 특정 종목에 뉴스 3건+ 집중 시 시그널 발행
 // 4시간 이내 뉴스 대상, 5분 간격 재검사
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { createNewsClusterSignal } from '../engine/signalEngine';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 
@@ -37,11 +37,10 @@ function classifyNews(title) {
 export function useNewsSignals(allNews = [], allItems = []) {
   const newsRef = useRef(allNews);
   const itemsRef = useRef(allItems);
-  const hasScannedRef = useRef(false);
   newsRef.current = allNews;
   itemsRef.current = allItems;
 
-  function scan() {
+  const scan = useCallback(() => {
     const news = newsRef.current;
     const items = itemsRef.current;
     if (!news?.length || !items?.length) return;
@@ -89,22 +88,20 @@ export function useNewsSignals(allNews = [], allItems = []) {
         );
       }
     }
-  }
+  }, []);
 
-  // 데이터 도착 시 즉시 첫 스캔
+  // 뉴스 또는 종목 데이터 변경 시 재스캔
   useEffect(() => {
-    if (!hasScannedRef.current && allNews.length > 0 && allItems.length > 0) {
-      hasScannedRef.current = true;
+    if (allNews.length > 0 && allItems.length > 0) {
       scan();
     }
-  }, [allNews.length, allItems.length]);
+  }, [allNews, allItems, scan]);
 
   // 5분 간격 재검사
   useEffect(() => {
     const interval = setInterval(() => {
       if (!document.hidden) scan();
     }, SCAN_INTERVAL);
-
     return () => clearInterval(interval);
-  }, []);
+  }, [scan]);
 }

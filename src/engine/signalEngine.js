@@ -481,6 +481,13 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
   }));
 }
 
+/** 타입+심볼로 기존 시그널 제거 (동일 시그널 갱신용) */
+export function removeSignalByTypeAndSymbol(type, symbol) {
+  const before = _signals.length;
+  _signals = _signals.filter(s => !(s.type === type && s.symbol === symbol));
+  if (_signals.length !== before) _notify();
+}
+
 /** 뉴스 클러스터 시그널 — 특정 종목에 뉴스 3건+ 집중 */
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
   if (newsCount < 3) return null;
@@ -490,11 +497,8 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;
-  // 동일 strength여도 count/방향 변경 시 갱신 — 기존 시그널 먼저 제거
-  const existIdx = _signals.findIndex(
-    s => s.type === SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER && s.symbol === symbol,
-  );
-  if (existIdx !== -1) _signals.splice(existIdx, 1);
+  // 동일 strength여도 count/방향 변경 시 갱신 — 공개 API로 기존 시그널 제거
+  removeSignalByTypeAndSymbol(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER, symbol);
   return addSignal(createSignal({
     type: SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER,
     symbol, name, market, direction, strength,
