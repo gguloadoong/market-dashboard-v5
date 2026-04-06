@@ -1,8 +1,13 @@
 // 뉴스 클러스터 시그널 훅 — 특정 종목에 뉴스 3건+ 집중 시 시그널 발행
 // 4시간 이내 뉴스 대상, 5분 간격 재검사
 import { useEffect, useRef, useCallback } from 'react';
-import { createNewsClusterSignal } from '../engine/signalEngine';
+import { createNewsClusterSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
+import { SIGNAL_TYPES } from '../engine/signalTypes';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
+
+function removeCluster(symbol) {
+  removeSignalByTypeAndSymbol(SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER, symbol);
+}
 
 const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
 const NEWS_WINDOW = 4 * 3600000; // 4시간
@@ -54,14 +59,21 @@ export function useNewsSignals(allNews = [], allItems = []) {
     });
     if (!recentNews.length) return;
 
-    // 시총 상위 + 활성 종목만 검사 (성능 최적화)
-    const targets = items.slice(0, 50);
+    // 마켓별 상위 20개씩 추출 (KR/US/COIN 균등 커버)
+    const byMarket = { KR: [], US: [], COIN: [] };
+    for (const item of items) {
+      const m = (item._market || 'KR').toUpperCase();
+      if (byMarket[m] && byMarket[m].length < 20) byMarket[m].push(item);
+    }
+    const targets = [...byMarket.KR, ...byMarket.US, ...byMarket.COIN];
 
+    const scannedSymbols = new Set();
     for (const item of targets) {
       if (!item.symbol || !item.name) continue;
       const market = (item._market || 'KR').toUpperCase();
       const keywords = buildStockKeywords(item.symbol, item.name, market);
       if (!keywords.length) continue;
+      scannedSymbols.add(item.symbol);
 
       let matchCount = 0;
       let bullCount = 0;
@@ -86,6 +98,9 @@ export function useNewsSignals(allNews = [], allItems = []) {
           bullCount,
           bearCount,
         );
+      } else {
+        // 임계값 미달 시 기존 클러스터 시그널 제거
+        removeCluster(item.symbol);
       }
     }
   }, []);
