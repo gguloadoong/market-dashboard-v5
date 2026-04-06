@@ -15,6 +15,7 @@ import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import MarketSentimentWidget from './widgets/MarketSentimentWidget';
 import AiDebateSection from './AiDebateSection';
 import { useSignals } from '../../hooks/useSignals';
+import { useNewsSignals } from '../../hooks/useNewsSignals';
 import { SIGNAL_TYPES } from '../../engine/signalTypes';
 import { clampPct } from '../../utils/clampPct';
 
@@ -257,6 +258,9 @@ export default function HomeDashboard({
   // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
+
+  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지)
+  useNewsSignals(allNews, allItems);
 
   // 세력 포착용 시그널 — 전체 시그널에서 필터 (top-20 슬라이스 전에 투자자 시그널 놓치지 않도록)
   const allSignals = useSignals();

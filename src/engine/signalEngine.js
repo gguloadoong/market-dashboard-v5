@@ -481,6 +481,22 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
   }));
 }
 
+/** 뉴스 클러스터 시그널 — 특정 종목에 뉴스 3건+ 집중 */
+export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
+  if (newsCount < 3) return null;
+  let direction = DIRECTIONS.NEUTRAL;
+  if (bullCount > bearCount) direction = DIRECTIONS.BULLISH;
+  else if (bearCount > bullCount) direction = DIRECTIONS.BEARISH;
+  const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
+  const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
+  const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER,
+    symbol, name, market, direction, strength,
+    title, meta: { count: newsCount, bullCount, bearCount },
+  }));
+}
+
 /** 마켓 온도계 — 활성 시그널 가중합 → -1(극도약세) ~ +1(극도강세) */
 export function getMarketTemperature() {
   const signals = getActiveSignals();
