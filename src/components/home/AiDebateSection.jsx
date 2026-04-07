@@ -112,7 +112,6 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [], krSt
 
   const summary = extractSummary(result);
   const confPct = Math.round((summary?.confidence ?? 0.5) * 100);
-  const confLabel = confPct >= 60 ? '매수 우세' : confPct <= 40 ? '매도 우세' : '팽팽';
 
   return (
     <div className="bg-white rounded-2xl p-5">

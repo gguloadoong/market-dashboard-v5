@@ -100,7 +100,6 @@ function FullCalendarModal({ events, onClose }) {
 
 export default function EventTicker() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
 
   // 향후 30일 이내 이벤트
   const upcoming = useMemo(() => {

@@ -14,7 +14,7 @@ export default function ExploreTabsWidget({
   hasData, krHot, usHot, coinHot, krDrop, usDrop, coinDrop, krwRate,
   onItemClick,
   // AI 토론 (미사용 — 하위 호환)
-  watchedItems, usStocks,
+  usStocks,
   // 섹터
   krStocks, coins, allItems, onTabChange,
 }) {

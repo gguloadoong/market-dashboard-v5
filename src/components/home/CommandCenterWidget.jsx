@@ -1,7 +1,7 @@
 // 커맨드 센터 위젯 — MarketPulse + Sentiment + HeroSignal + Watchlist + EventTicker 통합
 import { useMemo } from 'react';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
-import { useFearGreed, getFgColor } from '../../hooks/useFearGreed';
+import { useFearGreed } from '../../hooks/useFearGreed';
 import { calcTemperature, calcFallbackTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { TYPE_META } from '../../engine/signalTypes';
@@ -19,24 +19,6 @@ const ZONE = {
   '강한 강세': { bar: '#F04452', bg: '#FFF0F1', text: '#C0392B' },
 };
 
-const MESSAGE_MAP = {
-  '강한 경계': '조심하세요, 시장이 불안해하고 있어요',
-  '약세 우위': '약세 신호가 좀 더 많아요',
-  '중립':      '시장이 눈치를 보고 있어요',
-  '강세 징후': '강세 신호가 나오고 있어요',
-  '강한 강세': '시장이 뜨겁습니다!',
-};
-
-// ── 공포탐욕 쉬운 라벨 ──
-function toEasyFgLabel(score) {
-  if (score == null) return '';
-  if (score <= 24) return '겁먹음';
-  if (score <= 44) return '불안';
-  if (score <= 55) return '보통';
-  if (score <= 74) return '흥분';
-  return '과열';
-}
-
 // ────────────────────────────────────────────────────────
 // TemperatureBar — 시장 온도 프로그레스 바 + 지수 미니카드 + 공포탐욕
 // ────────────────────────────────────────────────────────
@@ -49,15 +31,7 @@ function TemperatureBar({ indices, krwRate, allItems }) {
   const isFallback = temp.count === 0;
   const displayTemp = isFallback && fallback ? { ...temp, score: fallback.score, label: fallback.label } : temp;
   const zone = ZONE[displayTemp.label] || ZONE['중립'];
-  const message = MESSAGE_MAP[displayTemp.label] || MESSAGE_MAP['중립'];
   const gaugeWidth = Math.round(((displayTemp.score + 1) / 2) * 100);
-
-  // 공포탐욕 미니 표시 (인라인)
-  const fgItems = [
-    { emoji: '🇰🇷', score: kr.data?.score, loading: kr.isLoading },
-    { emoji: '🇺🇸', score: us.data?.score, loading: us.isLoading },
-    { emoji: '🪙', score: crypto.data?.score, loading: crypto.isLoading },
-  ];
 
   // 공포탐욕 대표 점수 (가장 먼저 로딩 완료된 것)
   const fgScore = crypto.data?.score ?? us.data?.score ?? kr.data?.score ?? null;
@@ -253,7 +227,7 @@ function getMktBadge(item) {
   return MKT_BADGE_CONFIG.US;
 }
 
-function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick, krwRate }) {
+function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
   const items = watchedItems.length > 0 ? watchedItems.slice(0, 6) : popularItems.slice(0, 4);
   const isEmpty = watchedItems.length === 0;
 
@@ -286,7 +260,6 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick, krwRat
               const isUp = pct > 0;
               const isDown = pct < 0;
               const color = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
-              const badge = getMktBadge(item);
               return (
                 <div
                   key={item.id || item.symbol}

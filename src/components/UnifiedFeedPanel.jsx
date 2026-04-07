@@ -62,7 +62,7 @@ function fmtAmt(n) {
 }
 
 // ─── 피드 헤더 ──────────────────────────────────────────────
-function FeedHeader({ totalCount }) {
+function FeedHeader() {
   return (
     <div className="flex-shrink-0 flex items-center gap-1.5 px-5 py-3.5">
       <span className="w-1.5 h-1.5 rounded-full bg-[#2AC769] animate-[blink_1.5s_ease-in-out_infinite]" />
@@ -124,7 +124,7 @@ function WhaleFeedItem({ whale, onItemClick }) {
 }
 
 // ─── 뉴스 항목 ──────────────────────────────────────────────
-function NewsFeedItem({ item, onNewsClick, onItemClick }) {
+function NewsFeedItem({ item, onNewsClick }) {
   const tag = FEED_TAG.news;
   const cat = CAT_COLOR[item.category] || { bg: '#F2F4F6', color: '#6B7684', label: 'NEWS' };
   const signals = extractNewsSignals(item.title, item.pubDate);
@@ -283,13 +283,11 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
     return clusters.map(c => ({ ...c.lead, _relatedCount: c.related.length }));
   }, [sortedNews]);
 
-  const totalCount = interleavedFeed.length + clusteredNews.length;
-
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#E5E8EB] rounded-2xl overflow-hidden">
       {/* 실시간 피드 (시그널+고래, 최신 2건만) */}
       <div className="flex-shrink-0 px-0 pt-0 pb-2">
-        <FeedHeader totalCount={totalCount} />
+        <FeedHeader />
         {interleavedFeed.length > 0 && (
           <div>
             {interleavedFeed.slice(0, 2).map(item => (
@@ -341,7 +339,7 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
           )}
 
           {!isLoading && !isError && clusteredNews.map(item => (
-            <NewsFeedItem key={item.id} item={item} onNewsClick={onNewsClick} onItemClick={onItemClick} />
+            <NewsFeedItem key={item.id} item={item} onNewsClick={onNewsClick} />
           ))}
         </div>
       </div>
