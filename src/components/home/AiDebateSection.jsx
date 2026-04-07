@@ -28,7 +28,7 @@ const DEFAULT_SYMBOLS = [
   { symbol: '005930', name: '삼성전자', market: 'kr' },
   { symbol: '000660', name: 'SK하이닉스', market: 'kr' },
   { symbol: 'NVDA', name: 'NVIDIA', market: 'us' },
-  { symbol: 'BTC', name: 'Bitcoin', market: 'crypto' },
+  { symbol: 'BTC', name: '비트코인', market: 'crypto' },
 ];
 
 // 메시지 배열에서 핵심 요약 추출 (Bull 1줄 + Bear 1줄 + verdict)

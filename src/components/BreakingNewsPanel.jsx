@@ -53,12 +53,12 @@ const STOCK_TAG_MAP = [
   { keyword: 'Qualcomm', symbol: 'QCOM', name: 'Qualcomm' },
   { keyword: 'ASML', symbol: 'ASML', name: 'ASML' },
   // 코인
-  { keyword: '비트코인', symbol: 'BTC', name: 'Bitcoin' },
-  { keyword: 'Bitcoin', symbol: 'BTC', name: 'Bitcoin' },
-  { keyword: '이더리움', symbol: 'ETH', name: 'Ethereum' },
-  { keyword: 'Ethereum', symbol: 'ETH', name: 'Ethereum' },
-  { keyword: '리플', symbol: 'XRP', name: 'Ripple' },
-  { keyword: '솔라나', symbol: 'SOL', name: 'Solana' },
+  { keyword: '비트코인', symbol: 'BTC', name: '비트코인' },
+  { keyword: 'Bitcoin', symbol: 'BTC', name: '비트코인' },
+  { keyword: '이더리움', symbol: 'ETH', name: '이더리움' },
+  { keyword: 'Ethereum', symbol: 'ETH', name: '이더리움' },
+  { keyword: '리플', symbol: 'XRP', name: '리플' },
+  { keyword: '솔라나', symbol: 'SOL', name: '솔라나' },
 ];
 
 function extractStockTags(title) {

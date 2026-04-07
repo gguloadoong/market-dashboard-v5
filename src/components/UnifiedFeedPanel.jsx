@@ -290,7 +290,7 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
         <FeedHeader />
         {interleavedFeed.length > 0 && (
           <div>
-            {interleavedFeed.slice(0, 2).map(item => (
+            {interleavedFeed.slice(0, 5).map(item => (
               <div key={item.id}>
                 {item.feedType === 'signal' && (
                   <SignalFeedItem signal={item.data} onItemClick={onItemClick} />
