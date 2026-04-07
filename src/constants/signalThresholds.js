@@ -49,6 +49,7 @@ export const THRESHOLDS = {
     HIGH_VOL_LOW_PRICE_RATIO: 2, // 거래량 2배 이상인데 가격 정체
     HIGH_VOL_MAX_PRICE: 1,       // 가격 변동 1% 이하면 정체
     BIG_PRICE_MIN: 5,            // 큰 가격 변동 최소 5%
+    STRONG_RATIO: 5,             // 거래량 5배 이상 — 강한 누적 시그널
   },
   MARKET_MOOD: {
     DIRECTION_THRESHOLD: 1,      // 방향 판단 기준 1%
