@@ -21,6 +21,12 @@ export const SIGNAL_TYPES = {
   ORDER_FLOW_IMBALANCE: 'order_flow_imbalance',
   VWAP_DEVIATION: 'vwap_deviation',
   SOCIAL_SENTIMENT: 'social_sentiment',
+  CROSS_MARKET_CORRELATION: 'cross_market_correlation',
+  SENTIMENT_DIVERGENCE: 'sentiment_divergence',
+  SMART_MONEY_FLOW: 'smart_money_flow',
+  MOMENTUM_DIVERGENCE: 'momentum_divergence',
+  VOLUME_PRICE_DIVERGENCE: 'volume_price_divergence',
+  MARKET_MOOD_SHIFT: 'market_mood_shift',
 };
 
 // 시그널 방향
@@ -51,6 +57,12 @@ export const SIGNAL_TTL = {
   [SIGNAL_TYPES.ORDER_FLOW_IMBALANCE]: 15 * 60000,
   [SIGNAL_TYPES.VWAP_DEVIATION]: 2 * 3600000,
   [SIGNAL_TYPES.SOCIAL_SENTIMENT]: 4 * 3600000,
+  [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: 2 * 3600000,
+  [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: 2 * 3600000,
+  [SIGNAL_TYPES.SMART_MONEY_FLOW]: 24 * 3600000,
+  [SIGNAL_TYPES.MOMENTUM_DIVERGENCE]: 2 * 3600000,
+  [SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE]: 2 * 3600000,
+  [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: 4 * 3600000,
 };
 
 /** 시그널 타입별 TTL 조회 (기본값 2시간) */
@@ -151,5 +163,29 @@ export const TYPE_META = {
   [SIGNAL_TYPES.SECTOR_ROTATION]: {
     easyLabel: '돈이 섹터로 몰리고 있어요 🔄',
     easyDesc: (m) => `${m.sector || '?'} 섹터 ${m.direction === 'bullish' ? '강세' : '약세'} — 자금 흐름 변화 감지`,
+  },
+  [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: {
+    easyLabel: '다른 시장이 먼저 움직였어요 🌐',
+    easyDesc: (m) => `${m.leader} ${m.leaderPct > 0 ? '+' : ''}${m.leaderPct}% vs ${m.lagger} ${m.laggerPct > 0 ? '+' : ''}${m.laggerPct}% — 따라갈 수 있어요`,
+  },
+  [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: {
+    easyLabel: '가격과 뉴스가 엇갈리고 있어요 🤔',
+    easyDesc: (m) => `${m.name} ${m.pricePct > 0 ? '오르는데' : '내리는데'} 뉴스는 ${m.avgSentiment > 0 ? '호재' : '악재'} — 괴리 주의`,
+  },
+  [SIGNAL_TYPES.SMART_MONEY_FLOW]: {
+    easyLabel: '외국인+기관 스마트머니 감지 💎',
+    easyDesc: (m) => `${m.name}을 외국인(${m.foreignDays}일)+기관(${m.instDays}일) 동시 ${m.action} 중`,
+  },
+  [SIGNAL_TYPES.MOMENTUM_DIVERGENCE]: {
+    easyLabel: '흐름이 바뀌고 있어요 🔀',
+    easyDesc: (m) => `${m.name} ${m.shortDirection === 'up' ? '반등' : '꺾임'} 시작 — 최근 5봉 ${m.shortSlope > 0 ? '+' : ''}${m.shortSlope}%`,
+  },
+  [SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE]: {
+    easyLabel: '거래량과 가격이 따로 놀아요 🧩',
+    easyDesc: (m) => m.pattern === 'accumulation' ? `${m.name} 조용히 거래 폭발 — 누군가 모으는 중?` : `${m.name} ${m.pricePct > 0 ? '올랐지만' : '빠졌지만'} 거래량 부족 — 약한 움직임`,
+  },
+  [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: {
+    easyLabel: '시장 분위기 변화 감지 🌊',
+    easyDesc: (m) => m.moodType === 'consensus' ? `국장·미장·코인 모두 ${m.direction === 'bullish' ? '상승' : '하락'} — 강한 흐름` : `${m.flippedMarkets.join('·')} 방향 전환 — 변곡점 주의`,
   },
 };

@@ -481,6 +481,108 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
   }));
 }
 
+// ─── 신규 시그널 6종 헬퍼 ──────────────────────────────────
+
+/** 교차시장 상관관계 시그널 — leader/lagger 괴리 감지 */
+export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct) {
+  const gap = Math.abs(leaderPct - laggerPct);
+  const direction = leaderPct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = gap >= THRESHOLDS.CROSS_MARKET.STRONG ? 4 : 3;
+  const title = `${leader} ${leaderPct > 0 ? '+' : ''}${leaderPct.toFixed(1)}% vs ${lagger} ${laggerPct > 0 ? '+' : ''}${laggerPct.toFixed(1)}% — 괴리 ${gap.toFixed(1)}%`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.CROSS_MARKET_CORRELATION,
+    symbol: `${leader}_${lagger}`,
+    name: `${leader}↔${lagger}`,
+    market: 'cross',
+    direction,
+    strength,
+    title,
+    meta: { leader, lagger, leaderPct: +leaderPct.toFixed(1), laggerPct: +laggerPct.toFixed(1), gap },
+  }));
+}
+
+/** 심리 괴리 시그널 — 가격 방향 vs 뉴스 감성 불일치 */
+export function createSentimentDivergenceSignal(symbol, name, market, pricePct, avgSentiment, newsCount) {
+  // 가격 오르는데 뉴스 악재, 또는 가격 내리는데 뉴스 호재
+  const direction = avgSentiment > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = Math.abs(avgSentiment) >= THRESHOLDS.SENTIMENT_DIV.STRONG ? 4 : 3;
+  const priceDir = pricePct > 0 ? '상승' : '하락';
+  const newsDir = avgSentiment > 0 ? '호재' : '악재';
+  const title = `${name} 가격 ${priceDir} ${Math.abs(pricePct).toFixed(1)}% vs 뉴스 ${newsDir} — 괴리 주의`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.SENTIMENT_DIVERGENCE,
+    symbol, name, market, direction, strength,
+    title,
+    meta: { name, pricePct: +pricePct.toFixed(1), avgSentiment: +avgSentiment.toFixed(2), newsCount },
+  }));
+}
+
+/** 스마트머니 흐름 시그널 — 외국인+기관 동시 매수/매도 */
+export function createSmartMoneySignal(symbol, name, foreignDays, instDays, totalAmt, isBuy) {
+  const direction = isBuy ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const action = isBuy ? '매수' : '매도';
+  const strength = Math.min(Math.max(foreignDays, instDays), 5);
+  const title = `${name} 외국인(${foreignDays}일)+기관(${instDays}일) 동시 ${action} — 스마트머니`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.SMART_MONEY_FLOW,
+    symbol, name,
+    market: 'kr',
+    direction, strength,
+    title,
+    meta: { name, foreignDays, instDays, totalAmt, action },
+  }));
+}
+
+/** 모멘텀 괴리 시그널 — 단기 vs 중기 추세 방향 불일치 */
+export function createMomentumSignal(symbol, name, market, shortSlope, mediumSlope) {
+  const shortDirection = shortSlope > 0 ? 'up' : 'down';
+  const direction = shortSlope > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = Math.abs(shortSlope) >= THRESHOLDS.MOMENTUM.STRONG ? 4 : Math.abs(shortSlope) >= THRESHOLDS.MOMENTUM.MID ? 3 : 2;
+  const label = shortDirection === 'up' ? '반등 시작' : '꺾임 시작';
+  const title = `${name} ${label} — 최근 5봉 ${shortSlope > 0 ? '+' : ''}${shortSlope.toFixed(1)}% (중기 ${mediumSlope > 0 ? '+' : ''}${mediumSlope.toFixed(1)}%)`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.MOMENTUM_DIVERGENCE,
+    symbol, name, market, direction, strength,
+    title,
+    meta: { name, shortSlope: +shortSlope.toFixed(1), shortDirection, mediumSlope: +mediumSlope.toFixed(1) },
+  }));
+}
+
+/** 거래량-가격 괴리 시그널 — accumulation 또는 weak_move */
+export function createVolumePriceDivergenceSignal(symbol, name, market, pattern, pricePct, volRatio) {
+  const direction = pattern === 'accumulation' ? DIRECTIONS.BULLISH : DIRECTIONS.NEUTRAL;
+  const strength = pattern === 'accumulation' ? (volRatio >= THRESHOLDS.VOL_PRICE.STRONG_RATIO ? 4 : 3) : 2;
+  const label = pattern === 'accumulation'
+    ? `거래량 ${volRatio.toFixed(1)}배 폭발인데 가격 정체 — 누적 가능성`
+    : `가격 ${Math.abs(pricePct).toFixed(1)}% 변동인데 거래량 부족 — 약한 움직임`;
+  const title = `${name} ${label}`;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE,
+    symbol, name, market, direction, strength,
+    title,
+    meta: { name, pattern, pricePct: +pricePct.toFixed(1), volRatio: +volRatio.toFixed(1) },
+  }));
+}
+
+/** 시장 무드 전환 시그널 — 3시장 동시 방향 전환 또는 합의 */
+export function createMarketMoodShiftSignal(moodType, direction, flippedMarkets, marketAvgs) {
+  const strength = moodType === 'consensus' ? 4 : 3;
+  const label = moodType === 'consensus'
+    ? `국장·미장·코인 모두 ${direction === 'bullish' ? '상승' : '하락'} — 강한 흐름`
+    : `${flippedMarkets.join('·')} 방향 전환 — 변곡점 주의`;
+  const title = label;
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.MARKET_MOOD_SHIFT,
+    symbol: 'MARKET',
+    name: '시장 무드',
+    market: 'all',
+    direction: direction === 'bullish' ? DIRECTIONS.BULLISH : direction === 'bearish' ? DIRECTIONS.BEARISH : DIRECTIONS.NEUTRAL,
+    strength,
+    title,
+    meta: { moodType, direction, flippedMarkets, marketAvgs },
+  }));
+}
+
 /** 타입+심볼로 기존 시그널 제거 (동일 시그널 갱신용) */
 export function removeSignalByTypeAndSymbol(type, symbol) {
   const before = _signals.length;

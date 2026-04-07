@@ -6,6 +6,8 @@ import {
   unsubscribeBtcWhales,
   startWhaleAlertPolling,
   stopWhaleAlertPolling,
+  startTelegramWhalePolling,
+  stopTelegramWhalePolling,
 } from '../api/whale';
 import { fetchWhaleChain } from '../api/_gateway';
 import { pushWhaleEvent } from '../state/whaleBus';
@@ -59,6 +61,9 @@ function buildRouteTitle(event) {
   const from = resolveExchangeName(event.fromOwner) || event.fromOwner || null;
   const to   = resolveExchangeName(event.toOwner)   || event.toOwner   || null;
 
+  if (event.source === 'telegram') {
+    return `[TG] ${from || '지갑'} → ${to || '지갑'} (${event.symbol || ''})`;
+  }
   if (event.source === 'bithumb') {
     return `빗썸 ${event.symbol || ''} ${event.side || '체결'}`;
   }
@@ -322,7 +327,9 @@ function EventRow({ event, onItemClick, coinMap }) {
   const volStr = fmtVol(event.volume, event.symbol);
 
   // 체인/소스 배지
-  const chainBadge = event.source === 'whale-alert'
+  const chainBadge = event.source === 'telegram'
+    ? { bg: '#E8F5E9', color: '#0088CC', text: 'TG 고래' }
+    : event.source === 'whale-alert'
     ? { bg: '#F0F4FF', color: '#3182F6', text: (event.chain || 'CHAIN').toUpperCase() }
     : event.source === 'binance'
     ? { bg: '#FFF8E1', color: '#F0B90B', text: 'BINANCE' }
@@ -444,9 +451,15 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       addEvent(evt);
     });
 
+    // ── 텔레그램 고래 알림 채널 폴링 (2분 간격) ──────────────────
+    startTelegramWhalePolling((evt) => {
+      addEvent(evt);
+    });
+
     return () => {
       unsubscribeBtcWhales();
       stopWhaleAlertPolling();
+      stopTelegramWhalePolling();
       setBtcConnected(false);
     };
   }, [isVisible]);
@@ -589,7 +602,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F2F4F6]">
         <span className="text-[15px]">🐋</span>
-        <span className="text-[14px] font-bold text-[#191F28]">고래 알림 · 온체인</span>
+        <span className="text-[14px] font-bold text-[#191F28]">고래 알림 · 온체인 + TG</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAnyConnected ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#B0B8C1]">
@@ -618,7 +631,7 @@ export default function WhalePanel({ isVisible = true, coins = [], onItemClick }
 
       {/* 설명 */}
       <div className="px-4 py-2 text-[10px] text-[#FF9500] bg-[#FFFBF5]">
-        블록체인 15 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름
+        블록체인 15 BTC+ 이동 / 글로벌 500K USD+ 자금 흐름 / 텔레그램 고래 채널
       </div>
 
       {/* 이벤트 목록 */}
