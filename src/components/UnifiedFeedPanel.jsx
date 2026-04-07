@@ -285,12 +285,12 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#E5E8EB] rounded-2xl overflow-hidden">
-      {/* 실시간 피드 (시그널+고래, 최신 2건만) */}
+      {/* 실시간 피드 (시그널+고래, 최신 5건) */}
       <div className="flex-shrink-0 px-0 pt-0 pb-2">
         <FeedHeader />
         {interleavedFeed.length > 0 && (
           <div>
-            {interleavedFeed.slice(0, 2).map(item => (
+            {interleavedFeed.slice(0, 5).map(item => (
               <div key={item.id}>
                 {item.feedType === 'signal' && (
                   <SignalFeedItem signal={item.data} onItemClick={onItemClick} />
