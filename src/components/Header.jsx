@@ -42,10 +42,15 @@ export default function Header({
 
         {/* 좌: 로고 + CDS TabNavigation */}
         <div className="flex items-center gap-6">
+          {/* 브랜드 로고 — 레이더 심볼 + 워드마크 */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-6 h-6 rounded-md bg-[#191F28] flex items-center justify-center">
-              <span className="text-[11px] font-black text-white leading-none">M</span>
-            </div>
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="8" fill="#3182F6"/>
+              <path d="M6 24C6 14.059 14.059 6 24 6" stroke="white" strokeWidth="2.8" strokeLinecap="round" opacity="0.35"/>
+              <path d="M10 24C10 16.268 16.268 10 24 10" stroke="white" strokeWidth="2.8" strokeLinecap="round" opacity="0.6"/>
+              <path d="M14 24C14 18.477 18.477 14 24 14" stroke="white" strokeWidth="2.8" strokeLinecap="round"/>
+              <circle cx="24" cy="24" r="3.2" fill="white"/>
+            </svg>
             <span className="text-[17px] font-bold text-[#191F28] tracking-tight">
               마켓레이더
             </span>
