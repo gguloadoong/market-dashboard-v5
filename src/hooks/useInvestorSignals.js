@@ -430,10 +430,12 @@ function detectMarketMoodShift(allItems, moodPrevRef) {
   }
 
   // 방향 전환 감지 — ref 기반 이전 상태 비교 (localStorage 대신 메모리)
-  const prevDirs = moodPrevRef.current;
-  moodPrevRef.current = marketDirs;
+  const prev = moodPrevRef.current;
+  moodPrevRef.current = { dirs: marketDirs, ts: Date.now() };
 
-  if (!prevDirs) return;
+  // 이전 상태 없거나 STALE_MS 초과 시 무시 (탭 비활성 후 복귀 시 허위 시그널 방지)
+  if (!prev || Date.now() - prev.ts > T_MM.STALE_MS) return;
+  const prevDirs = prev.dirs;
 
   const flipped = [];
   for (const market of markets) {
