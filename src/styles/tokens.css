@@ -96,6 +96,7 @@
     --primary:      #4E9BFF;
     --primary-muted: rgba(78,155,255,0.12);
     --live:         #3DD68C;
+    --success:      #3DD68C;
     --elevation-1:  0 2px 8px rgba(0,0,0,0.4);
     --elevation-2:  0 8px 24px rgba(0,0,0,0.6);
   }
@@ -129,6 +130,7 @@ html.dark {
   --primary:      #4E9BFF;
   --primary-muted: rgba(78,155,255,0.12);
   --live:         #3DD68C;
+  --success:      #3DD68C;
   --elevation-1:  0 2px 8px rgba(0,0,0,0.4);
   --elevation-2:  0 8px 24px rgba(0,0,0,0.6);
 }
