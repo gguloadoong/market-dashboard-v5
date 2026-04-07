@@ -388,7 +388,6 @@ function detectCrossMarketCorrelation(allItems) {
   }
 }
 
-/** 시장 무드 전환 감지 — 3시장 동시 방향 전환 또는 합의 */
 /** 시장 무드 전환 감지 — 3시장 동시 방향 전환 또는 합의
  * @param {Array} allItems - 전체 종목 배열
  * @param {{ current: object|null }} moodPrevRef - 이전 시장 방향 상태 ref (메모리 기반)
@@ -439,9 +438,9 @@ function detectMarketMoodShift(allItems, moodPrevRef) {
 
   const flipped = [];
   for (const market of markets) {
-    const prev = prevDirs[market];
+    const prevDir = prevDirs[market];
     const cur = marketDirs[market];
-    if (prev && cur && prev !== 'neutral' && cur !== 'neutral' && prev !== cur) {
+    if (prevDir && cur && prevDir !== 'neutral' && cur !== 'neutral' && prevDir !== cur) {
       flipped.push(market);
     }
   }
