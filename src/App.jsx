@@ -6,6 +6,7 @@ import SurgeBanner from './components/SurgeBanner';
 import MarketSummaryBar from './components/MarketSummaryBar';
 import WatchlistTable from './components/WatchlistTable';
 import BreakingNewsPanel from './components/BreakingNewsPanel';
+import UnifiedFeedPanel from './components/UnifiedFeedPanel';
 import ChartSidePanel from './components/ChartSidePanel';
 import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
@@ -363,7 +364,7 @@ export default function App() {
         </div>
 
         <div className="hidden lg:block self-start" style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}>
-          <BreakingNewsPanel coins={coins} onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
+          <UnifiedFeedPanel coins={coins} onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
         </div>
       </div>
 

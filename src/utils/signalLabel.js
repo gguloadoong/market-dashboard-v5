@@ -1,0 +1,12 @@
+// 시그널 라벨 유틸리티 — SignalSummaryWidget에서 추출
+import { TYPE_META } from '../engine/signalTypes';
+
+// 시그널에서 표시 이름 추출
+export function extractName(signal) {
+  return signal.name || signal.symbol || signal.sector || signal.label || TYPE_META[signal.type]?.easyLabel || signal.type || '';
+}
+
+// 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
+export function getEasyLabel(signal) {
+  return TYPE_META[signal.type]?.easyLabel || signal.type;
+}
