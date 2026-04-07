@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="32" viewBox="0 0 140 32" fill="none">
+  <!-- 심볼: 레이더 파동 + 시그널 점 -->
+  <g>
+    <!-- 레이더 호 (바깥) -->
+    <path d="M6 22C6 13.163 13.163 6 22 6" stroke="#3182F6" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.3"/>
+    <!-- 레이더 호 (중간) -->
+    <path d="M10 22C10 15.373 15.373 10 22 10" stroke="#3182F6" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.6"/>
+    <!-- 레이더 호 (안쪽) -->
+    <path d="M14 22C14 17.582 17.582 14 22 14" stroke="#3182F6" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+    <!-- 시그널 점 -->
+    <circle cx="22" cy="22" r="3" fill="#3182F6"/>
+  </g>
+  <!-- 워드마크: 마켓레이더 -->
+  <text x="34" y="23" font-family="Pretendard, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#191F28" letter-spacing="-0.03em">마켓레이더</text>
+</svg>
