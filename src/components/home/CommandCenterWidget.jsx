@@ -350,7 +350,7 @@ export default function CommandCenterWidget({
   toggle,
 }) {
   return (
-    <div className="bg-white rounded-2xl p-5">
+    <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
       {/* 온도바 + 지수 + 공포탐욕 */}
       <TemperatureBar indices={indices} krwRate={krwRate} allItems={allItems} />
 

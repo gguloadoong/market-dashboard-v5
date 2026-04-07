@@ -21,7 +21,7 @@ export default function ExploreTabsWidget({
   const [activeTab, setActiveTab] = useState('hotcold');
 
   return (
-    <div className="bg-white rounded-2xl p-5">
+    <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
       {/* 섹션 헤더 */}
       <div className="mb-0">
         <h2 className="text-[19px] font-bold text-[#191F28] tracking-tight">탐색</h2>

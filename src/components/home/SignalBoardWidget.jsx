@@ -60,7 +60,7 @@ export default function SignalBoardWidget({ onItemClick }) {
   // 빈 상태
   if (allSignals.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-5">
+      <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
         <div className="flex items-center gap-2 mb-5">
           <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
           <span className="text-[11px] font-bold text-[#2AC769] flex items-center gap-1">
@@ -80,7 +80,7 @@ export default function SignalBoardWidget({ onItemClick }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-5">
+    <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
       {/* 헤더 */}
       <div className="flex items-center gap-2 mb-5">
         <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
