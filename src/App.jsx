@@ -364,7 +364,7 @@ export default function App() {
         </div>
 
         <div className="hidden lg:block self-start" style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}>
-          <UnifiedFeedPanel coins={coins} onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
+          <UnifiedFeedPanel onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
         </div>
       </div>
 

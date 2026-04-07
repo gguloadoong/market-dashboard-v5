@@ -1,19 +1,16 @@
-// 통합 피드 패널 — 시그널+뉴스+고래 시간순 인터리빙
+// 통합 피드 패널 — 시그널+뉴스 시간순 인터리빙
 // BreakingNewsPanel 교체용 데스크톱 우측 패널
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';
 import { useSignals } from '../hooks/useSignals';
-import { subscribeLatestWhale, getLatestWhale } from '../state/whaleBus';
 import { extractNewsSignals, getNewsImpact, isBreakingNews, getNewsImpactType } from '../utils/newsSignal';
 import { clusterNews } from '../utils/newsCluster';
 import { extractName, getEasyLabel } from '../utils/signalLabel';
-import WhalePanel from './WhalePanel';
 
 // ─── 피드 타입 태그 색상 ────────────────────────────────────
 const FEED_TAG = {
   signal: { bg: '#FFF0F1', color: '#F04452', label: '시그널' },
   news:   { bg: '#EDF4FF', color: '#3182F6', label: '뉴스' },
-  whale:  { bg: '#F0FFF6', color: '#2AC769', label: '고래' },
 };
 
 // 뉴스 카테고리 색상
@@ -52,14 +49,6 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
-// 금액 포맷 (고래용)
-function fmtAmt(n) {
-  if (!n) return '—';
-  if (n >= 1e12) return `${(n / 1e12).toFixed(1)}조`;
-  if (n >= 1e8)  return `${(n / 1e8).toFixed(1)}억`;
-  if (n >= 1e4)  return `${(n / 1e4).toFixed(0)}만`;
-  return n.toLocaleString('ko-KR');
-}
 
 // ─── 피드 헤더 ──────────────────────────────────────────────
 function FeedHeader() {
@@ -104,21 +93,6 @@ function SignalFeedItem({ signal, onItemClick }) {
       tagColor={tag.color}
       text={`${extractName(signal)} ${getEasyLabel(signal)}`}
       onClick={() => signal.symbol && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market })}
-    />
-  );
-}
-
-// ─── 고래 항목 (3컬럼) ──────────────────────────────────────
-function WhaleFeedItem({ whale, onItemClick }) {
-  const tag = FEED_TAG.whale;
-  const text = `${whale.symbol} ${whale.side || ''} ${whale.tradeAmt ? '₩' + fmtAmt(whale.tradeAmt) : ''}`.trim();
-  return (
-    <FeedItem3Col
-      time={timeShort(whale.timestamp || whale.ts)}
-      tagLabel={tag.label}
-      tagColor={tag.color}
-      text={text}
-      onClick={() => whale.symbol && onItemClick?.({ symbol: whale.symbol, name: whale.symbol })}
     />
   );
 }
@@ -217,56 +191,23 @@ function sortWithBreakingFirst(items) {
 }
 
 // ─── 메인 컴포넌트 ──────────────────────────────────────────
-export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick }) {
+export default function UnifiedFeedPanel({ onItemClick, onNewsClick }) {
   // 시그널 데이터
   const allSignals = useSignals();
 
-  // 고래 이벤트 수집 (최근 5건 유지)
-  const [whaleEvents, setWhaleEvents] = useState(() => {
-    const latest = getLatestWhale();
-    return latest ? [latest] : [];
-  });
-
-  useEffect(() => {
-    const unsub = subscribeLatestWhale((evt) => {
-      setWhaleEvents(prev => [evt, ...prev.filter(e => e !== evt)].slice(0, 5));
-    });
-    return unsub;
-  }, []);
-
-  // 인터리빙 피드 — 시그널 + 고래를 timestamp 기준으로 합산 (최대 15건)
-  const interleavedFeed = useMemo(() => {
-    const items = [];
-
-    // 시그널 → 피드 항목
-    for (const sig of allSignals.slice(0, 10)) {
-      items.push({
-        feedType: 'signal',
-        ts: sig.timestamp || sig.createdAt || Date.now(),
-        data: sig,
-        id: `sig-${sig.id}`,
-      });
-    }
-
-    // 고래 → 피드 항목
-    for (const whale of whaleEvents) {
-      items.push({
-        feedType: 'whale',
-        ts: whale.timestamp || whale.ts || Date.now(),
-        data: whale,
-        id: `whale-${whale.symbol}-${whale.ts || Date.now()}`,
-      });
-    }
-
-    // timestamp 기준 내림차순 정렬
-    items.sort((a, b) => {
+  // 시그널 피드 — timestamp 기준 내림차순 (최대 15건)
+  const signalFeed = useMemo(() => {
+    return allSignals.slice(0, 15).map(sig => ({
+      feedType: 'signal',
+      ts: sig.timestamp || sig.createdAt || Date.now(),
+      data: sig,
+      id: `sig-${sig.id}`,
+    })).sort((a, b) => {
       const aMs = typeof a.ts === 'number' ? a.ts : new Date(a.ts).getTime() || 0;
       const bMs = typeof b.ts === 'number' ? b.ts : new Date(b.ts).getTime() || 0;
       return bMs - aMs;
     });
-
-    return items.slice(0, 15);
-  }, [allSignals, whaleEvents]);
+  }, [allSignals]);
 
   // ─── 하단 뉴스 탭 섹션 ────────────────────────────────────
   const [newsTab, setNewsTab] = useState('all');
@@ -285,20 +226,13 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#E5E8EB] rounded-2xl overflow-hidden">
-      {/* 실시간 피드 (시그널+고래, 최신 5건) */}
+      {/* 실시간 피드 (시그널, 최신 5건) */}
       <div className="flex-shrink-0 px-0 pt-0 pb-2">
         <FeedHeader />
-        {interleavedFeed.length > 0 && (
+        {signalFeed.length > 0 && (
           <div>
-            {interleavedFeed.slice(0, 5).map(item => (
-              <div key={item.id}>
-                {item.feedType === 'signal' && (
-                  <SignalFeedItem signal={item.data} onItemClick={onItemClick} />
-                )}
-                {item.feedType === 'whale' && (
-                  <WhaleFeedItem whale={item.data} onItemClick={onItemClick} />
-                )}
-              </div>
+            {signalFeed.slice(0, 5).map(item => (
+              <SignalFeedItem key={item.id} signal={item.data} onItemClick={onItemClick} />
             ))}
           </div>
         )}
@@ -344,10 +278,6 @@ export default function UnifiedFeedPanel({ coins = [], onItemClick, onNewsClick 
         </div>
       </div>
 
-      {/* 고래 패널 (숨김 — WebSocket 상시 연결 유지용) */}
-      <div className="hidden">
-        <WhalePanel coins={coins} onItemClick={onItemClick} />
-      </div>
     </div>
   );
 }

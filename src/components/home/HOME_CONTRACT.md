@@ -32,9 +32,7 @@
 ```
 UnifiedFeedPanel           — 통합 실시간 피드 (BreakingNewsPanel 교체)
 ├── FeedHeader             — "실시간" + LIVE dot
-├── 인터리빙 피드           — 시그널+고래 timestamp 기준 정렬 (최대 5건)
-│   ├── 시그널 항목         — 빨강 태그
-│   └── 고래 항목           — 초록 태그
+├── 시그널 피드             — 시그널 timestamp 기준 정렬 (최대 5건, 빨강 태그)
 ├── 뉴스 탭 헤더            — 속보/국내/해외/코인
 └── 뉴스 목록               — 파랑 태그, 클러스터링 적용
 ```
@@ -103,7 +101,7 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 
 | 파일 | 역할 | 핵심 데이터 |
 |------|------|-----------|
-| `UnifiedFeedPanel.jsx` | 데스크톱 우측 통합 피드 (시그널+뉴스+고래 인터리빙) | `useSignals`, `useNewsAutoRefetch`, `whaleBus` |
+| `UnifiedFeedPanel.jsx` | 데스크톱 우측 통합 피드 (시그널+뉴스) | `useSignals`, `useNewsAutoRefetch` |
 | `BreakingNewsPanel.jsx` | 모바일 뉴스 탭 전용 (기존 패널) | `useNewsAutoRefetch`, `whaleBus` |
 
 ### 섹션 (src/components/home/)
