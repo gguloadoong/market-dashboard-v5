@@ -17,7 +17,6 @@ const CROSS_MARKET_PAIRS = [
   { leader: 'BTC', lagger: 'IBIT', leaderMarket: 'COIN', laggerMarket: 'US' },
   { leader: 'ETH', lagger: 'COIN', leaderMarket: 'COIN', laggerMarket: 'US' },
   { leader: 'SOL', lagger: 'COIN', leaderMarket: 'COIN', laggerMarket: 'US' },
-  { leader: 'BTC', lagger: 'COINBASE', leaderMarket: 'COIN', laggerMarket: 'US' },
   { leader: 'NVDA', lagger: '000660', leaderMarket: 'US', laggerMarket: 'KR' },
   { leader: 'AAPL', lagger: '005930', leaderMarket: 'US', laggerMarket: 'KR' },
   { leader: 'TSLA', lagger: '373220', leaderMarket: 'US', laggerMarket: 'KR' },
@@ -426,7 +425,8 @@ function detectMarketMoodShift(allItems) {
 
   // 방향 전환 감지 — localStorage 이전 상태 비교
   const prevRaw = localStorage.getItem('market_mood_prev');
-  const prevDirs = prevRaw ? JSON.parse(prevRaw) : null;
+  let prevDirs = null;
+  try { prevDirs = prevRaw ? JSON.parse(prevRaw) : null; } catch { /* 손상된 값 무시 */ }
   localStorage.setItem('market_mood_prev', JSON.stringify(marketDirs));
 
   if (!prevDirs) return;

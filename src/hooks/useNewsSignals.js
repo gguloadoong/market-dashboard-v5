@@ -79,6 +79,8 @@ export function useNewsSignals(allNews = [], allItems = []) {
     }
     const targets = [...byMarket.KR, ...byMarket.US, ...byMarket.COIN];
 
+    // 종목별 매칭 뉴스 캐시 (O(n²) → O(n) 재사용)
+    const matchCache = new Map(); // symbol → [{ article, cls }]
     const currentClustered = new Set();
     for (const item of targets) {
       if (!item.symbol || !item.name) continue;
@@ -89,6 +91,7 @@ export function useNewsSignals(allNews = [], allItems = []) {
       let matchCount = 0;
       let bullCount = 0;
       let bearCount = 0;
+      const matched = [];
 
       for (const article of recentNews) {
         const text = article.title + ' ' + (article.summary || article.description || '');
@@ -97,8 +100,11 @@ export function useNewsSignals(allNews = [], allItems = []) {
           const cls = classifyNews(article.title);
           if (cls === 'bull') bullCount++;
           else if (cls === 'bear') bearCount++;
+          matched.push({ article, cls });
         }
       }
+
+      matchCache.set(item.symbol, matched);
 
       if (matchCount >= MIN_CLUSTER) {
         currentClustered.add(item.symbol);
@@ -118,23 +124,17 @@ export function useNewsSignals(allNews = [], allItems = []) {
     const T_SD = THRESHOLDS.SENTIMENT_DIV;
     for (const item of targets) {
       if (!item.symbol || !item.name) continue;
-      const market = (item._market || 'KR').toUpperCase();
-      const keywords = buildStockKeywords(item.symbol, item.name, market);
-      if (!keywords.length) continue;
 
       const pricePct = clampPct(item.changePct ?? item.change24h ?? 0);
       if (Math.abs(pricePct) < T_SD.PRICE_MIN) continue; // 가격 변동 2% 미만 무시
 
-      // 매칭 뉴스의 감성 점수 수집
-      const scores = [];
-      for (const article of recentNews) {
-        const text = article.title + ' ' + (article.summary || article.description || '');
-        if (matchesKeywords(text, keywords)) {
-          scores.push(getNewsSentimentScore(article.title));
-        }
-      }
+      // 캐시된 매칭 뉴스에서 감성 점수 수집 (title + summary 포함)
+      const cached = matchCache.get(item.symbol);
+      if (!cached || cached.length < T_SD.MIN_NEWS) continue; // 최소 2건
 
-      if (scores.length < T_SD.MIN_NEWS) continue; // 최소 2건
+      const scores = cached.map(({ article }) =>
+        getNewsSentimentScore(article.title + ' ' + (article.summary || ''))
+      );
       const avgSentiment = scores.reduce((a, b) => a + b, 0) / scores.length;
       if (Math.abs(avgSentiment) < T_SD.SENTIMENT_MIN) continue; // 감성 점수 중립이면 무시
 
@@ -142,6 +142,7 @@ export function useNewsSignals(allNews = [], allItems = []) {
       const priceUp = pricePct > 0;
       const sentimentPositive = avgSentiment > 0;
       if (priceUp !== sentimentPositive) {
+        const market = (item._market || 'KR').toUpperCase();
         createSentimentDivergenceSignal(item.symbol, item.name, market.toLowerCase(), pricePct, avgSentiment, scores.length);
       }
     }

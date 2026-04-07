@@ -62,9 +62,9 @@ function buildRouteTitle(event) {
   const to   = resolveExchangeName(event.toOwner)   || event.toOwner   || null;
 
   if (event.source === 'telegram') {
-    const from = resolveExchangeName(event.fromOwner) || event.fromOwner || '지갑';
-    const to   = resolveExchangeName(event.toOwner)   || event.toOwner   || '지갑';
-    return `[TG] ${from} → ${to} (${event.symbol || ''})`;
+    const tgFrom = resolveExchangeName(event.fromOwner) || event.fromOwner || '지갑';
+    const tgTo   = resolveExchangeName(event.toOwner)   || event.toOwner   || '지갑';
+    return `[TG] ${tgFrom} → ${tgTo} (${event.symbol || ''})`;
   }
   if (event.source === 'bithumb') {
     return `빗썸 ${event.symbol || ''} ${event.side || '체결'}`;
