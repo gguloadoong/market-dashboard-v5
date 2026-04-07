@@ -12,15 +12,16 @@ export default {
         surface: 'var(--bg-surface)',    // 카드/패널 배경
         border:  'var(--border)',        // 기본 구분선
         text1:   'var(--fg)',            // 기본 텍스트
-        text2:   'var(--fg-muted)',      // 보조 텍스트
-        text3:   'var(--fg-disabled)',   // 비활성 텍스트
+        text2:   'var(--fg-secondary)',   // 보조 텍스트 (t2)
+        text3:   'var(--fg-muted)',      // 약한 텍스트 (t3)
+        text4:   'var(--fg-disabled)',   // 비활성 텍스트 (t4)
         primary: 'var(--primary)',       // CTA/링크
         blue50:  'var(--bg-negative)',   // 하락 배경 (라이트: #EBF3FE)
         red50:   'var(--bg-positive)',   // 상승 배경 (라이트: #FEF0F1)
       },
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', '"Apple SD Gothic Neo"', '"Noto Sans KR"', 'sans-serif'],
-        mono: ['"Roboto Mono"', '"SF Mono"', 'monospace'],
+        mono: ['"JetBrains Mono"', '"SF Mono"', 'monospace'],
       },
       borderRadius: {
         'sm': '4px',
