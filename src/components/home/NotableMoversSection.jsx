@@ -103,7 +103,8 @@ function NotableCard({ item, newsCount, volumeRank, whyReason, krwRate, onClick 
   return (
     <div
       onClick={() => onClick?.(item)}
-      className="flex-shrink-0 w-[200px] bg-white rounded-xl border border-[#F2F4F6] shadow-sm p-3 cursor-pointer hover:shadow-md hover:border-[#E5E8EB] transition-all"
+      className="flex-shrink-0 w-[220px] bg-white rounded-[14px] p-[18px] cursor-pointer hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)] hover:-translate-y-0.5 transition-all"
+      style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
     >
       {/* 상단: 로고 + 종목명 */}
       <div className="flex items-center gap-2 mb-2">
@@ -295,16 +296,10 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
   if (!displayed.length) return null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold text-[#191F28]">주목할 종목</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#2AC769] animate-pulse" />
-          {hasClosedMarket && (
-            <span className="text-[9px] text-[#8B95A1] bg-[#F8F9FA] px-1.5 py-0.5 rounded">마감 포함</span>
-          )}
-        </div>
-        <span className="text-[11px] text-[#B0B8C1]">변동폭 + 거래량 + 뉴스</span>
+    <div className="bg-white rounded-2xl p-5 pt-6">
+      <div className="mb-4">
+        <h2 className="text-[19px] font-bold text-[#191F28] tracking-tight">주목할 종목</h2>
+        <p className="text-[13px] text-[#8B95A1] mt-0.5">지금 시장에서 눈여겨볼 움직임</p>
       </div>
       {/* 수평 스크롤 + 양쪽 페이드 힌트 */}
       <div className="relative">

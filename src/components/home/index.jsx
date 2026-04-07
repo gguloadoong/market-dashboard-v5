@@ -3,194 +3,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
-import MarketPulseWidget from './widgets/MarketPulseWidget';
-import WatchlistWidget from './widgets/WatchlistWidget';
-import TopMoversWidget from './widgets/TopMoversWidget';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
-import EventTicker from './EventTicker';
-import SignalSummaryWidget from './SignalSummaryWidget';
 import NotableMoversSection from './NotableMoversSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
-import MarketSentimentWidget from './widgets/MarketSentimentWidget';
-import AiDebateSection from './AiDebateSection';
-import { useSignals } from '../../hooks/useSignals';
 import { useNewsSignals } from '../../hooks/useNewsSignals';
-import { SIGNAL_TYPES } from '../../engine/signalTypes';
-import { clampPct } from '../../utils/clampPct';
-
-// ─── 세력 포착 (외국인·기관 연속 매수매도) ──
-function SeoulForceSection({ signals, onItemClick }) {
-  const FORCE_TYPES = [
-    SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
-    SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL,
-    SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY,
-    SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
-  ];
-  const forceSignals = signals.filter(s => FORCE_TYPES.includes(s.type) && s.strength >= 3);
-  if (!forceSignals.length) return null;
-
-  return (
-    <div className="bg-white rounded-xl border border-[#ECEEF1] p-3">
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-[12px] font-bold text-[#191F28]">세력 포착</span>
-        <span className="text-[10px] text-[#B0B8C1]">외국인·기관 연속 매수매도</span>
-      </div>
-      <div className="space-y-1.5">
-        {forceSignals.slice(0, 3).map(sig => {
-          const isBull = sig.direction === 'bullish';
-          const typeLabel = sig.type.includes('foreign') ? '외국인' : '기관';
-          const dirLabel = isBull ? '연속 매수' : '연속 매도';
-          return (
-            <button
-              key={sig.symbol + sig.type + (sig.timestamp || '')}
-              onClick={() => onItemClick?.({ symbol: sig.symbol, name: sig.name, market: sig.market })}
-              className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-left"
-              style={{ background: isBull ? '#F0FFF6' : '#FFF0F1' }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold" style={{ color: isBull ? '#2AC769' : '#F04452' }}>
-                  {typeLabel}
-                </span>
-                <span className="text-[12px] font-bold text-[#191F28]">{sig.name}</span>
-                <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.meta?.consecutiveDays || sig.strength}일+</span>
-              </div>
-              <span className="text-[10px] text-[#B0B8C1]">차트 →</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── 섹터 미니 위젯 (HOT 5 + COLD 5 칩 + 클릭 drill-down) ──
-function SectorMiniWidget({ krStocks, usStocks, coins, onTabChange, allItems, onItemClick }) {
-  const [expandedSector, setExpandedSector] = useState(null);
-
-  const sectors = useMemo(() => {
-    const coinsWithPct = coins.filter(c => c.sector).map(c => ({ ...c, changePct: c.change24h ?? 0 }));
-    const items = [...krStocks, ...usStocks, ...coinsWithPct];
-    const map = {};
-    for (const s of items) {
-      if (!s.sector) continue;
-      if (!map[s.sector]) map[s.sector] = { sum: 0, count: 0 };
-      map[s.sector].sum += clampPct(s.changePct ?? 0);
-      map[s.sector].count += 1;
-    }
-    return Object.entries(map)
-      .map(([name, { sum, count }]) => ({ name, avg: parseFloat((sum / count).toFixed(2)) }))
-      .sort((a, b) => b.avg - a.avg);
-  }, [krStocks, usStocks, coins]);
-
-  // 펼쳐진 섹터의 종목 리스트
-  const expandedItems = useMemo(() => {
-    if (!expandedSector || !allItems) return [];
-    return allItems
-      .filter(i => i.sector === expandedSector)
-      .sort((a, b) => (getPct(b) || 0) - (getPct(a) || 0))
-      .slice(0, 10);
-  }, [expandedSector, allItems]);
-
-  if (!sectors.length) return null;
-
-  const hot  = sectors.filter(s => s.avg > 0).slice(0, 5);
-  const cold = [...sectors.filter(s => s.avg <= 0)].reverse().slice(0, 5);
-
-  // 섹터 칩 클릭 핸들러
-  const handleSectorClick = (sectorName) => {
-    setExpandedSector(prev => prev === sectorName ? null : sectorName);
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-[#ECEEF1] p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold text-[#191F28]">섹터 자금 흐름</span>
-          <span className="text-[10px] text-[#B0B8C1]">HOT · COLD</span>
-        </div>
-        <button
-          onClick={() => onTabChange?.('sector')}
-          className="text-[11px] text-[#3182F6] font-medium hover:underline"
-        >섹터 탭에서 상세 →</button>
-      </div>
-      <div className="flex gap-4">
-        {/* HOT */}
-        <div className="flex-1">
-          <span className="text-[10px] font-bold text-[#F04452] uppercase mb-1.5 block">HOT</span>
-          <div className="flex flex-wrap gap-1.5">
-            {hot.length > 0 ? hot.map(s => (
-              <button
-                key={s.name}
-                onClick={() => handleSectorClick(s.name)}
-                className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${
-                  expandedSector === s.name
-                    ? 'bg-[#F04452] text-white'
-                    : 'bg-[#FFF0F1] text-[#F04452] hover:bg-[#FFE0E3]'
-                }`}
-              >
-                {s.name} +{s.avg.toFixed(1)}%
-              </button>
-            )) : <span className="text-[10px] text-[#B0B8C1]">없음</span>}
-          </div>
-        </div>
-        {/* COLD */}
-        <div className="flex-1">
-          <span className="text-[10px] font-bold text-[#1764ED] uppercase mb-1.5 block">COLD</span>
-          <div className="flex flex-wrap gap-1.5">
-            {cold.length > 0 ? cold.map(s => (
-              <button
-                key={s.name}
-                onClick={() => handleSectorClick(s.name)}
-                className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-colors ${
-                  expandedSector === s.name
-                    ? 'bg-[#1764ED] text-white'
-                    : 'bg-[#EDF4FF] text-[#1764ED] hover:bg-[#DCE8FF]'
-                }`}
-              >
-                {s.name} {s.avg.toFixed(1)}%
-              </button>
-            )) : <span className="text-[10px] text-[#B0B8C1]">없음</span>}
-          </div>
-        </div>
-      </div>
-
-      {/* 섹터 drill-down: 종목 리스트 인라인 펼침 */}
-      {expandedSector && expandedItems.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-[#F2F4F6]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-[#191F28]">{expandedSector} 종목</span>
-            <button
-              onClick={() => setExpandedSector(null)}
-              className="text-[10px] text-[#B0B8C1] hover:text-[#4E5968]"
-            >접기 ✕</button>
-          </div>
-          <div className="space-y-1">
-            {expandedItems.map(item => {
-              const pct = getPct(item) || 0;
-              const color = pct > 0 ? '#F04452' : pct < 0 ? '#1764ED' : '#8B95A1';
-              return (
-                <button
-                  key={item.symbol || item.id}
-                  onClick={() => onItemClick?.(item)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F7F8FA] active:bg-[#F2F4F6] transition-colors text-left"
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[12px] font-medium text-[#191F28] truncate block">{item.name || item.symbol}</span>
-                    <span className="text-[10px] text-[#8B95A1] font-mono">{item.symbol}</span>
-                  </div>
-                  <span className="text-[12px] font-bold font-mono tabular-nums flex-shrink-0 ml-2" style={{ color }}>
-                    {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+import CommandCenterWidget from './CommandCenterWidget';
+import SignalBoardWidget from './SignalBoardWidget';
+import AiDebateSection from './AiDebateSection';
+import ExploreTabsWidget from './ExploreTabsWidget';
 
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
@@ -262,9 +83,6 @@ export default function HomeDashboard({
   // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지)
   useNewsSignals(allNews, allItems);
 
-  // 세력 포착용 시그널 — 전체 시그널에서 필터 (top-20 슬라이스 전에 투자자 시그널 놓치지 않도록)
-  const allSignals = useSignals();
-
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 
   // 시그널 클릭 → allItems에서 full item 조회 후 ChartSidePanel 오픈
@@ -310,7 +128,7 @@ export default function HomeDashboard({
 
   return (
     <div
-      className="space-y-4"
+      className="space-y-3"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -327,13 +145,18 @@ export default function HomeDashboard({
         </div>
       )}
 
-      {/* ─── 1. 시장 지수 + 환율 ──────────────────────────── */}
-      <MarketPulseWidget indices={indices} krwRate={krwRate} />
+      {/* ─── 1. 커맨드 센터 (지수+온도+히어로시그널+관심종목+이벤트) ── */}
+      <CommandCenterWidget
+        indices={indices}
+        krwRate={krwRate}
+        allItems={allItems}
+        watchedItems={watchedItems}
+        popularItems={popularItems}
+        onItemClick={onItemClick}
+        toggle={toggle}
+      />
 
-      {/* ─── 2. 시장 심리 (온도계 + 공포탐욕 통합 예정) ─────── */}
-      <MarketSentimentWidget allItems={allItems} />
-
-      {/* ─── 3. 주목할 종목 (WHY 카드) ───────────────────── */}
+      {/* ─── 2. 주목할 종목 (WHY 카드) ───────────────────── */}
       {hasData && (
         <NotableMoversSection
           allItems={allItems}
@@ -343,38 +166,31 @@ export default function HomeDashboard({
         />
       )}
 
-      {/* ─── 4. 투자 시그널 (강세/약세 분리) ─────────────── */}
-      <SignalSummaryWidget onItemClick={handleSignalItemClick} />
+      {/* ─── 3. 시그널 보드 (시그널 + 세력 포착 통합) ────── */}
+      <SignalBoardWidget onItemClick={handleSignalItemClick} />
 
-      {/* ─── 5. 세력 포착 (외국인·기관 연속 매수매도) ──────── */}
-      <SeoulForceSection signals={allSignals} onItemClick={handleSignalItemClick} />
+      {/* ─── 3.5. AI 종목토론 (별도 섹션) ──────────────── */}
+      <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} krStocks={krStocks} allItems={allItems} />
 
-      {/* ─── 6. 관심종목 (v2 크기, 컴팩트) ────────────────── */}
-      <WatchlistWidget
-        watchedItems={watchedItems}
-        popularItems={popularItems}
-        toggle={toggle}
-        onItemClick={onItemClick}
-        krwRate={krwRate}
-      />
-
-      {/* ─── 7. AI 종목토론 ("살 이유 vs 조심할 이유") ───── */}
-      <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} />
-
-      {/* ─── 8. 급등/급락 ────────────────────────────────── */}
-      <TopMoversWidget
+      {/* ─── 4. 탐색 탭 (급등/급락 + 섹터) ──────────────── */}
+      <ExploreTabsWidget
         hasData={hasData}
         krHot={krHot} usHot={usHot} coinHot={coinHot}
         krDrop={krDrop} usDrop={usDrop} coinDrop={coinDrop}
         krwRate={krwRate}
         onItemClick={onItemClick}
+        watchedItems={watchedItems}
+        usStocks={usStocks}
+        krStocks={krStocks}
+        coins={coins}
+        allItems={allItems}
+        onTabChange={onTabChange}
       />
 
-      {/* ─── 9. 뉴스 ────────────────────────────────────── */}
-      <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
-
-      {/* ─── 10. 경제 이벤트 (원래 위치) ──────────────────── */}
-      <EventTicker />
+      {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 우측 UnifiedFeedPanel) ── */}
+      <div className="lg:hidden">
+        <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
+      </div>
 
     </div>
   );

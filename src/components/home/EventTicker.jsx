@@ -100,7 +100,6 @@ function FullCalendarModal({ events, onClose }) {
 
 export default function EventTicker() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
 
   // 향후 30일 이내 이벤트
   const upcoming = useMemo(() => {
@@ -111,35 +110,49 @@ export default function EventTicker() {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   }, []);
 
-  // 3초마다 롤링
+  // 세로 롤링용 — 3아이템 순환, 9초 주기 (시안 C)
+  const displayItems = upcoming.slice(0, 3);
+  const [rollIdx, setRollIdx] = useState(0);
+
   useEffect(() => {
-    if (upcoming.length <= 1) return;
-    const id = setInterval(() => setActiveIdx(i => (i + 1) % upcoming.length), 3000);
+    if (displayItems.length <= 1) return;
+    // 3초마다 다음 아이템으로 전환 (9초에 3개 순환)
+    const id = setInterval(() => setRollIdx(i => (i + 1) % displayItems.length), 3000);
     return () => clearInterval(id);
-  }, [upcoming.length]);
+  }, [displayItems.length]);
 
   if (!upcoming.length) return null;
-
-  const ev = upcoming[activeIdx % upcoming.length];
-  const cfg = TYPE_CONFIG[ev.type] || { color: '#8B95A1', bg: '#F2F4F6', emoji: '📅' };
-  const dd = dday(ev.date);
 
   return (
     <>
       <button
         onClick={() => setModalOpen(true)}
-        className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-white rounded-xl border border-[#F2F4F6] shadow-sm hover:bg-[#FAFBFC] transition-colors"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-[#F4F5F7] rounded-[10px] hover:bg-[#ECEEF0] transition-colors overflow-hidden"
       >
-        <span className="text-[14px] flex-shrink-0">{cfg.emoji}</span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-          style={{ background: cfg.bg, color: cfg.color }}>{ev.type}</span>
-        <span className="text-[12px] font-medium text-[#191F28] truncate">{ev.label}</span>
-        <span className={`text-[11px] font-bold tabular-nums flex-shrink-0 ml-auto ${dd.urgent ? 'text-[#F04452]' : 'text-[#8B95A1]'}`}>
-          {dd.text}
-        </span>
-        {upcoming.length > 1 && (
+        <span className="text-[11px] font-bold text-[#FF9500] flex-shrink-0">일정</span>
+        {/* 세로 롤링 영역 */}
+        <div className="flex-1 overflow-hidden h-5 relative">
+          <div
+            className="transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateY(-${rollIdx * 20}px)` }}
+          >
+            {displayItems.map((ev, i) => {
+              const cfg = TYPE_CONFIG[ev.type] || { color: '#8B95A1', bg: '#F2F4F6', emoji: '📅' };
+              const dd = dday(ev.date);
+              return (
+                <div key={`${ev.date}-${ev.type}-${i}`} className="h-5 flex items-center gap-2 whitespace-nowrap">
+                  <span className="text-[12px] text-[#4E5968]">{ev.label}</span>
+                  <span className={`text-[11px] font-bold tabular-nums ${dd.urgent ? 'text-[#F04452]' : 'text-[#8B95A1]'}`}>
+                    {dd.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {upcoming.length > 3 && (
           <span className="text-[10px] text-[#C9CDD2] flex-shrink-0">
-            +{upcoming.length - 1}
+            +{upcoming.length - 3}
           </span>
         )}
       </button>

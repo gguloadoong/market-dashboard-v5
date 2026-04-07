@@ -43,13 +43,14 @@ describe('홈 레이아웃 — 삭제된 컴포넌트 재import 방지', () => {
 // ─── 현재 활성 컴포넌트 — 누락 방지 ──────────────────────────────────────────
 // HomeDashboard가 렌더해야 하는 핵심 위젯 목록.
 // 새 위젯을 추가하면 여기도 추가하라. 삭제하면 여기서도 제거하라.
-// Phase 8A에서 홈 축소 반영 (FearGreedWidget 제거)
+// v5 홈 전면 개편 — 시안 C 커맨드 센터 레이아웃 반영
 const REQUIRED_IMPORTS = [
-  'MarketPulseWidget',
-  'WatchlistWidget',
-  'TopMoversWidget',
+  'CommandCenterWidget',
+  'SignalBoardWidget',
+  'AiDebateSection',
+  'ExploreTabsWidget',
   'NewsFeedWidget',
-  'EventTicker',
+  'NotableMoversSection',
 ];
 
 describe('홈 레이아웃 — 핵심 위젯 누락 방지', () => {
