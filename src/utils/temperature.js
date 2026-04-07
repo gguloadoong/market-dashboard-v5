@@ -14,13 +14,13 @@ export function calcTemperature(signals) {
   const total = bullWeight + bearWeight;
   const score = total === 0 ? 0 : (bullWeight - bearWeight) / total;
   // 시그널 3개 미만이면 극단 라벨 방지 — 최대 "중립"까지만 허용
-  const minSignals = signals.length >= 3;
+  const hasEnoughSignals = signals.length >= 3;
   let label;
-  if (score <= -0.5) label = minSignals ? '강한 경계' : '중립';
-  else if (score <= -0.15) label = minSignals ? '약세 우위' : '중립';
+  if (score <= -0.5) label = hasEnoughSignals ? '강한 경계' : '중립';
+  else if (score <= -0.15) label = hasEnoughSignals ? '약세 우위' : '중립';
   else if (score < 0.15) label = '중립';
-  else if (score < 0.5) label = minSignals ? '강세 징후' : '중립';
-  else label = minSignals ? '강한 강세' : '중립';
+  else if (score < 0.5) label = hasEnoughSignals ? '강세 징후' : '중립';
+  else label = hasEnoughSignals ? '강한 강세' : '중립';
   return { score, label, count: signals.length,
     bullCount: signals.filter(s => s.direction === 'bullish').length,
     bearCount: signals.filter(s => s.direction === 'bearish').length,

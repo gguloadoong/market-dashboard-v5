@@ -266,7 +266,7 @@ export const US_STOCK_LIST = [
   { symbol:'UPST', name:'업스타트', nameEn:'Upstart', market:'us', sector:'핀테크' },
   { symbol:'OPEN', name:'오픈도어', nameEn:'Opendoor', market:'us', sector:'부동산테크' },
   { symbol:'BILL', name:'빌닷컴', nameEn:'BILL Holdings', market:'us', sector:'핀테크' },
-  { symbol:'SE', name:'씨리미티드', nameEn:'Sea Limited', market:'us', sector:'이커머스' },
+  { symbol:'SE', name:'씨 리미티드', nameEn:'Sea Limited', market:'us', sector:'이커머스' },
   { symbol:'GRAB', name:'그랩', nameEn:'Grab Holdings', market:'us', sector:'플랫폼' },
   { symbol:'BABA', name:'알리바바', nameEn:'Alibaba', market:'us', sector:'중국테크' },
   { symbol:'JD', name:'징둥닷컴', nameEn:'JD.com', market:'us', sector:'중국테크' },
