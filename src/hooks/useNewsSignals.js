@@ -1,9 +1,12 @@
 // 뉴스 클러스터 시그널 훅 — 특정 종목에 뉴스 3건+ 집중 시 시그널 발행
 // 4시간 이내 뉴스 대상, 5분 간격 재검사
 import { useEffect, useRef, useCallback } from 'react';
-import { createNewsClusterSignal, removeSignalByTypeAndSymbol, removeAllSignalsByType } from '../engine/signalEngine';
+import { createNewsClusterSignal, removeSignalByTypeAndSymbol, removeAllSignalsByType, createSentimentDivergenceSignal } from '../engine/signalEngine';
 import { SIGNAL_TYPES } from '../engine/signalTypes';
+import { THRESHOLDS } from '../constants/signalThresholds';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
+import { getNewsSentimentScore } from '../utils/newsSignal';
+import { clampPct } from '../utils/clampPct';
 
 const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
 const NEWS_WINDOW = 4 * 3600000; // 4시간
@@ -110,6 +113,38 @@ export function useNewsSignals(allNews = [], allItems = []) {
       }
     }
     prevClusteredRef.current = currentClustered;
+
+    // ── 심리 괴리 (Sentiment Divergence) — 가격 방향 vs 뉴스 감성 불일치 ──
+    const T_SD = THRESHOLDS.SENTIMENT_DIV;
+    for (const item of targets) {
+      if (!item.symbol || !item.name) continue;
+      const market = (item._market || 'KR').toUpperCase();
+      const keywords = buildStockKeywords(item.symbol, item.name, market);
+      if (!keywords.length) continue;
+
+      const pricePct = clampPct(item.changePct ?? item.change24h ?? 0);
+      if (Math.abs(pricePct) < T_SD.PRICE_MIN) continue; // 가격 변동 2% 미만 무시
+
+      // 매칭 뉴스의 감성 점수 수집
+      const scores = [];
+      for (const article of recentNews) {
+        const text = article.title + ' ' + (article.summary || article.description || '');
+        if (matchesKeywords(text, keywords)) {
+          scores.push(getNewsSentimentScore(article.title));
+        }
+      }
+
+      if (scores.length < T_SD.MIN_NEWS) continue; // 최소 2건
+      const avgSentiment = scores.reduce((a, b) => a + b, 0) / scores.length;
+      if (Math.abs(avgSentiment) < T_SD.SENTIMENT_MIN) continue; // 감성 점수 중립이면 무시
+
+      // 가격과 감성 방향 불일치 체크
+      const priceUp = pricePct > 0;
+      const sentimentPositive = avgSentiment > 0;
+      if (priceUp !== sentimentPositive) {
+        createSentimentDivergenceSignal(item.symbol, item.name, market.toLowerCase(), pricePct, avgSentiment, scores.length);
+      }
+    }
   }, []);
 
   // 뉴스 또는 종목 데이터 변경 시 재스캔 (빈 데이터도 정리 위해 무조건 호출)

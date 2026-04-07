@@ -8,7 +8,9 @@ import {
   createVWAPSignal,
   createSocialSentimentSignal,
   createWhaleSignal,
+  createMomentumSignal,
 } from '../engine/signalEngine';
+import { THRESHOLDS } from '../constants/signalThresholds';
 
 // VWAP 계산 — sparkline(가격 배열) 기반 단순 평균 (실제 거래량 없어 단순 이동평균 대체)
 function calcVWAPFromSparkline(sparkline) {
@@ -109,6 +111,23 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
           if (!stock.price || !stock.sparkline?.length) continue;
           const vwap = calcVWAPFromSparkline(stock.sparkline);
           if (vwap) createVWAPSignal(stock.symbol, stock.name || stock.symbol, stock.market, stock.price, vwap);
+
+          // 모멘텀 괴리 — 단기(5봉) vs 중기(전체) 추세 방향 불일치
+          const sl = stock.sparkline;
+          const T_MOM = THRESHOLDS.MOMENTUM;
+          if (sl.length >= T_MOM.MIN_SPARKLINE) {
+            const base = sl[0] || 1; // 0 방지
+            // 중기 기울기: 전체 sparkline 시작→끝 변화율
+            const mediumSlope = ((sl[sl.length - 1] - sl[0]) / Math.abs(base)) * 100;
+            // 단기 기울기: 최근 5봉 변화율
+            const shortStart = sl[sl.length - 5];
+            const shortSlope = ((sl[sl.length - 1] - shortStart) / Math.abs(shortStart || 1)) * 100;
+
+            // 부호 다르고 단기 기울기 최소값 이상이면 시그널
+            if (mediumSlope * shortSlope < 0 && Math.abs(shortSlope) >= T_MOM.MIN_SLOPE) {
+              createMomentumSignal(stock.symbol, stock.name || stock.symbol, stock.market, shortSlope, mediumSlope);
+            }
+          }
         }
       } catch {}
     }

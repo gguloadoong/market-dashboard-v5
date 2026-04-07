@@ -2,9 +2,26 @@
 // 5분 간격 폴링으로 시그널 엔진에 시그널 추가
 import { useEffect, useRef } from 'react';
 import { fetchInvestorTrendGateway } from '../api/_gateway';
-import { createInvestorSignal, createVolumeSignal, createSignal, addSignal, getActiveSignals } from '../engine/signalEngine';
+import {
+  createInvestorSignal, createVolumeSignal, createSignal, addSignal, getActiveSignals,
+  createSmartMoneySignal, createVolumePriceDivergenceSignal,
+  createCrossMarketSignal, createMarketMoodShiftSignal,
+} from '../engine/signalEngine';
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
+import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
+
+// 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
+const CROSS_MARKET_PAIRS = [
+  { leader: 'BTC', lagger: 'MSTR', leaderMarket: 'COIN', laggerMarket: 'US' },
+  { leader: 'BTC', lagger: 'IBIT', leaderMarket: 'COIN', laggerMarket: 'US' },
+  { leader: 'ETH', lagger: 'COIN', leaderMarket: 'COIN', laggerMarket: 'US' },
+  { leader: 'SOL', lagger: 'COIN', leaderMarket: 'COIN', laggerMarket: 'US' },
+  { leader: 'BTC', lagger: 'COINBASE', leaderMarket: 'COIN', laggerMarket: 'US' },
+  { leader: 'NVDA', lagger: '000660', leaderMarket: 'US', laggerMarket: 'KR' },
+  { leader: 'AAPL', lagger: '005930', leaderMarket: 'US', laggerMarket: 'KR' },
+  { leader: 'TSLA', lagger: '373220', leaderMarket: 'US', laggerMarket: 'KR' },
+];
 
 // 시총 상위 KR 종목 (최소 5개)
 const KR_TOP_SYMBOLS = [
@@ -98,6 +115,12 @@ export function useInvestorSignals(allItems = []) {
 
         // ── P0-4: 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 ──
         generateBootSeedSignals(allItems);
+
+        // ── 신규: 교차시장 상관관계 ──
+        detectCrossMarketCorrelation(allItems);
+
+        // ── 신규: 시장 무드 전환 ──
+        detectMarketMoodShift(allItems);
       } catch {
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
@@ -164,6 +187,13 @@ async function scanInvestorTrends() {
           SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
           inst.sellDays, Math.abs(inst.totalAmt),
         );
+      }
+
+      // 스마트머니 — 외국인+기관 동시 2일+ 매수 또는 매도
+      if (foreign.buyDays >= 2 && inst.buyDays >= 2) {
+        createSmartMoneySignal(symbol, name, foreign.buyDays, inst.buyDays, foreign.totalAmt + inst.totalAmt, true);
+      } else if (foreign.sellDays >= 2 && inst.sellDays >= 2) {
+        createSmartMoneySignal(symbol, name, foreign.sellDays, inst.sellDays, Math.abs(foreign.totalAmt) + Math.abs(inst.totalAmt), false);
       }
     } catch {
       // 개별 종목 실패 시 무시 — 다른 종목은 계속 진행
@@ -314,6 +344,106 @@ function scanVolumeAnomalies(allItems) {
           threshold,
         );
       }
+
+      // 거래량-가격 괴리 — 거래량 폭발인데 가격 정체 (accumulation), 또는 큰 가격 변동인데 거래량 부족 (weak_move)
+      const pct = clampPct(item.changePct ?? item.change24h ?? 0);
+      const volRatio = threshold > 0 ? vol / threshold : 0;
+      const T_VP = THRESHOLDS.VOL_PRICE;
+      if (volRatio >= T_VP.HIGH_VOL_LOW_PRICE_RATIO && Math.abs(pct) < T_VP.HIGH_VOL_MAX_PRICE) {
+        // 거래량 2배+ 인데 가격 1% 미만 — 누군가 모으는 중
+        createVolumePriceDivergenceSignal(item.symbol, item.name ?? item.symbol, market.toLowerCase(), 'accumulation', pct, volRatio);
+      } else if (Math.abs(pct) >= T_VP.BIG_PRICE_MIN && vol > 0 && vol < threshold * 0.5) {
+        // 가격 5%+ 변동인데 거래량 평균의 절반 이하 — 약한 움직임
+        createVolumePriceDivergenceSignal(item.symbol, item.name ?? item.symbol, market.toLowerCase(), 'weak_move', pct, volRatio);
+      }
     }
+  }
+}
+
+/** 교차시장 상관관계 감지 — leader/lagger 괴리율 기준 */
+function detectCrossMarketCorrelation(allItems) {
+  if (!allItems?.length) return;
+
+  // 심볼→종목 맵 (빠른 조회)
+  const bySymbol = {};
+  for (const item of allItems) {
+    bySymbol[item.symbol] = item;
+  }
+
+  const T_CM = THRESHOLDS.CROSS_MARKET;
+  for (const pair of CROSS_MARKET_PAIRS) {
+    const leaderItem = bySymbol[pair.leader];
+    const laggerItem = bySymbol[pair.lagger];
+    if (!leaderItem || !laggerItem) continue;
+
+    const leaderPct = clampPct(leaderItem.changePct ?? leaderItem.change24h ?? 0);
+    const laggerPct = clampPct(laggerItem.changePct ?? laggerItem.change24h ?? 0);
+    const gap = Math.abs(leaderPct - laggerPct);
+
+    // 같은 방향인데 괴리가 크거나, 반대 방향이면 시그널
+    if (gap >= T_CM.DIVERGENCE) {
+      createCrossMarketSignal(pair.leader, pair.lagger, leaderPct, laggerPct);
+    }
+  }
+}
+
+/** 시장 무드 전환 감지 — 3시장 동시 방향 전환 또는 합의 */
+function detectMarketMoodShift(allItems) {
+  if (!allItems?.length) return;
+
+  const T_MM = THRESHOLDS.MARKET_MOOD;
+
+  // 시장별 평균 등락률 계산
+  const marketPcts = { KR: [], US: [], COIN: [] };
+  for (const item of allItems) {
+    const m = (item._market || '').toUpperCase();
+    if (marketPcts[m]) {
+      marketPcts[m].push(clampPct(item.changePct ?? item.change24h ?? 0));
+    }
+  }
+
+  const marketAvgs = {};
+  const marketDirs = {};
+  for (const [market, pcts] of Object.entries(marketPcts)) {
+    if (!pcts.length) continue;
+    const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length;
+    marketAvgs[market] = +avg.toFixed(2);
+    if (avg > T_MM.DIRECTION_THRESHOLD) marketDirs[market] = 'bullish';
+    else if (avg < -T_MM.DIRECTION_THRESHOLD) marketDirs[market] = 'bearish';
+    else marketDirs[market] = 'neutral';
+  }
+
+  const dirs = Object.values(marketDirs);
+  const markets = Object.keys(marketDirs);
+  if (markets.length < 3) return;
+
+  // 3시장 합의 (모두 같은 방향, neutral 제외)
+  const nonNeutral = dirs.filter(d => d !== 'neutral');
+  if (nonNeutral.length === 3 && new Set(nonNeutral).size === 1) {
+    createMarketMoodShiftSignal('consensus', nonNeutral[0], markets, marketAvgs);
+    return;
+  }
+
+  // 방향 전환 감지 — localStorage 이전 상태 비교
+  const prevRaw = localStorage.getItem('market_mood_prev');
+  const prevDirs = prevRaw ? JSON.parse(prevRaw) : null;
+  localStorage.setItem('market_mood_prev', JSON.stringify(marketDirs));
+
+  if (!prevDirs) return;
+
+  const flipped = [];
+  for (const market of markets) {
+    const prev = prevDirs[market];
+    const cur = marketDirs[market];
+    if (prev && cur && prev !== 'neutral' && cur !== 'neutral' && prev !== cur) {
+      flipped.push(market);
+    }
+  }
+
+  if (flipped.length >= T_MM.MIN_FLIPS) {
+    // 전환된 시장의 현재 방향 — 다수결
+    const bullCount = flipped.filter(m => marketDirs[m] === 'bullish').length;
+    const direction = bullCount > flipped.length / 2 ? 'bullish' : 'bearish';
+    createMarketMoodShiftSignal('shift', direction, flipped, marketAvgs);
   }
 }
