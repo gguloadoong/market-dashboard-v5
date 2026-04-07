@@ -84,29 +84,25 @@ export async function setSnap(key, data, ex) {
   }
 }
 
-// US 샤드 병합 조회 — snap:us (레거시) + snap:us:0~N 샤드 병합
+// US 샤드 병합 조회 — snap:us:0~N 샤드 + snap:us 레거시 fallback
 export async function getUsSnap() {
   if (!redis) return null;
   try {
-    // 샤드 키 조회 (최대 8샤드)
-    const shardKeys = Array.from({ length: 8 }, (_, i) => `snap:us:${i}`);
-    const [legacy, ...shards] = await Promise.all([
-      getSnapWithFallback(SNAP_KEYS.US),
-      ...shardKeys.map(k => getSnap(k)),
-    ]);
-    // 샤드 데이터 병합
-    const merged = new Map();
-    // 레거시 데이터 먼저 (낮은 우선순위)
-    if (Array.isArray(legacy)) {
-      for (const item of legacy) merged.set(item.symbol, item);
+    // 샤드 수 동적 조회 (크론이 저장)
+    const shardCount = parseInt(await redis.get('us:cron:shardCount') || '0', 10);
+    if (shardCount > 0) {
+      // mget으로 한 번에 조회
+      const shardKeys = Array.from({ length: shardCount }, (_, i) => `snap:us:${i}`);
+      const shards = await redis.mget(...shardKeys);
+      const merged = new Map();
+      for (const shard of shards) {
+        if (!Array.isArray(shard)) continue;
+        for (const item of shard) merged.set(item.symbol, item);
+      }
+      if (merged.size > 0) return [...merged.values()];
     }
-    // 샤드 데이터 덮어쓰기 (높은 우선순위)
-    for (const shard of shards) {
-      if (!Array.isArray(shard)) continue;
-      for (const item of shard) merged.set(item.symbol, item);
-    }
-    const result = [...merged.values()];
-    return result.length > 0 ? result : legacy;
+    // 샤드 없으면 레거시 fallback
+    return getSnapWithFallback(SNAP_KEYS.US);
   } catch (e) {
     console.error('[price-cache] getUsSnap 실패:', e);
     return getSnapWithFallback(SNAP_KEYS.US);

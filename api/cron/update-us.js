@@ -68,8 +68,17 @@ async function getSymbolList() {
     } catch (_) { /* fallback */ }
   }
 
-  // NASDAQ API에서 수집
-  const symbols = await fetchNasdaqSymbols(1000);
+  // NASDAQ API에서 수집 (총 30초 타임아웃)
+  let symbols = [];
+  try {
+    symbols = await Promise.race([
+      fetchNasdaqSymbols(1000),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('NASDAQ API 총 타임아웃')), 30000)),
+    ]);
+  } catch (e) {
+    console.warn('[update-us] NASDAQ 수집 실패:', e.message);
+    symbols = [];
+  }
   if (symbols.length > 100 && redis) {
     try {
       await redis.set(SYMBOL_LIST_KEY, symbols, { ex: SYMBOL_LIST_TTL });
@@ -208,16 +217,15 @@ export default async function handler(request) {
     if (items.length > 0) {
       const shardKey = `snap:us:${shard}`;
       await setSnap(shardKey, items, SHARD_TTL);
-      // 레거시 키에도 병합 저장 (하위 호환)
-      if (shard === 0) {
-        await setSnap(SNAP_KEYS.US, items, SNAP_TTL.US);
-      }
     }
 
-    // 7. 커서 다음 샤드로 이동
+    // 7. 커서 + 샤드 수 저장 (읽기 측에서 동적 참조)
     if (redis) {
       try {
-        await redis.set(SHARD_CURSOR_KEY, (shard + 1) % totalShards, { ex: 3600 });
+        await Promise.all([
+          redis.set(SHARD_CURSOR_KEY, (shard + 1) % totalShards, { ex: 3600 }),
+          redis.set('us:cron:shardCount', totalShards, { ex: 3600 }),
+        ]);
       } catch (_) { /* 무시 */ }
     }
 
