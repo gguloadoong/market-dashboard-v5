@@ -16,9 +16,11 @@
     -webkit-font-smoothing: antialiased;
   }
   /* 커스텀 스크롤바 — 목업 기준 (4px, 미세 thumb) */
-  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-thumb { background: var(--border-heavy); border-radius: 2px; }
   ::-webkit-scrollbar-track { background: transparent; }
+  /* Firefox 스크롤바 fallback */
+  * { scrollbar-width: thin; scrollbar-color: var(--border-heavy) transparent; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   * { -webkit-tap-highlight-color: rgba(0,0,0,0); }
