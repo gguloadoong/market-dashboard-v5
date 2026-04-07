@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
         name: '마켓레이더',
         short_name: '마켓레이더',
         description: '국장·미장·코인 실시간 급등 종목 모니터링',
-        theme_color: '#863bff',
+        theme_color: '#3182F6',
         background_color: '#F8F9FA',
         display: 'standalone',
         orientation: 'portrait',

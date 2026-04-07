@@ -44,7 +44,7 @@ export default function Header({
         <div className="flex items-center gap-6">
           {/* 브랜드 로고 — 레이더 심볼 + 워드마크 */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
               <rect width="32" height="32" rx="8" fill="#3182F6"/>
               <path d="M6 24C6 14.059 14.059 6 24 6" stroke="white" strokeWidth="2.8" strokeLinecap="round" opacity="0.35"/>
               <path d="M10 24C10 16.268 16.268 10 24 10" stroke="white" strokeWidth="2.8" strokeLinecap="round" opacity="0.6"/>
