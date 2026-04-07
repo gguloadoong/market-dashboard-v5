@@ -681,6 +681,8 @@ async function pollTelegramWhale(callback) {
  * @param {Function} callback - 이벤트 수신 콜백
  */
 export function startTelegramWhalePolling(callback) {
+  // 기존 타이머 정리 — 중복 호출 시 이중 폴링 방지
+  if (telegramTimer) { clearInterval(telegramTimer); telegramTimer = null; }
   telegramDestroyed = false;
   telegramSeenIds   = new Set();
   pollTelegramWhale(callback);
