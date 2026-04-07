@@ -1,4 +1,4 @@
-import { fetchWhaleProxy } from './_gateway.js';
+import { fetchWhaleProxy, fetchWhaleTelegram } from './_gateway.js';
 // ─── 코인 고래 알림 API ────────────────────────────────────────
 //
 // 【결론: WhaleAlert RSS는 클라이언트 사이드에서 불가】
@@ -602,4 +602,96 @@ export function unsubscribeBinanceWhaleTrades() {
   binanceHandler   = null;
   clearTimeout(binanceReconnect);
   if (binanceWs) { try { binanceWs.close(); } catch {} binanceWs = null; }
+}
+
+// ─── Layer 5: 텔레그램 고래 알림 채널 폴링 ──────────────────────────────────
+// Redis 캐시된 텔레그램 Whale Alert 메시지 → 프론트엔드 이벤트 변환
+// Cron(api/cron/whale-telegram.js)이 2분 간격 수집 → 여기서 2분 간격 읽기
+
+let telegramTimer    = null;
+let telegramDestroyed = false;
+let telegramSeenIds  = new Set();
+
+/**
+ * 텔레그램 이벤트를 WhalePanel 포맷으로 변환
+ * Cron 저장 형식: { symbol, amount, tradeUsd, from, to, movementType, ts }
+ * WhalePanel 기대 형식: { id, symbol, chain, side, tradeAmt, tradeUsd, volume, severity, timestamp, source, movementType, fromOwner, toOwner, insight, label }
+ */
+function transformTelegramEvent(raw, idx) {
+  // signal / insight 결정
+  let signal, insight;
+  if (raw.movementType === 'exchange_deposit') {
+    signal  = 'bearish';
+    insight = `[텔레그램] ${raw.to || '거래소'} 입금 — 매도 압력 주의`;
+  } else if (raw.movementType === 'exchange_withdrawal') {
+    signal  = 'bullish';
+    insight = `[텔레그램] ${raw.from || '거래소'} 출금 — HODLing 신호`;
+  } else {
+    signal  = 'neutral';
+    insight = `[텔레그램] ${raw.from || '지갑'} → ${raw.to || '지갑'} 이동`;
+  }
+
+  const krwAmt = Math.round((raw.tradeUsd || 0) * currentKrwRate);
+
+  return {
+    id:           `tg-${raw.ts}-${idx}`,
+    symbol:       raw.symbol || '?',
+    chain:        'telegram',
+    side:         '온체인',
+    tradeAmt:     krwAmt,
+    tradeUsd:     raw.tradeUsd || 0,
+    volume:       raw.amount || 0,
+    severity:     (raw.tradeUsd || 0) >= 10_000_000 ? 'high' : 'normal',
+    timestamp:    raw.ts || Date.now(),
+    source:       'telegram',
+    movementType: raw.movementType || 'transfer',
+    signal,
+    insight,
+    fromOwner:    raw.from || null,
+    toOwner:      raw.to || null,
+    label:        `${raw.from || '지갑'} → ${raw.to || '지갑'}`,
+  };
+}
+
+async function pollTelegramWhale(callback) {
+  if (telegramDestroyed) return;
+  try {
+    const data = await fetchWhaleTelegram(8000);
+    const events = data?.events || [];
+    for (let i = 0; i < events.length; i++) {
+      const raw = events[i];
+      const dedupKey = `${raw.symbol}-${raw.ts}-${raw.tradeUsd}`;
+      if (telegramSeenIds.has(dedupKey)) continue;
+      telegramSeenIds.add(dedupKey);
+      // Set 크기 제한
+      if (telegramSeenIds.size > 200) {
+        telegramSeenIds = new Set([...telegramSeenIds].slice(-100));
+      }
+      const evt = transformTelegramEvent(raw, i);
+      callback(evt);
+    }
+  } catch (e) {
+    console.warn('[Whale] Telegram poll fail:', e.message);
+  }
+}
+
+/**
+ * startTelegramWhalePolling(callback)
+ * 텔레그램 고래 알림 채널 데이터 폴링 시작 (2분 간격)
+ * @param {Function} callback - 이벤트 수신 콜백
+ */
+export function startTelegramWhalePolling(callback) {
+  telegramDestroyed = false;
+  telegramSeenIds   = new Set();
+  pollTelegramWhale(callback);
+  telegramTimer = setInterval(() => pollTelegramWhale(callback), 120_000); // 2분
+}
+
+/**
+ * stopTelegramWhalePolling()
+ * 텔레그램 고래 알림 폴링 중단
+ */
+export function stopTelegramWhalePolling() {
+  telegramDestroyed = true;
+  if (telegramTimer) { clearInterval(telegramTimer); telegramTimer = null; }
 }
