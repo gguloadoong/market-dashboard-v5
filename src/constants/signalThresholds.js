@@ -51,8 +51,12 @@ export const THRESHOLDS = {
     BIG_PRICE_MIN: 5,            // 큰 가격 변동 최소 5%
     STRONG_RATIO: 5,             // 거래량 5배 이상 — 강한 누적 시그널
   },
+  SMART_MONEY: {
+    MIN_DAYS: 2,                 // 외국인+기관 동시 매수/매도 최소 일수
+  },
   MARKET_MOOD: {
     DIRECTION_THRESHOLD: 1,      // 방향 판단 기준 1%
     MIN_FLIPS: 2,                // 최소 전환 시장 수
+    STALE_MS: 10 * 60 * 1000,   // 이전 상태 유효 시간 10분
   },
 };

@@ -96,6 +96,7 @@ function calcPercentileVolume(items, market) {
 export function useInvestorSignals(allItems = []) {
   const timerRef = useRef(null);
   const runningRef = useRef(false);
+  const moodPrevRef = useRef(null); // 시장 무드 이전 상태 (localStorage 대신 메모리)
 
   useEffect(() => {
     async function scan() {
@@ -119,7 +120,7 @@ export function useInvestorSignals(allItems = []) {
         detectCrossMarketCorrelation(allItems);
 
         // ── 신규: 시장 무드 전환 ──
-        detectMarketMoodShift(allItems);
+        detectMarketMoodShift(allItems, moodPrevRef);
       } catch {
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
@@ -188,10 +189,11 @@ async function scanInvestorTrends() {
         );
       }
 
-      // 스마트머니 — 외국인+기관 동시 2일+ 매수 또는 매도
-      if (foreign.buyDays >= 2 && inst.buyDays >= 2) {
+      // 스마트머니 — 외국인+기관 동시 MIN_DAYS일+ 매수 또는 매도
+      const smMinDays = THRESHOLDS.SMART_MONEY.MIN_DAYS;
+      if (foreign.buyDays >= smMinDays && inst.buyDays >= smMinDays) {
         createSmartMoneySignal(symbol, name, foreign.buyDays, inst.buyDays, foreign.totalAmt + inst.totalAmt, true);
-      } else if (foreign.sellDays >= 2 && inst.sellDays >= 2) {
+      } else if (foreign.sellDays >= smMinDays && inst.sellDays >= smMinDays) {
         createSmartMoneySignal(symbol, name, foreign.sellDays, inst.sellDays, Math.abs(foreign.totalAmt) + Math.abs(inst.totalAmt), false);
       }
     } catch {
@@ -387,7 +389,11 @@ function detectCrossMarketCorrelation(allItems) {
 }
 
 /** 시장 무드 전환 감지 — 3시장 동시 방향 전환 또는 합의 */
-function detectMarketMoodShift(allItems) {
+/** 시장 무드 전환 감지 — 3시장 동시 방향 전환 또는 합의
+ * @param {Array} allItems - 전체 종목 배열
+ * @param {{ current: object|null }} moodPrevRef - 이전 시장 방향 상태 ref (메모리 기반)
+ */
+function detectMarketMoodShift(allItems, moodPrevRef) {
   if (!allItems?.length) return;
 
   const T_MM = THRESHOLDS.MARKET_MOOD;
@@ -423,11 +429,9 @@ function detectMarketMoodShift(allItems) {
     return;
   }
 
-  // 방향 전환 감지 — localStorage 이전 상태 비교
-  const prevRaw = localStorage.getItem('market_mood_prev');
-  let prevDirs = null;
-  try { prevDirs = prevRaw ? JSON.parse(prevRaw) : null; } catch { /* 손상된 값 무시 */ }
-  localStorage.setItem('market_mood_prev', JSON.stringify(marketDirs));
+  // 방향 전환 감지 — ref 기반 이전 상태 비교 (localStorage 대신 메모리)
+  const prevDirs = moodPrevRef.current;
+  moodPrevRef.current = marketDirs;
 
   if (!prevDirs) return;
 
