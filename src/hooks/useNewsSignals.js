@@ -133,7 +133,7 @@ export function useNewsSignals(allNews = [], allItems = []) {
       if (!cached || cached.length < T_SD.MIN_NEWS) continue; // 최소 2건
 
       const scores = cached.map(({ article }) =>
-        getNewsSentimentScore(article.title + ' ' + (article.summary || ''))
+        getNewsSentimentScore(article.title + ' ' + (article.summary || article.description || ''))
       );
       const avgSentiment = scores.reduce((a, b) => a + b, 0) / scores.length;
       if (Math.abs(avgSentiment) < T_SD.SENTIMENT_MIN) continue; // 감성 점수 중립이면 무시

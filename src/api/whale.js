@@ -663,12 +663,12 @@ async function pollTelegramWhale(callback) {
       const dedupKey = `${raw.symbol}-${raw.ts}-${raw.tradeUsd}`;
       if (telegramSeenIds.has(dedupKey)) continue;
       telegramSeenIds.add(dedupKey);
-      // Set 크기 제한
-      if (telegramSeenIds.size > 200) {
-        telegramSeenIds = new Set([...telegramSeenIds].slice(-100));
-      }
       const evt = transformTelegramEvent(raw, i);
       callback(evt);
+    }
+    // Set 크기 제한 — 루프 외부에서 1회만 실행
+    if (telegramSeenIds.size > 200) {
+      telegramSeenIds = new Set([...telegramSeenIds].slice(-100));
     }
   } catch (e) {
     console.warn('[Whale] Telegram poll fail:', e.message);
