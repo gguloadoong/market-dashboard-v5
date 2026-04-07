@@ -4,20 +4,13 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
 import { TYPE_META as ENGINE_META } from '../../engine/signalTypes';
 
-// easyLabel 해석 — 문자열 또는 함수(meta 기반) 지원
-function resolveEasyLabel(signal) {
-  const raw = ENGINE_META[signal.type]?.easyLabel;
-  if (typeof raw === 'function') return raw(signal.meta || signal) || signal.type;
-  return raw || signal.type;
-}
-
 function extractName(signal) {
-  return signal.name || signal.symbol || signal.sector || signal.label || resolveEasyLabel(signal) || signal.type || '';
+  return signal.name || signal.symbol || signal.sector || signal.label || ENGINE_META[signal.type]?.easyLabel || signal.type || '';
 }
 
 // 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
 function getEasyLabel(signal) {
-  return resolveEasyLabel(signal);
+  return ENGINE_META[signal.type]?.easyLabel || signal.type;
 }
 
 export default function SignalSummaryWidget({ onItemClick }) {

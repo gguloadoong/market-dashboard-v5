@@ -173,7 +173,7 @@ export const TYPE_META = {
     easyDesc: (m) => `${m.name} ${m.pricePct > 0 ? '오르는데' : '내리는데'} 뉴스는 ${m.avgSentiment > 0 ? '호재' : '악재'} — 괴리 주의`,
   },
   [SIGNAL_TYPES.SMART_MONEY_FLOW]: {
-    easyLabel: (m) => m?.action === '매도' ? '외국인+기관 동시 매도 🚨' : '외국인+기관 동시 매집 💎',
+    easyLabel: '외국인+기관 스마트머니 감지 💎',
     easyDesc: (m) => `${m.name}을 외국인(${m.foreignDays}일)+기관(${m.instDays}일) 동시 ${m.action} 중`,
   },
   [SIGNAL_TYPES.MOMENTUM_DIVERGENCE]: {
@@ -185,7 +185,7 @@ export const TYPE_META = {
     easyDesc: (m) => m.pattern === 'accumulation' ? `${m.name} 조용히 거래 폭발 — 누군가 모으는 중?` : `${m.name} ${m.pricePct > 0 ? '올랐지만' : '빠졌지만'} 거래량 부족 — 약한 움직임`,
   },
   [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: {
-    easyLabel: (m) => m?.moodType === 'consensus' ? '3시장이 한 방향이에요 🎯' : '시장 분위기가 확 바뀌었어요 🌊',
+    easyLabel: '시장 분위기 변화 감지 🌊',
     easyDesc: (m) => m.moodType === 'consensus' ? `국장·미장·코인 모두 ${m.direction === 'bullish' ? '상승' : '하락'} — 강한 흐름` : `${m.flippedMarkets.join('·')} 방향 전환 — 변곡점 주의`,
   },
 };

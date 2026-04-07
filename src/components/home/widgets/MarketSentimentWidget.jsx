@@ -131,8 +131,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
       .slice(0, 3)
       .map(sig => {
         const meta = TYPE_META[sig.type];
-        const raw = meta?.easyLabel;
-        return (typeof raw === 'function' ? raw(sig.meta || sig) : raw) || sig.label || sig.title || sig.type;
+        return meta?.easyLabel || sig.label || sig.title || sig.type;
       });
   }, [signals]);
 
