@@ -421,16 +421,16 @@ function detectMarketMoodShift(allItems, moodPrevRef) {
   const markets = Object.keys(marketDirs);
   if (markets.length < 3) return;
 
+  // 항상 현재 상태 저장 (consensus 포함 — 조기 return 시 미갱신 방지)
+  const prev = moodPrevRef.current;
+  moodPrevRef.current = { dirs: marketDirs, ts: Date.now() };
+
   // 3시장 합의 (모두 같은 방향, neutral 제외)
   const nonNeutral = dirs.filter(d => d !== 'neutral');
   if (nonNeutral.length === 3 && new Set(nonNeutral).size === 1) {
     createMarketMoodShiftSignal('consensus', nonNeutral[0], markets, marketAvgs);
     return;
   }
-
-  // 방향 전환 감지 — ref 기반 이전 상태 비교 (localStorage 대신 메모리)
-  const prev = moodPrevRef.current;
-  moodPrevRef.current = { dirs: marketDirs, ts: Date.now() };
 
   // 이전 상태 없거나 STALE_MS 초과 시 무시 (탭 비활성 후 복귀 시 허위 시그널 방지)
   if (!prev || Date.now() - prev.ts > T_MM.STALE_MS) return;
