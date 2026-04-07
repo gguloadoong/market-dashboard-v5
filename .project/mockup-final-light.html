@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketRadar v5 — 마켓레이더</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+/* ─── 토스증권 라이트모드 디자인 시스템 ─── */
+:root {
+  --bg: #F4F5F7;
+  --card: #FFFFFF;
+  --hover: #F2F3F5;
+
+  --t1: #191F28;
+  --t2: #4E5968;
+  --t3: #8B95A1;
+  --t4: #B0B8C1;
+
+  --up: #F04452;
+  --dn: #1764ED;
+  --blue: #3182F6;
+  --green: #34C759;
+  --amber: #FF9500;
+
+  --line: #F2F3F5;
+  --divider: #E5E8EB;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--t1);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 2px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.up { color: var(--up); }
+.dn { color: var(--dn); }
+
+
+/* ─── 헤더 ─── */
+.hdr {
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.hdr-in {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.logo {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.logo-dot {
+  width: 7px; height: 7px;
+  background: var(--up);
+  border-radius: 50%;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.search {
+  flex: 1;
+  max-width: 300px;
+  position: relative;
+}
+.search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  letter-spacing: inherit;
+  background: var(--bg);
+  color: var(--t1);
+  outline: none;
+  transition: background 150ms;
+}
+.search input:focus { background: #ECEEF0; }
+.search input::placeholder { color: var(--t4); }
+.search svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--t4);
+}
+.live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.5px;
+}
+.live::before {
+  content: '';
+  width: 5px; height: 5px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.tab {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t3);
+  border-radius: 8px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.tab:hover { color: var(--t2); background: var(--hover); }
+.tab.on { color: #fff; background: var(--t1); }
+
+
+/* ─── 레이아웃 ─── */
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 24px 48px;
+  display: flex;
+  gap: 20px;
+}
+.main { flex: 1; min-width: 0; }
+.side {
+  width: 340px;
+  flex-shrink: 0;
+}
+
+/* ─── 카드 ─── */
+.card {
+  background: var(--card);
+  border-radius: 16px;
+}
+.card + .card { margin-top: 12px; }
+
+
+/* ═══════════════════════════════════════
+   COMMAND CENTER — Layer 1
+   ═══════════════════════════════════════ */
+.cc { padding: 20px 20px 16px; }
+
+/* 온도바 */
+.temp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.temp-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t2);
+  flex-shrink: 0;
+}
+.temp-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(23,100,237,0.10);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.temp-fill {
+  height: 100%;
+  background: var(--up);
+  border-radius: 3px;
+  transition: width 600ms cubic-bezier(.4,0,.2,1);
+}
+.temp-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--up);
+  flex-shrink: 0;
+}
+.temp-fg {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  flex-shrink: 0;
+  padding: 2px 10px;
+  background: rgba(255,149,0,0.06);
+  border-radius: 12px;
+}
+
+/* 지수 행 */
+.indices {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+}
+.idx {
+  flex: 1;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 150ms;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.idx:hover { background: var(--hover); }
+.idx-body { flex: 1; min-width: 0; }
+.idx-nm {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t3);
+  margin-bottom: 2px;
+}
+.idx-pr {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.idx-ch {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.idx-spk { flex-shrink: 0; }
+
+/* 히어로 + 관심종목 그리드 */
+.hero-row {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+/* 히어로 시그널 */
+.hero {
+  padding: 20px 24px;
+  background: rgba(240,68,82,0.03);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 200ms;
+  position: relative;
+}
+.hero:hover { background: rgba(240,68,82,0.06); }
+.hero-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.hero-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--up);
+}
+.hero-type {
+  font-size: 12px;
+  color: var(--t3);
+  margin-left: auto;
+}
+.hero-dots {
+  display: flex;
+  gap: 3px;
+}
+.hero-dots i {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--up);
+  opacity: 0.2;
+}
+.hero-dots i.on { opacity: 1; }
+.hero-tk {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
+}
+.hero-pr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.hero-pr {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.hero-unit {
+  font-size: 13px;
+  color: var(--t4);
+}
+.hero-ch {
+  font-size: 15px;
+  font-weight: 600;
+}
+.hero-desc {
+  font-size: 14px;
+  color: var(--t2);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.hero-cta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hero-cta:hover { opacity: 0.7; }
+
+/* 관심종목 */
+.wl { padding: 0; }
+.wl-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.wl-hd h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t1);
+}
+.wl-hd span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t3);
+  cursor: pointer;
+}
+.wl-hd span:hover { color: var(--t2); }
+.wl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.wl-item + .wl-item {
+  border-top: 1px solid var(--line);
+}
+.wl-item:hover { background: var(--hover); margin: 0 -8px; padding: 10px 8px; border-radius: 8px; }
+.wl-nm {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.wl-sub {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 1px;
+}
+.wl-rt { text-align: right; }
+.wl-pr {
+  font-size: 15px;
+  font-weight: 600;
+}
+.wl-ch {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+/* 이벤트 스트립 — 세로 롤링 (시안 C 방식) */
+.ev {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ev-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+  flex-shrink: 0;
+}
+.ev-scroll {
+  flex: 1;
+  overflow: hidden;
+  height: 20px;
+}
+.ev-roller {
+  animation: evRoll 9s ease-in-out infinite;
+}
+.ev-roller-item {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--t2);
+  white-space: nowrap;
+}
+@keyframes evRoll {
+  0%, 30% { transform: translateY(0); }
+  33%, 63% { transform: translateY(-33.33%); }
+  66%, 96% { transform: translateY(-66.66%); }
+  100% { transform: translateY(0); }
+}
+
+
+/* ═══════════════════════════════════════
+   주목할 종목 — Layer 2
+   ═══════════════════════════════════════ */
+.why { padding: 24px 20px 20px; }
+.sec-hd {
+  margin-bottom: 16px;
+}
+.sec-hd h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+}
+.sec-hd p {
+  font-size: 13px;
+  color: var(--t3);
+  margin-top: 2px;
+}
+.why-list {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+}
+.why-list::-webkit-scrollbar { display: none; }
+
+.wc {
+  flex-shrink: 0;
+  width: 220px;
+  scroll-snap-align: start;
+  padding: 18px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 200ms;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.wc:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  transform: translateY(-2px);
+}
+.wc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.wc-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.wc-tag.vol { color: var(--amber); }
+.wc-tag.news { color: var(--dn); }
+.wc-tag.move { color: var(--up); }
+.wc-tag.whale { color: var(--green); }
+.wc-ch {
+  font-size: 13px;
+  font-weight: 700;
+}
+.wc-nm {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 4px;
+}
+.wc-why {
+  font-size: 13px;
+  color: var(--t3);
+  line-height: 1.4;
+  margin-bottom: 12px;
+  /* 2줄 제한 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wc-pr {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.wc-spark { margin-top: 10px; }
+
+
+/* ═══════════════════════════════════════
+   시그널 보드 — Layer 2/3
+   ═══════════════════════════════════════ */
+.sig { padding: 24px 20px 16px; }
+
+.sig-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sig-hd h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+}
+.sig-live {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sig-live::before {
+  content: '';
+  width: 5px; height: 5px;
+  background: var(--green);
+  border-radius: 50%;
+}
+
+/* 카운터 */
+.sig-counts {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 20px;
+  padding: 0 4px;
+}
+.sig-cnt {
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+.sig-cnt:hover { opacity: 0.8; }
+.sig-cnt .num {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.sig-cnt .lbl {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t3);
+  margin-top: 4px;
+}
+.sig-cnt.bull .num { color: var(--up); }
+.sig-cnt.bear .num { color: var(--dn); }
+.sig-cnt.neut .num { color: var(--t3); }
+
+/* 시그널 행 */
+.sig-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.sig-row:hover { background: var(--hover); }
+.sig-row + .sig-row {
+  border-top: 1px solid var(--line);
+}
+.sig-row:hover + .sig-row { border-top-color: transparent; }
+.sig-nm {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.sig-nm.bull { color: var(--up); }
+.sig-nm.bear { color: var(--dn); }
+.sig-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--t3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sig-str {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.sig-str i {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  opacity: 0.15;
+}
+.sig-str i.on { opacity: 1; }
+.sig-str.bull i { background: var(--up); }
+.sig-str.bear i { background: var(--dn); }
+
+.sig-more-wrap {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms ease;
+}
+.sig-more-wrap.open { max-height: 500px; }
+
+.sig-toggle {
+  padding: 10px 0 4px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t3);
+  cursor: pointer;
+  transition: color 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.sig-toggle:hover { color: var(--t2); }
+.sig-toggle svg {
+  transition: transform 200ms;
+}
+.sig-toggle.open svg {
+  transform: rotate(180deg);
+}
+
+
+/* ═══════════════════════════════════════
+   탐색 — Layer 3
+   ═══════════════════════════════════════ */
+.explore { padding: 24px 20px 20px; }
+
+.ex-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--bg);
+  padding: 3px;
+  border-radius: 10px;
+}
+.ex-tab {
+  flex: 1;
+  padding: 7px 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t3);
+  border-radius: 8px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.ex-tab.on {
+  background: var(--card);
+  color: var(--t1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ex-tab:hover:not(.on) { color: var(--t2); }
+
+.ex-panel { display: none; }
+.ex-panel.on { display: block; }
+
+/* 급등/급락 */
+.mv-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 0;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.mv-row + .mv-row { border-top: 1px solid var(--line); }
+.mv-row:hover { background: var(--hover); margin: 0 -8px; padding: 11px 8px; border-radius: 8px; }
+.mv-row:hover + .mv-row { border-top-color: transparent; }
+.mv-rk {
+  width: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t4);
+  text-align: center;
+  flex-shrink: 0;
+}
+.mv-nm {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.mv-ch {
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: right;
+}
+.mv-spk { flex-shrink: 0; }
+
+/* AI 토론 */
+.debate-tk {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 16px;
+}
+.debate-box {
+  padding: 16px 18px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.debate-box.buy-box { background: rgba(240,68,82,0.03); }
+.debate-box.sell-box { background: rgba(23,100,237,0.03); }
+.debate-lbl {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.debate-lbl.buy { color: var(--up); }
+.debate-lbl.sell { color: var(--dn); }
+.debate-txt {
+  font-size: 14px;
+  color: var(--t2);
+  line-height: 1.6;
+}
+.debate-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.debate-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(23,100,237,0.10);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.debate-bar-fill {
+  height: 100%;
+  background: var(--up);
+  border-radius: 3px;
+  transition: width 400ms;
+}
+.debate-bar .pct {
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.debate-panel { }
+.debate-panel.on { display: block; }
+
+/* 섹터 그리드 */
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sector-item {
+  padding: 14px;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 150ms;
+  background: var(--bg);
+}
+.sector-item:hover { background: var(--hover); }
+.sector-nm {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.sector-ch {
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.sector-sub {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 3px;
+}
+
+/* 종목 티커 아이콘 */
+.tk-icon {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* 급등/급락 그리드 카드 */
+.mv-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mv-card {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.mv-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+.mv-card.rise { background: rgba(240,68,82,0.02); }
+.mv-card.fall { background: rgba(23,100,237,0.02); }
+.mv-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.mv-card-nm {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.mv-card-pr {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t2);
+}
+.mv-card-mid {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.mv-card-ch {
+  font-size: 14px;
+  font-weight: 700;
+}
+.mv-card-vol {
+  font-size: 11px;
+  color: var(--t4);
+}
+.sector-viewall {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  padding: 0;
+}
+.sector-viewall:hover { opacity: 0.7; }
+
+
+/* ═══════════════════════════════════════
+   우측 패널
+   ═══════════════════════════════════════ */
+.side > .card {
+  position: sticky;
+  top: 70px;
+  max-height: calc(100vh - 86px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 통합 피드 */
+.feed {
+  padding: 18px 20px 14px;
+}
+.feed-hd {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.feed-hd .dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+.fi {
+  display: grid;
+  grid-template-columns: 36px 44px 1fr;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.fi + .fi { border-top: 1px solid var(--line); }
+.fi:hover { background: var(--hover); margin: 0 -8px; padding: 10px 8px; border-radius: 8px; }
+.fi:hover + .fi { border-top-color: transparent; }
+.fi-time {
+  font-size: 11px;
+  color: var(--t4);
+  flex-shrink: 0;
+  min-width: 32px;
+}
+.fi-tag {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.fi-tag.sig { color: var(--up); }
+.fi-tag.wh { color: var(--green); }
+.fi-tag.nw { color: var(--dn); }
+.fi-txt {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 뉴스 */
+.news {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--divider);
+}
+.news-tabs {
+  display: flex;
+  padding: 0 20px;
+}
+.news-tab {
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.news-tab.on {
+  color: var(--t1);
+  border-bottom-color: var(--t1);
+}
+.news-tab:hover:not(.on) { color: var(--t2); }
+
+.news-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 20px;
+}
+.news-panel { display: none; }
+.news-panel.on { display: block; }
+
+.ni {
+  padding: 12px 0;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.ni + .ni { border-top: 1px solid var(--line); }
+.ni:hover { background: var(--hover); margin: 0 -8px; padding: 12px 8px; border-radius: 8px; }
+.ni:hover + .ni { border-top-color: transparent; }
+.ni-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.ni-pri {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.ni-pri.hi { background: rgba(240,68,82,0.06); color: var(--up); }
+.ni-pri.md { background: rgba(255,149,0,0.06); color: var(--amber); }
+.ni-pri.lo { background: var(--hover); color: var(--t3); }
+.ni-time {
+  font-size: 11px;
+  color: var(--t4);
+}
+.ni-hl {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t1);
+  line-height: 1.45;
+}
+.ni-src {
+  font-size: 11px;
+  color: var(--t4);
+  margin-top: 3px;
+}
+
+
+/* ─── 가격 플래시 ─── */
+@keyframes flash-up {
+  0% { background: rgba(240,68,82,0.06); }
+  100% { background: transparent; }
+}
+@keyframes flash-dn {
+  0% { background: rgba(23,100,237,0.06); }
+  100% { background: transparent; }
+}
+
+
+/* ─── 반응형 ─── */
+@media (max-width: 1024px) {
+  .wrap {
+    flex-direction: column;
+    padding: 12px 16px 100px;
+  }
+  .side { width: 100%; display: none; }
+  .tabs { display: none; }
+  .search { max-width: none; }
+  .hdr-in { padding: 0 16px; gap: 12px; }
+
+  .hero-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .hero { margin-bottom: 12px; }
+
+  .indices { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .indices::-webkit-scrollbar { display: none; }
+  .idx { min-width: 140px; flex-shrink: 0; padding: 10px 12px; }
+  .idx-pr { font-size: 14px !important; }
+
+  .cc { padding: 16px; }
+  .why, .sig, .explore { padding: 20px 16px 16px; }
+
+  .wc { width: 190px; min-width: 190px; }
+  .hero-pr { font-size: 22px !important; }
+  .hero-tk { font-size: 18px; }
+
+  /* 관심종목 칩 모드 */
+  .wl-item { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px !important; margin: 0 6px 6px 0 !important; border: 1px solid var(--line) !important; border-radius: 20px !important; white-space: nowrap; }
+  .wl-item + .wl-item { border-top: none !important; }
+  .wl-item:hover { margin: 0 6px 6px 0 !important; }
+  .wl-sub { display: none; }
+  .wl-rt { display: flex; align-items: center; gap: 6px; }
+  .wl-pr { font-size: 13px !important; }
+  .wl-ch { font-size: 11px !important; }
+
+  .mob-nav { display: block !important; }
+}
+
+/* 모바일 하단 네비 */
+.mob-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 6px 0 env(safe-area-inset-bottom, 8px);
+  z-index: 50;
+}
+.mob-nav-in {
+  display: flex;
+  justify-content: space-around;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.mob-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--t4);
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mob-btn.on { color: var(--t1); }
+</style>
+</head>
+<body>
+
+<!-- ═══ 헤더 ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      마켓레이더
+    </div>
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" placeholder="종목명, 티커, 시그널 검색">
+    </div>
+    <span class="live">LIVE</span>
+    <nav class="tabs">
+      <button class="tab on">홈</button>
+      <button class="tab">시그널</button>
+      <button class="tab">탐색</button>
+      <button class="tab">뉴스</button>
+    </nav>
+  </div>
+</header>
+
+<!-- ═══ 메인 ═══ -->
+<div class="wrap">
+  <main class="main">
+
+    <!-- ─── Command Center ─── -->
+    <div class="card cc">
+      <!-- 온도바 -->
+      <div class="temp">
+        <span class="temp-lbl">시장 온도</span>
+        <div class="temp-track">
+          <div class="temp-fill" style="width:63%"></div>
+        </div>
+        <span class="temp-val">강세 63%</span>
+        <span class="temp-fg">탐욕 72</span>
+      </div>
+
+      <!-- 지수 -->
+      <div class="indices">
+        <div class="idx">
+          <div class="idx-body">
+            <div class="idx-nm">KOSPI</div>
+            <div class="idx-pr mono up">2,687.45</div>
+            <div class="idx-ch mono up">+0.82%</div>
+          </div>
+          <div class="idx-spk">
+            <svg width="56" height="28" viewBox="0 0 56 28"><path d="M0,22 L7,20 L14,23 L21,18 L28,16 L35,14 L42,17 L49,9 L56,5" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="idx">
+          <div class="idx-body">
+            <div class="idx-nm">S&P 500</div>
+            <div class="idx-pr mono up">5,243.77</div>
+            <div class="idx-ch mono up">+1.24%</div>
+          </div>
+          <div class="idx-spk">
+            <svg width="56" height="28" viewBox="0 0 56 28"><path d="M0,24 L9,25 L18,19 L27,17 L36,11 L45,13 L54,6" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="idx">
+          <div class="idx-body">
+            <div class="idx-nm">NASDAQ</div>
+            <div class="idx-pr mono up">16,428.82</div>
+            <div class="idx-ch mono up">+1.67%</div>
+          </div>
+          <div class="idx-spk">
+            <svg width="56" height="28" viewBox="0 0 56 28"><path d="M0,25 L9,23 L18,21 L27,15 L36,17 L45,9 L54,4" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="idx">
+          <div class="idx-body">
+            <div class="idx-nm">BTC</div>
+            <div class="idx-pr mono up" style="font-size:14px">₩128,450,000</div>
+            <div class="idx-ch mono up">+2.13%</div>
+          </div>
+          <div class="idx-spk">
+            <svg width="56" height="28" viewBox="0 0 56 28"><path d="M0,20 L7,18 L14,22 L21,15 L28,13 L35,18 L42,10 L49,8 L56,4" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 히어로 시그널 (복수) + 관심종목 -->
+      <div class="hero-row">
+        <div style="display:flex; flex-direction:column; gap:10px; flex:3; min-width:0;">
+          <!-- 히어로 1: 삼성전자 -->
+          <div class="hero">
+            <div class="hero-top">
+              <span class="hero-badge">강세</span>
+              <div class="hero-dots">
+                <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i>
+              </div>
+              <span class="hero-type">외국인 연속매수</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="tk-icon" style="background:#1428A0; width:28px; height:28px; font-size:13px;">삼</span>
+              <div class="hero-tk">삼성전자</div>
+              <span class="hero-pr mono up" style="font-size:22px">82,400</span>
+              <span class="hero-unit">원</span>
+              <span class="hero-ch mono up">+1.2%</span>
+              <svg width="80" height="28" viewBox="0 0 80 28" style="margin-left:auto; flex-shrink:0;"><path d="M0,22 L10,20 L20,23 L30,18 L40,16 L50,14 L60,17 L70,9 L80,5" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="hero-desc">외국인이 5일째 사모으는 중. 최근 3개월 최장 연속 매수 기록.</div>
+          </div>
+          <!-- 히어로 2: SK하이닉스 -->
+          <div class="hero" style="background:rgba(240,68,82,0.02);">
+            <div class="hero-top">
+              <span class="hero-badge">강세</span>
+              <div class="hero-dots">
+                <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i>
+              </div>
+              <span class="hero-type">거래량 폭증</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="tk-icon" style="background:#E31E25; width:28px; height:28px; font-size:10px;">SK</span>
+              <div class="hero-tk">SK하이닉스</div>
+              <span class="hero-pr mono up" style="font-size:22px">185,000</span>
+              <span class="hero-unit">원</span>
+              <span class="hero-ch mono up">+2.8%</span>
+              <svg width="80" height="28" viewBox="0 0 80 28" style="margin-left:auto; flex-shrink:0;"><path d="M0,25 L10,23 L20,20 L30,22 L40,16 L50,14 L60,18 L70,8 L80,4" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="hero-desc">거래량 평소 대비 4.2배. HBM4 양산 앞당겨진다는 뉴스 영향.</div>
+          </div>
+          <!-- 히어로 3: 에코프로 (약세) -->
+          <div class="hero" style="background:rgba(23,100,237,0.03);">
+            <div class="hero-top">
+              <span class="hero-badge" style="color:var(--dn);">약세</span>
+              <div class="hero-dots">
+                <i class="on" style="background:var(--dn);"></i><i class="on" style="background:var(--dn);"></i><i class="on" style="background:var(--dn);"></i><i></i><i></i>
+              </div>
+              <span class="hero-type">심리 괴리</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="tk-icon" style="background:#00A651; width:28px; height:28px; font-size:10px;">EP</span>
+              <div class="hero-tk">에코프로</div>
+              <span class="hero-pr mono dn" style="font-size:22px">67,200</span>
+              <span class="hero-unit">원</span>
+              <span class="hero-ch mono dn">-3.8%</span>
+              <svg width="80" height="28" viewBox="0 0 80 28" style="margin-left:auto; flex-shrink:0;"><path d="M0,6 L10,8 L20,7 L30,12 L40,14 L50,16 L60,13 L70,20 L80,24" fill="none" stroke="var(--dn)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="hero-desc">가격은 내리는데 뉴스는 호재. 괴리가 커지고 있어요.</div>
+          </div>
+        </div>
+
+        <div class="wl">
+          <div class="wl-hd">
+            <h3>관심종목</h3>
+            <span>/ 검색</span>
+          </div>
+          <div style="color:var(--t4); font-size:13px; margin-bottom:10px;">관심종목을 추가해보세요 — 인기 종목을 둘러보세요</div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#F04452; line-height:1.4;">KR</span>
+              <div class="wl-nm">삼성전자</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono up">+1.2%</div>
+                <div class="wl-pr mono">82,400</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#1764ED; line-height:1.4;">US</span>
+              <div class="wl-nm">NVDA</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono up">+3.10%</div>
+                <div class="wl-pr mono">$142.50</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#FF9500; line-height:1.4;">COIN</span>
+              <div class="wl-nm">BTC</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono up">+2.13%</div>
+                <div class="wl-pr mono" style="font-size:13px">₩128,450,000</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#1764ED; line-height:1.4;">US</span>
+              <div class="wl-nm">TSLA</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono dn">-1.42%</div>
+                <div class="wl-pr mono">$178.90</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#F04452; line-height:1.4;">KR</span>
+              <div class="wl-nm">SK하이닉스</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono up">+2.80%</div>
+                <div class="wl-pr mono">185,000</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+          <div class="wl-item">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; background:#FF9500; line-height:1.4;">COIN</span>
+              <div class="wl-nm">ETH</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="wl-rt">
+                <div class="wl-ch mono up">+3.45%</div>
+                <div class="wl-pr mono">₩4,850,000</div>
+              </div>
+              <span class="wl-add-btn" style="font-size:18px; color:var(--t4); cursor:pointer; line-height:1; user-select:none;" onclick="this.textContent=this.textContent==='+'?'✓':'+'; this.style.color=this.textContent==='✓'?'var(--green)':'var(--t4)'">+</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 이벤트 -->
+      <div class="ev">
+        <span class="ev-lbl">일정</span>
+        <div class="ev-scroll">
+          <div class="ev-roller">
+            <div class="ev-roller-item">트럼프, 반도체 관세 90일 유예 발표 — 반도체주 수혜</div>
+            <div class="ev-roller-item">4/9 FOMC 의사록 공개 — 금리 방향 주목</div>
+            <div class="ev-roller-item">4/11 삼성전자 잠정실적 — 영업이익 서프라이즈 전망</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 주목할 종목 ─── -->
+    <div class="card why">
+      <div class="sec-hd">
+        <h2>주목할 종목</h2>
+        <p>지금 시장에서 눈여겨볼 움직임</p>
+      </div>
+      <div class="why-list">
+        <div class="wc">
+          <div class="wc-top">
+            <span class="wc-tag vol">VOL</span>
+            <span class="wc-ch mono up">+2.80%</span>
+          </div>
+          <div class="wc-nm" style="display:flex; align-items:center; gap:6px;"><span class="tk-icon" style="background:#E31E25; width:20px; height:20px; font-size:9px;">SK</span> SK하이닉스</div>
+          <div class="wc-why">거래량 평소 대비 4.2배 폭증. HBM3E 양산 소식에 매수세 집중</div>
+          <div class="wc-pr mono">185,000원</div>
+          <div class="wc-spark">
+            <svg width="184" height="28" viewBox="0 0 184 28"><path d="M0,24 L14,22 L28,25 L42,20 L56,18 L70,16 L84,20 L98,14 L112,12 L126,16 L140,8 L154,10 L168,5 L184,3" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-top">
+            <span class="wc-tag news">NEWS</span>
+            <span class="wc-ch mono up">+3.10%</span>
+          </div>
+          <div class="wc-nm" style="display:flex; align-items:center; gap:6px;"><span class="tk-icon" style="background:#76B900; width:20px; height:20px; font-size:9px;">N</span> NVDA</div>
+          <div class="wc-why">AI 수출규제 완화 행정명령 서명. 중국 시장 재진입 기대감</div>
+          <div class="wc-pr mono">$142.50</div>
+          <div class="wc-spark">
+            <svg width="184" height="28" viewBox="0 0 184 28"><path d="M0,18 L20,20 L40,16 L60,22 L80,18 L100,14 L120,16 L140,8 L160,6 L184,3" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-top">
+            <span class="wc-tag move">MOVE</span>
+            <span class="wc-ch mono up">+5.20%</span>
+          </div>
+          <div class="wc-nm" style="display:flex; align-items:center; gap:6px;"><span class="tk-icon" style="background:#F7931A; width:20px; height:20px; font-size:9px;">&#x20BF;</span> BTC</div>
+          <div class="wc-why">24시간 5.2% 급등, 거래소 유입 증가. ETF 자금 3일 연속 순유입</div>
+          <div class="wc-pr mono">₩128,450,000</div>
+          <div class="wc-spark">
+            <svg width="184" height="28" viewBox="0 0 184 28"><path d="M0,24 L20,22 L40,20 L60,18 L80,22 L100,14 L120,12 L140,10 L160,6 L184,3" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-top">
+            <span class="wc-tag whale">WHALE</span>
+            <span class="wc-ch mono up">+3.45%</span>
+          </div>
+          <div class="wc-nm" style="display:flex; align-items:center; gap:6px;"><span class="tk-icon" style="background:#627EEA; width:20px; height:20px; font-size:9px;">&#x039E;</span> ETH</div>
+          <div class="wc-why">고래 지갑에서 15,000 ETH 거래소 출금. 장기 보유 전환 시그널</div>
+          <div class="wc-pr mono">₩4,850,000</div>
+          <div class="wc-spark">
+            <svg width="184" height="28" viewBox="0 0 184 28"><path d="M0,22 L23,24 L46,18 L69,20 L92,16 L115,12 L138,14 L161,6 L184,4" fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+        <div class="wc">
+          <div class="wc-top">
+            <span class="wc-tag news">NEWS</span>
+            <span class="wc-ch mono dn">-1.82%</span>
+          </div>
+          <div class="wc-nm" style="display:flex; align-items:center; gap:6px;"><span class="tk-icon" style="background:#00A651; width:20px; height:20px; font-size:9px;">EP</span> 에코프로</div>
+          <div class="wc-why">기관 3일 연속 매도. 2차전지 업종 전반 약세 지속</div>
+          <div class="wc-pr mono">98,400원</div>
+          <div class="wc-spark">
+            <svg width="184" height="28" viewBox="0 0 184 28"><path d="M0,6 L23,8 L46,10 L69,8 L92,14 L115,16 L138,14 L161,20 L184,24" fill="none" stroke="var(--dn)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 시그널 보드 ─── -->
+    <div class="card sig">
+      <div class="sig-hd">
+        <h2>시그널 보드</h2>
+        <span class="sig-live">실시간</span>
+      </div>
+
+      <div class="sig-counts">
+        <div class="sig-cnt bull" onclick="filterSig('bull')">
+          <div class="num">8</div>
+          <div class="lbl">강세 시그널</div>
+        </div>
+        <div class="sig-cnt bear" onclick="filterSig('bear')">
+          <div class="num">4</div>
+          <div class="lbl">약세 시그널</div>
+        </div>
+        <div class="sig-cnt neut" onclick="filterSig('all')">
+          <div class="num">2</div>
+          <div class="lbl">중립</div>
+        </div>
+      </div>
+
+      <div id="sig-list">
+        <div class="sig-row" data-t="bull">
+          <span class="tk-icon" style="background:#1428A0; width:22px; height:22px; font-size:10px;">삼</span>
+          <span class="sig-nm bull">삼성전자</span>
+          <span class="sig-desc">외국인 5일 연속 매수</span>
+          <div class="sig-str bull"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bull">
+          <span class="tk-icon" style="background:#E31E25; width:22px; height:22px; font-size:9px;">SK</span>
+          <span class="sig-nm bull">SK하이닉스</span>
+          <span class="sig-desc">거래량 폭증 (4.2배)</span>
+          <div class="sig-str bull"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bull">
+          <span class="tk-icon" style="background:#76B900; width:22px; height:22px; font-size:9px;">N</span>
+          <span class="sig-nm bull">NVDA</span>
+          <span class="sig-desc">교차시장 시그널 (뉴스+거래량)</span>
+          <div class="sig-str bull"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bear">
+          <span class="tk-icon" style="background:#00A651; width:22px; height:22px; font-size:9px;">EP</span>
+          <span class="sig-nm bear">에코프로</span>
+          <span class="sig-desc">심리 괴리 (과열 경고)</span>
+          <div class="sig-str bear"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bear">
+          <span class="tk-icon" style="background:#FEE500; width:22px; height:22px; font-size:9px; color:#000;">카</span>
+          <span class="sig-nm bear">카카오</span>
+          <span class="sig-desc">기관 매도 지속</span>
+          <div class="sig-str bear"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div class="sig-more-wrap" id="sig-more">
+        <div class="sig-row" data-t="bull">
+          <span class="tk-icon" style="background:#6B4C9A; width:22px; height:22px; font-size:9px;">S</span>
+          <span class="sig-nm bull">SOXL</span>
+          <span class="sig-desc">반도체 섹터 동반 상승</span>
+          <div class="sig-str bull"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bull">
+          <span class="tk-icon" style="background:#F7931A; width:22px; height:22px; font-size:9px;">&#x20BF;</span>
+          <span class="sig-nm bull">BTC</span>
+          <span class="sig-desc">고래 지갑 대량 이동</span>
+          <div class="sig-str bull"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bear">
+          <span class="tk-icon" style="background:#CC0000; width:22px; height:22px; font-size:9px;">T</span>
+          <span class="sig-nm bear">TSLA</span>
+          <span class="sig-desc">공매도 비율 상승</span>
+          <div class="sig-str bear"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="sig-row" data-t="bear">
+          <span class="tk-icon" style="background:#0F9D58; width:22px; height:22px; font-size:9px;">LG</span>
+          <span class="sig-nm bear">LG에너지솔루션</span>
+          <span class="sig-desc">실적 하향 컨센서스</span>
+          <div class="sig-str bear"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div class="sig-toggle" id="sig-toggle" onclick="toggleSig()">
+        더보기
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <!-- ─── AI 종목토론 ─── -->
+    <div class="card" style="padding:24px 20px 20px;">
+      <div class="sec-hd" style="margin-bottom:12px;">
+        <h2>AI 종목토론</h2>
+      </div>
+      <!-- 종목 선택 칩 -->
+      <div style="display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap;">
+        <button class="debate-chip on" onclick="switchDebate('samsung',this)" style="display:inline-flex; align-items:center; gap:5px; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:600; border:1px solid var(--line); background:var(--t1); color:#fff; cursor:pointer; font-family:inherit; letter-spacing:inherit; transition:all 150ms;"><span class="tk-icon" style="background:#1428A0; width:18px; height:18px; font-size:9px;">삼</span>삼성전자</button>
+        <button class="debate-chip" onclick="switchDebate('skhynix',this)" style="display:inline-flex; align-items:center; gap:5px; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:600; border:1px solid var(--line); background:none; color:var(--t2); cursor:pointer; font-family:inherit; letter-spacing:inherit; transition:all 150ms;"><span class="tk-icon" style="background:#E31E25; width:18px; height:18px; font-size:8px;">SK</span>SK하이닉스</button>
+        <button class="debate-chip" onclick="switchDebate('nvda',this)" style="display:inline-flex; align-items:center; gap:5px; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:600; border:1px solid var(--line); background:none; color:var(--t2); cursor:pointer; font-family:inherit; letter-spacing:inherit; transition:all 150ms;"><span class="tk-icon" style="background:#76B900; width:18px; height:18px; font-size:9px;">N</span>NVDA</button>
+        <button class="debate-chip" onclick="switchDebate('btc',this)" style="display:inline-flex; align-items:center; gap:5px; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:600; border:1px solid var(--line); background:none; color:var(--t2); cursor:pointer; font-family:inherit; letter-spacing:inherit; transition:all 150ms;"><span class="tk-icon" style="background:#F7931A; width:18px; height:18px; font-size:9px;">&#x20BF;</span>BTC</button>
+      </div>
+      <!-- 토론 내용 영역 -->
+      <div id="debate-content">
+        <div class="debate-panel on" id="debate-samsung">
+          <div class="debate-box buy-box">
+            <div class="debate-lbl buy">살 이유</div>
+            <div class="debate-txt">외국인 5일 연속 순매수 기록 중이며, HBM 수주 파이프라인 확대. 현재 주가는 12개월 선행 PBR 1.1배 수준으로 역사적 저점 구간.</div>
+          </div>
+          <div class="debate-box sell-box">
+            <div class="debate-lbl sell">조심할 이유</div>
+            <div class="debate-txt">반도체 업황 피크아웃 우려 지속. 환율 1,460원대 고착 시 외국인 매수 모멘텀 둔화 가능.</div>
+          </div>
+          <div class="debate-bar">
+            <span class="pct up" style="font-weight:700;font-size:13px">매수 62%</span>
+            <div class="debate-bar-track"><div class="debate-bar-fill" style="width:62%"></div></div>
+            <span class="pct dn" style="font-weight:700;font-size:13px">관망 38%</span>
+          </div>
+        </div>
+        <div class="debate-panel" id="debate-skhynix" style="display:none;">
+          <div class="debate-box buy-box">
+            <div class="debate-lbl buy">살 이유</div>
+            <div class="debate-txt">HBM4 양산 일정 앞당겨지며 AI 서버 수요 독점적 수혜. 삼성 대비 기술 격차 유지 중.</div>
+          </div>
+          <div class="debate-box sell-box">
+            <div class="debate-lbl sell">조심할 이유</div>
+            <div class="debate-txt">밸류에이션 부담. 현재 PER 12개월 선행 기준 역사적 상단에 위치.</div>
+          </div>
+          <div class="debate-bar">
+            <span class="pct up" style="font-weight:700;font-size:13px">매수 58%</span>
+            <div class="debate-bar-track"><div class="debate-bar-fill" style="width:58%"></div></div>
+            <span class="pct dn" style="font-weight:700;font-size:13px">관망 42%</span>
+          </div>
+        </div>
+        <div class="debate-panel" id="debate-nvda" style="display:none;">
+          <div class="debate-box buy-box">
+            <div class="debate-lbl buy">살 이유</div>
+            <div class="debate-txt">AI 인프라 독점적 지위 유지. 수출규제 완화 행정명령으로 중국 시장 재진입 기대감 상승.</div>
+          </div>
+          <div class="debate-box sell-box">
+            <div class="debate-lbl sell">조심할 이유</div>
+            <div class="debate-txt">고평가 논란 지속. AMD, 인텔 등 경쟁사 AI 칩 출시로 점유율 압박 가능성.</div>
+          </div>
+          <div class="debate-bar">
+            <span class="pct up" style="font-weight:700;font-size:13px">매수 71%</span>
+            <div class="debate-bar-track"><div class="debate-bar-fill" style="width:71%"></div></div>
+            <span class="pct dn" style="font-weight:700;font-size:13px">관망 29%</span>
+          </div>
+        </div>
+        <div class="debate-panel" id="debate-btc" style="display:none;">
+          <div class="debate-box buy-box">
+            <div class="debate-lbl buy">살 이유</div>
+            <div class="debate-txt">ETF 순유입 3일째 지속. 반감기 효과로 공급 감소 사이클 진입 중.</div>
+          </div>
+          <div class="debate-box sell-box">
+            <div class="debate-lbl sell">조심할 이유</div>
+            <div class="debate-txt">규제 불확실성 여전. 단기 변동성 확대 구간으로 리스크 관리 필요.</div>
+          </div>
+          <div class="debate-bar">
+            <span class="pct up" style="font-weight:700;font-size:13px">매수 55%</span>
+            <div class="debate-bar-track"><div class="debate-bar-fill" style="width:55%"></div></div>
+            <span class="pct dn" style="font-weight:700;font-size:13px">관망 45%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 탐색 ─── -->
+    <div class="card explore">
+      <div class="sec-hd" style="margin-bottom:0">
+        <h2>탐색</h2>
+      </div>
+      <div class="ex-tabs" style="margin-top:16px">
+        <button class="ex-tab on" onclick="switchEx('movers',this)">급등/급락</button>
+        <button class="ex-tab" onclick="switchEx('sector',this)">섹터</button>
+      </div>
+
+      <!-- 급등/급락 6카드 (3열 x 2행, 카드당 TOP 5) -->
+      <div class="ex-panel on" id="p-movers">
+        <!-- 급등 행 -->
+        <div style="font-size:13px; font-weight:600; color:var(--t3); margin-bottom:10px;">급등</div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px;">
+          <!-- 🇰🇷 국내 급등 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🇰🇷</span><span style="font-size:12px; font-weight:700;">국내</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--up); background:rgba(240,68,82,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#1428A0; width:20px; height:20px; font-size:9px;">삼</span><span style="flex:1; font-size:11px; font-weight:600;">삼성전자</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.20%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#E31E25; width:20px; height:20px; font-size:9px;">SK</span><span style="flex:1; font-size:11px; font-weight:600;">SK하이닉스</span><span class="mono up" style="font-size:11px; font-weight:600;">+2.80%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#003DA5; width:20px; height:20px; font-size:9px;">현</span><span style="flex:1; font-size:11px; font-weight:600;">현대차</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.85%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#FF6600; width:20px; height:20px; font-size:9px;">한</span><span style="flex:1; font-size:11px; font-weight:600;">한화에어로</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.52%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#0066B3; width:20px; height:20px; font-size:9px;">포</span><span style="flex:1; font-size:11px; font-weight:600;">POSCO홀딩스</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.30%</span></div>
+            </div>
+          </div>
+          <!-- 🇺🇸 미장 급등 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🇺🇸</span><span style="font-size:12px; font-weight:700;">미장</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--blue); background:rgba(49,130,246,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#6B4C9A; width:20px; height:20px; font-size:9px;">S</span><span style="flex:1; font-size:11px; font-weight:600;">SOXL</span><span class="mono up" style="font-size:11px; font-weight:600;">+8.42%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#76B900; width:20px; height:20px; font-size:9px;">N</span><span style="flex:1; font-size:11px; font-weight:600;">NVDA</span><span class="mono up" style="font-size:11px; font-weight:600;">+3.10%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#4285F4; width:20px; height:20px; font-size:9px;">G</span><span style="flex:1; font-size:11px; font-weight:600;">GOOGL</span><span class="mono up" style="font-size:11px; font-weight:600;">+2.45%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#0668E1; width:20px; height:20px; font-size:9px;">M</span><span style="flex:1; font-size:11px; font-weight:600;">META</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.87%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#FF9900; width:20px; height:20px; font-size:9px;">A</span><span style="flex:1; font-size:11px; font-weight:600;">AMZN</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.62%</span></div>
+            </div>
+          </div>
+          <!-- 🪙 코인 급등 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🪙</span><span style="font-size:12px; font-weight:700;">코인</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--amber); background:rgba(255,149,0,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#627EEA; width:20px; height:20px; font-size:9px;">Ξ</span><span style="flex:1; font-size:11px; font-weight:600;">ETH</span><span class="mono up" style="font-size:11px; font-weight:600;">+3.45%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#F7931A; width:20px; height:20px; font-size:9px;">₿</span><span style="flex:1; font-size:11px; font-weight:600;">BTC</span><span class="mono up" style="font-size:11px; font-weight:600;">+2.13%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#14F195; width:20px; height:20px; font-size:9px; color:#000;">S</span><span style="flex:1; font-size:11px; font-weight:600;">SOL</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.92%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#2775CA; width:20px; height:20px; font-size:9px;">X</span><span style="flex:1; font-size:11px; font-weight:600;">XRP</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.45%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#F3BA2F; width:20px; height:20px; font-size:9px; color:#000;">B</span><span style="flex:1; font-size:11px; font-weight:600;">BNB</span><span class="mono up" style="font-size:11px; font-weight:600;">+1.18%</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- 급락 행 -->
+        <div style="font-size:13px; font-weight:600; color:var(--t3); margin-bottom:10px;">급락</div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+          <!-- 🇰🇷 국내 급락 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🇰🇷</span><span style="font-size:12px; font-weight:700;">국내</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--dn); background:rgba(23,100,237,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#00A651; width:20px; height:20px; font-size:9px;">EP</span><span style="flex:1; font-size:11px; font-weight:600;">에코프로</span><span class="mono dn" style="font-size:11px; font-weight:600;">-3.80%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#0F9D58; width:20px; height:20px; font-size:9px;">LG</span><span style="flex:1; font-size:11px; font-weight:600;">LG엔솔</span><span class="mono dn" style="font-size:11px; font-weight:600;">-1.15%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#FEE500; width:20px; height:20px; font-size:9px; color:#000;">카</span><span style="flex:1; font-size:11px; font-weight:600;">카카오</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.95%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#1EC800; width:20px; height:20px; font-size:9px;">네</span><span style="flex:1; font-size:11px; font-weight:600;">네이버</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.72%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#003478; width:20px; height:20px; font-size:9px;">셀</span><span style="flex:1; font-size:11px; font-weight:600;">셀트리온</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.58%</span></div>
+            </div>
+          </div>
+          <!-- 🇺🇸 미장 급락 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🇺🇸</span><span style="font-size:12px; font-weight:700;">미장</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--dn); background:rgba(23,100,237,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#CC0000; width:20px; height:20px; font-size:9px;">T</span><span style="flex:1; font-size:11px; font-weight:600;">TSLA</span><span class="mono dn" style="font-size:11px; font-weight:600;">-1.42%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#A2AAAD; width:20px; height:20px; font-size:9px;">A</span><span style="flex:1; font-size:11px; font-weight:600;">AAPL</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.85%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#E50914; width:20px; height:20px; font-size:9px;">N</span><span style="flex:1; font-size:11px; font-weight:600;">NFLX</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.63%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#00ADEF; width:20px; height:20px; font-size:9px;">I</span><span style="flex:1; font-size:11px; font-weight:600;">INTC</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.52%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#5865F2; width:20px; height:20px; font-size:9px;">D</span><span style="flex:1; font-size:11px; font-weight:600;">DIS</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.41%</span></div>
+            </div>
+          </div>
+          <!-- 🪙 코인 급락 -->
+          <div style="background:var(--card); border-radius:14px; border:1px solid var(--line); overflow:hidden;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; align-items:center; gap:4px;"><span style="font-size:12px;">🪙</span><span style="font-size:12px; font-weight:700;">코인</span></div>
+              <span style="font-size:9px; font-weight:700; color:var(--dn); background:rgba(23,100,237,0.08); padding:2px 6px; border-radius:10px;">TOP 5</span>
+            </div>
+            <div style="padding:4px 0;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">1</span><span class="tk-icon" style="background:#26A17B; width:20px; height:20px; font-size:9px;">D</span><span style="flex:1; font-size:11px; font-weight:600;">DOGE</span><span class="mono dn" style="font-size:11px; font-weight:600;">-2.35%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">2</span><span class="tk-icon" style="background:#E6007A; width:20px; height:20px; font-size:9px;">D</span><span style="flex:1; font-size:11px; font-weight:600;">DOT</span><span class="mono dn" style="font-size:11px; font-weight:600;">-1.78%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">3</span><span class="tk-icon" style="background:#2B6DEF; width:20px; height:20px; font-size:9px;">A</span><span style="flex:1; font-size:11px; font-weight:600;">ADA</span><span class="mono dn" style="font-size:11px; font-weight:600;">-1.42%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">4</span><span class="tk-icon" style="background:#C3A634; width:20px; height:20px; font-size:9px;">A</span><span style="flex:1; font-size:11px; font-weight:600;">AVAX</span><span class="mono dn" style="font-size:11px; font-weight:600;">-1.15%</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 12px; cursor:pointer;"><span style="color:var(--t4); font-size:10px; width:12px;" class="mono">5</span><span class="tk-icon" style="background:#3C3C3D; width:20px; height:20px; font-size:9px;">L</span><span style="flex:1; font-size:11px; font-weight:600;">LINK</span><span class="mono dn" style="font-size:11px; font-weight:600;">-0.88%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 섹터 -->
+      <div class="ex-panel" id="p-sector">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:15px; font-weight:700; color:var(--t1);">섹터 자금 흐름</span>
+            <span style="font-size:12px; font-weight:600; color:var(--t3);">HOT · COLD</span>
+          </div>
+          <span style="font-size:13px; font-weight:600; color:var(--blue); cursor:pointer;">섹터 탭에서 상세 &rarr;</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <!-- HOT -->
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--up); margin-bottom:10px;">HOT</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(240,68,82,0.06); font-size:12px; font-weight:600; color:var(--up);">항공/방산 +2.0%</span>
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(240,68,82,0.06); font-size:12px; font-weight:600; color:var(--up);">여행 +1.6%</span>
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(240,68,82,0.06); font-size:12px; font-weight:600; color:var(--up);">반도체 +1.3%</span>
+            </div>
+          </div>
+          <!-- COLD -->
+          <div>
+            <div style="font-size:12px; font-weight:700; color:var(--dn); margin-bottom:10px;">COLD</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(23,100,237,0.06); font-size:12px; font-weight:600; color:var(--dn);">전기차 -3.1%</span>
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(23,100,237,0.06); font-size:12px; font-weight:600; color:var(--dn);">바이오 -2.5%</span>
+              <span style="display:inline-block; padding:6px 14px; border-radius:20px; background:rgba(23,100,237,0.06); font-size:12px; font-weight:600; color:var(--dn);">2차전지 -1.8%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ─── 우측 패널 ─── -->
+  <aside class="side">
+    <div class="card">
+      <!-- 실시간 피드 (시그널+고래, 최신 2건만) -->
+      <div class="feed" style="padding-bottom:8px;">
+        <div class="feed-hd">
+          <span class="dot"></span>
+          실시간
+        </div>
+        <div class="fi">
+          <span class="fi-time mono">14:32</span>
+          <span class="fi-tag sig">시그널</span>
+          <span class="fi-txt">삼성전자 외국인 5일 연속 순매수</span>
+        </div>
+        <div class="fi">
+          <span class="fi-time mono">14:28</span>
+          <span class="fi-tag wh">고래</span>
+          <span class="fi-txt">BTC 2,100개 거래소 이동 감지</span>
+        </div>
+      </div>
+
+      <!-- 뉴스 -->
+      <div class="news">
+        <div class="news-tabs">
+          <button class="news-tab on" onclick="switchNews('breaking',this)">속보</button>
+          <button class="news-tab" onclick="switchNews('kr',this)">국내</button>
+          <button class="news-tab" onclick="switchNews('us',this)">해외</button>
+          <button class="news-tab" onclick="switchNews('coin',this)">코인</button>
+        </div>
+        <div class="news-body">
+          <div class="news-panel on" id="n-breaking">
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri hi">긴급</span>
+                <span class="ni-time">14:30</span>
+              </div>
+              <div class="ni-hl">트럼프, 반도체 관세 90일 유예 행정명령 서명</div>
+              <div class="ni-src">Reuters</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri hi">긴급</span>
+                <span class="ni-time">14:12</span>
+              </div>
+              <div class="ni-hl">삼성전자 1분기 잠정실적 — 영업이익 6.7조원 (컨센서스 상회)</div>
+              <div class="ni-src">삼성전자 공시</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri md">주요</span>
+                <span class="ni-time">13:45</span>
+              </div>
+              <div class="ni-hl">연준 위원 "6월 금리인하 가능성 열려있다" 발언</div>
+              <div class="ni-src">Bloomberg</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri lo">일반</span>
+                <span class="ni-time">13:20</span>
+              </div>
+              <div class="ni-hl">한국은행 금통위 의사록 — "추가 인하 여지 제한적"</div>
+              <div class="ni-src">한국은행</div>
+            </div>
+          </div>
+          <div class="news-panel" id="n-kr">
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri hi">긴급</span>
+                <span class="ni-time">14:05</span>
+              </div>
+              <div class="ni-hl">SK하이닉스, HBM3E 양산 본격화 — 하반기 매출 30% 증가 전망</div>
+              <div class="ni-src">한국경제</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri md">주요</span>
+                <span class="ni-time">13:30</span>
+              </div>
+              <div class="ni-hl">현대차, 미국 조지아 공장 EV 라인 증설 발표</div>
+              <div class="ni-src">매일경제</div>
+            </div>
+          </div>
+          <div class="news-panel" id="n-us">
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri hi">긴급</span>
+                <span class="ni-time">13:50</span>
+              </div>
+              <div class="ni-hl">NVIDIA, AI 수출규제 완화로 중국 시장 재진입 기대감</div>
+              <div class="ni-src">CNBC</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri md">주요</span>
+                <span class="ni-time">13:15</span>
+              </div>
+              <div class="ni-hl">Apple, 자체 5G 모뎀 탑재 iPhone SE 4 출시 확정</div>
+              <div class="ni-src">Bloomberg</div>
+            </div>
+          </div>
+          <div class="news-panel" id="n-coin">
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri hi">긴급</span>
+                <span class="ni-time">14:00</span>
+              </div>
+              <div class="ni-hl">미국 비트코인 현물 ETF 순유입 3일 연속 — 총 $420M 유입</div>
+              <div class="ni-src">CoinDesk</div>
+            </div>
+            <div class="ni">
+              <div class="ni-top">
+                <span class="ni-pri md">주요</span>
+                <span class="ni-time">13:40</span>
+              </div>
+              <div class="ni-hl">Ripple, SEC 합의 최종안 제출 — XRP 7% 급등</div>
+              <div class="ni-src">The Block</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- 모바일 하단 네비 -->
+<div class="mob-nav">
+  <div class="mob-nav-in">
+    <button class="mob-btn on">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      홈
+    </button>
+    <button class="mob-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M2 12h20"/><path d="M12 2a10 10 0 0 1 0 20"/><path d="M12 2a10 10 0 0 0 0 20"/></svg>
+      시그널
+    </button>
+    <button class="mob-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      탐색
+    </button>
+    <button class="mob-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/></svg>
+      뉴스
+    </button>
+    <button class="mob-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      마이
+    </button>
+  </div>
+</div>
+
+<script>
+/* 시그널 보드 접기/펼치기 */
+function toggleSig() {
+  const wrap = document.getElementById('sig-more');
+  const btn = document.getElementById('sig-toggle');
+  const isOpen = wrap.classList.toggle('open');
+  btn.classList.toggle('open', isOpen);
+  btn.childNodes[0].textContent = isOpen ? '접기 ' : '더보기 ';
+}
+
+/* 시그널 필터 */
+function filterSig(type) {
+  document.querySelectorAll('.sig-row').forEach(r => {
+    r.style.display = (type === 'all' || r.dataset.t === type) ? '' : 'none';
+  });
+}
+
+/* 탐색 탭 전환 */
+function switchEx(id, btn) {
+  document.querySelectorAll('.ex-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.ex-panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('p-' + id).classList.add('on');
+}
+
+/* 뉴스 탭 전환 */
+function switchNews(id, btn) {
+  document.querySelectorAll('.news-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.news-panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('n-' + id).classList.add('on');
+}
+
+/* AI 종목토론 칩 전환 */
+function switchDebate(id, btn) {
+  document.querySelectorAll('.debate-chip').forEach(c => {
+    c.classList.remove('on');
+    c.style.background = 'none';
+    c.style.color = 'var(--t2)';
+  });
+  document.querySelectorAll('.debate-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('on');
+  btn.style.background = 'var(--t1)';
+  btn.style.color = '#fff';
+  document.getElementById('debate-' + id).style.display = 'block';
+}
+</script>
+</body>
+</html>
