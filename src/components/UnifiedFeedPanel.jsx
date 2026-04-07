@@ -1,4 +1,4 @@
-// 통합 피드 패널 — 시그널+뉴스 시간순 인터리빙
+// 통합 피드 패널 — 상단 시그널(최신 5건) + 하단 뉴스 탭(별도 스크롤)
 // BreakingNewsPanel 교체용 데스크톱 우측 패널
 import { useState, useMemo } from 'react';
 import { useNewsAutoRefetch, useCategoryNewsQuery } from '../hooks/useNewsQuery';

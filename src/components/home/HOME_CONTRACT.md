@@ -102,7 +102,7 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | 파일 | 역할 | 핵심 데이터 |
 |------|------|-----------|
 | `UnifiedFeedPanel.jsx` | 데스크톱 우측 통합 피드 (시그널+뉴스) | `useSignals`, `useNewsAutoRefetch` |
-| `BreakingNewsPanel.jsx` | 모바일 뉴스 탭 전용 (기존 패널) | `useNewsAutoRefetch`, `whaleBus` |
+| `BreakingNewsPanel.jsx` | 모바일 뉴스 탭 전용 (기존 패널) | `useNewsAutoRefetch` |
 
 ### 섹션 (src/components/home/)
 
