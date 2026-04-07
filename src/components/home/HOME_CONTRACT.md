@@ -5,37 +5,63 @@
 
 ---
 
-## 현재 활성 렌더 구조 (2026-04-06 기준 — Phase 8B 재설계)
+## 현재 활성 렌더 구조 (2026-04-07 기준 — Phase 4+5+6 개편)
 
 > **핵심 원칙**: 시그널 중심. "데이터 대시보드"가 아니라 "시그널 인텔리전스".
 > **언어 원칙**: 전문용어 배제, 쉽고 위트있는 우리만의 언어.
 
-`src/components/home/index.jsx`의 `HomeDashboard` 렌더 순서:
+### 홈 대시보드 (`src/components/home/index.jsx`)
 
 ```
-1. MarketPulseWidget       — 시장 지수 + 환율
-2. MarketSentimentWidget   — 시장 심리 (온도계+공포탐욕 통합, "지금 시장 분위기" 한 줄 해석)
-3. NotableMoversSection    — 주목할 종목 (WHY 카드) ← Phase 8B에서 복원
-4. SignalSummaryWidget     — 투자 시그널 (강세/약세 2열 분리, easyLabel 적용)
-5. SeoulForceSection       — 세력 포착 (index.jsx 인라인 정의)
-6. WatchlistWidget         — 관심종목 (v2 크기, 컴팩트) ← 6번으로 하강
-7. AiDebateSection         — AI 종목토론 ("살 이유 vs 조심할 이유" 2줄 요약)
-8. TopMoversWidget         — 급등/급락 (KR/US/COIN 탭)
-9. NewsFeedWidget          — 투자 뉴스
-10. EventTicker            — 경제 이벤트 (원래 위치)
+1. CommandCenterWidget     — 커맨드 센터 (온도바+지수+히어로시그널+관심종목+이벤트 통합)
+   ├── TemperatureBar      — 시장 온도 인라인 바 + 공포탐욕 점수 + 지수 미니카드
+   ├── HeroSignalCard      — 최강 시그널 TOP3 카드 (md:grid-cols-[1fr_260px])
+   ├── WatchlistMini       — 관심종목 (마켓 배지 KR/US/COIN + 추가 버튼 + 검색 링크)
+   └── EventStrip          — EventTicker 세로 롤링 (translateY, 3아이템, 9초 순환)
+2. NotableMoversSection    — 주목할 종목 (WHY 카드)
+3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분)
+4. AiDebateSection         — AI 종목토론 (별도 섹션, 4종목 칩 선택)
+5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터)
+   ├── TopMoversWidget     — 급등/급락 탭 (KR/US/COIN 서브탭)
+   └── SectorMiniContent   — 섹터 탭 (HOT/COLD pill 칩 + drill-down)
+6. NewsFeedWidget          — 투자 뉴스 (lg:hidden — 모바일 전용, 데스크톱은 우측 패널)
 ```
 
-### Phase 8B에서 홈에서 비표시인 컴포넌트
+### 우측 패널 (`src/App.jsx` — 데스크톱 전용)
+
+```
+UnifiedFeedPanel           — 통합 실시간 피드 (BreakingNewsPanel 교체)
+├── FeedHeader             — "실시간" + LIVE dot
+├── 인터리빙 피드           — 시그널+고래 timestamp 기준 정렬 (최대 5건)
+│   ├── 시그널 항목         — 빨강 태그
+│   └── 고래 항목           — 초록 태그
+├── 뉴스 탭 헤더            — 속보/국내/해외/코인
+└── 뉴스 목록               — 파랑 태그, 클러스터링 적용
+```
+
+### 모바일 뉴스 탭 (`activeTab === 'news'`)
+
+```
+BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden)
+```
+
+### 커맨드 센터 개편으로 홈에서 비표시인 컴포넌트
 
 | 컴포넌트 | 비표시 이유 |
 |---------|---------|
+| MarketPulseWidget (독립) | CommandCenterWidget의 TemperatureBar에 통합됨 |
+| MarketSentimentWidget (독립) | CommandCenterWidget의 TemperatureBar에 통합됨 |
+| WatchlistWidget (독립) | CommandCenterWidget의 WatchlistMini에 통합됨 |
+| EventTicker (독립) | CommandCenterWidget의 EventStrip에 래핑됨 |
 | MorningBriefing | "5분 안에 파악" 목표와 충돌 — 시그널 푸시로 전환 예정 |
-| FearGreedWidget (독립) | MarketSentimentWidget에 서브로 통합됨 |
-| MarketTemperatureWidget (독립) | MarketSentimentWidget으로 교체됨 |
+| FearGreedWidget (독립) | CommandCenterWidget에 인라인 통합됨 |
+| MarketTemperatureWidget (독립) | CommandCenterWidget에 통합됨 |
 | DerivativesWidget | 전문 트레이더 전용. 고급 설정 토글로 이동 예정 |
 | MarketTimeline | EventTicker 롤링으로 충분 |
 | MarketInvestorSection | SeoulForceSection과 데이터 중복 (외국인/기관 수급) |
-| SectorMiniWidget | 섹터 탭으로 이동 |
+| SectorMiniWidget (독립) | ExploreTabsWidget의 SectorMiniContent로 통합됨 |
+| SignalSummaryWidget (독립) | SignalBoardWidget에 통합됨 |
+| SeoulForceSection (인라인) | SignalBoardWidget에 통합됨 |
 
 ---
 
@@ -61,15 +87,24 @@
 
 | 파일 | 역할 | 핵심 데이터 |
 |------|------|-----------|
-| `MarketPulseWidget.jsx` | 지수 + 환율 컴팩트 뷰 | `indices`, `krwRate` |
+| `CommandCenterWidget.jsx` | 커맨드 센터 통합 (지수+온도+시그널+관심종목+이벤트) | `indices`, `krwRate`, `allItems`, `watchedItems`, `popularItems` |
+| `MarketPulseWidget.jsx` | 지수 + 환율 컴팩트 뷰 (CommandCenter에 통합) | `indices`, `krwRate` |
 | `WatchlistWidget.jsx` | 관심종목 실시간 리스트 | `krStocks`, `usStocks`, `coins` |
 | `TopMoversWidget.jsx` | 급등/급락 랭킹 (HotListSection 래퍼) | `krStocks`, `usStocks`, `coins` |
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
-| `SignalSummaryWidget.jsx` | 투자 시그널 (스코어 + TOP 카드 + 칩) | `useTopSignals` |
+| `SignalSummaryWidget.jsx` | (비활성) 투자 시그널 — SignalBoardWidget에 통합됨 | `useTopSignals` |
+| `SignalBoardWidget.jsx` | 시그널 보드 (카운터 + 세력 포착 + 시그널 리스트 통합) | `useTopSignals` |
 | `MarketSentimentWidget.jsx` | 통합 시장 심리 (온도계 + 공포탐욕) | `useSignals`, `useFearGreed`, `allItems` |
 | `MarketTemperatureWidget.jsx` | (비활성) 마켓 온도계 단독 — MarketSentimentWidget에 통합됨 | `useSignals` |
 | `DerivativesWidget.jsx` | 파생 시그널 | 파생/소셜 데이터 |
+
+### 우측 패널 (src/components/)
+
+| 파일 | 역할 | 핵심 데이터 |
+|------|------|-----------|
+| `UnifiedFeedPanel.jsx` | 데스크톱 우측 통합 피드 (시그널+뉴스+고래 인터리빙) | `useSignals`, `useNewsAutoRefetch`, `whaleBus` |
+| `BreakingNewsPanel.jsx` | 모바일 뉴스 탭 전용 (기존 패널) | `useNewsAutoRefetch`, `whaleBus` |
 
 ### 섹션 (src/components/home/)
 
@@ -80,8 +115,11 @@
 | `MarketInvestorSection.jsx` | 외국인/기관 수급 | ✅ 활성 |
 | `HotListSection.jsx` | HotList UI (TopMoversWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
 | `MarketIndexSection.jsx` | 지수 UI (MarketPulseWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
-| `AiDebateSection.jsx` | AI 종목토론 (채팅 버블 UI, Bull vs Bear 3라운드) | ✅ 활성 |
-| `SeoulForceSection` | 세력 포착 (index.jsx 인라인, 외국인·기관 연속 매수매도) | ✅ 활성 |
+| `AiDebateSection.jsx` | AI 종목토론 (4종목 칩 선택, 살 이유 vs 조심할 이유) | ✅ 활성 (독립 섹션) |
+| `SeoulForceSection` | (비활성) 세력 포착 — SignalBoardWidget에 통합됨 | ❌ 비활성 |
+| `ExploreTabsWidget.jsx` | 탐색 탭 (급등/급락 + AI 토론 + 섹터 통합) | ✅ 활성 |
+| `SectorMiniContent.jsx` | 섹터 미니 (HOT/COLD 칩 + drill-down) | ✅ 활성 (ExploreTabsWidget 내부) |
+| `SignalBoardWidget.jsx` | 시그널 보드 (카운터 + 세력 포착 + 시그널 리스트) | ✅ 활성 |
 
 ---
 

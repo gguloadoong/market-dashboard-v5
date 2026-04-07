@@ -2,16 +2,7 @@
 // Phase 8B: "우리만의 언어"로 사용자가 한눈에 판단할 수 있는 구조
 import { useState, useCallback, useMemo } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
-import { TYPE_META as ENGINE_META } from '../../engine/signalTypes';
-
-function extractName(signal) {
-  return signal.name || signal.symbol || signal.sector || signal.label || ENGINE_META[signal.type]?.easyLabel || signal.type || '';
-}
-
-// 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
-function getEasyLabel(signal) {
-  return ENGINE_META[signal.type]?.easyLabel || signal.type;
-}
+import { extractName, getEasyLabel } from '../../utils/signalLabel';
 
 export default function SignalSummaryWidget({ onItemClick }) {
   const [expanded, setExpanded] = useState(false);

@@ -1,7 +1,10 @@
-// AI 종목토론 섹션 — "살 이유 vs 조심할 이유" 2줄 요약 + 확신도 바
+// AI 종목토론 섹션 — "살 이유 vs 조심할 이유" 2줄 요약 + 확신도 바 + 아코디언 근거
 // Phase 8B 개편: 3라운드 채팅 → 핵심 판단 중심 컴팩트 UI
-import { useState, useCallback } from 'react';
+// D안: 아코디언 확장형 — 근거 보기 펼침
+import { useState, useCallback, useMemo } from 'react';
 import { fetchAiDebate } from '../../api/_gateway';
+import { useTopSignals } from '../../hooks/useSignals';
+import TickerLogo from './TickerLogo';
 
 // sessionStorage 캐시 (30분)
 const CACHE_TTL = 30 * 60 * 1000;
@@ -20,12 +23,11 @@ function setCached(symbol, data) {
   } catch {}
 }
 
-// 인기 종목 기본 목록
+// 기본 4종목 칩 (목업 기준)
 const DEFAULT_SYMBOLS = [
+  { symbol: '005930', name: '삼성전자', market: 'kr' },
+  { symbol: '000660', name: 'SK하이닉스', market: 'kr' },
   { symbol: 'NVDA', name: 'NVIDIA', market: 'us' },
-  { symbol: 'AAPL', name: 'Apple', market: 'us' },
-  { symbol: 'TSLA', name: 'Tesla', market: 'us' },
-  { symbol: 'MSFT', name: 'Microsoft', market: 'us' },
   { symbol: 'BTC', name: 'Bitcoin', market: 'crypto' },
 ];
 
@@ -43,7 +45,7 @@ function extractSummary(result) {
   };
 }
 
-export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
+export default function AiDebateSection({ watchedItems = [], usStocks = [], krStocks = [], allItems = [] }) {
   const [selected, setSelected] = useState(DEFAULT_SYMBOLS[0]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -98,30 +100,51 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
 
   // 자동 로드 제거 — 사용자가 종목 선택 시에만 토론 시작
 
+  // 아코디언 근거 보기 상태
+  const [showEvidence, setShowEvidence] = useState(false);
+
+  // 선택된 종목의 관련 시그널 (useTopSignals에서 필터)
+  const topSignals = useTopSignals(20);
+  const relatedSignals = useMemo(() => {
+    if (!selected) return [];
+    return topSignals.filter(s => s.symbol === selected.symbol).slice(0, 3);
+  }, [topSignals, selected]);
+
   const summary = extractSummary(result);
   const confPct = Math.round((summary?.confidence ?? 0.5) * 100);
   const confLabel = confPct >= 60 ? '매수 우세' : confPct <= 40 ? '매도 우세' : '팽팽';
 
   return (
-    <div className="bg-white rounded-xl border border-[#ECEEF1] p-4">
+    <div className="bg-white rounded-2xl p-5">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold text-[#191F28]">{selected?.name} 사도 될까?</span>
-          <span className="text-[11px] text-[#8B95A1]">AI 분석</span>
-        </div>
-        <select
-          value={selected?.symbol || ''}
-          onChange={e => {
-            const item = symbolList.find(s => s.symbol === e.target.value);
-            if (item) { setSelected(item); setResult(null); runDebate(item); }
-          }}
-          className="text-[11px] border border-[#E5E8EB] rounded-lg px-2 py-1 text-[#191F28] bg-white"
-        >
-          {symbolList.map(s => (
-            <option key={s.symbol} value={s.symbol}>{s.name} ({s.symbol})</option>
-          ))}
-        </select>
+      <div className="mb-3">
+        <h2 className="text-[19px] font-bold text-[#191F28] tracking-tight">AI 종목토론</h2>
+      </div>
+
+      {/* 종목 선택 칩 (TickerLogo 포함) */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {symbolList.map(s => {
+          // allItems에서 매칭하여 로고 표시용 item 구성
+          const logoItem = allItems.find(i => i.symbol === s.symbol || i.id === s.symbol) || { symbol: s.symbol, name: s.name, _market: s.market === 'kr' ? 'KR' : s.market === 'us' ? 'US' : s.market === 'crypto' ? 'COIN' : '' };
+          return (
+            <button
+              key={s.symbol}
+              onClick={() => {
+                setSelected(s);
+                setResult(null);
+                runDebate(s);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-all ${
+                selected?.symbol === s.symbol
+                  ? 'bg-[#191F28] text-white border-[#191F28]'
+                  : 'bg-white text-[#4E5968] border-[#F2F3F5] hover:border-[#B0B8C1]'
+              }`}
+            >
+              <TickerLogo item={logoItem} size={18} />
+              {s.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* 로딩 / 에러 / 시작 전 */}
@@ -145,50 +168,74 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [] }) {
         </div>
       )}
 
-      {/* 2줄 요약 (기본 상태) */}
+      {/* 살 이유 / 조심할 이유 + 아코디언 근거 보기 */}
       {summary && !error && (
-        <div className="space-y-3">
-          {/* 살 이유 / 조심할 이유 */}
-          <div className="space-y-2">
-            <div className="flex items-start gap-2 bg-[#FFF0F1] rounded-lg px-3 py-2.5">
-              <span className="text-[12px] flex-shrink-0 mt-0.5">🔴</span>
-              <div>
-                <span className="text-[11px] font-bold text-[#F04452]">살 이유</span>
-                <p className="text-[12px] text-[#191F28] mt-0.5 leading-relaxed">{summary.bull || '분석 중...'}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2 bg-[#EDF4FF] rounded-lg px-3 py-2.5">
-              <span className="text-[12px] flex-shrink-0 mt-0.5">🔵</span>
-              <div>
-                <span className="text-[11px] font-bold text-[#1764ED]">조심할 이유</span>
-                <p className="text-[12px] text-[#191F28] mt-0.5 leading-relaxed">{summary.bear || '분석 중...'}</p>
-              </div>
-            </div>
+        <div className="space-y-2.5">
+          <div className="rounded-xl px-[18px] py-4" style={{ background: 'rgba(240,68,82,0.03)' }}>
+            <div className="text-[13px] font-bold text-[#F04452] mb-2">살 이유</div>
+            <div className="text-[14px] text-[#4E5968] leading-relaxed">{summary.bull || '분석 중...'}</div>
+          </div>
+          <div className="rounded-xl px-[18px] py-4" style={{ background: 'rgba(23,100,237,0.03)' }}>
+            <div className="text-[13px] font-bold text-[#1764ED] mb-2">조심할 이유</div>
+            <div className="text-[14px] text-[#4E5968] leading-relaxed">{summary.bear || '분석 중...'}</div>
           </div>
 
+          {/* 근거 보기 아코디언 */}
+          {relatedSignals.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowEvidence(v => !v)}
+                className="flex items-center gap-1 text-[12px] font-semibold text-[#8B95A1] hover:text-[#4E5968] transition-colors py-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                  className={`transition-transform duration-200 ${showEvidence ? 'rotate-180' : ''}`}>
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+                근거 보기
+              </button>
+              {showEvidence && (
+                <div className="mt-1.5 rounded-lg bg-[#F7F8FA] px-3 py-2.5 space-y-2">
+                  <div className="text-[11px] font-bold text-[#4E5968] mb-1">관련 시그널</div>
+                  {relatedSignals.map((sig, i) => {
+                    const isBull = sig.direction === 'bullish';
+                    return (
+                      <div key={sig.id || `ev-${i}`} className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: isBull ? '#FFF0F1' : '#EDF4FF', color: isBull ? '#F04452' : '#1764ED' }}>
+                          {isBull ? '강세' : '약세'}
+                        </span>
+                        <span className="text-[12px] text-[#191F28] font-medium truncate flex-1">{sig.name || sig.symbol}</span>
+                        <div className="flex gap-[2px] flex-shrink-0">
+                          {Array.from({ length: 5 }).map((_, j) => (
+                            <i key={j} className="block w-[4px] h-[4px] rounded-full" style={{ background: isBull ? '#F04452' : '#1764ED', opacity: j < (sig.strength || 0) ? 1 : 0.15 }} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 확신도 바 */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-[#1764ED] w-6">매도</span>
-            <div className="flex-1 h-2 bg-[#F2F4F6] rounded-full overflow-hidden relative">
+          <div className="flex items-center gap-2.5 mt-3.5">
+            <span className="text-[13px] font-bold tabular-nums" style={{ color: '#F04452' }}>
+              매수 {confPct}%
+            </span>
+            <div className="flex-1 h-1.5 rounded-[3px] overflow-hidden" style={{ background: 'rgba(23,100,237,0.10)' }}>
               <div
-                className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${confPct}%`,
-                  background: confPct >= 60 ? '#F04452' : confPct <= 40 ? '#1764ED' : '#FF9500',
-                }}
+                className="h-full rounded-[3px] transition-all duration-400"
+                style={{ width: `${confPct}%`, background: '#F04452' }}
               />
             </div>
-            <span className="text-[10px] text-[#F04452] w-6 text-right">매수</span>
-            <span className="text-[11px] font-bold ml-1 tabular-nums" style={{
-              color: confPct >= 60 ? '#F04452' : confPct <= 40 ? '#1764ED' : '#FF9500',
-            }}>
-              {confPct}% {confLabel}
+            <span className="text-[13px] font-bold tabular-nums" style={{ color: '#1764ED' }}>
+              관망 {100 - confPct}%
             </span>
           </div>
 
           {/* AI 종합 의견 */}
           {summary.verdict && (
-            <div className="bg-[#F7F8FA] rounded-lg p-2.5">
+            <div className="bg-[#F7F8FA] rounded-lg p-2.5 mt-1">
               <span className="text-[10px] text-[#8B95A1]">AI 종합: </span>
               <span className="text-[11px] text-[#191F28] font-medium">{summary.verdict}</span>
             </div>
