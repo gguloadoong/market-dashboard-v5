@@ -1,7 +1,13 @@
 // SVG 스파크라인 컴포넌트
-import React from 'react';
+import React, { useRef } from 'react';
+
+// 모듈 스코프 카운터 — 인스턴스별 고유 ID (콜론 없음, SVG url() 안전)
+let _sparkId = 0;
 
 function Sparkline({ data = [], width = 80, height = 32, positive }) {
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = `sp${++_sparkId}`;
+  const uid = idRef.current;
   if (!data || data.length < 2) {
     return <svg width={width} height={height} />;
   }
@@ -31,12 +37,12 @@ function Sparkline({ data = [], width = 80, height = 32, positive }) {
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
       <defs>
-        <linearGradient id={`grad-${color.slice(1)}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`grad-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.15" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={areaPath} fill={`url(#grad-${color.slice(1)})`} />
+      <path d={areaPath} fill={`url(#grad-${uid})`} />
       <polyline
         points={polyline}
         fill="none"
