@@ -148,14 +148,14 @@ const HANTOO_NAME_MAP = {
   '069500': 'KODEX 200',
 };
 
-// 이전 snap:kr 스냅샷에서 symbol 목록 추출 (시총 상위 200종목, 없으면 HANTOO_NAME_MAP fallback)
+// 이전 snap:kr 스냅샷에서 symbol 목록 추출 (시총 상위 100종목, 없으면 HANTOO_NAME_MAP fallback)
 async function getPrevSnapSymbols() {
   try {
     const prev = await getSnap(SNAP_KEYS.KR);
     if (Array.isArray(prev) && prev.length > 0) {
-      // 시총 내림차순 정렬 후 상위 200종목 추출 (타임아웃 방지)
+      // 시총 내림차순 정렬 후 상위 100종목 추출 (타임아웃 방지)
       const sorted = [...prev].sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
-      return sorted.slice(0, 200).map((s) => s.symbol);
+      return sorted.slice(0, 100).map((s) => s.symbol);
     }
   } catch (e) {
     console.warn('[update-kr] 이전 스냅샷 조회 실패, HANTOO_NAME_MAP fallback:', e.message);
