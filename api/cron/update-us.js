@@ -7,7 +7,7 @@ import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure, redis } from '../_pric
 // ── 심볼 소스: NASDAQ API 동적 + 하드코딩 fallback ──
 const SHARD_SIZE = 250;    // 샤드당 종목 수
 const CONCURRENCY = 30;    // Yahoo v8 동시 요청 수
-const SHARD_TTL = 600;     // 샤드 TTL 10분 (크론 8분 주기 × 1.25)
+const SHARD_TTL = 900;     // 샤드 TTL 15분 (크론 8분 주기 × 1.9, 장애 버퍼)
 const SYMBOL_LIST_TTL = 86400; // 종목 리스트 24시간 캐시
 const SYMBOL_LIST_KEY = 'us:symbols'; // Redis 키
 const SHARD_CURSOR_KEY = 'us:cron:shard'; // 현재 샤드 인덱스
@@ -213,10 +213,21 @@ export default async function handler(request) {
 
     const items = [...firstResults, ...retryResults];
 
-    // 6. 샤드별 Redis 저장
+    // 6. 샤드별 Redis 저장 + 레거시 키 병합 갱신
     if (items.length > 0) {
       const shardKey = `snap:us:${shard}`;
       await setSnap(shardKey, items, SHARD_TTL);
+
+      // 레거시 snap:us도 병합 갱신 (fallback 보장)
+      try {
+        const existing = await redis?.get(SNAP_KEYS.US);
+        const merged = new Map();
+        if (Array.isArray(existing)) {
+          for (const it of existing) merged.set(it.symbol, it);
+        }
+        for (const it of items) merged.set(it.symbol, it);
+        await setSnap(SNAP_KEYS.US, [...merged.values()], SHARD_TTL);
+      } catch (_) { /* 레거시 병합 실패해도 샤드 키는 이미 저장됨 */ }
     }
 
     // 7. 커서 + 샤드 수 저장 (읽기 측에서 동적 참조)
