@@ -97,7 +97,19 @@ export default function HomeDashboard({
     const full = allItems.find(i =>
       i.symbol?.toLowerCase() === sym || i.id?.toLowerCase() === sym,
     );
-    onItemClick(full || { ...sigItem, _market });
+    if (full) {
+      onItemClick(full);
+    } else {
+      // fallback: 코인은 id/market 정규화 필수 (fetchCandles, isCoinItem 호환)
+      const isCoin = _market === 'COIN';
+      onItemClick({
+        ...sigItem,
+        _market,
+        market: isCoin ? 'coin' : (sigItem.market || _market.toLowerCase()),
+        // 코인 id가 없으면 symbol 소문자로 대체 (CoinGecko fallback용)
+        id: isCoin ? (sigItem.id || sym) : sigItem.id,
+      });
+    }
   }, [allItems, onItemClick]);
 
   // ─── Pull-to-refresh ──────────────────────────────────────

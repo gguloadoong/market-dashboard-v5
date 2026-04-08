@@ -53,7 +53,9 @@ export default function SignalBoardWidget({ onItemClick }) {
 
   const handleClick = useCallback((signal) => {
     if (signal.symbol && onItemClick) {
-      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market });
+      // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
+      const market = signal.market === 'crypto' ? 'coin' : signal.market;
+      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
     }
   }, [onItemClick]);
 
