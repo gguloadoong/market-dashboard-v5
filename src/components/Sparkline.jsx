@@ -1,8 +1,13 @@
 // SVG 스파크라인 컴포넌트
-import React, { useId } from 'react';
+import React, { useRef } from 'react';
+
+// 모듈 스코프 카운터 — 인스턴스별 고유 ID (콜론 없음, SVG url() 안전)
+let _sparkId = 0;
 
 function Sparkline({ data = [], width = 80, height = 32, positive }) {
-  const uid = useId();
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = `sp${++_sparkId}`;
+  const uid = idRef.current;
   if (!data || data.length < 2) {
     return <svg width={width} height={height} />;
   }

@@ -138,8 +138,14 @@ export function useInvestorSignals(allItems = []) {
     // 마운트 즉시 부팅 시드 — 가격 데이터 이미 있으면 바로 시그널 생성
     generateBootSeedSignals(allItemsRef.current);
 
-    // 초기 풀 스캔 (마운트 후 1초 대기 — 가격 데이터 로딩 여유)
-    const initTimer = setTimeout(scan, 1000);
+    // 초기 풀 스캔 (마운트 후 2초 대기 — 가격 데이터 로딩 여유)
+    // allItems가 비어있으면 5초 후 재시도 (경합 조건 방어)
+    const initTimer = setTimeout(() => {
+      scan();
+      if (!allItemsRef.current?.length) {
+        setTimeout(scan, 4000);
+      }
+    }, 2000);
 
     // 5분 간격 폴링
     timerRef.current = setInterval(() => {
