@@ -234,9 +234,9 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         const newsScore = Math.min(newsCount, 3);
         const closedPenalty = item._isClosed ? -5 : 0;
         const nameLower = (item.name || '').toLowerCase();
-        const isLeveraged = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage/i.test(nameLower);
-        const leveragedPenalty = isLeveraged ? -2 : 0;
-        const totalScore = pctScore + volScore + newsScore + closedPenalty + leveragedPenalty;
+        const isLeveraged = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage|ETN|ELW|선물/i.test(nameLower);
+        if (isLeveraged) return null; // 파생상품 완전 제외
+        const totalScore = pctScore + volScore + newsScore + closedPenalty;
 
         const newsTitle = relatedNews?.title || null;
         const newsSource = relatedNews?.source || null;
@@ -256,6 +256,7 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
           _whyReason: whyReason,
         };
       })
+      .filter(Boolean)
       .filter(i => i._totalScore >= 3)
       .sort((a, b) => {
         if (b._totalScore !== a._totalScore) return b._totalScore - a._totalScore;

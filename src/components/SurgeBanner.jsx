@@ -41,9 +41,19 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
     const krOpen = getKoreanMarketStatus().status === 'open';
     const usOpen = getUsMarketStatus().status === 'open';
 
+    // ELW/ETN/파생상품 필터 — 이름 미해결, 상한가 초과, 또는 파생상품 키워드
+    const isDerivative = (s) => {
+      if (s.market !== 'kr') return false;
+      if (!s.name || s.name === s.symbol) return true;
+      if (Math.abs(s.changePct ?? 0) > 30) return true;
+      if (/인버스|레버리지|2x|곱버스|ETN|ELW|선물/i.test(s.name || '')) return true;
+      return false;
+    };
+
     const all = [
       ...stocks
         .filter(s => s.market === 'kr' ? krOpen : s.market === 'us' ? usOpen : true)
+        .filter(s => !isDerivative(s))
         .map(s => ({
           name:            s.name || s.symbol,
           symbol:          s.symbol,
