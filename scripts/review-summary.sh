@@ -82,7 +82,9 @@ if command -v codex &>/dev/null; then
     if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)" \
       || echo "$CODEX_TEXT" | grep -qE "^[[:space:]]*-[[:space:]]*\[P[01]\]"; then
       CODEX_VERDICT="BLOCK"
-      CODEX_LINE="🚫 BLOCK"
+      CODEX_BLOCK_DETAIL=$(echo "$CODEX_TEXT" | grep -E "^\s*-\s*\[P[012]\]" | head -3 | sed 's/^/  /' || echo "")
+      CODEX_LINE="🚫 BLOCK${CODEX_BLOCK_DETAIL:+
+${CODEX_BLOCK_DETAIL}}"
     else
       CODEX_VERDICT="PASS"
       CODEX_SUMMARY=$(echo "$CODEX_TEXT" | grep -v "^$" | tail -3 | head -1 | head -c 120 || echo "")

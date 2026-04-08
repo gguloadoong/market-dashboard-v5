@@ -3,7 +3,7 @@
 // Vercel 서버에서 KRX LOGOUT 시 Naver marketValue API로 KOSPI+KOSDAQ ~4000종목 수집
 
 import { createRequire } from 'module';
-import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, recordCronFailure } from '../_price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, getSnapWithFallback, recordCronFailure } from '../_price-cache.js';
 
 const require = createRequire(import.meta.url);
 const KR_STOCK_NAMES = require('../kr-stock-names.json');
@@ -151,7 +151,7 @@ const HANTOO_NAME_MAP = {
 // 이전 snap:kr 스냅샷에서 symbol 목록 추출 (시총 상위 100종목, 없으면 HANTOO_NAME_MAP fallback)
 async function getPrevSnapSymbols() {
   try {
-    const prev = await getSnap(SNAP_KEYS.KR);
+    const prev = await getSnapWithFallback(SNAP_KEYS.KR);
     if (Array.isArray(prev) && prev.length > 0) {
       // 시총 내림차순 정렬 후 상위 100종목 추출 (타임아웃 방지)
       const sorted = [...prev].sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
