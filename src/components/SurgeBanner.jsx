@@ -4,6 +4,7 @@
 // afterHoursPrice: 시간외 단일가가 있을 때 표시
 import { memo, useMemo } from 'react';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
+import { DERIVATIVE_RE } from './home/utils';
 
 // 시장별 컬러 도트
 const MARKET_DOT = {
@@ -46,7 +47,7 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
       if (s.market !== 'kr') return false;
       if (!s.name || s.name === s.symbol) return true;
       if (Math.abs(s.changePct ?? 0) > 30) return true;
-      if (/인버스|레버리지|2x|곱버스|ETN|ELW|선물/i.test(s.name || '')) return true;
+      if (DERIVATIVE_RE.test(s.name || '')) return true;
       return false;
     };
 

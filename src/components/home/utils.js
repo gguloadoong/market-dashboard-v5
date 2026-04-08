@@ -66,6 +66,9 @@ export const TYPE_BADGE = {
   index:  { bg: '#F2F4F6', color: '#8B95A1', label: '지수' },
 };
 
+// ─── 파생상품(ELW/ETN/레버리지) 판별 ──────────────────
+export const DERIVATIVE_RE = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage|ETN|ELW|선물/i;
+
 // ─── 로고 아바타 (로고 실패 시 컬러 이니셜) ──────────────────
 export const PALETTE = ['#3182F6','#F04452','#FF9500','#2AC769','#8B5CF6','#EC4899','#14B8A6','#F59E0B'];
 export function getAvatarBg(symbol) {

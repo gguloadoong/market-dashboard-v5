@@ -1,7 +1,7 @@
 // 주목할만한 움직임 — 복합 스코어 기반 히어로 수평 카드
 // 변동폭 + 거래량 순위 + 뉴스 매칭 복합 점수 + WHY 뉴스 연결
 import { useMemo, useState, useEffect } from 'react';
-import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews } from './utils';
+import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews, DERIVATIVE_RE } from './utils';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
 
@@ -234,9 +234,9 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         const newsScore = Math.min(newsCount, 3);
         const closedPenalty = item._isClosed ? -5 : 0;
         const nameLower = (item.name || '').toLowerCase();
-        const isLeveraged = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage|ETN|ELW|선물/i.test(nameLower);
-        if (isLeveraged) return null; // 파생상품 완전 제외
-        const totalScore = pctScore + volScore + newsScore + closedPenalty;
+        const isLeveraged = DERIVATIVE_RE.test(nameLower);
+        const leveragedPenalty = isLeveraged ? -2 : 0;
+        const totalScore = pctScore + volScore + newsScore + closedPenalty + leveragedPenalty;
 
         const newsTitle = relatedNews?.title || null;
         const newsSource = relatedNews?.source || null;
@@ -256,7 +256,6 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
           _whyReason: whyReason,
         };
       })
-      .filter(Boolean)
       .filter(i => i._totalScore >= 3)
       .sort((a, b) => {
         if (b._totalScore !== a._totalScore) return b._totalScore - a._totalScore;
