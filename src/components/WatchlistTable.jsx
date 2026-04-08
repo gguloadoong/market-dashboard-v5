@@ -63,13 +63,15 @@ function fmtLarge(n) {
   if (n >= 1e6)  return `${(n / 1e6).toFixed(1)}M`;
   return String(Math.round(n));
 }
+import { isCoinItem } from './home/utils';
+
 function getPct(item) {
-  return item.id ? (item.change24h ?? 0) : (item.changePct ?? 0);
+  return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
 }
 
 // ─── KRW 가격 표시 ───────────────────────────────────────────
 function fmtKrwPrice(item, krwRate) {
-  if (item.id) {
+  if (isCoinItem(item)) {
     const p = item.priceKrw || (item.priceUsd ?? 0) * krwRate;
     if (!p) return '—';
     if (p < 1)   return `₩${p.toFixed(4)}`;
@@ -84,7 +86,7 @@ function fmtKrwPrice(item, krwRate) {
   return `₩${fmt(item.price)}`;
 }
 function fmtChangeAmt(item, krwRate) {
-  if (item.id) return '';
+  if (isCoinItem(item)) return '';
   const amt = item.change ?? 0;
   const sign = amt >= 0 ? '+' : '';
   if (item.market === 'kr') return `${sign}₩${fmt(Math.abs(amt))}`;

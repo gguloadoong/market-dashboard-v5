@@ -44,9 +44,17 @@ export function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-// 종목 등락률 추출 (KR/US/COIN 통합)
+// 코인 여부 판별 — CoinGecko/CoinPaprika id 필드, _market 태그, market 필드 모두 체크
+// item.id: CoinGecko("bitcoin") 또는 CoinPaprika("btc-bitcoin") 고유 ID (주식에는 없음)
+// item._market: HomeDashboard에서 allItems 생성 시 태그 (KR/US/COIN)
+// item.market: API 원본 필드 (kr/us/coin)
+export function isCoinItem(item) {
+  return !!(item.id || item._market === 'COIN' || item.market === 'coin');
+}
+
+// 종목 등락률 추출 (KR/US/COIN 통합, 캐시 복원 시 _market 누락 방어)
 export function getPct(item) {
-  if (item._market === 'COIN') return item.change24h ?? 0;
+  if (isCoinItem(item)) return item.change24h ?? 0;
   return item.changePct ?? 0;
 }
 
