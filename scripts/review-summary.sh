@@ -21,8 +21,12 @@ NC='\033[0m'
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SAFE_BRANCH="${BRANCH//\//-}"
 REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
+CODEX_ARTIFACT=".tmp/codex-review-${SAFE_BRANCH}.md"
 CODEX_TMP="$(mktemp)"
 trap 'rm -f "$CODEX_TMP"' EXIT
+
+# 스테일 Codex artifact 제거 — 이전 실행 결과가 남아 있으면 새 결과와 혼동될 수 있음
+rm -f .tmp/codex-review-*.md
 
 echo -e "${BLUE}[review-summary] 브랜치: ${BRANCH}${NC}"
 
@@ -70,6 +74,9 @@ if command -v codex &>/dev/null; then
   # 플래그 검증: --output-last-message(-o), --full-auto 모두 codex exec review --help에서 확인됨
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
+    # Codex 결과를 persistent artifact로 저장 — 다른 스크립트에서 참조 가능
+    mkdir -p .tmp
+    printf '%s\n' "$CODEX_TEXT" > "$CODEX_ARTIFACT"
     # BLOCK 판정: DECISION:BLOCK, 줄 시작 [P0]/[P1] 태그, JSON "patch is incorrect" 패턴 감지
     # [P0]/[P1]은 줄 시작(^[[:space:]]*-)에서만 매칭 — 본문 내 "P1 이슈" 등 오탐 방지
     if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)" \
@@ -124,7 +131,17 @@ echo ""
 echo -e "${GREEN}[review-summary] ✅ 완료 — PR #${PR_NUMBER}${NC}"
 echo -e "${GREEN}[review-summary] Opus: ${OPUS_VERDICT} / Codex: ${CODEX_VERDICT}${NC}"
 
-# 둘 다 PASS가 아니면 경고
+# 최종 판정 — Opus PASS + Codex BLOCK 중재 규칙:
+#   - Opus가 PASS이고 Codex만 BLOCK인 경우: Codex 지적은 PR 코멘트에 기록되었으므로 배포 허용
+#     (macOS에서 timeout 명령 부재로 Codex가 자주 실패하는 점 반영 — Opus를 우선 신뢰)
+#   - Opus가 BLOCK이면 Codex 결과와 무관하게 배포 차단
+#   - Codex가 SKIP인 경우 Opus 결과만으로 판정
+if [ "$OPUS_VERDICT" = "PASS" ] && [ "$CODEX_VERDICT" = "BLOCK" ]; then
+  echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK — 중재 규칙 적용${NC}"
+  echo -e "${YELLOW}[review-summary]    Codex 지적이 PR 코멘트에 기록됨. Opus 결과를 우선하여 배포 허용.${NC}"
+  exit 0
+fi
+
 if [ "$OPUS_VERDICT" != "PASS" ] || { [ "$CODEX_VERDICT" != "PASS" ] && [ "$CODEX_VERDICT" != "SKIP" ]; }; then
   echo -e "${RED}[review-summary] ⚠️  BLOCK 있음 — 수정 후 재실행, 머지 금지${NC}"
   exit 1

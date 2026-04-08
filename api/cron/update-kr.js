@@ -3,7 +3,7 @@
 // Vercel 서버에서 KRX LOGOUT 시 Naver marketValue API로 KOSPI+KOSDAQ ~4000종목 수집
 
 import { createRequire } from 'module';
-import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, recordCronFailure } from '../_price-cache.js';
 
 const require = createRequire(import.meta.url);
 const KR_STOCK_NAMES = require('../kr-stock-names.json');
@@ -148,7 +148,23 @@ const HANTOO_NAME_MAP = {
   '069500': 'KODEX 200',
 };
 
-// 한투 API fallback (기존 hantoo-price.js 패턴 참고)
+// 이전 snap:kr 스냅샷에서 symbol 목록 추출 (시총 상위 200종목, 없으면 HANTOO_NAME_MAP fallback)
+async function getPrevSnapSymbols() {
+  try {
+    const prev = await getSnap(SNAP_KEYS.KR);
+    if (Array.isArray(prev) && prev.length > 0) {
+      // 시총 내림차순 정렬 후 상위 200종목 추출 (타임아웃 방지)
+      const sorted = [...prev].sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
+      return sorted.slice(0, 200).map((s) => s.symbol);
+    }
+  } catch (e) {
+    console.warn('[update-kr] 이전 스냅샷 조회 실패, HANTOO_NAME_MAP fallback:', e.message);
+  }
+  // 이전 스냅샷 없으면 하드코딩 61종목 fallback
+  return Object.keys(HANTOO_NAME_MAP);
+}
+
+// 한투 API fallback — 이전 snap:kr 기반 symbol 목록 조회 (없으면 61종목 fallback)
 async function fetchHantooFallback() {
   // 한투 토큰이 없으면 fallback 불가
   const appKey = process.env.HANTOO_APP_KEY;
@@ -160,49 +176,54 @@ async function fetchHantooFallback() {
   const token = await getHantooToken();
   if (!token) return null;
 
-  // 주요 종목만 조회 (전종목 불가 — 한투는 개별 API)
-  // HANTOO_NAME_MAP에서 파생 — 단일 소스, 종목 추가·삭제 시 맵만 수정
-  const majorSymbols = Object.keys(HANTOO_NAME_MAP);
+  // 이전 스냅샷 기반 symbol 목록 (최대 200종목)
+  const symbols = await getPrevSnapSymbols();
+  console.info(`[update-kr] 한투 fallback 대상: ${symbols.length}종목`);
 
-  const results = await Promise.allSettled(
-    majorSymbols.map(async (symbol) => {
-      const url = `${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${symbol}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          appkey: appKey,
-          appsecret: appSecret,
-          tr_id: 'FHKST01010100',
-          custtype: 'P',
-        },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.rt_cd !== '0') return null;
-      const o = data.output;
-      const price = parseInt(o.stck_prpr || '0', 10);
-      const sign = o.prdy_vrss_sign ?? '3';
-      const changeAbs = parseInt(o.prdy_vrss || '0', 10);
-      const change = (sign === '4' || sign === '5') ? -changeAbs : changeAbs;
-      return {
-        symbol,
-        name: (o.hts_kor_isnm || '').trim() || HANTOO_NAME_MAP[symbol] || symbol,
-        price,
-        change,
-        changePct: parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0,
-        volume: parseInt((o.acml_vol || '0').replace(/,/g, ''), 10) || 0,
-        marketCap: 0,
-        market: 'kr',
-      };
-    }),
-  );
+  // 한투는 개별 API — 20종목씩 배치로 순차 처리 (동시 전체 요청 시 rate-limit 위험)
+  const BATCH_SIZE = 20;
+  const allItems = [];
+  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+    const batch = symbols.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (symbol) => {
+        const url = `${HANTOO_BASE}/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=${symbol}`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            appkey: appKey,
+            appsecret: appSecret,
+            tr_id: 'FHKST01010100',
+            custtype: 'P',
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.rt_cd !== '0') return null;
+        const o = data.output;
+        const price = parseInt(o.stck_prpr || '0', 10);
+        const sign = o.prdy_vrss_sign ?? '3';
+        const changeAbs = parseInt(o.prdy_vrss || '0', 10);
+        const change = (sign === '4' || sign === '5') ? -changeAbs : changeAbs;
+        return {
+          symbol,
+          name: (o.hts_kor_isnm || '').trim() || HANTOO_NAME_MAP[symbol] || KR_STOCK_NAMES[symbol] || symbol,
+          price,
+          change,
+          changePct: parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0,
+          volume: parseInt((o.acml_vol || '0').replace(/,/g, ''), 10) || 0,
+          marketCap: 0,
+          market: 'kr',
+        };
+      }),
+    );
+    results.forEach((r) => {
+      if (r.status === 'fulfilled' && r.value) allItems.push(r.value);
+    });
+  }
 
-  const items = results
-    .filter((r) => r.status === 'fulfilled' && r.value)
-    .map((r) => r.value);
-
-  return items.length > 0 ? items : null;
+  return allItems.length > 0 ? allItems : null;
 }
 
 // Naver 모바일 공통 헤더 — fetchNaverFullMarket / fetchNaverFallback 공유
@@ -278,9 +299,9 @@ async function fetchNaverFullMarket() {
   return allItems.length > 0 ? allItems : null;
 }
 
-// 네이버 증권 모바일 API 개별 fallback — 주요 61종목 (최후 수단)
+// 네이버 증권 모바일 API 개별 fallback — 이전 스냅샷 기반 (없으면 61종목 fallback, 최후 수단)
 async function fetchNaverFallback() {
-  const symbols = Object.keys(HANTOO_NAME_MAP);
+  const symbols = await getPrevSnapSymbols();
   const results = await Promise.allSettled(
     symbols.map(async (symbol) => {
       const res = await fetch(`https://m.stock.naver.com/api/stock/${symbol}/basic`, {
