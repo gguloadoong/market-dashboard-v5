@@ -146,12 +146,18 @@ export default function HomeDashboard({
         </div>
       )}
 
-      {/* ─── 초기 로딩 가드 — 캐시 데이터 표시 전 실시간 데이터 대기 ── */}
+      {/* ─── 초기 로딩 가드 — 데이터 없으면 스켈레톤, 캐시만 있으면 갱신 중 표시 ── */}
       {!dataReady && !hasData && (
         <div className="space-y-3 animate-pulse">
           <div className="h-40 bg-[#F2F4F6] rounded-2xl" />
           <div className="h-32 bg-[#F2F4F6] rounded-2xl" />
           <div className="h-24 bg-[#F2F4F6] rounded-2xl" />
+        </div>
+      )}
+      {!dataReady && hasData && (
+        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] text-[#8B95A1]">
+          <div className="w-3 h-3 border border-[#B0B8C1] border-t-transparent rounded-full animate-spin" />
+          <span>시세 업데이트 중...</span>
         </div>
       )}
 

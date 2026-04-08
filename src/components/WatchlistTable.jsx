@@ -63,10 +63,7 @@ function fmtLarge(n) {
   if (n >= 1e6)  return `${(n / 1e6).toFixed(1)}M`;
   return String(Math.round(n));
 }
-// 코인 여부 판별 — id 필드, market 모두 체크 (캐시 복원 시 id 누락 방어)
-function isCoinItem(item) {
-  return !!(item.id || item.market === 'coin');
-}
+import { isCoinItem } from './home/utils';
 
 function getPct(item) {
   return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);

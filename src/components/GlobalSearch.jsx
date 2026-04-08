@@ -7,10 +7,7 @@ function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-// 코인 여부 판별 — id 필드, market 모두 체크 (캐시 복원 시 id 누락 방어)
-function isCoinItem(item) {
-  return !!(item.id || item.market === 'coin');
-}
+import { isCoinItem } from './home/utils';
 
 function getPct(item) {
   return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
