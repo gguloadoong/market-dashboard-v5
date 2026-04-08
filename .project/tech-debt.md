@@ -1,6 +1,6 @@
 ---
 담당: 박서연 (Staff FE)
-마지막 업데이트: 2026-04-04
+마지막 업데이트: 2026-04-08
 ---
 
 # 기술 부채 목록
@@ -24,10 +24,7 @@
 
 ## 🟢 P2 — 백로그
 
-| 파일 | 내용 | 등록일 |
-|------|------|--------|
-| `NewsSidePanel.jsx` | Stage 3 섹터 확장 시 `Object.entries(RELATED_ASSETS)` 전수 순회 — 현재 ~50항목 무해, 향후 500+ 시 sector→symbols 역인덱스 Map으로 최적화 필요 | 2026-03-26 |
-| `api/cron/update-us.js` | Yahoo v8 chart API per-symbol 개별 호출 — 250종목 순차 조회 시 Vercel 함수 타임아웃(10초) 위험. 배치 병렬화 또는 청크 분할 필요 | 2026-04-04 |
+현재 없음 ✅
 
 ---
 
@@ -53,3 +50,5 @@
 | 2026-03-28 | `vercel.json` | ignoreCommand "exit 0" 확정 — 수동 배포 게이트 운영 (ADR-013) |
 | 2026-04-04 | `api/kr-fear-greed.js` | fetchForeignNetNaver dead code 제거, 14일 윈도우 확장, VKOSPI fallback 경고 로그 추가 (PR #37) |
 | 2026-04-04 | `scripts/pre-deploy-consensus.sh` | PM nonce 인젝션 차단, Gate5 ancestor 검색, gh set-e 방지 (PR #37) |
+| 2026-04-08 | `src/data/relatedAssets.js` + `NewsSidePanel.jsx` | Stage 3 섹터 확장 `Object.entries` 전수 순회 → `SECTOR_SYMBOL_INDEX` 역인덱스 Map O(1) 조회로 교체 |
+| 2026-04-08 | `api/cron/update-us.js` | Yahoo v8 per-symbol 병렬화 — `CONCURRENCY=30` 배치 + `Promise.allSettled`로 이미 구현 완료 확인. 추가 작업 불필요 |

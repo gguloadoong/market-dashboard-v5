@@ -6,7 +6,7 @@ import { useMemo, useEffect, useState } from 'react';
 const _summaryCache = new Map();
 const _CACHE_MAX = 50;
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
-import { RELATED_ASSETS } from '../data/relatedAssets';
+import { RELATED_ASSETS, SECTOR_SYMBOL_INDEX } from '../data/relatedAssets';
 import { detectNewsSectors, KR_STOCK_MARKET_KEYWORDS } from '../utils/newsTopicMap';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
 import { fetchNewsSummary } from '../api/_gateway.js';
@@ -261,12 +261,16 @@ export default function NewsSidePanel({ news, allData, krwRate, onClose, onRelat
       for (const s of assetSectors) matchedSectors.add(s);
     }
     if (matchedSectors.size > 0) {
-      for (const [sym, info] of Object.entries(RELATED_ASSETS)) {
-        if (!info.sector || !matchedSectors.has(info.sector)) continue;
-        if (scored.has(sym)) continue;
-        const relItem = allMap[sym];
-        if (!relItem || !allowedMarkets.has(relItem._market)) continue;
-        scored.set(sym, { item: relItem, score: 3 });
+      // 역인덱스 Map으로 O(1) 섹터 조회 (전수 순회 제거)
+      for (const sector of matchedSectors) {
+        const syms = SECTOR_SYMBOL_INDEX.get(sector);
+        if (!syms) continue;
+        for (const sym of syms) {
+          if (scored.has(sym)) continue;
+          const relItem = allMap[sym];
+          if (!relItem || !allowedMarkets.has(relItem._market)) continue;
+          scored.set(sym, { item: relItem, score: 3 });
+        }
       }
     }
 

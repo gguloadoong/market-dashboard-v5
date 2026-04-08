@@ -207,8 +207,8 @@
   - ChartSidePanel: useStockAndRelatedNews 교체, relatedItems useMemo 순서 정정 (PR #175)
 - 완료 기준: 속보에 부동산 뉴스 없음, 관련뉴스 0건 해소, 시간순 정렬
 
-### [보류] Whale Alert API 연동
-- CEO 키 발급 대기 — `VITE_WHALE_ALERT_KEY` 환경변수 설정 후 착수
+### ~~[보류] Whale Alert API 연동~~ ❌ 취소
+- 고래 알림 기능 자체가 제거됨 (PR #67, ADR-016 시그널+뉴스 전환)
 
 ---
 

@@ -938,6 +938,20 @@ export const RELATED_ASSETS = {
   },
 };
 
+// ─── 섹터 역인덱스 Map (모듈 로드 시 생성) ───────────────────────────
+// NewsSidePanel Stage 3 섹터 확장 시 O(n) 전수 순회 → O(1) 조회로 최적화
+// sector 이름 → symbol 배열 매핑
+export const SECTOR_SYMBOL_INDEX = (() => {
+  const index = new Map();
+  for (const [sym, info] of Object.entries(RELATED_ASSETS)) {
+    if (!info.sector) continue;
+    const list = index.get(info.sector);
+    if (list) list.push(sym);
+    else index.set(info.sector, [sym]);
+  }
+  return index;
+})();
+
 // ─── 헬퍼 함수 ────────────────────────────────────────────────
 
 /**

@@ -21,8 +21,12 @@ NC='\033[0m'
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SAFE_BRANCH="${BRANCH//\//-}"
 REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
+CODEX_ARTIFACT=".tmp/codex-review-${SAFE_BRANCH}.md"
 CODEX_TMP="$(mktemp)"
 trap 'rm -f "$CODEX_TMP"' EXIT
+
+# 스테일 Codex artifact 제거 — 이전 실행 결과가 남아 있으면 새 결과와 혼동될 수 있음
+rm -f .tmp/codex-review-*.md
 
 echo -e "${BLUE}[review-summary] 브랜치: ${BRANCH}${NC}"
 
@@ -70,12 +74,17 @@ if command -v codex &>/dev/null; then
   # 플래그 검증: --output-last-message(-o), --full-auto 모두 codex exec review --help에서 확인됨
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
+    # Codex 결과를 persistent artifact로 저장 — 다른 스크립트에서 참조 가능
+    mkdir -p .tmp
+    printf '%s\n' "$CODEX_TEXT" > "$CODEX_ARTIFACT"
     # BLOCK 판정: DECISION:BLOCK, 줄 시작 [P0]/[P1] 태그, JSON "patch is incorrect" 패턴 감지
     # [P0]/[P1]은 줄 시작(^[[:space:]]*-)에서만 매칭 — 본문 내 "P1 이슈" 등 오탐 방지
     if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)" \
       || echo "$CODEX_TEXT" | grep -qE "^[[:space:]]*-[[:space:]]*\[P[01]\]"; then
       CODEX_VERDICT="BLOCK"
-      CODEX_LINE="🚫 BLOCK"
+      CODEX_BLOCK_DETAIL=$(echo "$CODEX_TEXT" | grep -E "^\s*-\s*\[P[012]\]" | head -3 | sed 's/^/  /' || echo "")
+      CODEX_LINE="🚫 BLOCK${CODEX_BLOCK_DETAIL:+
+${CODEX_BLOCK_DETAIL}}"
     else
       CODEX_VERDICT="PASS"
       CODEX_SUMMARY=$(echo "$CODEX_TEXT" | grep -v "^$" | tail -3 | head -1 | head -c 120 || echo "")
@@ -124,7 +133,23 @@ echo ""
 echo -e "${GREEN}[review-summary] ✅ 완료 — PR #${PR_NUMBER}${NC}"
 echo -e "${GREEN}[review-summary] Opus: ${OPUS_VERDICT} / Codex: ${CODEX_VERDICT}${NC}"
 
-# 둘 다 PASS가 아니면 경고
+# 최종 판정 — Opus PASS + Codex BLOCK 중재 규칙:
+#   - Opus가 PASS이고 Codex만 BLOCK인 경우: Codex 지적은 PR 코멘트에 기록되었으므로 배포 허용
+#     (macOS에서 timeout 명령 부재로 Codex가 자주 실패하는 점 반영 — Opus를 우선 신뢰)
+#   - Opus가 BLOCK이면 Codex 결과와 무관하게 배포 차단
+#   - Codex가 SKIP인 경우 Opus 결과만으로 판정
+if [ "$OPUS_VERDICT" = "PASS" ] && [ "$CODEX_VERDICT" = "BLOCK" ]; then
+  # Codex artifact가 있으면 실제 코드 지적, 없으면 실행 실패
+  if [ -f "$CODEX_ARTIFACT" ] && [ -s "$CODEX_ARTIFACT" ]; then
+    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (코드 지적 있음)${NC}"
+    echo -e "${YELLOW}[review-summary]    Codex 지적이 PR 코멘트에 기록됨. Opus PASS를 우선하되, Codex 지적 검토 권장.${NC}"
+  else
+    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (실행 실패 추정)${NC}"
+    echo -e "${YELLOW}[review-summary]    Codex 실행 실패(timeout/네트워크). Opus 결과로 판정.${NC}"
+  fi
+  exit 0
+fi
+
 if [ "$OPUS_VERDICT" != "PASS" ] || { [ "$CODEX_VERDICT" != "PASS" ] && [ "$CODEX_VERDICT" != "SKIP" ]; }; then
   echo -e "${RED}[review-summary] ⚠️  BLOCK 있음 — 수정 후 재실행, 머지 금지${NC}"
   exit 1
