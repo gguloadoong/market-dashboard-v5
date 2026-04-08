@@ -105,8 +105,17 @@ export async function fetchInvestorData(symbol) {
   }
 
   // 2순위: Naver Finance (한투 실패 시 fallback)
-  const url  = `https://m.stock.naver.com/api/stock/${symbol}/investor`;
-  const data = await naverProxyFetch(url);
+  let data;
+  try {
+    const url  = `https://m.stock.naver.com/api/stock/${symbol}/investor`;
+    data = await naverProxyFetch(url);
+  } catch (e2) {
+    console.warn(`[투자자동향] Naver도 실패: ${e2.message}`);
+    return null;
+  }
+
+  // Naver 응답이 비어있거나 유효하지 않으면 null 반환
+  if (!data || typeof data !== 'object') return null;
 
   // Naver 응답 필드명 (실제 응답 기준)
   // stcTrdDd: 거래일, indvNetAmt/frgnNetAmt/instNetAmt: 순매수금액(원)

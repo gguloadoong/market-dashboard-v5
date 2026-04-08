@@ -80,10 +80,25 @@ export function useCoins(krwRateRef) {
     try {
       const data = await fetchCoins(krwRateRef.current);
       if (data.length > 0) {
-        setCoins(prev => data.map(c => {
-          const old = prev.find(p => p.id === c.id || p.symbol === c.symbol);
-          return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
-        }));
+        setCoins(prev => {
+          // 심볼 대소문자 정규화 — BTC/btc 중복 방지
+          const seen = new Set();
+          return data
+            .filter(c => {
+              const key = c.symbol?.toUpperCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            })
+            .map(c => {
+              const sym = c.symbol?.toUpperCase();
+              const old = prev.find(p =>
+                p.id === c.id ||
+                (p.symbol?.toUpperCase() === sym)
+              );
+              return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
+            });
+        });
         saveCoinCache(data);
         setCoinError(false);
       }

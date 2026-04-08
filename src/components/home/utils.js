@@ -44,9 +44,9 @@ export function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-// 종목 등락률 추출 (KR/US/COIN 통합)
+// 종목 등락률 추출 (KR/US/COIN 통합, 캐시 복원 시 _market 누락 방어)
 export function getPct(item) {
-  if (item._market === 'COIN') return item.change24h ?? 0;
+  if (item._market === 'COIN' || item.market === 'coin') return item.change24h ?? 0;
   return item.changePct ?? 0;
 }
 

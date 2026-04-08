@@ -114,9 +114,9 @@ function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-// 코인 여부 판별 — id 필드 또는 _market === 'COIN' 으로 감지
+// 코인 여부 판별 — id 필드, _market, market 모두 체크 (캐시 복원 시 id 누락 방어)
 function isCoinItem(item) {
-  return !!(item.id || item._market === 'COIN');
+  return !!(item.id || item._market === 'COIN' || item.market === 'coin');
 }
 
 function fmtKrwPrice(item, krwRate) {

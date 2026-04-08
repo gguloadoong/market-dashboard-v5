@@ -16,6 +16,7 @@ import ExploreTabsWidget from './ExploreTabsWidget';
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
   krwRate = 1466, onItemClick, onNewsClick, onTabChange,
+  dataReady = true,
 }) {
   const queryClient = useQueryClient();
   const { data: allNews = [] } = useAllNewsQuery();
@@ -142,6 +143,15 @@ export default function HomeDashboard({
           <span className="text-[10px] mt-1 text-[#8B95A1]">
             {refreshing ? '새로고침 중...' : pullDistance > 60 ? '놓으면 새로고침' : '당겨서 새로고침'}
           </span>
+        </div>
+      )}
+
+      {/* ─── 초기 로딩 가드 — 캐시 데이터 표시 전 실시간 데이터 대기 ── */}
+      {!dataReady && !hasData && (
+        <div className="space-y-3 animate-pulse">
+          <div className="h-40 bg-[#F2F4F6] rounded-2xl" />
+          <div className="h-32 bg-[#F2F4F6] rounded-2xl" />
+          <div className="h-24 bg-[#F2F4F6] rounded-2xl" />
         </div>
       )}
 

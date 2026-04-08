@@ -7,12 +7,17 @@ function fmt(n, d = 0) {
   return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+// 코인 여부 판별 — id 필드, market 모두 체크 (캐시 복원 시 id 누락 방어)
+function isCoinItem(item) {
+  return !!(item.id || item.market === 'coin');
+}
+
 function getPct(item) {
-  return item.id ? (item.change24h ?? 0) : (item.changePct ?? 0);
+  return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
 }
 
 function getPrice(item, krwRate) {
-  if (item.id) {
+  if (isCoinItem(item)) {
     const p = item.priceKrw || (item.priceUsd ?? 0) * krwRate;
     if (!p) return '—';
     if (p < 1)   return `₩${p.toFixed(4)}`;
