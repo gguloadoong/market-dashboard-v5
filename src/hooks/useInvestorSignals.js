@@ -10,6 +10,7 @@ import {
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
+import { getPct } from '../components/home/utils';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -96,31 +97,37 @@ function calcPercentileVolume(items, market) {
 export function useInvestorSignals(allItems = []) {
   const timerRef = useRef(null);
   const runningRef = useRef(false);
-  const moodPrevRef = useRef(null); // 시장 무드 이전 상태 (localStorage 대신 메모리)
+  const moodPrevRef = useRef(null); // 시장 무드 이전 상태 (메모리 기반)
+  const allItemsRef = useRef(allItems); // 최신 allItems를 ref로 유지 — 타이머 리셋 방지
+  const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
+
+  // allItems가 변경될 때마다 ref 갱신 (useEffect 의존성에서 제거)
+  allItemsRef.current = allItems;
 
   useEffect(() => {
     async function scan() {
       if (runningRef.current) return;
       runningRef.current = true;
 
+      const items = allItemsRef.current;
       try {
         // ── P0-1: 외국인/기관 연속 매수매도 시그널 ──
         await scanInvestorTrends();
 
         // ── P0-2: 거래량 이상치 시그널 ──
-        scanVolumeAnomalies(allItems);
+        scanVolumeAnomalies(items);
 
         // ── P0-3: 섹터 로테이션 + 현재 섹터 강세/약세 감지 ──
-        detectSectorRotation(allItems);
+        detectSectorRotation(items, sectorRanksPrevRef);
 
         // ── P0-4: 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 ──
-        generateBootSeedSignals(allItems);
+        generateBootSeedSignals(items);
 
         // ── 신규: 교차시장 상관관계 ──
-        detectCrossMarketCorrelation(allItems);
+        detectCrossMarketCorrelation(items);
 
         // ── 신규: 시장 무드 전환 ──
-        detectMarketMoodShift(allItems, moodPrevRef);
+        detectMarketMoodShift(items, moodPrevRef);
       } catch {
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
@@ -129,7 +136,7 @@ export function useInvestorSignals(allItems = []) {
     }
 
     // 마운트 즉시 부팅 시드 — 가격 데이터 이미 있으면 바로 시그널 생성
-    generateBootSeedSignals(allItems);
+    generateBootSeedSignals(allItemsRef.current);
 
     // 초기 풀 스캔 (마운트 후 1초 대기 — 가격 데이터 로딩 여유)
     const initTimer = setTimeout(scan, 1000);
@@ -143,7 +150,8 @@ export function useInvestorSignals(allItems = []) {
       clearTimeout(initTimer);
       clearInterval(timerRef.current);
     };
-  }, [allItems]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
 
 /** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출 */
@@ -202,8 +210,11 @@ async function scanInvestorTrends() {
   }));
 }
 
-/** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널 */
-function detectSectorRotation(allItems) {
+/** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널
+ * @param {Array} allItems - 전체 종목 배열
+ * @param {{ current: object|null }} sectorRanksPrevRef - 이전 섹터 순위 ref (메모리 기반)
+ */
+function detectSectorRotation(allItems, sectorRanksPrevRef) {
   if (!allItems?.length) return;
 
   // 섹터별 평균 등락률
@@ -226,10 +237,9 @@ function detectSectorRotation(allItems) {
   const curRanks = {};
   sectorAvg.forEach((s, i) => { curRanks[s.sector] = i + 1; });
 
-  // 이전 순위 비교
-  const prevRaw = localStorage.getItem('sector_ranks_prev');
-  const prevRanks = prevRaw ? JSON.parse(prevRaw) : null;
-  localStorage.setItem('sector_ranks_prev', JSON.stringify(curRanks));
+  // 이전 순위 비교 (useRef 기반 — localStorage 대신 메모리)
+  const prevRanks = sectorRanksPrevRef.current;
+  sectorRanksPrevRef.current = curRanks;
 
   // ── P0-3: 첫 방문에도 섹터 강세/약세 시그널 생성 ──
   // 상위 3개 섹터 평균 등락률 2% 이상이면 강세 시그널
@@ -296,9 +306,6 @@ function detectSectorRotation(allItems) {
 /** 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 */
 function generateBootSeedSignals(allItems) {
   if (getActiveSignals().length > 0 || !allItems?.length) return;
-
-  // 등락률 추출 헬퍼
-  const getPct = (item) => item.changePct ?? item.change24h ?? 0;
 
   const topMovers = [...allItems]
     .filter(i => i._market) // 유효한 종목만
