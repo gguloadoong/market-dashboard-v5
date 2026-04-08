@@ -137,8 +137,14 @@ echo -e "${GREEN}[review-summary] Opus: ${OPUS_VERDICT} / Codex: ${CODEX_VERDICT
 #   - Opus가 BLOCK이면 Codex 결과와 무관하게 배포 차단
 #   - Codex가 SKIP인 경우 Opus 결과만으로 판정
 if [ "$OPUS_VERDICT" = "PASS" ] && [ "$CODEX_VERDICT" = "BLOCK" ]; then
-  echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK — 중재 규칙 적용${NC}"
-  echo -e "${YELLOW}[review-summary]    Codex 지적이 PR 코멘트에 기록됨. Opus 결과를 우선하여 배포 허용.${NC}"
+  # Codex artifact가 있으면 실제 코드 지적, 없으면 실행 실패
+  if [ -f "$CODEX_ARTIFACT" ] && [ -s "$CODEX_ARTIFACT" ]; then
+    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (코드 지적 있음)${NC}"
+    echo -e "${YELLOW}[review-summary]    Codex 지적이 PR 코멘트에 기록됨. Opus PASS를 우선하되, Codex 지적 검토 권장.${NC}"
+  else
+    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (실행 실패 추정)${NC}"
+    echo -e "${YELLOW}[review-summary]    Codex 실행 실패(timeout/네트워크). Opus 결과로 판정.${NC}"
+  fi
   exit 0
 fi
 

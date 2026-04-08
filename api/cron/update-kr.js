@@ -221,6 +221,8 @@ async function fetchHantooFallback() {
     results.forEach((r) => {
       if (r.status === 'fulfilled' && r.value) allItems.push(r.value);
     });
+    // 배치 간 500ms 대기 — 한투 API rate-limit 방지
+    if (i + BATCH_SIZE < symbols.length) await new Promise(r => setTimeout(r, 500));
   }
 
   return allItems.length > 0 ? allItems : null;
