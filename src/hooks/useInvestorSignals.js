@@ -100,10 +100,14 @@ export function useInvestorSignals(allItems = []) {
   const allItemsRef = useRef(allItems); // 최신 allItems를 ref로 유지 — 타이머 리셋 방지
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
 
-  // allItems가 변경될 때마다 ref 갱신 (useEffect 의존성에서 제거)
-  allItemsRef.current = allItems;
+  // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
+  useEffect(() => {
+    allItemsRef.current = allItems;
+  }, [allItems]);
 
   useEffect(() => {
+    let retryTimer = null; // 재시도 타이머 추적 (언마운트 시 정리)
+
     async function scan() {
       if (runningRef.current) return;
       runningRef.current = true;
@@ -138,11 +142,11 @@ export function useInvestorSignals(allItems = []) {
     generateBootSeedSignals(allItemsRef.current);
 
     // 초기 풀 스캔 (마운트 후 2초 대기 — 가격 데이터 로딩 여유)
-    // allItems가 비어있으면 5초 후 재시도 (경합 조건 방어)
+    // allItems가 비어있으면 4초 후 1회 재시도 (경합 조건 방어)
     const initTimer = setTimeout(() => {
       scan();
       if (!allItemsRef.current?.length) {
-        setTimeout(scan, 4000);
+        retryTimer = setTimeout(scan, 4000);
       }
     }, 2000);
 
@@ -153,6 +157,7 @@ export function useInvestorSignals(allItems = []) {
 
     return () => {
       clearTimeout(initTimer);
+      clearTimeout(retryTimer);
       clearInterval(timerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
