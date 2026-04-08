@@ -1,4 +1,5 @@
 // 뉴스 상세 슬라이드 패널 — AI 요약 + 관련 종목 + 관련 뉴스 + 원문 링크
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useMemo, useEffect, useState } from 'react';
 
 // AI 요약 클라이언트 캐시 — 페이지 생존 기간 동안 동일 기사 재열람 시 즉시 표시
@@ -45,7 +46,7 @@ function RelatedRow({ item, krwRate, onItemClick }) {
   const color = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
 
   const price = isCoin
-    ? `₩${fmt(Math.round(item.priceKrw || (item.priceUsd ?? 0) * (krwRate || 1466)))}`
+    ? `₩${fmt(Math.round(item.priceKrw || (item.priceUsd ?? 0) * (krwRate || DEFAULT_KRW_RATE)))}`
     : item._market === 'KR' || item.market === 'kr'
       ? `₩${fmt(item.price)}`
       : `$${(item.price ?? 0).toFixed(2)}`;

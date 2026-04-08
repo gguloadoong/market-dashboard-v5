@@ -268,7 +268,7 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
                 >
                   <span className="text-[11px] font-semibold text-[#191F28] whitespace-nowrap">{item.name?.slice(0, 6)}</span>
                   <span className="text-[10px] font-bold tabular-nums font-mono whitespace-nowrap" style={{ color }}>
-                    {isUp ? '+' : ''}{pct.toFixed(1)}%
+                    {isUp ? '+' : ''}{(Number.isFinite(pct) ? pct : 0).toFixed(1)}%
                   </span>
                 </div>
               );
@@ -302,7 +302,7 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
                   </div>
                   <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
                     <span className="text-[13px] font-semibold tabular-nums font-mono" style={{ color }}>
-                      {isUp ? '+' : ''}{pct.toFixed(2)}%
+                      {isUp ? '+' : ''}{(Number.isFinite(pct) ? pct : 0).toFixed(2)}%
                     </span>
                     <span className="text-[15px] font-bold tabular-nums font-mono text-[#191F28]">
                       {fmt(item.price || item.priceKrw || 0)}

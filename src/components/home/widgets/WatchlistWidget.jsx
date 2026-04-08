@@ -1,4 +1,5 @@
 // 관심종목 위젯 — 빈 상태 시 인기 종목 추천
+import { DEFAULT_KRW_RATE } from '../../../constants/market';
 import { getPct, fmt } from '../utils';
 
 function WatchRow({ item, krwRate, onItemClick, onToggle }) {
@@ -92,7 +93,7 @@ function SuggestRow({ item, krwRate, onItemClick, onAdd }) {
   );
 }
 
-export default function WatchlistWidget({ watchedItems, popularItems = [], toggle, onItemClick, krwRate = 1466 }) {
+export default function WatchlistWidget({ watchedItems, popularItems = [], toggle, onItemClick, krwRate = DEFAULT_KRW_RATE }) {
   if (!watchedItems.length) {
     return (
       <div className="bg-white rounded-xl overflow-hidden border border-[#ECEEF1]">

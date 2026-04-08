@@ -1,5 +1,6 @@
 // 시장 지수 서머리 바 — 개선
 // 환율 표시 개선, hover 효과, 장 오픈 상태 animate-pulse dot
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useMemo } from 'react';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 
@@ -63,7 +64,7 @@ function IndexItem({ idx, isOpen }) {
   );
 }
 
-export default function MarketSummaryBar({ indices = [], krwRate = 1466, loading = false }) {
+export default function MarketSummaryBar({ indices = [], krwRate = DEFAULT_KRW_RATE, loading = false }) {
   const displayIndices = useMemo(() => indices.slice(0, 6), [indices]);
   const kr = getKoreanMarketStatus();
   const us = getUsMarketStatus();

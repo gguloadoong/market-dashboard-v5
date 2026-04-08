@@ -4,10 +4,11 @@ import { fetchIndices } from '../api/stocks';
 import { fetchExchangeRate } from '../api/coins';
 import { setWhaleKrwRate } from '../api/whale';
 import { POLLING } from '../constants/polling';
+import { DEFAULT_KRW_RATE } from '../constants/market';
 
 export function useIndices() {
   const [indices, setIndices]   = useState([]);
-  const [krwRate, setKrwRate]   = useState(1466);
+  const [krwRate, setKrwRate]   = useState(DEFAULT_KRW_RATE);
 
   const refreshIndices = useCallback(async () => {
     try {

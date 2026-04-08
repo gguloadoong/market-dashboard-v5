@@ -1,3 +1,4 @@
+import { DEFAULT_KRW_RATE } from '../constants/market';
 // 코인 실시간 데이터 — 다중 소스 최적화
 // 가격: Upbit(KRW) + Binance(USD) — 키 불필요, 빠르고 안정
 // 메타데이터/이미지: CoinPaprika — 키 불필요, rate limit 관대
@@ -185,7 +186,7 @@ export function getSparklineCache() {
 
 // ─── 환율 ──────────────────────────────────────────────────────
 const RATE_CACHE_KEY = 'market_krw_rate';
-const RATE_FALLBACK  = 1466;
+const RATE_FALLBACK  = DEFAULT_KRW_RATE;
 
 function saveRateCache(rate) {
   try { localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rate, ts: Date.now() })); } catch {}
@@ -238,7 +239,7 @@ export async function fetchExchangeRate() {
 }
 
 // ─── Upbit만으로 빠른 가격 갱신 (10초 폴링용) ─────────────────
-export async function fetchCoinsUpbitOnly(prevCoins = [], krwRate = 1466) {
+export async function fetchCoinsUpbitOnly(prevCoins = [], krwRate = DEFAULT_KRW_RATE) {
   const upbitMap = await fetchUpbit().catch(() => ({}));
   if (!Object.keys(upbitMap).length) return prevCoins;
 
@@ -261,7 +262,7 @@ export async function fetchCoinsUpbitOnly(prevCoins = [], krwRate = 1466) {
 // 2순위: CoinGecko (fallback + 스파크라인)
 // + Upbit (KRW 가격 덮어쓰기)
 // + Binance (USD 가격 보강)
-export async function fetchCoins(krwRate = 1466) {
+export async function fetchCoins(krwRate = DEFAULT_KRW_RATE) {
   // 3개 소스 병렬 호출
   const [upbitMap, paprikaRaw, binanceMap] = await Promise.all([
     fetchUpbit().catch(() => ({})),

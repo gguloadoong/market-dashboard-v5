@@ -1,4 +1,5 @@
 // 파생 시그널 위젯 — PCR · 펀딩비 · 호가창 불균형 + 해석 텍스트
+// 데이터는 props로 주입받아 useDerivativeSignals 훅과 이중 폴링 방지
 import { useState, useEffect } from 'react';
 import { fetchPCR, fetchFundingRate, fetchOrderFlow } from '../../../api/_gateway';
 import { THRESHOLDS } from '../../../constants/signalThresholds';
@@ -48,16 +49,21 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 3600)}시간 전`;
 }
 
-export default function DerivativesWidget() {
+// props로 데이터를 주입받으면 재사용, 없으면 자체 폴링 (하위 호환)
+export default function DerivativesWidget({ pcr: propPcr, btcFunding: propBtcFunding, ethFunding: propEthFunding, orderFlow: propOrderFlow, fetchedAt: propFetchedAt } = {}) {
+  const isExternal = propPcr !== undefined || propBtcFunding !== undefined;
+
   const [pcr, setPcr]         = useState(null);
   const [btcFunding, setBtcFunding] = useState(null);
   const [ethFunding, setEthFunding] = useState(null);
   const [orderFlow, setOrderFlow]   = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isExternal);
   const [fetchedAt, setFetchedAt]   = useState(null);
   const [, setTick] = useState(0); // 시간 표시 1분 갱신
 
+  // 외부 props 데이터가 있으면 자체 폴링 안 함 (이중 폴링 방지)
   useEffect(() => {
+    if (isExternal) return;
     let cancelled = false;
     async function load() {
       try {
@@ -80,7 +86,14 @@ export default function DerivativesWidget() {
     const poll   = setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);
     const ticker = setInterval(() => setTick(t => t + 1), 60 * 1000);
     return () => { cancelled = true; clearInterval(poll); clearInterval(ticker); };
-  }, []);
+  }, [isExternal]);
+
+  // 외부 props 우선 사용
+  const _pcr = isExternal ? propPcr : pcr;
+  const _btcFunding = isExternal ? propBtcFunding : btcFunding;
+  const _ethFunding = isExternal ? propEthFunding : ethFunding;
+  const _orderFlow = isExternal ? propOrderFlow : orderFlow;
+  const _fetchedAt = isExternal ? propFetchedAt : fetchedAt;
 
   if (loading) return (
     <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
@@ -89,7 +102,7 @@ export default function DerivativesWidget() {
     </div>
   );
 
-  const hasData = pcr?.pcr != null || btcFunding?.ratePercent != null || ethFunding?.ratePercent != null;
+  const hasData = _pcr?.pcr != null || _btcFunding?.ratePercent != null || _ethFunding?.ratePercent != null;
   // API 없는 환경(로컬 dev)에서도 data-testid 유지 — 빈 상태로 표시
   if (!hasData) return (
     <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
@@ -100,7 +113,7 @@ export default function DerivativesWidget() {
     </div>
   );
 
-  const pcrInterp = getPcrInterpretation(pcr?.pcr);
+  const pcrInterp = getPcrInterpretation(_pcr?.pcr);
 
   return (
     <div data-testid="derivatives-widget" className="bg-white rounded-xl border border-[#ECEEF1] p-4">
@@ -109,33 +122,33 @@ export default function DerivativesWidget() {
           <span className="text-[13px] font-bold text-[#191F28]">파생 시그널</span>
           <span className="text-[10px] text-[#B0B8C1]">PCR · 펀딩비 · 호가</span>
         </div>
-        {fetchedAt && (
-          <span className="text-[10px] text-[#B0B8C1]">{timeAgo(fetchedAt)}</span>
+        {_fetchedAt && (
+          <span className="text-[10px] text-[#B0B8C1]">{timeAgo(_fetchedAt)}</span>
         )}
       </div>
 
       <div className="space-y-3">
         {/* PCR */}
-        {pcr?.pcr != null && (
+        {_pcr?.pcr != null && (
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] text-[#8B95A1]">S&P500 Put/Call Ratio</span>
-              <span className="text-[12px] font-bold text-[#191F28]">{pcr.pcr.toFixed(2)}</span>
+              <span className="text-[12px] font-bold text-[#191F28]">{_pcr.pcr.toFixed(2)}</span>
             </div>
             <p className="text-[11px] font-medium" style={{ color: pcrInterp.color }}>{pcrInterp.text}</p>
           </div>
         )}
 
         {/* BTC 펀딩비 */}
-        {btcFunding?.ratePercent != null && (() => {
-          const interp = getFundingInterpretation(btcFunding.ratePercent);
-          const sign = btcFunding.ratePercent > 0 ? '+' : '';
+        {_btcFunding?.ratePercent != null && (() => {
+          const interp = getFundingInterpretation(_btcFunding.ratePercent);
+          const sign = _btcFunding.ratePercent > 0 ? '+' : '';
           return (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[11px] text-[#8B95A1]">BTC 펀딩비</span>
                 <span className="text-[12px] font-bold" style={{ color: interp.color }}>
-                  {sign}{btcFunding.ratePercent.toFixed(3)}%
+                  {sign}{_btcFunding.ratePercent.toFixed(3)}%
                 </span>
               </div>
               <p className="text-[11px] font-medium" style={{ color: interp.color }}>{interp.text}</p>
@@ -144,15 +157,15 @@ export default function DerivativesWidget() {
         })()}
 
         {/* ETH 펀딩비 */}
-        {ethFunding?.ratePercent != null && (() => {
-          const interp = getFundingInterpretation(ethFunding.ratePercent);
-          const sign = ethFunding.ratePercent > 0 ? '+' : '';
+        {_ethFunding?.ratePercent != null && (() => {
+          const interp = getFundingInterpretation(_ethFunding.ratePercent);
+          const sign = _ethFunding.ratePercent > 0 ? '+' : '';
           return (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[11px] text-[#8B95A1]">ETH 펀딩비</span>
                 <span className="text-[12px] font-bold" style={{ color: interp.color }}>
-                  {sign}{ethFunding.ratePercent.toFixed(3)}%
+                  {sign}{_ethFunding.ratePercent.toFixed(3)}%
                 </span>
               </div>
               <p className="text-[11px] font-medium" style={{ color: interp.color }}>{interp.text}</p>
@@ -161,9 +174,9 @@ export default function DerivativesWidget() {
         })()}
 
         {/* BTC 호가창 불균형 */}
-        {orderFlow?.imbalance != null && (() => {
-          const interp = getOrderFlowInterpretation(orderFlow.imbalance);
-          const bidPct = orderFlow.bidVolume / (orderFlow.bidVolume + orderFlow.askVolume) * 100;
+        {_orderFlow?.imbalance != null && (() => {
+          const interp = getOrderFlowInterpretation(_orderFlow.imbalance);
+          const bidPct = _orderFlow.bidVolume / (_orderFlow.bidVolume + _orderFlow.askVolume) * 100;
           return (
             <div>
               <div className="flex items-center justify-between mb-1">

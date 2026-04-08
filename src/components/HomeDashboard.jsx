@@ -4,6 +4,7 @@
 // ③ 3열 HOT 리스트 (국내/미장/코인 각 TOP5)
 // ④ 인사이트 카드 (뉴스 시그널 기반, compact 가로 스크롤)
 
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useState, useMemo, memo } from 'react';
 import MarketSummaryCards from './MarketSummaryCards';
 import Sparkline from './Sparkline';
@@ -463,7 +464,7 @@ const SURGE_FILTERS = [
 // ─── 메인 홈 대시보드 ────────────────────────────────────────
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [],
-  krwRate = 1466, onItemClick,
+  krwRate = DEFAULT_KRW_RATE, onItemClick,
 }) {
   const { data: allNews = [], isLoading: newsLoading } = useAllNewsQuery();
   const { watchlist, toggle, isWatched } = useWatchlist();
