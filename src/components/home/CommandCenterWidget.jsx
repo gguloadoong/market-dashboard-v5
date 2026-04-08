@@ -130,7 +130,7 @@ function HeroSignalCard({ onItemClick, allItems }) {
       <div
         className={`rounded-[14px] p-5 ${hero.symbol ? 'cursor-pointer hover:brightness-[0.98]' : ''} transition-all`}
         style={{ background: heroBg }}
-        onClick={() => hero.symbol && onItemClick?.({ symbol: hero.symbol, name: hero.name || hero.symbol, market: hero.market })}
+        onClick={() => hero.symbol && onItemClick?.({ symbol: hero.symbol, name: hero.name || hero.symbol, market: hero.market === 'crypto' ? 'coin' : hero.market })}
         role={hero.symbol ? 'button' : undefined}
         tabIndex={hero.symbol ? 0 : undefined}
       >
@@ -187,7 +187,7 @@ function HeroSignalCard({ onItemClick, allItems }) {
             key={signal.id || `hero-sub-${idx}`}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${signal.symbol ? 'cursor-pointer hover:bg-[#F7F8FA]' : ''} transition-colors`}
             style={{ borderTop: '1px solid #F2F3F5' }}
-            onClick={() => signal.symbol && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market })}
+            onClick={() => signal.symbol && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market })}
           >
             {item && <TickerLogo item={item} size={24} />}
             <span className="text-[14px] font-semibold text-[#191F28] truncate flex-1 min-w-0">{extractName(signal)}</span>
