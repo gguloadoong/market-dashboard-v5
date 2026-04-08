@@ -1,4 +1,5 @@
 import { fetchWhaleProxy, fetchWhaleTelegram } from './_gateway.js';
+import { DEFAULT_KRW_RATE } from '../constants/market';
 // ─── 코인 고래 알림 API ────────────────────────────────────────
 //
 // 【결론: WhaleAlert RSS는 클라이언트 사이드에서 불가】
@@ -23,7 +24,7 @@ import { fetchWhaleProxy, fetchWhaleTelegram } from './_gateway.js';
 //   - 가격/거래량 이상 징후 감지로 대체 (간접 지표)
 
 // ─── 환율 / BTC 가격 (App.jsx에서 주입) ──────────────────────
-let currentKrwRate    = 1466;       // USD → KRW 환율
+let currentKrwRate    = DEFAULT_KRW_RATE;       // USD → KRW 환율
 let currentBtcKrwPrice = 130_000_000; // BTC 현재가 (원)
 
 /** USD/KRW 환율 업데이트 — App.jsx에서 fetchExchangeRate() 결과로 호출 */

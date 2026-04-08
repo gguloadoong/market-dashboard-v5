@@ -1,4 +1,5 @@
 // 전역 종목 검색 모달 — `/` 키로 열기, ESC / 바깥 클릭으로 닫기
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { fetchNaverSearch, fetchUsStockSearch } from '../api/_gateway.js';
 
@@ -32,7 +33,7 @@ const MARKET_COLOR = { kr: '#F04452', us: '#3182F6', coin: '#FF9500', etf: '#8B5
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useAllNewsQuery } from '../hooks/useNewsQuery';
 
-export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = 1466, onSelect, onNewsClick, onClose }) {
+export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [], etfs = [], krwRate = DEFAULT_KRW_RATE, onSelect, onNewsClick, onClose }) {
   const { toggle, isWatched } = useWatchlist();
   const { data: allNews = [] } = useAllNewsQuery();
   const [query, setQuery] = useState('');

@@ -1,5 +1,6 @@
 // 워치리스트 테이블 — 로고 + 섹션 구분 + 티커 심볼 + 클릭 시 차트
 // 가상 스크롤: 4,000+ 종목 DOM 성능 최적화 (@tanstack/react-virtual)
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import React from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -518,7 +519,7 @@ const RELIABILITY = {
   etf:  { label: '⏱ 15분 지연', sub: 'Yahoo Finance', color: '#FF9500' },
 };
 
-export default function WatchlistTable({ items = [], type = 'kr', krwRate = 1466, onRowClick, loading = false, initializing = false, dataError = null, onRetry }) {
+export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFAULT_KRW_RATE, onRowClick, loading = false, initializing = false, dataError = null, onRetry }) {
   const [sortKey, setSortKey] = useState('changePct');
   const [sortDir, setSortDir] = useState('desc');
   const [searchInput, setSearchInput] = useState('');       // 즉시 반영 (입력 UI용)

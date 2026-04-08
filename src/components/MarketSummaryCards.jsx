@@ -1,4 +1,5 @@
 // 오늘의 마켓 요약 — 공포탐욕 / BTC 도미넌스 / 김치프리미엄
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useState, useEffect } from 'react';
 import { fetchFearGreed, fetchBtcDominance, calcKimchiPremium } from '../api/market';
 
@@ -21,7 +22,7 @@ function GaugeBar({ value, max = 100, color }) {
   );
 }
 
-export default function MarketSummaryCards({ coins = [], krwRate = 1466 }) {
+export default function MarketSummaryCards({ coins = [], krwRate = DEFAULT_KRW_RATE }) {
   const [fearGreed, setFearGreed] = useState(null);
   const [dominance, setDominance] = useState(null);
 

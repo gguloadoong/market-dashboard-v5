@@ -1,3 +1,4 @@
+import { DEFAULT_KRW_RATE } from '../../constants/market';
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
@@ -15,7 +16,7 @@ import ExploreTabsWidget from './ExploreTabsWidget';
 
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
-  krwRate = 1466, onItemClick, onNewsClick, onTabChange,
+  krwRate = DEFAULT_KRW_RATE, onItemClick, onNewsClick, onTabChange,
   dataReady = true,
 }) {
   const queryClient = useQueryClient();

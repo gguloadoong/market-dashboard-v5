@@ -1,5 +1,6 @@
 // 주목할만한 움직임 — 복합 스코어 기반 히어로 수평 카드
 // 변동폭 + 거래량 순위 + 뉴스 매칭 복합 점수 + WHY 뉴스 연결
+import { DEFAULT_KRW_RATE } from '../../constants/market';
 import { useMemo, useState, useEffect } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews, DERIVATIVE_RE } from './utils';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
@@ -173,16 +174,25 @@ function NotableCard({ item, newsCount, volumeRank, whyReason, krwRate, onClick 
   );
 }
 
-export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = 1466, onItemClick }) {
+// 20분 슬롯 간격 (모듈 스코프 — 렌더마다 재생성 방지)
+const SLOT_MS = 20 * 60 * 1000;
+
+export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = DEFAULT_KRW_RATE, onItemClick }) {
   const krOpen = getKoreanMarketStatus().status === 'open';
   const usOpen = getUsMarketStatus().status === 'open';
   const hasClosedMarket = !krOpen || !usOpen;
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
-  const [timeSlot, setTimeSlot] = useState(() => Math.floor(Date.now() / (20 * 60 * 1000)));
+  // 첫 tick을 다음 20분 경계까지의 남은 시간으로 정렬
+  const [timeSlot, setTimeSlot] = useState(() => Math.floor(Date.now() / SLOT_MS));
   useEffect(() => {
-    const id = setInterval(() => setTimeSlot(Math.floor(Date.now() / (20 * 60 * 1000))), 20 * 60 * 1000);
-    return () => clearInterval(id);
+    const msToNextBoundary = SLOT_MS - (Date.now() % SLOT_MS);
+    let intervalId = null;
+    const timerId = setTimeout(() => {
+      setTimeSlot(Math.floor(Date.now() / SLOT_MS));
+      intervalId = setInterval(() => setTimeSlot(Math.floor(Date.now() / SLOT_MS)), SLOT_MS);
+    }, msToNextBoundary);
+    return () => { clearTimeout(timerId); if (intervalId) clearInterval(intervalId); };
   }, []);
 
   const notables = useMemo(() => {

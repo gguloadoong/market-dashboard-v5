@@ -1,4 +1,5 @@
 // 종목 상세 차트 사이드 패널 — lightweight-charts 사용
+import { DEFAULT_KRW_RATE } from '../constants/market';
 import { useState, useEffect, useRef, useMemo, Component } from 'react';
 import { createChart, CandlestickSeries, LineSeries, AreaSeries, HistogramSeries, ColorType, CrosshairMode } from 'lightweight-charts';
 
@@ -151,7 +152,7 @@ function _timeAgo(date) {
 }
 
 // ─── 시가총액 포맷 (조/억 단위) ──────────────────────────────────
-function fmtMcap(v, isCoin = false, _krwRate = 1466) {
+function fmtMcap(v, isCoin = false, _krwRate = DEFAULT_KRW_RATE) {
   if (!v) return '—';
   // 코인: USD 기준 → 조(T), 억(B)
   if (isCoin) {
@@ -648,7 +649,7 @@ function InvestorFlowEnhanced({ symbol }) {
 }
 
 // ─── 메인 패널 ──────────────────────────────────────────────────
-export default function ChartSidePanel({ item, krwRate = 1466, onClose, onRelatedClick, onNewsClick, allData = {}, newsContext = null }) {
+export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClose, onRelatedClick, onNewsClick, allData = {}, newsContext = null }) {
   const [period,    setPeriod]    = useState('5분');
   const [candles,   setCandles]   = useState([]);
   const [chartLoading, setChartLoading] = useState(false);

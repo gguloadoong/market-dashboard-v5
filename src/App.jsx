@@ -11,6 +11,7 @@ import ChartSidePanel from './components/ChartSidePanel';
 import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
 import GlobalSearch from './components/GlobalSearch';
+import { DEFAULT_KRW_RATE } from './constants/market';
 import SectorRotation from './components/SectorRotation';
 
 import { ETF_LIST } from './data/etfList';
@@ -67,7 +68,7 @@ export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode();
   const { watchlist, krSymbols, usSymbols } = useWatchlist();
   const { indices, krwRate }        = useIndices();
-  const krwRateRef                  = useRef(1466);
+  const krwRateRef                  = useRef(DEFAULT_KRW_RATE);
   useEffect(() => { krwRateRef.current = krwRate; }, [krwRate]);
 
   const { coins, setCoins: _setCoins, coinError, refreshCoins, coinsReady } = useCoins(krwRateRef);

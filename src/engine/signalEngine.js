@@ -1,5 +1,6 @@
 // 시그널 엔진 — 시그널 생성/관리/만료/구독
 import { SIGNAL_TYPES, DIRECTIONS, getTTL, STABLECOIN_SYMBOLS } from './signalTypes';
+import { THRESHOLDS } from '../constants/signalThresholds';
 
 // ─── 내부 저장소 ────────────────────────────────────────────
 const MAX_SIGNALS = 100;
@@ -345,8 +346,6 @@ export function createFearGreedSignal(current, previous, market) {
   });
   return addSignal(signal);
 }
-
-import { THRESHOLDS } from '../constants/signalThresholds';
 
 /** PCR 역발상 시그널 — 경계 구간 포함 */
 export function createPCRSignal(pcr, totalPuts, totalCalls) {
