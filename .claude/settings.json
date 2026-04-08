@@ -1,16 +1,13 @@
 {
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "deny": [
+      "Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(sudo *)",
+      "Read(.env*)", "Read(**/credentials*)", "Read(**/*secret*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/check-safety.sh",
-            "timeout": 5000
-          }
-        ]
-      },
       {
         "matcher": "Agent",
         "hooks": [

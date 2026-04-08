@@ -84,6 +84,31 @@ export async function setSnap(key, data, ex) {
   }
 }
 
+// US 샤드 병합 조회 — snap:us:0~N 샤드 + snap:us 레거시 fallback
+export async function getUsSnap() {
+  if (!redis) return null;
+  try {
+    // 샤드 수 동적 조회 (크론이 저장)
+    const shardCount = parseInt(await redis.get('us:cron:shardCount') || '0', 10);
+    if (shardCount > 0) {
+      // mget으로 한 번에 조회
+      const shardKeys = Array.from({ length: shardCount }, (_, i) => `snap:us:${i}`);
+      const shards = await redis.mget(...shardKeys);
+      const merged = new Map();
+      for (const shard of shards) {
+        if (!Array.isArray(shard)) continue;
+        for (const item of shard) merged.set(item.symbol, item);
+      }
+      if (merged.size > 0) return [...merged.values()];
+    }
+    // 샤드 없으면 레거시 fallback
+    return getSnapWithFallback(SNAP_KEYS.US);
+  } catch (e) {
+    console.error('[price-cache] getUsSnap 실패:', e);
+    return getSnapWithFallback(SNAP_KEYS.US);
+  }
+}
+
 // 전체 마켓 스냅샷 일괄 조회 (백업 fallback 포함)
 // ETF는 cron 없음 — 클라이언트 직접 폴링
 export async function getAllSnaps() {
@@ -91,7 +116,7 @@ export async function getAllSnaps() {
   try {
     const [kr, us, coins] = await Promise.all([
       getSnapWithFallback(SNAP_KEYS.KR),
-      getSnapWithFallback(SNAP_KEYS.US),
+      getUsSnap(),
       getSnapWithFallback(SNAP_KEYS.COINS),
     ]);
     return { kr, us, coins };

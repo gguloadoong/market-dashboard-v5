@@ -4,6 +4,7 @@
 // afterHoursPrice: 시간외 단일가가 있을 때 표시
 import { memo, useMemo } from 'react';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
+import { DERIVATIVE_RE } from './home/utils';
 
 // 시장별 컬러 도트
 const MARKET_DOT = {
@@ -41,9 +42,19 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
     const krOpen = getKoreanMarketStatus().status === 'open';
     const usOpen = getUsMarketStatus().status === 'open';
 
+    // ELW/ETN/파생상품 필터 — 이름 미해결, 상한가 초과, 또는 파생상품 키워드
+    const isDerivative = (s) => {
+      if (s.market !== 'kr') return false;
+      if (!s.name || s.name === s.symbol) return true;
+      if (Math.abs(s.changePct ?? 0) > 30) return true;
+      if (DERIVATIVE_RE.test(s.name || '')) return true;
+      return false;
+    };
+
     const all = [
       ...stocks
         .filter(s => s.market === 'kr' ? krOpen : s.market === 'us' ? usOpen : true)
+        .filter(s => !isDerivative(s))
         .map(s => ({
           name:            s.name || s.symbol,
           symbol:          s.symbol,
