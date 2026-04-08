@@ -10,7 +10,6 @@ import {
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
-import { getPct } from '../components/home/utils';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -307,6 +306,12 @@ function detectSectorRotation(allItems, sectorRanksPrevRef) {
       addSignal(signal);
     }
   }
+}
+
+// 종목 등락률 추출 — 코인(id 존재)은 change24h, 주식은 changePct
+function getPct(item) {
+  if (item.id || item._market === 'COIN' || item.market === 'coin') return item.change24h ?? 0;
+  return item.changePct ?? 0;
 }
 
 /** 부팅 시드 — 시그널 0건이면 변동폭 상위 종목으로 즉시 생성 */

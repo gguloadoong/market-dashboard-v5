@@ -4,12 +4,13 @@ import { useSignals } from '../../../hooks/useSignals';
 import { calcTemperature } from '../../../utils/temperature';
 
 // ── 게이지 존 스타일 — CommandCenterWidget/MarketSentimentWidget과 통일 ──
+// 한국 시장 관례: 빨강=상승(강세), 파랑=하락(약세)
 const ZONE = {
-  '강한 경계': { bar: '#3182F6', bg: '#EDF4FF', text: '#1764ED', icon: '🔴' },
+  '강한 경계': { bar: '#3182F6', bg: '#EDF4FF', text: '#1764ED', icon: '🔵' },
   '약세 우위': { bar: '#7EB4F7', bg: '#F0F6FF', text: '#3182F6', icon: '🟠' },
   '중립':      { bar: '#B0B8C1', bg: '#F7F8FA', text: '#4E5968', icon: '🟡' },
   '강세 징후': { bar: '#F7A0A8', bg: '#FFF5F6', text: '#F04452', icon: '🟢' },
-  '강한 강세': { bar: '#F04452', bg: '#FFF0F1', text: '#C0392B', icon: '🔵' },
+  '강한 강세': { bar: '#F04452', bg: '#FFF0F1', text: '#C0392B', icon: '🔴' },
 };
 
 export default function MarketTemperatureWidget() {
