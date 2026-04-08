@@ -54,8 +54,8 @@ export function isCoinItem(item) {
 
 // 종목 등락률 추출 (KR/US/COIN 통합, 캐시 복원 시 _market 누락 방어)
 export function getPct(item) {
-  if (isCoinItem(item)) return item.change24h ?? 0;
-  return item.changePct ?? 0;
+  const raw = isCoinItem(item) ? item.change24h : item.changePct;
+  return Number.isFinite(raw) ? raw : 0;
 }
 
 // ─── 시장 배지 팔레트 ─────────────────────────────────────────

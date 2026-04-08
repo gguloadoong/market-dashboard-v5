@@ -174,6 +174,9 @@ function NotableCard({ item, newsCount, volumeRank, whyReason, krwRate, onClick 
   );
 }
 
+// 20분 슬롯 간격 (모듈 스코프 — 렌더마다 재생성 방지)
+const SLOT_MS = 20 * 60 * 1000;
+
 export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = DEFAULT_KRW_RATE, onItemClick }) {
   const krOpen = getKoreanMarketStatus().status === 'open';
   const usOpen = getUsMarketStatus().status === 'open';
@@ -181,7 +184,6 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
   // 첫 tick을 다음 20분 경계까지의 남은 시간으로 정렬
-  const SLOT_MS = 20 * 60 * 1000;
   const [timeSlot, setTimeSlot] = useState(() => Math.floor(Date.now() / SLOT_MS));
   useEffect(() => {
     const msToNextBoundary = SLOT_MS - (Date.now() % SLOT_MS);

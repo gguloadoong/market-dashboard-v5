@@ -95,16 +95,24 @@ export async function getUsSnap() {
       const shardKeys = Array.from({ length: shardCount }, (_, i) => `snap:us:${i}`);
       const shards = await redis.mget(...shardKeys);
       const merged = new Map();
+      // 만료된 샤드 인덱스를 모아서 backup 일괄 조회 (N+1 방지)
+      const missIdx = [];
       for (let i = 0; i < shards.length; i++) {
-        let shard = shards[i];
-        // 샤드 만료 시 backup(:prev) 키에서 복구 시도
-        if (!Array.isArray(shard)) {
-          try {
-            shard = await redis.get(`${shardKeys[i]}:prev`);
-          } catch (_) { /* 백업 조회 실패 무시 */ }
+        if (Array.isArray(shards[i])) {
+          for (const item of shards[i]) merged.set(item.symbol, item);
+        } else {
+          missIdx.push(i);
         }
-        if (!Array.isArray(shard)) continue;
-        for (const item of shard) merged.set(item.symbol, item);
+      }
+      if (missIdx.length > 0) {
+        try {
+          const prevKeys = missIdx.map(i => `${shardKeys[i]}:prev`);
+          const backups = await redis.mget(...prevKeys);
+          for (const backup of backups) {
+            if (!Array.isArray(backup)) continue;
+            for (const item of backup) merged.set(item.symbol, item);
+          }
+        } catch (_) { /* 백업 일괄 조회 실패 무시 */ }
       }
       if (merged.size > 0) return [...merged.values()];
     }

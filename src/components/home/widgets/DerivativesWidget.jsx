@@ -50,8 +50,9 @@ function timeAgo(ts) {
 }
 
 // props로 데이터를 주입받으면 재사용, 없으면 자체 폴링 (하위 호환)
-export default function DerivativesWidget({ pcr: propPcr, btcFunding: propBtcFunding, ethFunding: propEthFunding, orderFlow: propOrderFlow, fetchedAt: propFetchedAt } = {}) {
-  const isExternal = propPcr !== undefined || propBtcFunding !== undefined;
+// external=true 명시 시 자체 폴링 비활성화 (이중 폴링 방지)
+export default function DerivativesWidget({ pcr: propPcr, btcFunding: propBtcFunding, ethFunding: propEthFunding, orderFlow: propOrderFlow, fetchedAt: propFetchedAt, external = false } = {}) {
+  const isExternal = external;
 
   const [pcr, setPcr]         = useState(null);
   const [btcFunding, setBtcFunding] = useState(null);
