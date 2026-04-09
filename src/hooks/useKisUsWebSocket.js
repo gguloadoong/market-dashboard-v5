@@ -253,10 +253,36 @@ export function useKisUsWebSocket(symbols, onQuote) {
       scheduleKeyRefresh();
     });
 
+    // [최적화] 백그라운드 탭 시 WS 해제 — 데이터 절감
+    function handleVisibility() {
+      if (!mountedRef.current) return;
+      const key = approvalKeyRef.current;
+      if (document.hidden) {
+        // 백그라운드 → WS 해제
+        clearTimeout(retryTimer.current);
+        const ws = wsRef.current;
+        if (ws) {
+          if (key) sendSubscribe(ws, key, prevSymbolsRef.current, '2');
+          ws.onclose = null;
+          ws.close();
+          wsRef.current = null;
+        }
+      } else {
+        // 포그라운드 복귀 → 재연결
+        if (!wsRef.current && key) {
+          retryRef.current = 0;
+          prevSymbolsRef.current = [];
+          connect(key);
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       mountedRef.current = false;
       clearTimeout(retryTimer.current);
       clearTimeout(keyRefreshTimer.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
       const ws  = wsRef.current;
       const key = approvalKeyRef.current;
       if (ws) {

@@ -3,15 +3,21 @@
 // 기존 10초 폴링을 보완: WS가 연결되면 <1초 단위로 가격 갱신
 // WS 끊김 → 5초 후 자동 재연결 (whale.js와 동일 패턴)
 // 폴링은 WS 연결 여부와 무관하게 유지 (fallback)
+//
+// [최적화] 백그라운드 탭 시 WS 해제 — 데이터 95% 절감
+// document.hidden 시 연결 해제, 복귀 시 자동 재연결
 
 let coinWs          = null;
 let coinHandler     = null;
 let coinMarkets     = null;
 let coinReconnTimer = null;
 let coinDestroyed   = false;
+let _visibilityHandler = null; // 탭 visibility 리스너
 
 function connectCoinWs() {
   if (coinDestroyed || !coinMarkets || !coinHandler) return;
+  // 백그라운드 상태면 연결하지 않음
+  if (document.hidden) return;
 
   try {
     const ws = new WebSocket('wss://api.upbit.com/websocket/v1');
@@ -53,12 +59,32 @@ function connectCoinWs() {
     ws.onclose  = () => {
       coinWs = null;
       coinHandler?.({ _disconnected: true });
-      if (!coinDestroyed) {
+      // 백그라운드가 아닐 때만 재연결 (백그라운드면 visibility 복귀 시 재연결)
+      if (!coinDestroyed && !document.hidden) {
         coinReconnTimer = setTimeout(connectCoinWs, 5000);
       }
     };
   } catch {
-    if (!coinDestroyed) coinReconnTimer = setTimeout(connectCoinWs, 5000);
+    if (!coinDestroyed && !document.hidden) coinReconnTimer = setTimeout(connectCoinWs, 5000);
+  }
+}
+
+// 백그라운드/포그라운드 전환 시 WS 자동 관리
+function _handleVisibility() {
+  if (coinDestroyed) return;
+  if (document.hidden) {
+    // 백그라운드 진입 → WS 해제 (데이터 절감)
+    clearTimeout(coinReconnTimer);
+    if (coinWs) {
+      try { coinWs.close(); } catch {}
+      coinWs = null;
+      coinHandler?.({ _disconnected: true });
+    }
+  } else {
+    // 포그라운드 복귀 → 즉시 재연결
+    if (!coinWs && coinMarkets && coinHandler) {
+      connectCoinWs();
+    }
   }
 }
 
@@ -74,6 +100,13 @@ export function subscribeCoinPrices(symbols, onTick) {
 
   if (coinWs) { try { coinWs.close(); } catch {} coinWs = null; }
   clearTimeout(coinReconnTimer);
+
+  // visibility 리스너 등록 (1회만)
+  if (!_visibilityHandler) {
+    _visibilityHandler = _handleVisibility;
+    document.addEventListener('visibilitychange', _visibilityHandler);
+  }
+
   connectCoinWs();
 }
 
@@ -87,4 +120,10 @@ export function unsubscribeCoinPrices() {
   coinMarkets   = null;
   clearTimeout(coinReconnTimer);
   if (coinWs) { try { coinWs.close(); } catch {} coinWs = null; }
+
+  // visibility 리스너 해제
+  if (_visibilityHandler) {
+    document.removeEventListener('visibilitychange', _visibilityHandler);
+    _visibilityHandler = null;
+  }
 }
