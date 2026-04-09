@@ -177,7 +177,7 @@ export function useKisWebSocket(symbols, onQuote) {
         const oldWs = wsRef.current;
         if (oldWs) { oldWs.onclose = null; oldWs.close(); wsRef.current = null; }
         retryRef.current = 0;
-        connect(newKey);
+        if (!document.hidden) connect(newKey); // 백그라운드면 복귀 시 자동 연결
         scheduleKeyRefresh();
       }, KEY_TTL_MS);
     }

@@ -418,7 +418,7 @@ let waDestroyed = false;
  */
 export function startWhaleAlertPolling(callback) {
   waDestroyed = false;
-  pollWhaleAlert(callback);
+  if (!document.hidden) pollWhaleAlert(callback);
   waTimer = setInterval(() => {
     if (document.hidden) return;
     pollWhaleAlert(callback);
@@ -689,7 +689,7 @@ export function startTelegramWhalePolling(callback) {
   if (telegramTimer) { clearInterval(telegramTimer); telegramTimer = null; }
   telegramDestroyed = false;
   telegramSeenIds   = new Set();
-  pollTelegramWhale(callback);
+  if (!document.hidden) pollTelegramWhale(callback);
   telegramTimer = setInterval(() => {
     if (document.hidden) return;
     pollTelegramWhale(callback);
