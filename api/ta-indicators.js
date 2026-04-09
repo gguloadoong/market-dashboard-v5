@@ -236,6 +236,11 @@ export default async function handler(req) {
     ta.totalScore = scores.length > 0 ? +scores.reduce((a, b) => a + b, 0).toFixed(1) : 0;
     ta.indicatorCount = scores.length;
 
+    // 프론트엔드 패턴 감지용 OHLCV 원본 포함 (최근 30봉)
+    ta.candles = candles.slice(-30);
+    ta.closes = closes.slice(-30);
+    ta.volumes = volumes.slice(-30);
+
     // 캐시 저장
     await setSnap(cacheKey, ta, TA_TTL);
     results[symbol] = ta;

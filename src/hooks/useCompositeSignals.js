@@ -1,7 +1,11 @@
 // 복합 시그널 훅 — TA API 폴링 + 기존 시그널 merge → 종목별 방향성 점수
 import { useState, useEffect, useRef } from 'react';
 import { calculateCompositeScore, extractFlowAndSentiment } from '../engine/compositeScorer';
-import { getActiveSignals, createSignal, addSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
+import {
+  getActiveSignals, createSignal, addSignal, removeSignalByTypeAndSymbol,
+  createSupportResistanceSignal, createDoubleBottomSignal, createRecoverySignal,
+} from '../engine/signalEngine';
+import { findSupportResistance, detectDoubleBottom, detectRecovery } from '../engine/taCalculator';
 import { SIGNAL_TYPES } from '../engine/signalTypes';
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5분
@@ -93,6 +97,39 @@ export function useCompositeSignals(allItems = []) {
                 macd: ta.macd?.histogram,
               },
             }));
+          }
+        }
+
+        // ── Tier2-3: TA 기반 패턴 시그널 (지지/저항 돌파, 이중바닥, 회복 감지) ──
+        for (const [symbol, ta] of Object.entries(allResults)) {
+          const name = findName(symbol, items) || symbol;
+          const market = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
+          const candles = ta.candles;
+          const closes = ta.closes ?? (Array.isArray(candles) ? candles.map(c => c.close).filter(Boolean) : null);
+          const volumes = ta.volumes ?? (Array.isArray(candles) ? candles.map(c => c.volume).filter(Boolean) : null);
+
+          // 지지/저항선 돌파 감지
+          if (Array.isArray(candles) && candles.length >= 10) {
+            const sr = findSupportResistance(candles);
+            if (sr?.breakType) {
+              createSupportResistanceSignal(symbol, name, market, sr.breakType, sr.breakLevel);
+            }
+          }
+
+          // 이중바닥 패턴 감지
+          if (Array.isArray(candles) && candles.length >= 15) {
+            const db = detectDoubleBottom(candles);
+            if (db?.approaching) {
+              createDoubleBottomSignal(symbol, name, market, db.bottom1, db.bottom2, db.neckline, db.broken);
+            }
+          }
+
+          // 회복 감지 — 급락 후 안정화
+          if (closes?.length >= 25 && volumes?.length >= 25) {
+            const rec = detectRecovery(closes, volumes);
+            if (rec) {
+              createRecoverySignal(symbol, name, market, rec.drawdown, rec.bbShrink, rec.volRatio);
+            }
           }
         }
 
