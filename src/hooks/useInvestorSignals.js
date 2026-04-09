@@ -531,8 +531,9 @@ function detectGapSignals(allItems) {
 function detectRebalancingSignal() {
   const result = detectRebalancingWindow();
   if (!result || !result.isRebalancing) return;
-  // 중복 방지: 기존 리밸런싱 시그널 제거 후 재생성
-  removeSignalByTypeAndSymbol(SIGNAL_TYPES.REBALANCING_ALERT, 'MARKET');
+  // 중복 방지: 기존 리밸런싱 시그널이 있으면 스킵 (TTL 24시간이므로 1일 1회만 생성)
+  const existing = getActiveSignals().find(s => s.type === SIGNAL_TYPES.REBALANCING_ALERT);
+  if (existing) return;
   createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
 }
 
@@ -561,9 +562,10 @@ function detectCapitulation(allItems) {
   if (!allItems?.length) return;
 
   const T = THRESHOLDS.CAPITULATION;
-  // 공포탐욕 지수는 기존 시그널에서 추출
+  // 공포탐욕 지수는 기존 시그널에서 추출 — 없으면 투매 감지 스킵
   const fgSignal = getActiveSignals().find(s => s.type === SIGNAL_TYPES.FEAR_GREED_SHIFT);
-  const fearGreed = fgSignal?.meta?.current ?? 50; // 기본값 50 (중립)
+  const fearGreed = fgSignal?.meta?.current;
+  if (fearGreed == null) return; // F&G 데이터 없으면 투매 판단 불가
 
   const markets = ['KR', 'US', 'COIN'];
   for (const market of markets) {
