@@ -775,7 +775,7 @@ export function createBtcLeadingSignal(alt, btcChange, altChange) {
 }
 
 /** 지지/저항선 돌파 시그널 */
-export function createSupportResistanceSignal(symbol, name, market, breakType, breakLevel) {
+export function createSupportResistanceSignal(symbol, name, market, breakType, breakLevel, currentPrice) {
   if (!breakType || !breakLevel) return null;
 
   const direction = breakType === 'resistance' ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
@@ -788,12 +788,12 @@ export function createSupportResistanceSignal(symbol, name, market, breakType, b
     symbol, name, market,
     direction, strength,
     title,
-    meta: { name, breakType, level: breakLevel },
+    meta: { name, breakType, level: breakLevel, currentPrice },
   }));
 }
 
 /** 이중바닥 패턴 시그널 */
-export function createDoubleBottomSignal(symbol, name, market, bottom1, bottom2, neckline, broken) {
+export function createDoubleBottomSignal(symbol, name, market, bottom1, bottom2, neckline, broken, currentPrice) {
   const strength = broken ? 4 : 3;
   const label = broken ? '넥라인 돌파' : '넥라인 접근';
   const title = `${name} 이중바닥 ${label} — 넥라인 ${neckline.toLocaleString()}`;
@@ -804,22 +804,22 @@ export function createDoubleBottomSignal(symbol, name, market, bottom1, bottom2,
     direction: DIRECTIONS.BULLISH,
     strength,
     title,
-    meta: { name, bottom1, bottom2, neckline, broken },
+    meta: { name, bottom1, bottom2, neckline, broken, currentPrice },
   }));
 }
 
 /** 회복 감지 시그널 — 급락 후 안정화 */
-export function createRecoverySignal(symbol, name, market, drawdown, bbShrink, volRatio) {
+export function createRecoverySignal(symbol, name, market, drawdown, bbShrink, volRatio, currentPrice) {
   const strength = Math.abs(drawdown) >= 15 ? 4 : 3;
   const title = `${name} ${Math.abs(drawdown).toFixed(1)}% 급락 후 안정화 — BB 축소 ${(bbShrink * 100).toFixed(0)}%`;
 
   return addSignal(createSignal({
     type: SIGNAL_TYPES.RECOVERY_DETECTION,
     symbol, name, market,
-    direction: DIRECTIONS.BULLISH, // 회복 시작
+    direction: DIRECTIONS.BULLISH,
     strength,
     title,
-    meta: { name, drawdown, bbShrink, volRatio },
+    meta: { name, drawdown, bbShrink, volRatio, currentPrice },
   }));
 }
 

@@ -114,12 +114,14 @@ export function useCompositeSignals(allItems = []) {
             const srCandles = candles.filter(c => c.close != null);
             // 회복 감지용 — close + volume 모두 필수 (인덱스 정합성 보장)
             const recCandles = candles.filter(c => c.close != null && c.volume != null);
+            // 적중률 트래킹용 — 최신 종가를 currentPrice로 전달
+            const latestClose = srCandles.length > 0 ? srCandles[srCandles.length - 1].close : null;
 
             // 지지/저항선 돌파 감지 (필터 후 10봉 재검증)
             if (srCandles.length >= 10) {
               const sr = findSupportResistance(srCandles);
               if (sr?.breakType) {
-                createSupportResistanceSignal(symbol, patternName, patternMarket, sr.breakType, sr.breakLevel);
+                createSupportResistanceSignal(symbol, patternName, patternMarket, sr.breakType, sr.breakLevel, latestClose);
               }
             }
 
@@ -127,7 +129,7 @@ export function useCompositeSignals(allItems = []) {
             if (srCandles.length >= 15) {
               const db = detectDoubleBottom(srCandles);
               if (db?.approaching) {
-                createDoubleBottomSignal(symbol, patternName, patternMarket, db.bottom1, db.bottom2, db.neckline, db.broken);
+                createDoubleBottomSignal(symbol, patternName, patternMarket, db.bottom1, db.bottom2, db.neckline, db.broken, latestClose);
               }
             }
 
@@ -137,7 +139,7 @@ export function useCompositeSignals(allItems = []) {
               const volumes = recCandles.map(c => c.volume);
               const rec = detectRecovery(closes, volumes);
               if (rec) {
-                createRecoverySignal(symbol, patternName, patternMarket, rec.drawdown, rec.bbShrink, rec.volRatio);
+                createRecoverySignal(symbol, patternName, patternMarket, rec.drawdown, rec.bbShrink, rec.volRatio, latestClose);
               }
             }
           }
