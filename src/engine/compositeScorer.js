@@ -10,14 +10,6 @@ const WEIGHT = {
   sentiment: 0.25,  // 심리 (공포탐욕, 펀딩비, PCR)
 };
 
-// ─── 시간 감쇠 — 24시간 반감기 ────────────────────────────────
-const HALF_LIFE_MS = 24 * 3600000;
-
-function timeDecay(ageMs) {
-  if (ageMs <= 0) return 1;
-  return Math.exp(-0.693 * ageMs / HALF_LIFE_MS);
-}
-
 // ─── Flow 점수 계산 ─────────────────────────────────────────
 /**
  * 외국인/기관 플로우 → 점수
@@ -173,9 +165,7 @@ export function extractFlowAndSentiment(signals) {
     pcr: null,
   };
 
-  const now = Date.now();
   for (const sig of signals) {
-    const decay = timeDecay(now - sig.timestamp);
     const meta = sig.meta || {};
 
     switch (sig.type) {

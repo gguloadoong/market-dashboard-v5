@@ -8,7 +8,9 @@ export const config = { runtime: 'edge' };
 const TA_CACHE_PREFIX = 'ta:';
 const TA_TTL = 300; // 5분
 
-// ─── TA 계산 함수 (서버 측 — taCalculator.js 복사, ESM import 불가하므로 인라인) ──
+// ─── TA 계산 함수 (서버 측 인라인) ──
+// ⚠️ src/engine/taCalculator.js와 동일 로직 유지 필수
+// 수정 시 양쪽 동시 업데이트 (Vercel Edge는 src/ ESM import 불가)
 
 function sma(data, period) {
   if (data.length < period) return null;
@@ -44,7 +46,7 @@ function calcRSI(closes, period = 14) {
   let score = 0;
   if (value <= 30) score = 30 * (1 - value / 30);
   else if (value >= 70) score = -30 * ((value - 70) / 30);
-  else score = (50 - value) * 0.45;
+  else score = (50 - value) * (30 / 20) * 0.3; // taCalculator.js와 동일
   return { value: +value.toFixed(2), score: +score.toFixed(1) };
 }
 
@@ -140,11 +142,11 @@ async function fetchBinanceCandles(symbol, count = 60) {
 }
 
 async function fetchYahooCandles(symbol, count = 60) {
-  // Yahoo Finance v8 via chart-proxy와 동일한 패턴
+  // Yahoo Finance v8 — chart-proxy와 동일 패턴 (UA 위장 없음)
   const range = count > 100 ? '1y' : '3mo';
   const res = await fetch(
     `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=${range}`,
-    { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0' } }
+    { signal: AbortSignal.timeout(8000) }
   );
   if (!res.ok) return null;
   const json = await res.json();
@@ -196,7 +198,14 @@ export default async function handler(req) {
 
   const results = {};
 
-  await Promise.allSettled(targets.map(async ({ symbol, market }) => {
+  // 동시 요청 5개씩 배치 (외부 API rate limit 방지)
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+    const batch = targets.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(batch.map(processTarget));
+  }
+
+  async function processTarget({ symbol, market }) {
     const cacheKey = `${TA_CACHE_PREFIX}${market}:${symbol}`;
 
     // 캐시 확인
@@ -230,7 +239,7 @@ export default async function handler(req) {
     // 캐시 저장
     await setSnap(cacheKey, ta, TA_TTL);
     results[symbol] = ta;
-  }));
+  }
 
   return new Response(JSON.stringify({ results, ts: Date.now() }), {
     headers: {
