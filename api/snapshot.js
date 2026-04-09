@@ -27,13 +27,17 @@ function stripCoins(items) {
 
 // ─── ETag: 실제 데이터 기반 fingerprint (레이스 컨디션 없음) ────
 function computeETag(kr, us, coins) {
-  // 배열 길이 + 첫/마지막 종목 가격으로 변경 감지 (충돌 확률 최소화)
-  const sample = (items, pKey, cKey) => {
-    if (!items?.length) return '';
-    const f = items[0], l = items[items.length - 1];
-    return `${f[pKey]},${f[cKey]},${l[pKey]},${l[cKey]}`;
+  // 전체 가격 합산 — 어떤 종목이 바뀌어도 합계가 변함
+  const sum = (items, pKey) => {
+    if (!items?.length) return 0;
+    let s = 0;
+    for (const item of items) s += (item[pKey] || 0);
+    return s;
   };
-  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${sample(kr, 'price', 'changePct')}-${sample(us, 'price', 'changePct')}-${sample(coins, 'priceKrw', 'change24h')}"`;
+  const krSum = sum(kr, 'price');
+  const usSum = sum(us, 'price');
+  const coinSum = sum(coins, 'priceKrw');
+  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${krSum}-${usSum}-${coinSum}"`;
 }
 
 export default async function handler(request) {
