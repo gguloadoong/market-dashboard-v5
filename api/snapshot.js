@@ -1,6 +1,6 @@
 // api/snapshot.js — 전종목 가격 스냅샷 반환 (Edge Function)
 // Redis 캐시에서 즉시 반환. 캐시 미스 시 빈 배열 (클라이언트가 skeleton 표시)
-// [최적화] ETag/304 + 필드 스트리핑 + 델타 전송
+// [최적화] ETag/304 + 필드 스트리핑
 export const config = { runtime: 'edge' };
 
 import { getAllSnaps, getCronHealth, redis } from './_price-cache.js';
@@ -12,6 +12,7 @@ const CORS_HEADERS = {
 };
 
 // ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
+// 제거: KR→exchange, Coins→accTradePrice24h/highPrice/lowPrice
 function stripStocks(items) {
   if (!Array.isArray(items)) return items;
   return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market }) =>
@@ -22,42 +23,6 @@ function stripCoins(items) {
   if (!Array.isArray(items)) return items;
   return items.map(({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }) =>
     ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }));
-}
-
-// ─── 델타 계산 (변경된 종목만 필터링) ─────────────────────────
-function priceHash(item) {
-  if (item.priceKrw !== undefined) return `${item.priceKrw}|${item.change24h}`;
-  return `${item.price}|${item.changePct}`;
-}
-
-async function computeAndStoreDelta(kr, us, coins) {
-  if (!redis) return null;
-  const HASH_KEY = 'snap:price-hash';
-  try {
-    const prevHash = await redis.get(HASH_KEY) || {};
-    const newHash = {};
-    const delta = { kr: [], us: [], coins: [] };
-    let changeCount = 0;
-
-    for (const [market, items] of [['kr', kr], ['us', us], ['coins', coins]]) {
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        const key = `${market}:${item.symbol}`;
-        const hash = priceHash(item);
-        newHash[key] = hash;
-        if (prevHash[key] !== hash) {
-          delta[market].push(item);
-          changeCount++;
-        }
-      }
-    }
-
-    // 새 해시 저장 (TTL 10분)
-    await redis.set(HASH_KEY, newHash, { ex: 600 });
-    return changeCount > 0 ? delta : null;
-  } catch {
-    return null;
-  }
 }
 
 export default async function handler(request) {
@@ -76,6 +41,7 @@ export default async function handler(request) {
     // ?health=1 파라미터 — Cron 실패 모니터링 헬스 체크 (CRON_SECRET 인증)
     const url = new URL(request.url);
     if (url.searchParams.get('health') === '1') {
+      // 인증: CRON_SECRET 설정 시 Bearer 토큰 필수 (미설정 시 인증 없이 허용 — 개발 환경 대응)
       const secret = process.env.CRON_SECRET;
       if (secret) {
         const auth = request.headers.get('authorization');
@@ -133,28 +99,6 @@ export default async function handler(request) {
     const kr = stripStocks(snaps?.kr ?? []);
     const us = stripStocks(snaps?.us ?? []);
     const coins = stripCoins(snaps?.coins ?? []);
-
-    // ── 델타 모드: ?mode=delta 시 변경분만 반환 ──
-    const mode = url.searchParams.get('mode');
-    if (mode === 'delta') {
-      const delta = await computeAndStoreDelta(kr, us, coins);
-      if (delta) {
-        return new Response(JSON.stringify({
-          ...delta, ts: Date.now(), _delta: true,
-        }), {
-          status: 200,
-          headers: { ...CORS_HEADERS, ...(etag ? { 'ETag': etag } : {}) },
-        });
-      }
-      // 변경 없음
-      return new Response(JSON.stringify({
-        kr: [], us: [], coins: [], ts: Date.now(), _delta: true, _noChange: true,
-      }), { status: 200, headers: CORS_HEADERS });
-    }
-
-    // ── 전체 모드 (첫 요청 또는 fallback) ──
-    // 해시 갱신 (다음 delta 요청 기준점) — await로 Edge 응답 전 완료 보장
-    await computeAndStoreDelta(kr, us, coins).catch(() => {});
 
     const payload = { kr, us, coins, ts: Date.now(), _fromCache: fromCache };
 

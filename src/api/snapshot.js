@@ -1,15 +1,12 @@
 // src/api/snapshot.js — 서버 가격 스냅샷 조회
 // /api/snapshot (Edge → Redis) 캐시된 전체 시세를 한 번에 가져옴
-// [최적화] ETag/304 + 델타 merge 지원
+// [최적화] ETag/304 지원 — 데이터 미변경 시 빈 응답으로 전송량 절감
 
 const SNAPSHOT_TTL = 25 * 1000; // 25초 (서버 s-maxage=30보다 짧게)
 let _cache = null;
 let _cacheTs = 0;
 let _inflight = null;
 let _lastETag = null;
-let _hasFullSnapshot = false;
-let _lastFullTs = 0;
-const FULL_REFRESH_INTERVAL = 5 * 60 * 1000; // 5분마다 전체 스냅샷 (상폐/제거 종목 동기화)
 
 export async function fetchSnapshot() {
   const now = Date.now();
@@ -23,11 +20,7 @@ export async function fetchSnapshot() {
       const headers = {};
       if (_lastETag) headers['If-None-Match'] = _lastETag;
 
-      // 전체 스냅샷 있고 5분 이내면 delta, 아니면 full (상폐/제거 종목 동기화)
-      const needFull = !_hasFullSnapshot || (Date.now() - _lastFullTs > FULL_REFRESH_INTERVAL);
-      const url = needFull ? '/api/snapshot' : '/api/snapshot?mode=delta';
-
-      const res = await fetch(url, {
+      const res = await fetch('/api/snapshot', {
         headers,
         signal: AbortSignal.timeout(5000),
       });
@@ -40,7 +33,6 @@ export async function fetchSnapshot() {
         }
         // cache가 null인데 304 → ETag stale, full 즉시 재요청
         _lastETag = null;
-        _hasFullSnapshot = false;
         const retry = await fetch('/api/snapshot', { signal: AbortSignal.timeout(5000) });
         if (retry.ok) {
           const retryData = await retry.json();
@@ -49,8 +41,6 @@ export async function fetchSnapshot() {
           if (retryData?.ts) {
             _cache = retryData;
             _cacheTs = Date.now();
-            _hasFullSnapshot = true;
-            _lastFullTs = Date.now();
           }
           return retryData;
         }
@@ -64,31 +54,9 @@ export async function fetchSnapshot() {
       if (etag) _lastETag = etag;
 
       const data = await res.json();
-
-      // 델타 응답 → 기존 캐시에 merge
-      if (data._delta && _cache) {
-        if (data._noChange) {
-          _cacheTs = Date.now();
-          return _cache;
-        }
-        const merged = {
-          kr: mergeItems(_cache.kr, data.kr, 'symbol'),
-          us: mergeItems(_cache.us, data.us, 'symbol'),
-          coins: mergeItems(_cache.coins, data.coins, 'symbol'),
-          ts: data.ts,
-          _fromCache: true,
-        };
-        _cache = merged;
-        _cacheTs = Date.now();
-        return merged;
-      }
-
-      // 전체 응답
       if (data?.ts) {
         _cache = data;
         _cacheTs = Date.now();
-        _hasFullSnapshot = true;
-        _lastFullTs = Date.now();
       }
       return data;
     } catch {
@@ -101,20 +69,8 @@ export async function fetchSnapshot() {
   return _inflight;
 }
 
-// 델타 merge: 변경된 항목만 교체, 나머지는 유지
-function mergeItems(existing, updates, key) {
-  if (!updates?.length) return existing || [];
-  if (!existing?.length) return updates;
-  const map = new Map(existing.map(item => [item[key], item]));
-  for (const u of updates) {
-    map.set(u[key], { ...map.get(u[key]), ...u });
-  }
-  return [...map.values()];
-}
-
 export function invalidateSnapshot() {
   _cache = null;
   _cacheTs = 0;
-  _hasFullSnapshot = false;
   _lastETag = null;
 }
