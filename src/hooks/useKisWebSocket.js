@@ -26,6 +26,7 @@ export function useKisWebSocket(symbols, onQuote) {
   const retryTimer      = useRef(null);
   const keyRefreshTimer = useRef(null);
   const mountedRef      = useRef(true);
+  const approvalKeyRef  = useRef(null);
 
   // 콜백·symbols 최신값 동기화 (재연결 없이)
   useEffect(() => { onQuoteRef.current = onQuote; }, [onQuote]);
@@ -171,11 +172,12 @@ export function useKisWebSocket(symbols, onQuote) {
         const newKey = await fetchApprovalKey();
         if (!mountedRef.current || !newKey) return;
         approvalKey = newKey;
+        approvalKeyRef.current = newKey;
         clearTimeout(retryTimer.current);
         const oldWs = wsRef.current;
         if (oldWs) { oldWs.onclose = null; oldWs.close(); wsRef.current = null; }
         retryRef.current = 0;
-        connect(newKey);
+        if (!document.hidden) connect(newKey); // 백그라운드면 복귀 시 자동 연결
         scheduleKeyRefresh();
       }, KEY_TTL_MS);
     }
@@ -184,15 +186,41 @@ export function useKisWebSocket(symbols, onQuote) {
     fetchApprovalKey().then(key => {
       if (!mountedRef.current || !key) return;
       approvalKey = key;
+      approvalKeyRef.current = key;
       connect(key);
       scheduleKeyRefresh();
     });
+
+    // [최적화] 백그라운드 탭 시 WS 해제 — 데이터 절감
+    function handleVisibility() {
+      if (!mountedRef.current) return;
+      const key = approvalKeyRef.current;
+      if (document.hidden) {
+        // 백그라운드 → WS 해제
+        clearTimeout(retryTimer.current);
+        const ws = wsRef.current;
+        if (ws) {
+          if (key) unsubscribe(ws, key, symbolsRef.current);
+          ws.onclose = null;
+          ws.close();
+          wsRef.current = null;
+        }
+      } else {
+        // 포그라운드 복귀 → 재연결
+        if (!wsRef.current && key) {
+          retryRef.current = 0;
+          connect(key);
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
 
     // ── 클린업: 구독 해제 + 소켓 닫기 ───────────────────────
     return () => {
       mountedRef.current = false;
       clearTimeout(retryTimer.current);
       clearTimeout(keyRefreshTimer.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
       const ws = wsRef.current;
       if (ws) {
         if (approvalKey) unsubscribe(ws, approvalKey, symbolsRef.current);

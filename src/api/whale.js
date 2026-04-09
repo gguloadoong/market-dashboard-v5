@@ -418,8 +418,11 @@ let waDestroyed = false;
  */
 export function startWhaleAlertPolling(callback) {
   waDestroyed = false;
-  pollWhaleAlert(callback);
-  waTimer = setInterval(() => pollWhaleAlert(callback), 60_000);
+  if (!document.hidden) pollWhaleAlert(callback);
+  waTimer = setInterval(() => {
+    if (document.hidden) return;
+    pollWhaleAlert(callback);
+  }, 60_000);
 }
 
 // Upbit 대량 체결 이벤트에 signal + insight 부여
@@ -686,8 +689,11 @@ export function startTelegramWhalePolling(callback) {
   if (telegramTimer) { clearInterval(telegramTimer); telegramTimer = null; }
   telegramDestroyed = false;
   telegramSeenIds   = new Set();
-  pollTelegramWhale(callback);
-  telegramTimer = setInterval(() => pollTelegramWhale(callback), 120_000); // 2분
+  if (!document.hidden) pollTelegramWhale(callback);
+  telegramTimer = setInterval(() => {
+    if (document.hidden) return;
+    pollTelegramWhale(callback);
+  }, 120_000); // 2분
 }
 
 /**

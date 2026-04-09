@@ -154,6 +154,7 @@ export default function MarketInvestorSection() {
     staleTime:    60_000,
     retry:        1,
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   // 로딩 중
