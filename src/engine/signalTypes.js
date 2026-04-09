@@ -27,6 +27,7 @@ export const SIGNAL_TYPES = {
   MOMENTUM_DIVERGENCE: 'momentum_divergence',
   VOLUME_PRICE_DIVERGENCE: 'volume_price_divergence',
   MARKET_MOOD_SHIFT: 'market_mood_shift',
+  COMPOSITE_SCORE: 'composite_score',
 };
 
 // 시그널 방향
@@ -63,6 +64,7 @@ export const SIGNAL_TTL = {
   [SIGNAL_TYPES.MOMENTUM_DIVERGENCE]: 2 * 3600000,
   [SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE]: 2 * 3600000,
   [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: 4 * 3600000,
+  [SIGNAL_TYPES.COMPOSITE_SCORE]: 10 * 60000, // 10분 (5분 크론 × 2)
 };
 
 /** 시그널 타입별 TTL 조회 (기본값 2시간) */
@@ -198,5 +200,21 @@ export const TYPE_META = {
   [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: {
     easyLabel: '시장 분위기 변화 감지 🌊',
     easyDesc: (m) => m.moodType === 'consensus' ? `국장·미장·코인 모두 ${m.direction === 'bullish' ? '상승' : '하락'} — 강한 흐름` : `${m.flippedMarkets.join('·')} 방향 전환 — 변곡점 주의`,
+  },
+  [SIGNAL_TYPES.COMPOSITE_SCORE]: {
+    easyLabel: (m) => {
+      const s = m?.compositeScore ?? 0;
+      if (s >= 70) return '강세 흐름 진행 중 🔥';
+      if (s >= 30) return '상승 타이밍 접근 중 📈';
+      if (s <= -70) return '강한 하락 경고 🚨';
+      if (s <= -30) return '하락 압력 감지 ⚠️';
+      return '관망 구간 👀';
+    },
+    easyDesc: (m) => {
+      const parts = [];
+      if (m?.rsi != null) parts.push(`RSI ${m.rsi}`);
+      if (m?.macd != null) parts.push(`MACD ${m.macd > 0 ? '상승' : '하락'}`);
+      return `복합 분석 점수 ${m?.compositeScore > 0 ? '+' : ''}${m?.compositeScore ?? 0}${parts.length ? ` (${parts.join(', ')})` : ''}`;
+    },
   },
 };
