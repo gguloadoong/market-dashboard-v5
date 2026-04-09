@@ -134,7 +134,8 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
     const local = allItems
       .filter(i =>
         (i.name   || '').toLowerCase().includes(q) ||
-        (i.symbol || '').toLowerCase().includes(q)
+        (i.symbol || '').toLowerCase().includes(q) ||
+        (i.nameEn || '').toLowerCase().includes(q)
       )
       .sort((a, b) => {
         // 심볼 정확 일치 우선
