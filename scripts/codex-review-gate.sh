@@ -23,9 +23,19 @@ fi
 echo "[codex-gate] ${BASE_BRANCH} 기준 Codex 리뷰 실행 중..."
 
 CODEX_TIMEOUT=${CODEX_TIMEOUT:-120}  # 기본 2분 타임아웃
+# macOS 호환 — timeout 없으면 perl alarm fallback
+_run_with_timeout() {
+  if command -v timeout &>/dev/null; then
+    timeout "$1" "${@:2}"
+  elif command -v gtimeout &>/dev/null; then
+    gtimeout "$1" "${@:2}"
+  else
+    perl -e 'alarm shift; exec @ARGV' "$@"
+  fi
+}
 CODEX_OK=false
 for attempt in 1 2; do
-  if timeout "$CODEX_TIMEOUT" codex exec review --base "$BASE_BRANCH" --output-last-message "$TMP_FILE" --full-auto; then
+  if _run_with_timeout "$CODEX_TIMEOUT" codex exec review --base "$BASE_BRANCH" --output-last-message "$TMP_FILE" --full-auto; then
     CODEX_OK=true
     break
   fi

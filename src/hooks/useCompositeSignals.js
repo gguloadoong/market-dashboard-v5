@@ -1,7 +1,11 @@
 // 복합 시그널 훅 — TA API 폴링 + 기존 시그널 merge → 종목별 방향성 점수
 import { useState, useEffect, useRef } from 'react';
 import { calculateCompositeScore, extractFlowAndSentiment } from '../engine/compositeScorer';
-import { getActiveSignals, createSignal, addSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
+import {
+  getActiveSignals, createSignal, addSignal, removeSignalByTypeAndSymbol,
+  createSupportResistanceSignal, createDoubleBottomSignal, createRecoverySignal,
+} from '../engine/signalEngine';
+import { findSupportResistance, detectDoubleBottom, detectRecovery } from '../engine/taCalculator';
 import { SIGNAL_TYPES } from '../engine/signalTypes';
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5분
@@ -93,6 +97,51 @@ export function useCompositeSignals(allItems = []) {
                 macd: ta.macd?.histogram,
               },
             }));
+          }
+
+          // ── Tier2-3: TA 기반 패턴 시그널 (지지/저항 돌파, 이중바닥, 회복 감지) ──
+          // 패턴 해제 시 stale 시그널 잔존 방지 — 매 폴링마다 기존 시그널 선제거
+          removeSignalByTypeAndSymbol('support_resistance_break', symbol);
+          removeSignalByTypeAndSymbol('double_bottom', symbol);
+          removeSignalByTypeAndSymbol('recovery_detection', symbol);
+
+          const patternName = findName(symbol, items) || symbol;
+          const patternMarket = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
+          const candles = ta.candles;
+
+          if (Array.isArray(candles) && candles.length >= 10) {
+            // SR/DB용 캔들 — close만 필수 (volume 없는 소스도 지원)
+            const srCandles = candles.filter(c => c.close != null);
+            // 회복 감지용 — close + volume 모두 필수 (인덱스 정합성 보장)
+            const recCandles = candles.filter(c => c.close != null && c.volume != null);
+            // 적중률 트래킹용 — 최신 종가를 currentPrice로 전달
+            const latestClose = srCandles.length > 0 ? srCandles[srCandles.length - 1].close : null;
+
+            // 지지/저항선 돌파 감지 (필터 후 10봉 재검증)
+            if (srCandles.length >= 10) {
+              const sr = findSupportResistance(srCandles);
+              if (sr?.breakType) {
+                createSupportResistanceSignal(symbol, patternName, patternMarket, sr.breakType, sr.breakLevel, latestClose);
+              }
+            }
+
+            // 이중바닥 패턴 감지 (15봉 이상)
+            if (srCandles.length >= 15) {
+              const db = detectDoubleBottom(srCandles);
+              if (db?.approaching) {
+                createDoubleBottomSignal(symbol, patternName, patternMarket, db.bottom1, db.bottom2, db.neckline, db.broken, latestClose);
+              }
+            }
+
+            // 회복 감지 — 급락 후 안정화 (25봉 이상)
+            if (recCandles.length >= 25) {
+              const closes = recCandles.map(c => c.close);
+              const volumes = recCandles.map(c => c.volume);
+              const rec = detectRecovery(closes, volumes);
+              if (rec) {
+                createRecoverySignal(symbol, patternName, patternMarket, rec.drawdown, rec.bbShrink, rec.volRatio, latestClose);
+              }
+            }
           }
         }
 
