@@ -155,7 +155,15 @@ export function _resetStore() {
   _signals = [];
   _subscribers = [];
   _counter = 0;
-  _accuracyBuffer = [];
+  // 적중률 버퍼 flush 후 정리 (미전송 데이터 손실 방지)
+  if (_accuracyBuffer.length > 0) {
+    const batch = _accuracyBuffer.splice(0);
+    fetch('/api/signal-accuracy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batch),
+    }).catch(() => {});
+  }
   clearTimeout(_accuracyTimer);
   _accuracyTimer = null;
 }

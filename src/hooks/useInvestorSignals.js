@@ -515,6 +515,12 @@ function detectGapSignals(allItems) {
   const T_GAP = THRESHOLDS.GAP;
 
   for (const item of allItems) {
+    // 이미 갭 시그널이 있으면 스킵 (폴링마다 중복 방지)
+    const existing = getActiveSignals().find(
+      s => s.type === SIGNAL_TYPES.GAP_ANALYSIS && s.symbol === item.symbol
+    );
+    if (existing) continue;
+
     // sparkline 데이터에서 캔들 추출 (open/close 필요)
     const candles = item.candles ?? item.sparkline;
     if (!Array.isArray(candles) || candles.length < 2) continue;
