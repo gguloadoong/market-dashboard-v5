@@ -227,7 +227,8 @@ export function buildStockKeywords(symbol, name, market) {
     // 코인: symbol(BTC 등) + 별칭
     // 일반 한국어 단어와 겹치는 코인명은 제외 (리스크→Lisk 등 거짓양성 방지)
     if (symbol) keys.add(symbol.toLowerCase());
-    if (name && !COIN_NAME_BLACKLIST.has(name)) keys.add(name.toLowerCase());
+    const trimmedName = (name || '').trim();
+    if (trimmedName && !COIN_NAME_BLACKLIST.has(trimmedName)) keys.add(trimmedName.toLowerCase());
     const aliases = COIN_ALIASES[symbol?.toUpperCase()] || [];
     aliases.forEach(a => keys.add(a.toLowerCase()));
   } else {
