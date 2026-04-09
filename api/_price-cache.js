@@ -77,6 +77,7 @@ export async function setSnap(key, data, ex) {
       console.warn(`[price-cache] 백업 저장 실패 (${key}:prev):`, backupErr.message);
     }
     await redis.set(key, data, { ex });
+    // ETag는 snapshot API가 실제 데이터 내용에서 직접 계산 — 별도 ts 키 불필요
     return true;
   } catch (e) {
     console.error(`[price-cache] setSnap 실패 (${key}):`, e);

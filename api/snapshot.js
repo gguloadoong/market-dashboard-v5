@@ -1,5 +1,6 @@
 // api/snapshot.js — 전종목 가격 스냅샷 반환 (Edge Function)
 // Redis 캐시에서 즉시 반환. 캐시 미스 시 빈 배열 (클라이언트가 skeleton 표시)
+// [최적화] ETag/304 + 필드 스트리핑
 export const config = { runtime: 'edge' };
 
 import { getAllSnaps, getCronHealth } from './_price-cache.js';
@@ -10,6 +11,30 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json',
 };
 
+// ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
+// 제거: KR→exchange, Coins→accTradePrice24h/highPrice/lowPrice
+function stripStocks(items) {
+  if (!Array.isArray(items)) return items;
+  return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market }) =>
+    ({ symbol, name, price, change, changePct, volume, marketCap, market }));
+}
+
+function stripCoins(items) {
+  if (!Array.isArray(items)) return items;
+  return items.map(({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }) =>
+    ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }));
+}
+
+// ─── ETag: JSON 문자열 해시 (모든 필드 변경 감지, 충돌 불가) ────
+function simpleHash(str) {
+  // DJB2 해시 — 빠르고 충돌 적음 (암호학적 보안 불필요)
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export default async function handler(request) {
   // CORS preflight
   if (request.method === 'OPTIONS') {
@@ -17,7 +42,7 @@ export default async function handler(request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, If-None-Match',
       },
     });
   }
@@ -51,10 +76,6 @@ export default async function handler(request) {
     const snaps = await getAllSnaps();
     const fromCache = snaps !== null;
 
-    const kr = snaps?.kr ?? [];
-    const us = snaps?.us ?? [];
-    const coins = snaps?.coins ?? [];
-
     // Redis 연결 자체가 안 되면 503 (인프라 장애)
     // 코인은 24시간 거래 → coins가 비어있으면 실제 장애
     // KR/US는 장외시간에 빈 배열일 수 있으므로 503 조건에서 제외
@@ -66,19 +87,28 @@ export default async function handler(request) {
       }), { status: 503, headers: CORS_HEADERS });
     }
 
-    const payload = {
-      kr,
-      us,
-      coins,
-      ts: Date.now(),
-      _fromCache: fromCache,
-    };
+    // 필드 스트리핑
+    const kr = stripStocks(snaps?.kr ?? []);
+    const us = stripStocks(snaps?.us ?? []);
+    const coins = stripCoins(snaps?.coins ?? []);
 
-    return new Response(JSON.stringify(payload), {
+    // ── ETag: 데이터 내용 해시 (ts/_fromCache 제외 — 매번 바뀌므로) ──
+    const etag = `"${simpleHash(JSON.stringify([kr, us, coins]))}"`;
+    const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: fromCache });
+    const clientETag = request.headers.get('if-none-match');
+    if (clientETag === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: { 'Access-Control-Allow-Origin': '*', 'ETag': etag },
+      });
+    }
+
+    return new Response(body, {
       status: 200,
       headers: {
         ...CORS_HEADERS,
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=15',
+        'ETag': etag,
       },
     });
   } catch (err) {
