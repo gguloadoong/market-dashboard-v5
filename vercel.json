@@ -12,6 +12,7 @@
     { "path": "/api/cron/update-us",    "schedule": "*/2 * * * *" },
     { "path": "/api/cron/update-coins", "schedule": "*/1 * * * *" },
     { "path": "/api/morning-briefing",  "schedule": "50 23 * * *" },
-    { "path": "/api/cron/whale-telegram", "schedule": "*/2 * * * *" }
+    { "path": "/api/cron/whale-telegram", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/check-signal-accuracy", "schedule": "*/30 * * * *" }
   ]
 }

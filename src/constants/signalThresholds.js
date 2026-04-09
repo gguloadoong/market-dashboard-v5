@@ -54,9 +54,57 @@ export const THRESHOLDS = {
   SMART_MONEY: {
     MIN_DAYS: 2,                 // 외국인+기관 동시 매수/매도 최소 일수
   },
+  GAP: {
+    MIN_PCT: 2,              // 갭 최소 2% 이상 시 시그널
+    MAX_SCORE: 20,           // 최대 점수 ±20
+  },
+  REBALANCING: {
+    BUSINESS_DAYS: 3,        // 월말/분기말 D-3 영업일부터 시그널
+    QUARTER_STRENGTH: 4,     // 분기말 strength
+    MONTH_STRENGTH: 2,       // 월말 strength
+  },
+  FX: {
+    MIN_CHANGE_PCT: 0.5,     // 환율 변동 최소 0.5% 이상 시 시그널
+    STRONG_CHANGE_PCT: 1.0,  // 강한 변동 1% 이상
+  },
   MARKET_MOOD: {
     DIRECTION_THRESHOLD: 1,      // 방향 판단 기준 1%
     MIN_FLIPS: 2,                // 최소 전환 시장 수
     STALE_MS: 10 * 60 * 1000,   // 이전 상태 유효 시간 10분
+  },
+  CAPITULATION: {
+    PRICE_DROP: -5,              // 가격 하락 -5% 이상
+    VOLUME_RATIO: 3,             // 거래량 평소 3배 이상
+    FEAR_GREED_MAX: 25,          // 공포탐욕 25 이하 (극도공포~공포)
+  },
+  STEALTH: {
+    VOLUME_RATIO: 3,             // 거래량 평소 3배 이상
+    NEWS_WINDOW_MS: 4 * 3600000, // 4시간 내 뉴스 클러스터 없어야 함
+  },
+  BTC_LEADING: {
+    BTC_MIN_CHANGE: 3,           // BTC 최소 1시간 변동률 3%
+    ALT_MAX_CHANGE: 1,           // 알트코인 최대 변동률 1% (아직 미반영)
+    ALT_SYMBOLS: ['ETH', 'SOL', 'XRP', 'DOGE'], // 추적 대상 알트코인
+  },
+  SUPPORT_RESISTANCE: {
+    CLUSTER_PCT: 2,              // 가격 수준 클러스터 범위 2%
+    MIN_TOUCHES: 2,              // 지지/저항 최소 접촉 횟수
+    BREAK_PCT: 1,                // 돌파 판정 최소 이탈 1%
+    LOOKBACK_DAYS: 60,           // 60일 캔들 데이터
+  },
+  DOUBLE_BOTTOM: {
+    PRICE_TOLERANCE: 3,          // 두 바닥 가격 차이 최대 3%
+    NECKLINE_MIN_PCT: 5,         // 넥라인 최소 높이 (바닥 대비 5%)
+    LOOKBACK_DAYS: 60,           // 60일 캔들 데이터
+  },
+  RECOVERY: {
+    DRAWDOWN_MIN: -10,           // 5일 최대 낙폭 -10% 이상
+    DRAWDOWN_DAYS: 5,            // 낙폭 측정 기간 5일
+    BB_BANDWIDTH_SHRINK: 0.7,    // BB 밴드폭 이전 대비 70% 이하로 축소
+    VOLUME_NORMALIZE_RATIO: 1.5, // 거래량 정상화 (1.5배 이하)
+  },
+  SECTOR_OUTLIER: {
+    MIN_DEVIATION: 2,            // 섹터 평균 대비 최소 2σ 이탈
+    MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
   },
 };

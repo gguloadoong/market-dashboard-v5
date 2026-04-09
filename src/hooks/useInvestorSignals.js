@@ -6,7 +6,12 @@ import {
   createInvestorSignal, createVolumeSignal, createSignal, addSignal, getActiveSignals,
   createSmartMoneySignal, createVolumePriceDivergenceSignal,
   createCrossMarketSignal, createMarketMoodShiftSignal,
+  createGapSignal, createRebalancingSignal, createFxImpactSignal,
+  createCapitulationSignal, createStealthActivitySignal,
+  createBtcLeadingSignal, createSectorOutlierSignal,
+  removeSignalByTypeAndSymbol,
 } from '../engine/signalEngine';
+import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/taCalculator';
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
@@ -131,6 +136,27 @@ export function useInvestorSignals(allItems = []) {
 
         // ── 신규: 시장 무드 전환 ──
         detectMarketMoodShift(items, moodPrevRef);
+
+        // ── 신규: 갭 분석 ──
+        detectGapSignals(items);
+
+        // ── 신규: 리밸런싱 경고 ──
+        detectRebalancingSignal();
+
+        // ── 신규: 환율 영향 ──
+        detectFxImpactSignal(items);
+
+        // ── Tier2: 투매 감지 (캐피튤레이션) ──
+        detectCapitulation(items);
+
+        // ── Tier2: 스텔스 활동 (뉴스 없는 거래 폭발) ──
+        detectStealthActivity(items);
+
+        // ── Tier2: BTC 선행 알트코인 예측 ──
+        detectBtcLeading(items);
+
+        // ── Tier2: 섹터 이탈 종목 ──
+        detectSectorOutlier(items);
       } catch {
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
@@ -480,5 +506,180 @@ function detectMarketMoodShift(allItems, moodPrevRef) {
     const bullCount = flipped.filter(m => marketDirs[m] === 'bullish').length;
     const direction = bullCount > flipped.length / 2 ? 'bullish' : 'bearish';
     createMarketMoodShiftSignal('shift', direction, flipped, marketAvgs);
+  }
+}
+
+/** 갭 분석 — sparkline/캔들 데이터가 있는 종목의 전일 종가 vs 당일 시가 갭 감지 */
+function detectGapSignals(allItems) {
+  if (!allItems?.length) return;
+  const T_GAP = THRESHOLDS.GAP;
+
+  for (const item of allItems) {
+    // 이미 갭 시그널이 있으면 스킵 (폴링마다 중복 방지)
+    const existing = getActiveSignals().find(
+      s => s.type === SIGNAL_TYPES.GAP_ANALYSIS && s.symbol === item.symbol
+    );
+    if (existing) continue;
+
+    // sparkline 데이터에서 캔들 추출 (open/close 필요)
+    const candles = item.candles ?? item.sparkline;
+    if (!Array.isArray(candles) || candles.length < 2) continue;
+
+    const result = detectGap(candles);
+    if (!result || Math.abs(result.gapPct) < T_GAP.MIN_PCT) continue;
+
+    const market = (item._market || 'kr').toLowerCase();
+    createGapSignal(item.symbol, item.name ?? item.symbol, market, result.gapPct);
+  }
+}
+
+/** 리밸런싱 경고 — 월말/분기말 영업일 3일 이내 시 기관 매물 출회 경고 */
+function detectRebalancingSignal() {
+  const result = detectRebalancingWindow();
+  if (!result || !result.isRebalancing) return;
+  // 중복 방지: 기존 리밸런싱 시그널이 있으면 스킵 (TTL 24시간이므로 1일 1회만 생성)
+  const existing = getActiveSignals().find(s => s.type === SIGNAL_TYPES.REBALANCING_ALERT);
+  if (existing) return;
+  createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
+}
+
+/** 환율 영향 — allItems에서 USDKRW 환율 데이터 추출 후 변동 감지 */
+function detectFxImpactSignal(allItems) {
+  if (!allItems?.length) return;
+
+  // 환율 데이터는 별도 심볼 또는 메타데이터에서 추출
+  const fxItem = allItems.find(i =>
+    i.symbol === 'USDKRW' || i.symbol === 'USD/KRW' || i.symbol === 'KRW=X',
+  );
+  if (!fxItem) return;
+
+  const rate = fxItem.price ?? fxItem.close ?? fxItem.currentPrice ?? 0;
+  const prevRate = fxItem.prevClose ?? fxItem.previousClose ?? 0;
+  if (!rate || !prevRate) return;
+
+  const result = detectFxImpact(rate, prevRate);
+  if (!result) return;
+
+  createFxImpactSignal(rate, prevRate, result.changePct, result.impact);
+}
+
+/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대 */
+function detectCapitulation(allItems) {
+  if (!allItems?.length) return;
+
+  const T = THRESHOLDS.CAPITULATION;
+  // 공포탐욕 지수는 기존 시그널에서 추출 — 없으면 투매 감지 스킵
+  const fgSignal = getActiveSignals().find(s => s.type === SIGNAL_TYPES.FEAR_GREED_SHIFT);
+  const fearGreed = fgSignal?.meta?.current;
+  if (fearGreed == null) return; // F&G 데이터 없으면 투매 판단 불가
+
+  const markets = ['KR', 'US', 'COIN'];
+  for (const market of markets) {
+    const threshold = calcPercentileVolume(allItems, market);
+    if (threshold <= 0) continue;
+
+    const marketItems = allItems.filter(i => i._market === market);
+    for (const item of marketItems) {
+      if (STABLECOIN_SYMBOLS.has(item.symbol?.toUpperCase())) continue;
+      const pct = clampPct(item.changePct ?? item.change24h ?? 0);
+      const vol = item.volume ?? item.volume24h ?? 0;
+      const volRatio = threshold > 0 ? vol / threshold : 0;
+
+      // 가격 급락 + 거래량 폭발 + 공포 지수 낮음
+      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fearGreed <= T.FEAR_GREED_MAX) {
+        createCapitulationSignal(
+          item.symbol, item.name ?? item.symbol,
+          market.toLowerCase(), pct, volRatio, fearGreed,
+        );
+      }
+    }
+  }
+}
+
+/** 스텔스 활동 감지 — 거래량 폭발인데 해당 종목 뉴스 없음 */
+function detectStealthActivity(allItems) {
+  if (!allItems?.length) return;
+
+  const T = THRESHOLDS.STEALTH;
+  const markets = ['KR', 'US', 'COIN'];
+  for (const market of markets) {
+    const threshold = calcPercentileVolume(allItems, market);
+    if (threshold <= 0) continue;
+
+    const marketItems = allItems.filter(i => i._market === market);
+    for (const item of marketItems) {
+      if (STABLECOIN_SYMBOLS.has(item.symbol?.toUpperCase())) continue;
+      const vol = item.volume ?? item.volume24h ?? 0;
+      const volRatio = threshold > 0 ? vol / threshold : 0;
+
+      if (volRatio >= T.VOLUME_RATIO) {
+        createStealthActivitySignal(
+          item.symbol, item.name ?? item.symbol,
+          market.toLowerCase(), volRatio,
+        );
+      }
+    }
+  }
+}
+
+/** BTC 선행 알트코인 예측 — BTC 급등락인데 알트코인 미반영 */
+function detectBtcLeading(allItems) {
+  if (!allItems?.length) return;
+
+  const T = THRESHOLDS.BTC_LEADING;
+  const btcItem = allItems.find(i => i.symbol === 'BTC' || i.symbol === 'bitcoin');
+  if (!btcItem) return;
+
+  const btcChange = clampPct(btcItem.change24h ?? btcItem.changePct ?? 0);
+  if (Math.abs(btcChange) < T.BTC_MIN_CHANGE) return;
+
+  for (const altSymbol of T.ALT_SYMBOLS) {
+    const altItem = allItems.find(i => i.symbol === altSymbol || i.symbol?.toUpperCase() === altSymbol);
+    if (!altItem) continue;
+
+    const altChange = clampPct(altItem.change24h ?? altItem.changePct ?? 0);
+    if (Math.abs(altChange) < T.ALT_MAX_CHANGE) {
+      createBtcLeadingSignal(altSymbol, btcChange, altChange);
+    }
+  }
+}
+
+/** 섹터 이탈 종목 감지 — 섹터 평균 대비 2σ 이상 이탈 */
+function detectSectorOutlier(allItems) {
+  if (!allItems?.length) return;
+
+  const T = THRESHOLDS.SECTOR_OUTLIER;
+
+  // 섹터별 등락률 수집
+  const sectorData = {};
+  for (const item of allItems) {
+    if (!item.sector) continue;
+    const pct = clampPct(item.changePct ?? item.change24h ?? 0);
+    if (!sectorData[item.sector]) sectorData[item.sector] = [];
+    sectorData[item.sector].push({ item, pct });
+  }
+
+  for (const [sector, entries] of Object.entries(sectorData)) {
+    if (entries.length < T.MIN_SECTOR_SIZE) continue;
+
+    // 섹터 평균 + 표준편차 계산
+    const pcts = entries.map(e => e.pct);
+    const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length;
+    const variance = pcts.reduce((a, b) => a + (b - avg) ** 2, 0) / pcts.length;
+    const stdDev = Math.sqrt(variance);
+    if (stdDev <= 0) continue;
+
+    // 2σ 이상 이탈 종목 시그널
+    for (const { item, pct } of entries) {
+      const deviation = (pct - avg) / stdDev;
+      if (Math.abs(deviation) >= T.MIN_DEVIATION) {
+        const above = deviation > 0;
+        const market = (item._market || 'kr').toLowerCase();
+        createSectorOutlierSignal(
+          item.symbol, item.name ?? item.symbol, market,
+          +deviation.toFixed(2), +avg.toFixed(2), pct, sector, above,
+        );
+      }
+    }
   }
 }
