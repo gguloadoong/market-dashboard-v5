@@ -658,6 +658,23 @@ export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClo
   const [isFav, setIsFav]         = useState(false);       // 관심 종목 토글 (UI 전용)
   const [chartFallbackMsg, setChartFallbackMsg] = useState(null); // 분봉 실패 알림
 
+  // item 보강 — 시그널 클릭 등으로 최소 정보만 전달된 경우 allData에서 전체 데이터 병합
+  const enrichedItem = useMemo(() => {
+    if (!item) return item;
+    // 이미 가격 있으면 보강 불필요
+    if (item.priceKrw || item.priceUsd || item.price) return item;
+    const { krStocks = [], usStocks = [], coins = [] } = allData;
+    const sym = (item.symbol || item.id || '').toUpperCase();
+    const found = [...coins, ...krStocks, ...usStocks].find(
+      s => (s.symbol || s.id || '').toUpperCase() === sym
+    );
+    return found ? { ...found, ...item, priceKrw: found.priceKrw, priceUsd: found.priceUsd, price: found.price, change24h: found.change24h, changePct: found.changePct, volume: found.volume, volume24h: found.volume24h, marketCap: found.marketCap, high24h: found.high24h, low24h: found.low24h, high52w: found.high52w, low52w: found.low52w } : item;
+  }, [item, allData]);
+
+  // 이후 모든 item 참조를 enrichedItem으로 사용하기 위해 재할당
+  // eslint-disable-next-line no-param-reassign
+  item = enrichedItem;
+
   // 뉴스 맥락 기반 관련종목 — newsContext가 있으면 키워드→섹터→종목 추출
   const newsBasedItems = useMemo(() => {
     if (!newsContext) return [];
