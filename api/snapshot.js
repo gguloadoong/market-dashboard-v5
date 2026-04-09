@@ -12,13 +12,7 @@ const CORS_HEADERS = {
 };
 
 // ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
-function stripKr(items) {
-  if (!Array.isArray(items)) return items;
-  return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market }) =>
-    ({ symbol, name, price, change, changePct, volume, marketCap, market }));
-}
-
-function stripUs(items) {
+function stripStocks(items) {
   if (!Array.isArray(items)) return items;
   return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market }) =>
     ({ symbol, name, price, change, changePct, volume, marketCap, market }));
@@ -103,17 +97,13 @@ export default async function handler(request) {
       });
     }
 
-    // ── ETag 체크 (Redis ts 키 3개로 변경 여부 판별) ──
+    // ── ETag 체크 (snap:ts 단일 키로 변경 여부 판별, Redis 왕복 1회) ──
     let etag = null;
     if (redis) {
       try {
-        const [krTs, usTs, coinsTs] = await Promise.all([
-          redis.get('snap:kr:ts'),
-          redis.get('snap:us:ts'),
-          redis.get('snap:coins:ts'),
-        ]);
-        if (krTs || usTs || coinsTs) {
-          etag = `"${krTs || 0}-${usTs || 0}-${coinsTs || 0}"`;
+        const snapTs = await redis.get('snap:ts');
+        if (snapTs) {
+          etag = `"${snapTs}"`;
           const clientETag = request.headers.get('if-none-match');
           if (clientETag === etag) {
             return new Response(null, {
@@ -138,8 +128,8 @@ export default async function handler(request) {
     }
 
     // 필드 스트리핑
-    const kr = stripKr(snaps?.kr ?? []);
-    const us = stripUs(snaps?.us ?? []);
+    const kr = stripStocks(snaps?.kr ?? []);
+    const us = stripStocks(snaps?.us ?? []);
     const coins = stripCoins(snaps?.coins ?? []);
 
     // ── 델타 모드: ?mode=delta 시 변경분만 반환 ──

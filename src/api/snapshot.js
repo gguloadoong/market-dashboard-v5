@@ -8,6 +8,8 @@ let _cacheTs = 0;
 let _inflight = null;
 let _lastETag = null;
 let _hasFullSnapshot = false;
+let _lastFullTs = 0;
+const FULL_REFRESH_INTERVAL = 5 * 60 * 1000; // 5분마다 전체 스냅샷 (상폐/제거 종목 동기화)
 
 export async function fetchSnapshot() {
   const now = Date.now();
@@ -21,8 +23,9 @@ export async function fetchSnapshot() {
       const headers = {};
       if (_lastETag) headers['If-None-Match'] = _lastETag;
 
-      // 전체 스냅샷 있으면 delta 모드로 변경분만 요청
-      const url = _hasFullSnapshot ? '/api/snapshot?mode=delta' : '/api/snapshot';
+      // 전체 스냅샷 있고 5분 이내면 delta, 아니면 full (상폐/제거 종목 동기화)
+      const needFull = !_hasFullSnapshot || (Date.now() - _lastFullTs > FULL_REFRESH_INTERVAL);
+      const url = needFull ? '/api/snapshot' : '/api/snapshot?mode=delta';
 
       const res = await fetch(url, {
         headers,
@@ -31,8 +34,13 @@ export async function fetchSnapshot() {
 
       // 304 Not Modified → 캐시 그대로, TTL만 리셋
       if (res.status === 304) {
-        _cacheTs = Date.now();
-        return _cache;
+        if (_cache) {
+          _cacheTs = Date.now();
+          return _cache;
+        }
+        // cache가 null인데 304 → ETag stale, full 재요청
+        _lastETag = null;
+        _hasFullSnapshot = false;
       }
 
       if (!res.ok) return null;
@@ -66,6 +74,7 @@ export async function fetchSnapshot() {
         _cache = data;
         _cacheTs = Date.now();
         _hasFullSnapshot = true;
+        _lastFullTs = Date.now();
       }
       return data;
     } catch {
@@ -93,4 +102,5 @@ export function invalidateSnapshot() {
   _cache = null;
   _cacheTs = 0;
   _hasFullSnapshot = false;
+  _lastETag = null;
 }
