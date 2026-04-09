@@ -3,7 +3,7 @@
 // [최적화] ETag/304 + 필드 스트리핑
 export const config = { runtime: 'edge' };
 
-import { getAllSnaps, getCronHealth, redis } from './_price-cache.js';
+import { getAllSnaps, getCronHealth } from './_price-cache.js';
 
 // CORS 공통 헤더
 const CORS_HEADERS = {
@@ -23,6 +23,15 @@ function stripCoins(items) {
   if (!Array.isArray(items)) return items;
   return items.map(({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }) =>
     ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }));
+}
+
+// ─── ETag: 실제 데이터 기반 fingerprint (레이스 컨디션 없음) ────
+function computeETag(kr, us, coins) {
+  // 배열 길이 + 첫 종목 가격으로 변경 감지 (cron이 데이터를 갱신하면 가격이 바뀜)
+  const krSample = kr?.[0] ? `${kr[0].price},${kr[0].changePct}` : '';
+  const usSample = us?.[0] ? `${us[0].price},${us[0].changePct}` : '';
+  const coinSample = coins?.[0] ? `${coins[0].priceKrw},${coins[0].change24h}` : '';
+  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${krSample}-${usSample}-${coinSample}"`;
 }
 
 export default async function handler(request) {
@@ -63,24 +72,6 @@ export default async function handler(request) {
       });
     }
 
-    // ── ETag 체크 (snap:ts 단일 키로 변경 여부 판별, Redis 왕복 1회) ──
-    let etag = null;
-    if (redis) {
-      try {
-        const snapTs = await redis.get('snap:ts');
-        if (snapTs) {
-          etag = `"${snapTs}"`;
-          const clientETag = request.headers.get('if-none-match');
-          if (clientETag === etag) {
-            return new Response(null, {
-              status: 304,
-              headers: { ...CORS_HEADERS, 'ETag': etag },
-            });
-          }
-        }
-      } catch { /* ETag 실패 시 전체 응답으로 fallback */ }
-    }
-
     const snaps = await getAllSnaps();
     const fromCache = snaps !== null;
 
@@ -100,6 +91,16 @@ export default async function handler(request) {
     const us = stripStocks(snaps?.us ?? []);
     const coins = stripCoins(snaps?.coins ?? []);
 
+    // ── ETag: 실제 데이터에서 계산 → 별도 Redis 키 불필요, 레이스 컨디션 없음 ──
+    const etag = computeETag(kr, us, coins);
+    const clientETag = request.headers.get('if-none-match');
+    if (clientETag === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: { ...CORS_HEADERS, 'ETag': etag },
+      });
+    }
+
     const payload = { kr, us, coins, ts: Date.now(), _fromCache: fromCache };
 
     return new Response(JSON.stringify(payload), {
@@ -107,7 +108,7 @@ export default async function handler(request) {
       headers: {
         ...CORS_HEADERS,
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=15',
-        ...(etag ? { 'ETag': etag } : {}),
+        'ETag': etag,
       },
     });
   } catch (err) {

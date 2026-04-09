@@ -31,9 +31,12 @@ export async function fetchSnapshot() {
           _cacheTs = Date.now();
           return _cache;
         }
-        // cache가 null인데 304 → ETag stale, full 즉시 재요청
+        // cache가 null인데 304 → ETag stale, full 즉시 재요청 (브라우저 캐시 우회)
         _lastETag = null;
-        const retry = await fetch('/api/snapshot', { signal: AbortSignal.timeout(5000) });
+        const retry = await fetch('/api/snapshot', {
+          signal: AbortSignal.timeout(5000),
+          cache: 'no-cache',
+        });
         if (retry.ok) {
           const retryData = await retry.json();
           const retryEtag = retry.headers.get('etag');
