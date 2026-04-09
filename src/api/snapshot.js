@@ -35,7 +35,7 @@ export async function fetchSnapshot() {
         _lastETag = null;
         const retry = await fetch('/api/snapshot', {
           signal: AbortSignal.timeout(5000),
-          cache: 'no-cache',
+          cache: 'no-store',
         });
         if (retry.ok) {
           const retryData = await retry.json();

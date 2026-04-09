@@ -27,11 +27,13 @@ function stripCoins(items) {
 
 // ─── ETag: 실제 데이터 기반 fingerprint (레이스 컨디션 없음) ────
 function computeETag(kr, us, coins) {
-  // 배열 길이 + 첫 종목 가격으로 변경 감지 (cron이 데이터를 갱신하면 가격이 바뀜)
-  const krSample = kr?.[0] ? `${kr[0].price},${kr[0].changePct}` : '';
-  const usSample = us?.[0] ? `${us[0].price},${us[0].changePct}` : '';
-  const coinSample = coins?.[0] ? `${coins[0].priceKrw},${coins[0].change24h}` : '';
-  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${krSample}-${usSample}-${coinSample}"`;
+  // 배열 길이 + 첫/마지막 종목 가격으로 변경 감지 (충돌 확률 최소화)
+  const sample = (items, pKey, cKey) => {
+    if (!items?.length) return '';
+    const f = items[0], l = items[items.length - 1];
+    return `${f[pKey]},${f[cKey]},${l[pKey]},${l[cKey]}`;
+  };
+  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${sample(kr, 'price', 'changePct')}-${sample(us, 'price', 'changePct')}-${sample(coins, 'priceKrw', 'change24h')}"`;
 }
 
 export default async function handler(request) {
