@@ -7,15 +7,22 @@ import { SIGNAL_TYPES } from '../engine/signalTypes';
 const POLL_INTERVAL = 5 * 60 * 1000; // 5분
 const API_URL = '/api/ta-indicators';
 
+// 마켓별 요청 분리 — 타임아웃 방지 (25종목 한번에 X → 3회 분리)
+const MARKET_REQUESTS = [
+  { market: 'coin', symbols: 'BTC,ETH,SOL,XRP,DOGE,ADA,AVAX,DOT,LINK,BNB' },
+  { market: 'us', symbols: 'NVDA,AAPL,TSLA,MSFT,META,GOOGL,AMZN,AMD,COIN,MSTR' },
+  { market: 'kr', symbols: '005930,000660,005380,373220,035420' },
+];
+
 /**
  * TA API에서 지표를 가져와 기존 시그널과 합산 → 복합 점수 생성
  * @param {Array} allItems - 전체 종목 배열 (시그널 매칭용)
  */
 export function useCompositeSignals(allItems = []) {
-  const [scores, setScores] = useState({}); // { BTC: { score, label, ... }, ... }
+  const [scores, setScores] = useState({});
   const [loading, setLoading] = useState(true);
   const runningRef = useRef(false);
-  const allItemsRef = useRef(allItems); // ref로 감싸서 무한 루프 방지
+  const allItemsRef = useRef(allItems);
   allItemsRef.current = allItems;
 
   useEffect(() => {
@@ -24,26 +31,38 @@ export function useCompositeSignals(allItems = []) {
       runningRef.current = true;
 
       try {
-        const res = await fetch(API_URL, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) return;
-        const { results } = await res.json();
-        if (!results) return;
+        // 마켓별 순차 요청 (각 10초 타임아웃)
+        const allResults = {};
+        for (const { market, symbols } of MARKET_REQUESTS) {
+          try {
+            const res = await fetch(
+              `${API_URL}?market=${market}&symbols=${symbols}`,
+              { signal: AbortSignal.timeout(10000) }
+            );
+            if (res.ok) {
+              const { results } = await res.json();
+              if (results) Object.assign(allResults, results);
+            }
+          } catch {
+            // 개별 마켓 실패 무시 — 다른 마켓은 계속 진행
+          }
+        }
+
+        if (!Object.keys(allResults).length) return;
 
         const allSignals = getActiveSignals();
         const items = allItemsRef.current;
         const newScores = {};
 
-        // 글로벌 sentiment 1회만 추출 (루프 밖)
+        // 글로벌 sentiment 1회만 추출
         const globalSentiment = extractFlowAndSentiment(allSignals).sentiment;
 
-        for (const [symbol, ta] of Object.entries(results)) {
-          // 해당 종목의 기존 시그널에서 Flow/Sentiment 추출
+        for (const [symbol, ta] of Object.entries(allResults)) {
           const symbolSignals = allSignals.filter(
             s => s.symbol === symbol || s.symbol === symbol.toUpperCase()
           );
           const { flow, sentiment } = extractFlowAndSentiment(symbolSignals);
 
-          // 종목별 sentiment + 글로벌 sentiment 병합
           const mergedSentiment = {
             fearGreed: sentiment.fearGreed ?? globalSentiment.fearGreed,
             fundingRate: sentiment.fundingRate ?? globalSentiment.fundingRate,
@@ -51,18 +70,13 @@ export function useCompositeSignals(allItems = []) {
           };
 
           const composite = calculateCompositeScore(ta, flow, mergedSentiment);
-          newScores[symbol] = {
-            ...composite,
-            ta,
-            symbol,
-            market: ta.market,
-          };
+          newScores[symbol] = { ...composite, ta, symbol, market: ta.market };
 
           // 강한 시그널(±50 이상)만 시그널 엔진에 등록
           if (Math.abs(composite.score) >= 50) {
             removeSignalByTypeAndSymbol('composite_score', symbol);
             const name = findName(symbol, items) || symbol;
-            const signal = createSignal({
+            addSignal(createSignal({
               type: SIGNAL_TYPES.COMPOSITE_SCORE,
               symbol,
               name,
@@ -76,24 +90,20 @@ export function useCompositeSignals(allItems = []) {
                 rsi: ta.rsi?.value,
                 macd: ta.macd?.histogram,
               },
-            });
-            addSignal(signal);
+            }));
           }
         }
 
         setScores(newScores);
       } catch {
-        // 에러 무시 — 다음 폴링에서 재시도
+        // 전체 실패 — 다음 폴링에서 재시도
       } finally {
         runningRef.current = false;
         setLoading(false);
       }
     }
 
-    // 초기 로드 (3초 대기 — 가격 데이터 로딩 여유)
     const initTimer = setTimeout(fetchAndScore, 3000);
-
-    // 5분 간격 폴링
     const interval = setInterval(() => {
       if (!document.hidden) fetchAndScore();
     }, POLL_INTERVAL);
@@ -102,24 +112,16 @@ export function useCompositeSignals(allItems = []) {
       clearTimeout(initTimer);
       clearInterval(interval);
     };
-  }, []); // deps 비움 — allItems는 ref로 접근
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { scores, loading };
 }
 
-/** 종목명 찾기 헬퍼 */
 function findName(symbol, allItems) {
-  const item = allItems.find(
-    i => (i.symbol || '').toUpperCase() === symbol.toUpperCase()
-  );
+  const item = allItems.find(i => (i.symbol || '').toUpperCase() === symbol.toUpperCase());
   return item?.name || null;
 }
 
-/**
- * 특정 종목의 복합 점수 조회 (ChartSidePanel용)
- * @param {string} symbol
- * @param {object} scores - useCompositeSignals의 scores
- */
 export function getCompositeScore(symbol, scores) {
   return scores[symbol?.toUpperCase()] || scores[symbol] || null;
 }
