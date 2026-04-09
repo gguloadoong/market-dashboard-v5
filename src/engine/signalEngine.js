@@ -155,6 +155,9 @@ export function _resetStore() {
   _signals = [];
   _subscribers = [];
   _counter = 0;
+  _accuracyBuffer = [];
+  clearTimeout(_accuracyTimer);
+  _accuracyTimer = null;
 }
 
 // ─── 시그널 생성 헬퍼 ───────────────────────────────────────
@@ -693,10 +696,8 @@ export function createFxImpactSignal(krwRate, prevRate, changePct, impact) {
 // ─── 신규 시그널 7종 (Tier 2-3: 패턴 감지 + 교차 참조) ──
 
 /** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대 → 역발상 매수 */
+// 조건 체크는 호출부(detectCapitulation)에서 수행 — 여기서는 시그널 생성만
 export function createCapitulationSignal(symbol, name, market, priceDrop, volRatio, fearGreed) {
-  const T = THRESHOLDS.CAPITULATION;
-  if (priceDrop > T.PRICE_DROP || volRatio < T.VOLUME_RATIO || fearGreed > T.FEAR_GREED_MAX) return null;
-
   // 기존 시그널 교차 참조 — VOLUME_ANOMALY + FEAR_GREED_SHIFT 존재 여부
   const symbolSignals = getSignalsBySymbol(symbol);
   const hasVolumeAnomaly = symbolSignals.some(s => s.type === SIGNAL_TYPES.VOLUME_ANOMALY);

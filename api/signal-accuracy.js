@@ -28,8 +28,16 @@ async function supabaseQuery(query, method = 'GET', body = null) {
 }
 
 export default async function handler(req) {
-  // POST: 시그널 발화 기록
+  // POST: 시그널 발화 기록 — 내부 호출만 허용 (Vercel 내부 or CRON_SECRET)
   if (req.method === 'POST') {
+    // 보안: 서버 환경에서만 호출 가능 (클라이언트 직접 호출 시에는 origin 체크)
+    const origin = req.headers.get('origin') || '';
+    const cronSecret = req.headers.get('x-cron-secret') || '';
+    const isInternal = !origin || origin.includes('vercel.app') || origin.includes('localhost');
+    const hasSecret = cronSecret === (process.env.CRON_SECRET || '');
+    if (!isInternal && !hasSecret) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 403 });
+    }
     try {
       const signals = await req.json();
       if (!Array.isArray(signals) || !signals.length) {
