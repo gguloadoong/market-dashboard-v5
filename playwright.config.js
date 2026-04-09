@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  globalTeardown: './e2e/global-teardown.js',
   timeout: 30000,
   retries: 0,
   use: {

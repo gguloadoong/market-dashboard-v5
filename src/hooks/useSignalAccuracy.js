@@ -18,6 +18,7 @@ export function useSignalAccuracy() {
     queryFn: fetchSignalAccuracy,
     staleTime: 5 * 60_000,       // 5분 캐시
     refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     placeholderData: [],
   });
 

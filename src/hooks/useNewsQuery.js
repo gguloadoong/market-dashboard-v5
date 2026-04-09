@@ -54,6 +54,7 @@ export function useNewsAutoRefetch() {
     initialDataUpdatedAt: () => getInitialNewsTimestamp('all'),
     ...NEWS_OPTIONS,
     refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
   });
 }
 
