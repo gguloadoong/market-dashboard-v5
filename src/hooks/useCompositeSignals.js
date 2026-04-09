@@ -63,10 +63,12 @@ export function useCompositeSignals(allItems = []) {
           );
           const { flow, sentiment } = extractFlowAndSentiment(symbolSignals);
 
+          // 마켓별 sentiment 스코핑 — 코인 시그널은 코인 sentiment만, 주식은 주식 sentiment만
+          const isCrypto = ta.market === 'coin';
           const mergedSentiment = {
-            fearGreed: sentiment.fearGreed ?? globalSentiment.fearGreed,
-            fundingRate: sentiment.fundingRate ?? globalSentiment.fundingRate,
-            pcr: sentiment.pcr ?? globalSentiment.pcr,
+            fearGreed: sentiment.fearGreed ?? (isCrypto ? globalSentiment.fearGreed : null), // 코인만 crypto F&G
+            fundingRate: isCrypto ? (sentiment.fundingRate ?? globalSentiment.fundingRate) : null, // 코인만 펀딩비
+            pcr: !isCrypto ? (sentiment.pcr ?? globalSentiment.pcr) : null, // 주식만 PCR
           };
 
           const composite = calculateCompositeScore(ta, flow, mergedSentiment);
