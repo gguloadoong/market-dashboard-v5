@@ -169,12 +169,12 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
                 style={{ background: MARKET_DOT[item.market] ?? C.dotIdleSolid }}
               />
 
-              {/* 심볼 */}
+              {/* 종목명 (국내는 이름, 해외/코인은 심볼) */}
               <span
                 className="text-[11px] font-bold tracking-tight"
                 style={{ color: C.symbolText }}
               >
-                {item.symbol}
+                {item.market === 'kr' ? (item.name || item.symbol) : item.symbol}
               </span>
 
               {/* 지수 모드: 지수 값 */}

@@ -7,7 +7,7 @@ import {
   createSmartMoneySignal, createVolumePriceDivergenceSignal,
   createCrossMarketSignal, createMarketMoodShiftSignal,
 } from '../engine/signalEngine';
-import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
+import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
 
@@ -324,7 +324,7 @@ function generateBootSeedSignals(allItems) {
   if (getActiveSignals().length > 0 || !allItems?.length) return;
 
   const topMovers = [...allItems]
-    .filter(i => i._market) // 유효한 종목만
+    .filter(i => i._market && !STABLECOIN_SYMBOLS.has(i.symbol?.toUpperCase())) // 스테이블코인 제외
     .sort((a, b) => Math.abs(getPct(b)) - Math.abs(getPct(a)))
     .slice(0, 3);
 
@@ -357,15 +357,19 @@ function scanVolumeAnomalies(allItems) {
 
     const marketItems = allItems.filter(i => i._market === market);
     for (const item of marketItems) {
+      // 스테이블코인은 거래량 시그널 제외 (투자 의미 없음)
+      if (STABLECOIN_SYMBOLS.has(item.symbol?.toUpperCase())) continue;
       const vol = item.volume ?? item.volume24h ?? 0;
       if (vol <= 0) continue;
       if (vol >= threshold) {
+        const pct = clampPct(item.changePct ?? item.change24h ?? 0);
         createVolumeSignal(
           item.symbol,
           item.name ?? item.symbol,
           market.toLowerCase(),
           vol,
           threshold,
+          pct,
         );
       }
 
@@ -395,6 +399,7 @@ function detectCrossMarketCorrelation(allItems) {
   }
 
   const T_CM = THRESHOLDS.CROSS_MARKET;
+  const krNameMap = Object.fromEntries(KR_TOP_SYMBOLS.map(s => [s.symbol, s.name]));
   for (const pair of CROSS_MARKET_PAIRS) {
     const leaderItem = bySymbol[pair.leader];
     const laggerItem = bySymbol[pair.lagger];
@@ -406,7 +411,9 @@ function detectCrossMarketCorrelation(allItems) {
 
     // 같은 방향인데 괴리가 크거나, 반대 방향이면 시그널
     if (gap >= T_CM.DIVERGENCE) {
-      createCrossMarketSignal(pair.leader, pair.lagger, leaderPct, laggerPct);
+      const leaderName = leaderItem.name || pair.leader;
+      const laggerName = laggerItem.name || krNameMap[pair.lagger] || pair.lagger;
+      createCrossMarketSignal(pair.leader, pair.lagger, leaderPct, laggerPct, leaderName, laggerName);
     }
   }
 }

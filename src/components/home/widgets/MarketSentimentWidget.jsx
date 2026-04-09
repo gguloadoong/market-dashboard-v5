@@ -90,7 +90,8 @@ export default function MarketSentimentWidget({ allItems = [] }) {
       .slice(0, 3)
       .map(sig => {
         const meta = TYPE_META[sig.type];
-        return meta?.easyLabel || sig.label || sig.title || sig.type;
+        const label = meta?.easyLabel;
+        return (typeof label === 'function' ? label(sig.meta || {}) : label) || sig.label || sig.title || sig.type;
       });
   }, [signals]);
 

@@ -6,6 +6,29 @@ import { DEFAULT_KRW_RATE } from '../constants/market';
 // 커버리지: 시총 상위 250개 + 업비트 상장 전체
 import { getCoinSector } from '../data/coinSectors';
 
+// ─── 주요 코인 한국어명 매핑 (CoinPaprika 영문명 → 한국어) ──────
+// Upbit korean_name 기준, 사용자가 익숙한 한국어명으로 표시
+const COIN_KO_NAME = {
+  BTC: '비트코인', ETH: '이더리움', XRP: '리플', SOL: '솔라나',
+  ADA: '에이다', DOGE: '도지코인', BNB: 'BNB', AVAX: '아발란체',
+  DOT: '폴카닷', LINK: '체인링크', PEPE: '페페', SUI: '수이',
+  APT: '앱토스', NEAR: '니어', ATOM: '코스모스', TON: '톤코인',
+  UNI: '유니스왑', OP: '옵티미즘', ARB: '아비트럼', INJ: '인젝티브',
+  SHIB: '시바이누', XLM: '스텔라루멘', FIL: '파일코인', ICP: '인터넷컴퓨터',
+  HBAR: '헤데라', ETC: '이더리움클래식', SAND: '샌드박스', MANA: '디센트럴랜드',
+  SEI: '세이', LTC: '라이트코인', TRX: '트론', BCH: '비트코인캐시',
+  AAVE: '에이브', MKR: '메이커', RENDER: '렌더', FET: '페치AI',
+  TAO: '비텐서', WLD: '월드코인', JUP: '주피터', ONDO: '온도',
+  PENDLE: '펜들', STX: '스택스', TIA: '셀레스티아', PYTH: '피스',
+  BONK: '봉크', WIF: '위프', FLOKI: '플로키', GALA: '갈라',
+  IMX: '이뮤터블X', EOS: '이오스', MATIC: '폴리곤',
+};
+
+/** CoinPaprika 영문명 → 한국어명 변환 (매핑 없으면 원본 반환) */
+function getCoinKoName(symbol, englishName) {
+  return COIN_KO_NAME[symbol] || englishName;
+}
+
 // 필터링 대상: 가격 변동이 없거나 원본 자산의 래핑본인 토큰
 const EXCLUDED_SYMBOLS = new Set([
   'USDT','USDC','DAI','BUSD','TUSD','PYUSD','USDS','USDE','FDUSD','FRAX',
@@ -333,7 +356,7 @@ function buildFromPaprika(paprikaList, upbitMap, binanceMap, krwRate) {
       return {
         id:        coin.id,
         symbol:    sym,
-        name:      coin.name,
+        name:      getCoinKoName(sym, coin.name),
         priceUsd,
         priceKrw,
         change24h,
@@ -375,7 +398,7 @@ function buildFromCoinGecko(cgList, upbitMap, krwRate) {
       return {
         id:        coin.id,
         symbol:    sym,
-        name:      coin.name,
+        name:      getCoinKoName(sym, coin.name),
         priceUsd,
         priceKrw,
         change24h,

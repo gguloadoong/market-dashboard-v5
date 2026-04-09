@@ -173,6 +173,38 @@ function isShortKeyword(kw) {
   return kw.length <= 2;
 }
 
+// ─── 코인 한글명 블랙리스트 — 일반 한국어 단어와 겹쳐 뉴스 거짓양성 유발 ──
+// Upbit korean_name 기준. 금융 뉴스에 빈번한 단어와 겹치는 코인명
+const COIN_NAME_BLACKLIST = new Set([
+  // Critical — 금융 뉴스 필수 단어
+  '리스크',     // Lisk (LSK) — "리스크" = 위험
+  '가스',       // GAS — 블록체인 수수료 용어
+  '스토리',     // Story (IP) — "스토리" = 이야기
+  '썬',         // SUN — "썬" = 해
+  '블러',       // Blur — "블러" = 흐림
+  '네오',       // NEO — "네오" = 신(新)
+  // High — 뉴스 혼동 가능
+  '스택스',     // Stacks (STX)
+  '스팀',       // Steem (STEEM)
+  '웨이브',     // Waves
+  '그래프',     // The Graph (GRT)
+  '블라스트',   // Blast
+  '매직',       // Magic
+  '스토리지',   // Storj
+  '파워',       // Power Ledger
+  '컴파운드',   // Compound
+  '펀디엑스',   // Pundi X
+  '트론',       // Tron
+  '메탈',       // Metal
+  '보라',       // BORA
+  '미나',       // Mina
+  '하이브',     // Hive — "하이브" = 엔터사 혼동
+  '빔',         // Beam
+  '레이',       // Ray
+  '밀크',       // Milk (MLK)
+  '카우프로토콜', // CoW Protocol
+]);
+
 // ─── 키워드 배열 생성 ────────────────────────────────────────
 // market: 'KR' | 'US' | 'COIN'
 export function buildStockKeywords(symbol, name, market) {
@@ -193,8 +225,9 @@ export function buildStockKeywords(symbol, name, market) {
     aliases.forEach(a => keys.add(a.toLowerCase()));
   } else if (market === 'COIN') {
     // 코인: symbol(BTC 등) + 별칭
+    // 일반 한국어 단어와 겹치는 코인명은 제외 (리스크→Lisk 등 거짓양성 방지)
     if (symbol) keys.add(symbol.toLowerCase());
-    if (name)   keys.add(name.toLowerCase());
+    if (name && !COIN_NAME_BLACKLIST.has(name)) keys.add(name.toLowerCase());
     const aliases = COIN_ALIASES[symbol?.toUpperCase()] || [];
     aliases.forEach(a => keys.add(a.toLowerCase()));
   } else {

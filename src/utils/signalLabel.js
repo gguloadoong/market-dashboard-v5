@@ -7,6 +7,9 @@ export function extractName(signal) {
 }
 
 // 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
+// easyLabel이 함수인 경우 signal.meta를 전달하여 동적 라벨 생성
 export function getEasyLabel(signal) {
-  return TYPE_META[signal.type]?.easyLabel || signal.type;
+  const label = TYPE_META[signal.type]?.easyLabel;
+  if (typeof label === 'function') return label(signal.meta || {});
+  return label || signal.type;
 }

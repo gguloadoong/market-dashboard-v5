@@ -98,8 +98,19 @@ export const TYPE_META = {
     easyDesc: (m) => `기관이 ${m.name || '종목'}에서 ${m.consecutiveDays || m.days || '?'}일째 매도 중`,
   },
   [SIGNAL_TYPES.VOLUME_ANOMALY]: {
-    easyLabel: '거래가 평소보다 폭발 💥',
-    easyDesc: (m) => `${m.name || '종목'} 거래량이 평소의 ${m.ratio || '?'}배 — 뭔가 일어나고 있어요`,
+    easyLabel: (m) => {
+      const pct = m?.changePct ?? 0;
+      if (pct <= -1) return '급락 속 거래 폭발 💥';
+      if (pct >= 1) return '급등 속 거래 폭발 🔥';
+      return '거래가 평소보다 폭발 💥';
+    },
+    easyDesc: (m) => {
+      const pct = m?.changePct ?? 0;
+      const name = m?.name || '종목';
+      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 투매 또는 세력 매집 주의`;
+      if (pct >= 1) return `${name} 상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
+      return `${name} 거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
+    },
   },
   [SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW]: {
     easyLabel: '큰손이 거래소에 입금 📥',
@@ -166,7 +177,7 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: {
     easyLabel: '다른 시장이 먼저 움직였어요 🌐',
-    easyDesc: (m) => `${m.leader} ${m.leaderPct > 0 ? '+' : ''}${m.leaderPct}% vs ${m.lagger} ${m.laggerPct > 0 ? '+' : ''}${m.laggerPct}% — 따라갈 수 있어요`,
+    easyDesc: (m) => `${m.leaderName || m.leader} ${m.leaderPct > 0 ? '+' : ''}${m.leaderPct}% → ${m.laggerName || m.lagger} ${m.laggerPct > 0 ? '+' : ''}${m.laggerPct}% — 따라갈 수 있어요`,
   },
   [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: {
     easyLabel: '가격과 뉴스가 엇갈리고 있어요 🤔',
