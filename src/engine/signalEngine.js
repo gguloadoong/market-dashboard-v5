@@ -183,7 +183,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
  * @param {number} currentVol - 현재 거래량
  * @param {number} avgVol - 평균 거래량
  */
-export function createVolumeSignal(symbol, name, market, currentVol, avgVol) {
+export function createVolumeSignal(symbol, name, market, currentVol, avgVol, changePct = 0) {
   if (!avgVol || avgVol <= 0) return null;
   const ratio = currentVol / avgVol;
   // 95th percentile 기준으로 외부에서 필터 후 호출되므로 ratio >= 1이면 통과
@@ -193,6 +193,11 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol) {
   if (ratio >= 10) strength = 5;
   else if (ratio >= 5) strength = 4;
 
+  // 가격 방향에 따라 direction 설정 — 거래량 폭발의 맥락 전달
+  const pct = changePct ?? 0;
+  const direction = Math.abs(pct) < 0.5 ? DIRECTIONS.NEUTRAL
+    : pct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+
   const title = `${name} 거래량 평소 대비 ${ratio.toFixed(1)}배`;
 
   const signal = createSignal({
@@ -200,10 +205,10 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol) {
     symbol,
     name,
     market,
-    direction: DIRECTIONS.NEUTRAL,
+    direction,
     strength,
     title,
-    meta: { currentVol, avgVol, ratio },
+    meta: { currentVol, avgVol, ratio, changePct: pct },
   });
   return addSignal(signal);
 }
@@ -483,27 +488,30 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
 // ─── 신규 시그널 6종 헬퍼 ──────────────────────────────────
 
 /** 교차시장 상관관계 시그널 — leader/lagger 괴리 감지 */
-export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct) {
+export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct, leaderName, laggerName) {
   const gap = Math.abs(leaderPct - laggerPct);
   const direction = leaderPct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
   const strength = gap >= THRESHOLDS.CROSS_MARKET.STRONG ? 4 : 3;
-  const title = `${leader} ${leaderPct > 0 ? '+' : ''}${leaderPct.toFixed(1)}% vs ${lagger} ${laggerPct > 0 ? '+' : ''}${laggerPct.toFixed(1)}% — 괴리 ${gap.toFixed(1)}%`;
+  // 사람이 읽을 수 있는 이름 사용 (없으면 심볼 코드 fallback)
+  const displayLeader = leaderName || leader;
+  const displayLagger = laggerName || lagger;
+  const title = `${displayLeader} ${leaderPct > 0 ? '+' : ''}${leaderPct.toFixed(1)}% → ${displayLagger} ${laggerPct > 0 ? '+' : ''}${laggerPct.toFixed(1)}% — 괴리 ${gap.toFixed(1)}%`;
   return addSignal(createSignal({
     type: SIGNAL_TYPES.CROSS_MARKET_CORRELATION,
     symbol: `${leader}_${lagger}`,
-    name: `${leader}↔${lagger}`,
+    name: `${displayLeader} → ${displayLagger}`,
     market: 'cross',
     direction,
     strength,
     title,
-    meta: { leader, lagger, leaderPct: +leaderPct.toFixed(1), laggerPct: +laggerPct.toFixed(1), gap },
+    meta: { leader, lagger, leaderPct: +leaderPct.toFixed(1), laggerPct: +laggerPct.toFixed(1), gap, leaderName: displayLeader, laggerName: displayLagger },
   }));
 }
 
 /** 심리 괴리 시그널 — 가격 방향 vs 뉴스 감성 불일치 */
 export function createSentimentDivergenceSignal(symbol, name, market, pricePct, avgSentiment, newsCount) {
-  // 가격 오르는데 뉴스 악재, 또는 가격 내리는데 뉴스 호재
-  const direction = avgSentiment > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  // 가격과 뉴스가 엇갈리는 "괴리 경고" — 방향 판단이 아니므로 NEUTRAL
+  const direction = DIRECTIONS.NEUTRAL;
   const strength = Math.abs(avgSentiment) >= THRESHOLDS.SENTIMENT_DIV.STRONG ? 4 : 3;
   const priceDir = pricePct > 0 ? '상승' : '하락';
   const newsDir = avgSentiment > 0 ? '호재' : '악재';
@@ -629,12 +637,14 @@ export function getMarketTemperature() {
   }
   const total = bullWeight + bearWeight;
   const score = total === 0 ? 0 : (bullWeight - bearWeight) / total;
+  // 시그널 5개 미만이면 극단 라벨 방지 (부팅 시드 3개만으로 "강한 강세" 방지)
+  const hasEnough = signals.length >= 5;
   let label;
-  if (score <= -0.5) label = '강한 경계';
-  else if (score <= -0.15) label = '약세 우위';
+  if (score <= -0.5) label = hasEnough ? '강한 경계' : '중립';
+  else if (score <= -0.15) label = hasEnough ? '약세 우위' : '중립';
   else if (score < 0.15) label = '중립';
-  else if (score < 0.5) label = '강세 징후';
-  else label = '강한 강세';
+  else if (score < 0.5) label = hasEnough ? '강세 징후' : '중립';
+  else label = hasEnough ? '강한 강세' : '중립';
   return {
     score,
     label,

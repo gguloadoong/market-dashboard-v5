@@ -31,7 +31,7 @@ export default function TickerLogo({ item, size = 24 }) {
       className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
       style={{ ...sizeStyle, background: bg, fontSize }}
     >
-      {(item.symbol || '?').slice(0, 2).toUpperCase()}
+      {(item.symbol || '?').slice(0, 3).toUpperCase()}
     </div>
   );
 }

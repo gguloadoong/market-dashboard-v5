@@ -13,8 +13,9 @@ export function calcTemperature(signals) {
   }
   const total = bullWeight + bearWeight;
   const score = total === 0 ? 0 : (bullWeight - bearWeight) / total;
-  // 시그널 3개 미만이면 극단 라벨 방지 — 최대 "중립"까지만 허용
-  const hasEnoughSignals = signals.length >= 3;
+  // 시그널 5개 미만이면 극단 라벨 방지 — 최대 "중립"까지만 허용
+  // (부팅 시드 3개만으로 "강한 강세" 표시 방지)
+  const hasEnoughSignals = signals.length >= 5;
   let label;
   if (score <= -0.5) label = hasEnoughSignals ? '강한 경계' : '중립';
   else if (score <= -0.15) label = hasEnoughSignals ? '약세 우위' : '중립';
