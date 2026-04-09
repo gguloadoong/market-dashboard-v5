@@ -120,8 +120,8 @@ let _accuracyBuffer = [];
 let _accuracyTimer = null;
 
 function _recordForAccuracy(signal) {
-  // neutral 방향이거나 symbol 없는 시그널은 적중률 추적 의미 없음
-  if (!signal.symbol || signal.direction === DIRECTIONS.NEUTRAL) return;
+  // symbol 없는 시그널은 적중률 추적 의미 없음 (NEUTRAL도 추적 — stealth activity 등)
+  if (!signal.symbol) return;
 
   _accuracyBuffer.push({
     type: signal.type,

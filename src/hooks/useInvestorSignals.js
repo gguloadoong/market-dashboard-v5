@@ -9,6 +9,7 @@ import {
   createGapSignal, createRebalancingSignal, createFxImpactSignal,
   createCapitulationSignal, createStealthActivitySignal,
   createBtcLeadingSignal, createSectorOutlierSignal,
+  removeSignalByTypeAndSymbol,
 } from '../engine/signalEngine';
 import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/taCalculator';
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
@@ -530,6 +531,8 @@ function detectGapSignals(allItems) {
 function detectRebalancingSignal() {
   const result = detectRebalancingWindow();
   if (!result || !result.isRebalancing) return;
+  // 중복 방지: 기존 리밸런싱 시그널 제거 후 재생성
+  removeSignalByTypeAndSymbol(SIGNAL_TYPES.REBALANCING_ALERT, 'MARKET');
   createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
 }
 
