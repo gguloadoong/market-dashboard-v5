@@ -38,9 +38,23 @@ export async function fetchSnapshot() {
           _cacheTs = Date.now();
           return _cache;
         }
-        // cache가 null인데 304 → ETag stale, full 재요청
+        // cache가 null인데 304 → ETag stale, full 즉시 재요청
         _lastETag = null;
         _hasFullSnapshot = false;
+        const retry = await fetch('/api/snapshot', { signal: AbortSignal.timeout(5000) });
+        if (retry.ok) {
+          const retryData = await retry.json();
+          const retryEtag = retry.headers.get('etag');
+          if (retryEtag) _lastETag = retryEtag;
+          if (retryData?.ts) {
+            _cache = retryData;
+            _cacheTs = Date.now();
+            _hasFullSnapshot = true;
+            _lastFullTs = Date.now();
+          }
+          return retryData;
+        }
+        return null;
       }
 
       if (!res.ok) return null;

@@ -119,6 +119,8 @@ export default async function handler(request) {
     const fromCache = snaps !== null;
 
     // Redis 연결 자체가 안 되면 503 (인프라 장애)
+    // 코인은 24시간 거래 → coins가 비어있으면 실제 장애
+    // KR/US는 장외시간에 빈 배열일 수 있으므로 503 조건에서 제외
     if (!fromCache) {
       return new Response(JSON.stringify({
         error: 'Service Unavailable — Redis 연결 실패',
@@ -151,8 +153,8 @@ export default async function handler(request) {
     }
 
     // ── 전체 모드 (첫 요청 또는 fallback) ──
-    // 해시도 갱신 (다음 delta 요청 기준점)
-    computeAndStoreDelta(kr, us, coins).catch(() => {});
+    // 해시 갱신 (다음 delta 요청 기준점) — await로 Edge 응답 전 완료 보장
+    await computeAndStoreDelta(kr, us, coins).catch(() => {});
 
     const payload = { kr, us, coins, ts: Date.now(), _fromCache: fromCache };
 
