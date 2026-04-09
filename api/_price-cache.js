@@ -77,8 +77,10 @@ export async function setSnap(key, data, ex) {
       console.warn(`[price-cache] 백업 저장 실패 (${key}:prev):`, backupErr.message);
     }
     await redis.set(key, data, { ex });
-    // ETag용 타임스탬프 갱신 — snapshot API가 304 판별에 사용 (단일 키)
-    await redis.set('snap:ts', Date.now(), { ex }).catch(() => {});
+    // ETag용 타임스탬프 갱신 — snapshot 가격 키(kr/us/coins)만 갱신
+    if (key === SNAP_KEYS.KR || key === SNAP_KEYS.US || key === SNAP_KEYS.COINS) {
+      await redis.set('snap:ts', Date.now(), { ex }).catch(() => {});
+    }
     return true;
   } catch (e) {
     console.error(`[price-cache] setSnap 실패 (${key}):`, e);
