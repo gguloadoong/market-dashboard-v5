@@ -28,6 +28,16 @@ export const SIGNAL_TYPES = {
   VOLUME_PRICE_DIVERGENCE: 'volume_price_divergence',
   MARKET_MOOD_SHIFT: 'market_mood_shift',
   COMPOSITE_SCORE: 'composite_score',
+  GAP_ANALYSIS: 'gap_analysis',
+  REBALANCING_ALERT: 'rebalancing_alert',
+  FX_IMPACT: 'fx_impact',
+  CAPITULATION: 'capitulation',
+  STEALTH_ACTIVITY: 'stealth_activity',
+  BTC_LEADING: 'btc_leading',
+  SUPPORT_RESISTANCE_BREAK: 'support_resistance_break',
+  DOUBLE_BOTTOM: 'double_bottom',
+  RECOVERY_DETECTION: 'recovery_detection',
+  SECTOR_OUTLIER: 'sector_outlier',
 };
 
 // 시그널 방향
@@ -65,6 +75,16 @@ export const SIGNAL_TTL = {
   [SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE]: 2 * 3600000,
   [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: 4 * 3600000,
   [SIGNAL_TYPES.COMPOSITE_SCORE]: 10 * 60000, // 10분 (5분 크론 × 2)
+  [SIGNAL_TYPES.GAP_ANALYSIS]: 4 * 3600000,       // 4시간
+  [SIGNAL_TYPES.REBALANCING_ALERT]: 24 * 3600000,  // 24시간
+  [SIGNAL_TYPES.FX_IMPACT]: 8 * 3600000,           // 8시간
+  [SIGNAL_TYPES.CAPITULATION]: 4 * 3600000,          // 4시간 — 투매 이벤트
+  [SIGNAL_TYPES.STEALTH_ACTIVITY]: 2 * 3600000,      // 2시간 — 뉴스 없는 거래 폭발
+  [SIGNAL_TYPES.BTC_LEADING]: 2 * 3600000,           // 2시간 — BTC 선행 신호
+  [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: 4 * 3600000, // 4시간 — 지지/저항선 돌파
+  [SIGNAL_TYPES.DOUBLE_BOTTOM]: 8 * 3600000,         // 8시간 — 이중바닥 패턴
+  [SIGNAL_TYPES.RECOVERY_DETECTION]: 6 * 3600000,    // 6시간 — 회복 감지
+  [SIGNAL_TYPES.SECTOR_OUTLIER]: 4 * 3600000,        // 4시간 — 섹터 이탈 종목
 };
 
 /** 시그널 타입별 TTL 조회 (기본값 2시간) */
@@ -200,6 +220,54 @@ export const TYPE_META = {
   [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: {
     easyLabel: '시장 분위기 변화 감지 🌊',
     easyDesc: (m) => m.moodType === 'consensus' ? `국장·미장·코인 모두 ${m.direction === 'bullish' ? '상승' : '하락'} — 강한 흐름` : `${m.flippedMarkets.join('·')} 방향 전환 — 변곡점 주의`,
+  },
+  [SIGNAL_TYPES.GAP_ANALYSIS]: {
+    easyLabel: (m) => (m?.gapPct ?? 0) >= 0 ? '갭 상승 출발 🚀' : '갭 하락 출발 ⚡',
+    easyDesc: (m) => {
+      const pct = m?.gapPct ?? 0;
+      if (pct >= 0) return `전일 종가 대비 +${pct.toFixed(1)}% 갭 상승 — 매수세 유입`;
+      return `전일 종가 대비 ${pct.toFixed(1)}% 갭 하락 — 매도 압력`;
+    },
+  },
+  [SIGNAL_TYPES.REBALANCING_ALERT]: {
+    easyLabel: '기관 리밸런싱 주의 📅',
+    easyDesc: (m) => `${m?.isQuarterEnd ? '분기말' : '월말'} D-${m?.daysLeft ?? '?'} — 기관 매물 출회 가능`,
+  },
+  [SIGNAL_TYPES.FX_IMPACT]: {
+    easyLabel: '환율 변동 주의 💱',
+    easyDesc: (m) => `원/달러 ${m?.rate ?? '?'}원 (${(m?.change ?? 0) > 0 ? '+' : ''}${(m?.change ?? 0).toFixed(1)}%) — ${m?.impact ?? ''}`,
+  },
+  [SIGNAL_TYPES.CAPITULATION]: {
+    easyLabel: '투매 감지 — 역발상 기회? 🔥',
+    easyDesc: (m) => `${m.name || '종목'} 공포 속 투매 발생 — 과거 패턴상 바닥 근처`,
+  },
+  [SIGNAL_TYPES.STEALTH_ACTIVITY]: {
+    easyLabel: '뉴스 없는 거래 폭발 👀',
+    easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 누군가 움직이고 있어요`,
+  },
+  [SIGNAL_TYPES.BTC_LEADING]: {
+    easyLabel: (m) => `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
+    easyDesc: (m) => `BTC ${(m?.btcChange ?? 0) > 0 ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}% 움직임 — ${m?.alt || '알트코인'} 아직 미반영`,
+  },
+  [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: {
+    easyLabel: (m) => m?.breakType === 'resistance' ? '저항선 돌파 🚀' : '지지선 이탈 ⚠️',
+    easyDesc: (m) => m?.breakType === 'resistance'
+      ? `${m.name || '종목'} ${m.level?.toLocaleString() || '?'}원 저항선 돌파 — 상승 탄력`
+      : `${m.name || '종목'} ${m.level?.toLocaleString() || '?'}원 지지선 이탈 — 추가 하락 주의`,
+  },
+  [SIGNAL_TYPES.DOUBLE_BOTTOM]: {
+    easyLabel: '이중바닥 패턴 감지 📈',
+    easyDesc: (m) => `${m.name || '종목'} 이중바닥 형성 — 넥라인 ${m.neckline?.toLocaleString() || '?'}원 돌파 시 강한 반등`,
+  },
+  [SIGNAL_TYPES.RECOVERY_DETECTION]: {
+    easyLabel: '급락 후 안정화 — 반등 모색 🌱',
+    easyDesc: (m) => `${m.name || '종목'} ${Math.abs(m?.drawdown ?? 0).toFixed(1)}% 급락 후 변동성 축소 — 회복 신호`,
+  },
+  [SIGNAL_TYPES.SECTOR_OUTLIER]: {
+    easyLabel: (m) => m?.above ? '섹터 대비 급등 — 독자 강세 💪' : '섹터 대비 급락 — 이탈 주의 ⚠️',
+    easyDesc: (m) => m?.above
+      ? `${m.name || '종목'} 섹터 평균 대비 ${m.deviation?.toFixed(1) || '?'}σ 초과 상승 — 독자 행보`
+      : `${m.name || '종목'} 섹터 평균 대비 ${Math.abs(m?.deviation ?? 0).toFixed(1)}σ 이탈 하락 — 개별 악재 의심`,
   },
   [SIGNAL_TYPES.COMPOSITE_SCORE]: {
     easyLabel: (m) => {

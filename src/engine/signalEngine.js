@@ -56,6 +56,9 @@ export function addSignal(signal) {
 
   _signals.push(signal);
 
+  // 적중률 트래킹 — 비동기 fire-and-forget (실패해도 시그널 영향 없음)
+  _recordForAccuracy(signal);
+
   // 최대 개수 초과 시 오래된 것부터 제거
   if (_signals.length > MAX_SIGNALS) {
     _signals.sort((a, b) => b.timestamp - a.timestamp);
@@ -108,6 +111,42 @@ export function subscribe(callback) {
 
 export function unsubscribe(callback) {
   _subscribers = _subscribers.filter(fn => fn !== callback);
+}
+
+// ─── 적중률 트래킹 ──────────────────────────────────────────
+
+// 배치 버퍼 — 5초 모아서 한번에 POST (API 부하 최소화)
+let _accuracyBuffer = [];
+let _accuracyTimer = null;
+
+function _recordForAccuracy(signal) {
+  // neutral 방향이거나 symbol 없는 시그널은 적중률 추적 의미 없음
+  if (!signal.symbol || signal.direction === DIRECTIONS.NEUTRAL) return;
+
+  _accuracyBuffer.push({
+    type: signal.type,
+    symbol: signal.symbol,
+    market: signal.market || 'unknown',
+    direction: signal.direction,
+    strength: signal.strength || 1,
+    title: signal.title || '',
+    priceAtFire: signal.meta?.currentPrice || signal.meta?.priceKrw || null,
+    meta: { compositeScore: signal.meta?.compositeScore, rsi: signal.meta?.rsi },
+  });
+
+  // 5초 디바운스 — 배치 전송
+  if (!_accuracyTimer) {
+    _accuracyTimer = setTimeout(() => {
+      const batch = _accuracyBuffer.splice(0);
+      _accuracyTimer = null;
+      if (!batch.length) return;
+      fetch('/api/signal-accuracy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+      }).catch(() => {}); // fire-and-forget
+    }, 5000);
+  }
 }
 
 // ─── 테스트/디버그용 초기화 ──────────────────────────────────
@@ -587,6 +626,207 @@ export function createMarketMoodShiftSignal(moodType, direction, flippedMarkets,
     strength,
     title,
     meta: { moodType, direction, flippedMarkets, marketAvgs },
+  }));
+}
+
+/** 갭 분석 시그널 — 전일 종가 vs 당일 시가 갭 */
+export function createGapSignal(symbol, name, market, gapPct) {
+  if (gapPct == null) return null;
+  const T = THRESHOLDS.GAP;
+  if (Math.abs(gapPct) < T.MIN_PCT) return null;
+
+  const direction = gapPct >= 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  // 점수 비례: 갭 크기에 비례, 최대 ±MAX_SCORE
+  const rawScore = Math.abs(gapPct) * (T.MAX_SCORE / 10); // 10%면 최대 점수
+  const strength = rawScore >= 15 ? 4 : rawScore >= 8 ? 3 : 2;
+  const label = gapPct >= 0 ? '갭 상승 출발' : '갭 하락 출발';
+  const title = `${name} ${label} ${gapPct > 0 ? '+' : ''}${gapPct.toFixed(1)}%`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.GAP_ANALYSIS,
+    symbol, name, market, direction, strength,
+    title, meta: { gapPct },
+  }));
+}
+
+/** 리밸런싱 경고 시그널 — 월말/분기말 기관 매물 출회 */
+export function createRebalancingSignal(isQuarterEnd, daysLeft) {
+  const T = THRESHOLDS.REBALANCING;
+  const strength = isQuarterEnd ? T.QUARTER_STRENGTH : T.MONTH_STRENGTH;
+  const periodLabel = isQuarterEnd ? '분기말' : '월말';
+  const title = `${periodLabel} D-${daysLeft} — 기관 리밸런싱 매물 출회 가능`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.REBALANCING_ALERT,
+    symbol: 'MARKET',
+    name: '기관 리밸런싱',
+    market: 'kr',
+    direction: DIRECTIONS.BEARISH,
+    strength,
+    title,
+    meta: { isQuarterEnd, daysLeft },
+  }));
+}
+
+/** 환율 영향 시그널 — KRW/USD 변동 감지 */
+export function createFxImpactSignal(krwRate, prevRate, changePct, impact) {
+  if (changePct == null) return null;
+  const T = THRESHOLDS.FX;
+  if (Math.abs(changePct) < T.MIN_CHANGE_PCT) return null;
+
+  // 환율 상승(원화 약세) → 수입주 기준 BEARISH
+  const direction = changePct > 0 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
+  const strength = Math.abs(changePct) >= T.STRONG_CHANGE_PCT ? 4 : 3;
+  const title = `원/달러 ${krwRate.toFixed(0)}원 (${changePct > 0 ? '+' : ''}${changePct.toFixed(1)}%) — ${impact}`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.FX_IMPACT,
+    symbol: 'USDKRW',
+    name: '원/달러 환율',
+    market: 'kr',
+    direction, strength,
+    title,
+    meta: { rate: krwRate, prevRate, change: changePct, impact },
+  }));
+}
+
+// ─── 신규 시그널 7종 (Tier 2-3: 패턴 감지 + 교차 참조) ──
+
+/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대 → 역발상 매수 */
+export function createCapitulationSignal(symbol, name, market, priceDrop, volRatio, fearGreed) {
+  const T = THRESHOLDS.CAPITULATION;
+  if (priceDrop > T.PRICE_DROP || volRatio < T.VOLUME_RATIO || fearGreed > T.FEAR_GREED_MAX) return null;
+
+  // 기존 시그널 교차 참조 — VOLUME_ANOMALY + FEAR_GREED_SHIFT 존재 여부
+  const symbolSignals = getSignalsBySymbol(symbol);
+  const hasVolumeAnomaly = symbolSignals.some(s => s.type === SIGNAL_TYPES.VOLUME_ANOMALY);
+  const hasFearGreed = getActiveSignals().some(s => s.type === SIGNAL_TYPES.FEAR_GREED_SHIFT);
+
+  // 교차 확인으로 strength 보정
+  let strength = 3;
+  if (hasVolumeAnomaly && hasFearGreed) strength = 5;
+  else if (hasVolumeAnomaly || hasFearGreed) strength = 4;
+
+  const title = `${name} 투매 감지 — 가격 ${priceDrop.toFixed(1)}%, 거래량 ${volRatio.toFixed(1)}배, F&G ${fearGreed}`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.CAPITULATION,
+    symbol, name, market,
+    direction: DIRECTIONS.BULLISH, // 역발상
+    strength,
+    title,
+    meta: { name, priceDrop, volRatio, fearGreed, hasVolumeAnomaly, hasFearGreed },
+  }));
+}
+
+/** 내부자 의심 (스텔스 활동) — 거래량 폭발인데 뉴스 없음 */
+export function createStealthActivitySignal(symbol, name, market, volRatio) {
+  const T = THRESHOLDS.STEALTH;
+  if (volRatio < T.VOLUME_RATIO) return null;
+
+  // 교차 참조 — VOLUME_ANOMALY 있고 NEWS_SENTIMENT_CLUSTER 없어야 함
+  const symbolSignals = getSignalsBySymbol(symbol);
+  const hasVolume = symbolSignals.some(s => s.type === SIGNAL_TYPES.VOLUME_ANOMALY);
+  const hasNews = symbolSignals.some(s => s.type === SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER);
+
+  if (hasNews) return null; // 뉴스 있으면 스텔스 아님
+
+  const strength = hasVolume ? 4 : 3;
+  const title = `${name} 뉴스 없는 거래량 ${volRatio.toFixed(1)}배 폭발 — 내부자 의심`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.STEALTH_ACTIVITY,
+    symbol, name, market,
+    direction: DIRECTIONS.NEUTRAL, // 방향 불명
+    strength,
+    title,
+    meta: { name, volRatio, hasVolumeAnomaly: hasVolume },
+  }));
+}
+
+/** BTC 선행 알트코인 예측 — BTC 급등락인데 알트코인 미반영 */
+export function createBtcLeadingSignal(alt, btcChange, altChange) {
+  const T = THRESHOLDS.BTC_LEADING;
+  if (Math.abs(btcChange) < T.BTC_MIN_CHANGE || Math.abs(altChange) >= T.ALT_MAX_CHANGE) return null;
+
+  const direction = btcChange > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = Math.abs(btcChange) >= 5 ? 4 : 3;
+  const title = `BTC ${btcChange > 0 ? '+' : ''}${btcChange.toFixed(1)}% → ${alt} 미반영 (${altChange > 0 ? '+' : ''}${altChange.toFixed(1)}%)`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.BTC_LEADING,
+    symbol: alt,
+    name: alt,
+    market: 'crypto',
+    direction,
+    strength,
+    title,
+    meta: { alt, btcChange, altChange },
+  }));
+}
+
+/** 지지/저항선 돌파 시그널 */
+export function createSupportResistanceSignal(symbol, name, market, breakType, breakLevel) {
+  if (!breakType || !breakLevel) return null;
+
+  const direction = breakType === 'resistance' ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const strength = 3;
+  const label = breakType === 'resistance' ? '저항선 돌파' : '지지선 이탈';
+  const title = `${name} ${breakLevel.toLocaleString()} ${label}`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
+    symbol, name, market,
+    direction, strength,
+    title,
+    meta: { name, breakType, level: breakLevel },
+  }));
+}
+
+/** 이중바닥 패턴 시그널 */
+export function createDoubleBottomSignal(symbol, name, market, bottom1, bottom2, neckline, broken) {
+  const strength = broken ? 4 : 3;
+  const label = broken ? '넥라인 돌파' : '넥라인 접근';
+  const title = `${name} 이중바닥 ${label} — 넥라인 ${neckline.toLocaleString()}`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.DOUBLE_BOTTOM,
+    symbol, name, market,
+    direction: DIRECTIONS.BULLISH,
+    strength,
+    title,
+    meta: { name, bottom1, bottom2, neckline, broken },
+  }));
+}
+
+/** 회복 감지 시그널 — 급락 후 안정화 */
+export function createRecoverySignal(symbol, name, market, drawdown, bbShrink, volRatio) {
+  const strength = Math.abs(drawdown) >= 15 ? 4 : 3;
+  const title = `${name} ${Math.abs(drawdown).toFixed(1)}% 급락 후 안정화 — BB 축소 ${(bbShrink * 100).toFixed(0)}%`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.RECOVERY_DETECTION,
+    symbol, name, market,
+    direction: DIRECTIONS.BULLISH, // 회복 시작
+    strength,
+    title,
+    meta: { name, drawdown, bbShrink, volRatio },
+  }));
+}
+
+/** 섹터 이탈 종목 시그널 — 섹터 평균 대비 2σ 이상 이탈 */
+export function createSectorOutlierSignal(symbol, name, market, deviation, sectorAvg, itemPct, sector, above) {
+  const strength = Math.abs(deviation) >= 3 ? 4 : 3;
+  const direction = above ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  const label = above ? '섹터 대비 급등' : '섹터 대비 급락';
+  const title = `${name} ${label} — ${sector} 평균 ${sectorAvg > 0 ? '+' : ''}${sectorAvg.toFixed(1)}% 대비 ${itemPct > 0 ? '+' : ''}${itemPct.toFixed(1)}% (${Math.abs(deviation).toFixed(1)}σ)`;
+
+  return addSignal(createSignal({
+    type: SIGNAL_TYPES.SECTOR_OUTLIER,
+    symbol, name, market,
+    direction, strength,
+    title,
+    meta: { name, deviation, sectorAvg, itemPct, sector, above },
   }));
 }
 
