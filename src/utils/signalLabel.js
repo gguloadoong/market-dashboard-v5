@@ -3,7 +3,14 @@ import { TYPE_META } from '../engine/signalTypes';
 
 // 시그널에서 표시 이름 추출
 export function extractName(signal) {
-  return signal.name || signal.symbol || signal.sector || signal.label || TYPE_META[signal.type]?.easyLabel || signal.type || '';
+  if (signal.name) return signal.name;
+  if (signal.symbol) return signal.symbol;
+  if (signal.sector) return signal.sector;
+  if (signal.label) return signal.label;
+  // easyLabel이 함수일 수 있으므로 문자열만 fallback (함수는 getEasyLabel로 처리)
+  const label = TYPE_META[signal.type]?.easyLabel;
+  if (typeof label === 'string') return label;
+  return signal.type || '';
 }
 
 // 시그널의 easyLabel 가져오기 (TYPE_META 단일 소스)
