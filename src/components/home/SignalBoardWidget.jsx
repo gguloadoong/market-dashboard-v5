@@ -1,10 +1,12 @@
 // 시그널 보드 위젯 — SignalSummaryWidget + SeoulForceSection 통합
-// 카운터 3개 (강세/약세/중립) + 시그널 리스트 + 접기/펼치기
+// 카운터 3개 (강세/약세/중립) + 시그널 리스트 + 접기/펼치기 + 성적표 탭
 import { useState, useCallback, useMemo } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { SIGNAL_TYPES } from '../../engine/signalTypes';
+import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import TickerLogo from './TickerLogo';
+import SignalScorecardTab from './SignalScorecardTab';
 
 const FORCE_TYPES = [
   SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
@@ -14,9 +16,12 @@ const FORCE_TYPES = [
 ];
 
 export default function SignalBoardWidget({ onItemClick }) {
+  // 탭 상태: 'live' | 'scorecard'
+  const [activeTab, setActiveTab] = useState('live');
   // 모바일 기본 접힘 — 카운터만 노출
   const [expanded, setExpanded] = useState(false);
   const allSignals = useTopSignals(20);
+  const { botMap } = useSignalAccuracy();
 
   const { bullSignals, bearSignals, neutralSignals, bullCount, bearCount, neutralCount } = useMemo(() => {
     const bull = [], bear = [], neutral = [];
@@ -59,16 +64,36 @@ export default function SignalBoardWidget({ onItemClick }) {
     }
   }, [onItemClick]);
 
+  // 탭 헤더 공통
+  const tabHeader = (
+    <div className="flex items-center justify-between mb-5">
+      <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
+      <div className="flex bg-[#F2F4F6] rounded-lg p-0.5">
+        <button
+          onClick={() => setActiveTab('live')}
+          className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${
+            activeTab === 'live' ? 'bg-white text-[#191F28] shadow-sm' : 'text-[#8B95A1]'
+          }`}
+        >
+          실시간
+        </button>
+        <button
+          onClick={() => setActiveTab('scorecard')}
+          className={`px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${
+            activeTab === 'scorecard' ? 'bg-white text-[#191F28] shadow-sm' : 'text-[#8B95A1]'
+          }`}
+        >
+          성적표
+        </button>
+      </div>
+    </div>
+  );
+
   // 빈 상태
-  if (allSignals.length === 0) {
+  if (allSignals.length === 0 && activeTab === 'live') {
     return (
       <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
-          <span className="text-[11px] font-bold text-[#2AC769] flex items-center gap-1">
-            <span className="w-[5px] h-[5px] rounded-full bg-[#2AC769] inline-block" />실시간
-          </span>
-        </div>
+        {tabHeader}
         <p className="text-[13px] text-[#8B95A1] leading-relaxed">
           시장을 분석 중이에요. 시그널이 포착되면 여기에 알려드릴게요.
         </p>
@@ -81,15 +106,20 @@ export default function SignalBoardWidget({ onItemClick }) {
     );
   }
 
+  // 성적표 탭
+  if (activeTab === 'scorecard') {
+    return (
+      <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
+        {tabHeader}
+        <SignalScorecardTab />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
-      {/* 헤더 */}
-      <div className="flex items-center gap-2 mb-5">
-        <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
-        <span className="text-[11px] font-bold text-[#2AC769] flex items-center gap-1">
-          <span className="w-[5px] h-[5px] rounded-full bg-[#2AC769] inline-block" />실시간
-        </span>
-      </div>
+      {/* 헤더 + 탭 */}
+      {tabHeader}
 
       {/* 카운터 3개 — 큰 숫자 + 레이블만 (카드 배경 없음) */}
       <div className="flex gap-8 mb-5 px-1">
@@ -166,7 +196,22 @@ export default function SignalBoardWidget({ onItemClick }) {
                 <span className="text-[14px] font-semibold flex-shrink-0" style={{ color: nameColor }}>
                   {extractName(signal)}
                 </span>
-                <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">{getEasyLabel(signal)}</span>
+                <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">
+                  {getEasyLabel(signal)}
+                  {/* 적중률 배지 */}
+                  {botMap.get(signal.type)?.totalFired > 0 && (
+                    <span
+                      className="ml-1 text-[10px] font-bold px-1 py-[1px] rounded-full"
+                      style={{
+                        color: '#fff',
+                        background: (botMap.get(signal.type)?.accuracy ?? 0) >= 70 ? '#2AC769'
+                          : (botMap.get(signal.type)?.accuracy ?? 0) >= 50 ? '#FF9500' : '#F04452',
+                      }}
+                    >
+                      {botMap.get(signal.type).accuracy}%
+                    </span>
+                  )}
+                </span>
                 {/* 강도 도트 (원형) */}
                 <div className="flex gap-[3px] flex-shrink-0">
                   {Array.from({ length: 5 }).map((_, i) => (
