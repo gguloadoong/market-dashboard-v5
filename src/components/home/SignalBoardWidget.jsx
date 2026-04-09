@@ -89,8 +89,18 @@ export default function SignalBoardWidget({ onItemClick }) {
     </div>
   );
 
-  // 빈 상태
-  if (allSignals.length === 0 && activeTab === 'live') {
+  // 성적표 탭 (시그널 0건이어도 접근 가능)
+  if (activeTab === 'scorecard') {
+    return (
+      <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
+        {tabHeader}
+        <SignalScorecardTab />
+      </div>
+    );
+  }
+
+  // 라이브 탭 — 시그널 0건일 때 빈 상태
+  if (allSignals.length === 0) {
     return (
       <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
         {tabHeader}
@@ -102,16 +112,6 @@ export default function SignalBoardWidget({ onItemClick }) {
             <div key={i} className="h-11 bg-[#F7F8FA] rounded-[10px] animate-pulse" />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  // 성적표 탭
-  if (activeTab === 'scorecard') {
-    return (
-      <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
-        {tabHeader}
-        <SignalScorecardTab />
       </div>
     );
   }
@@ -208,7 +208,7 @@ export default function SignalBoardWidget({ onItemClick }) {
                           : (botMap.get(signal.type)?.accuracy ?? 0) >= 50 ? '#FF9500' : '#F04452',
                       }}
                     >
-                      {botMap.get(signal.type).accuracy}%
+                      {botMap.get(signal.type)?.accuracy ?? 0}%
                     </span>
                   )}
                 </span>
