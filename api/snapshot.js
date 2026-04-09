@@ -25,19 +25,14 @@ function stripCoins(items) {
     ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }));
 }
 
-// ─── ETag: 실제 데이터 기반 fingerprint (레이스 컨디션 없음) ────
-function computeETag(kr, us, coins) {
-  // 전체 가격 합산 — 어떤 종목이 바뀌어도 합계가 변함
-  const sum = (items, pKey) => {
-    if (!items?.length) return 0;
-    let s = 0;
-    for (const item of items) s += (item[pKey] || 0);
-    return s;
-  };
-  const krSum = sum(kr, 'price');
-  const usSum = sum(us, 'price');
-  const coinSum = sum(coins, 'priceKrw');
-  return `"${kr?.length || 0}-${us?.length || 0}-${coins?.length || 0}-${krSum}-${usSum}-${coinSum}"`;
+// ─── ETag: JSON 문자열 해시 (모든 필드 변경 감지, 충돌 불가) ────
+function simpleHash(str) {
+  // DJB2 해시 — 빠르고 충돌 적음 (암호학적 보안 불필요)
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
 }
 
 export default async function handler(request) {
@@ -97,19 +92,18 @@ export default async function handler(request) {
     const us = stripStocks(snaps?.us ?? []);
     const coins = stripCoins(snaps?.coins ?? []);
 
-    // ── ETag: 실제 데이터에서 계산 → 별도 Redis 키 불필요, 레이스 컨디션 없음 ──
-    const etag = computeETag(kr, us, coins);
+    // ── ETag: 데이터 내용 해시 (ts/_fromCache 제외 — 매번 바뀌므로) ──
+    const etag = `"${simpleHash(JSON.stringify([kr, us, coins]))}"`;
+    const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: fromCache });
     const clientETag = request.headers.get('if-none-match');
     if (clientETag === etag) {
       return new Response(null, {
         status: 304,
-        headers: { ...CORS_HEADERS, 'ETag': etag },
+        headers: { 'Access-Control-Allow-Origin': '*', 'ETag': etag },
       });
     }
 
-    const payload = { kr, us, coins, ts: Date.now(), _fromCache: fromCache };
-
-    return new Response(JSON.stringify(payload), {
+    return new Response(body, {
       status: 200,
       headers: {
         ...CORS_HEADERS,
