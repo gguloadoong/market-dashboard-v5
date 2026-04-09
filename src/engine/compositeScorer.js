@@ -33,9 +33,11 @@ function calcFlowScore(flow) {
   if (foreignBuyDays >= 2 && instBuyDays >= 2) score += 15;
   else if (foreignSellDays >= 2 && instSellDays >= 2) score -= 15;
 
-  // 거래량 가속 (10% 가중)
+  // 거래량 가속 (10% 가중) — flow 방향이 있을 때만 부스트, 없으면 중립
   const volRatio = flow.volumeRatio ?? 1;
-  if (volRatio >= 2) score += Math.min(20, (volRatio - 1) * 10) * (score > 0 ? 1 : -1);
+  if (volRatio >= 2 && score !== 0) {
+    score += Math.min(20, (volRatio - 1) * 10) * (score > 0 ? 1 : -1);
+  }
 
   return Math.max(-100, Math.min(100, score));
 }
