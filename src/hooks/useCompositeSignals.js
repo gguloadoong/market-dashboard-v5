@@ -100,36 +100,36 @@ export function useCompositeSignals(allItems = []) {
           }
 
           // ── Tier2-3: TA 기반 패턴 시그널 (지지/저항 돌파, 이중바닥, 회복 감지) ──
-          const tName = findName(symbol, items) || symbol;
-          const tMarket = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
+          const patternName = findName(symbol, items) || symbol;
+          const patternMarket = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
           const candles = ta.candles;
-          const closes = Array.isArray(candles) ? candles.map(c => c.close).filter(v => v != null) : null;
-          const volumes = Array.isArray(candles) ? candles.map(c => c.volume).filter(v => v != null) : null;
 
-          // 지지/저항선 돌파 감지 — 기존 시그널 제거 후 재등록
-          removeSignalByTypeAndSymbol('support_resistance_break', symbol);
           if (Array.isArray(candles) && candles.length >= 10) {
-            const sr = findSupportResistance(candles);
+            // candle 단위로 null 제거 → closes/volumes 인덱스 정합성 보장
+            const validCandles = candles.filter(c => c.close != null && c.volume != null);
+            const closes = validCandles.map(c => c.close);
+            const volumes = validCandles.map(c => c.volume);
+
+            // 지지/저항선 돌파 감지
+            const sr = findSupportResistance(validCandles);
             if (sr?.breakType) {
-              createSupportResistanceSignal(symbol, tName, tMarket, sr.breakType, sr.breakLevel);
+              createSupportResistanceSignal(symbol, patternName, patternMarket, sr.breakType, sr.breakLevel);
             }
-          }
 
-          // 이중바닥 패턴 감지
-          removeSignalByTypeAndSymbol('double_bottom', symbol);
-          if (Array.isArray(candles) && candles.length >= 15) {
-            const db = detectDoubleBottom(candles);
-            if (db?.approaching) {
-              createDoubleBottomSignal(symbol, tName, tMarket, db.bottom1, db.bottom2, db.neckline, db.broken);
+            // 이중바닥 패턴 감지 (15봉 이상)
+            if (validCandles.length >= 15) {
+              const db = detectDoubleBottom(validCandles);
+              if (db?.approaching) {
+                createDoubleBottomSignal(symbol, patternName, patternMarket, db.bottom1, db.bottom2, db.neckline, db.broken);
+              }
             }
-          }
 
-          // 회복 감지 — 급락 후 안정화
-          removeSignalByTypeAndSymbol('recovery_detection', symbol);
-          if (closes?.length >= 25 && volumes?.length >= 25) {
-            const rec = detectRecovery(closes, volumes);
-            if (rec) {
-              createRecoverySignal(symbol, tName, tMarket, rec.drawdown, rec.bbShrink, rec.volRatio);
+            // 회복 감지 — 급락 후 안정화 (25봉 이상)
+            if (closes.length >= 25) {
+              const rec = detectRecovery(closes, volumes);
+              if (rec) {
+                createRecoverySignal(symbol, patternName, patternMarket, rec.drawdown, rec.bbShrink, rec.volRatio);
+              }
             }
           }
         }
