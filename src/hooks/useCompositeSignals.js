@@ -98,37 +98,38 @@ export function useCompositeSignals(allItems = []) {
               },
             }));
           }
-        }
 
-        // ── Tier2-3: TA 기반 패턴 시그널 (지지/저항 돌파, 이중바닥, 회복 감지) ──
-        for (const [symbol, ta] of Object.entries(allResults)) {
-          const name = findName(symbol, items) || symbol;
-          const market = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
+          // ── Tier2-3: TA 기반 패턴 시그널 (지지/저항 돌파, 이중바닥, 회복 감지) ──
+          const tName = findName(symbol, items) || symbol;
+          const tMarket = ta.market === 'coin' ? 'crypto' : ta.market || 'kr';
           const candles = ta.candles;
-          const closes = ta.closes ?? (Array.isArray(candles) ? candles.map(c => c.close).filter(Boolean) : null);
-          const volumes = ta.volumes ?? (Array.isArray(candles) ? candles.map(c => c.volume).filter(Boolean) : null);
+          const closes = Array.isArray(candles) ? candles.map(c => c.close).filter(v => v != null) : null;
+          const volumes = Array.isArray(candles) ? candles.map(c => c.volume).filter(v => v != null) : null;
 
-          // 지지/저항선 돌파 감지
+          // 지지/저항선 돌파 감지 — 기존 시그널 제거 후 재등록
+          removeSignalByTypeAndSymbol('support_resistance_break', symbol);
           if (Array.isArray(candles) && candles.length >= 10) {
             const sr = findSupportResistance(candles);
             if (sr?.breakType) {
-              createSupportResistanceSignal(symbol, name, market, sr.breakType, sr.breakLevel);
+              createSupportResistanceSignal(symbol, tName, tMarket, sr.breakType, sr.breakLevel);
             }
           }
 
           // 이중바닥 패턴 감지
+          removeSignalByTypeAndSymbol('double_bottom', symbol);
           if (Array.isArray(candles) && candles.length >= 15) {
             const db = detectDoubleBottom(candles);
             if (db?.approaching) {
-              createDoubleBottomSignal(symbol, name, market, db.bottom1, db.bottom2, db.neckline, db.broken);
+              createDoubleBottomSignal(symbol, tName, tMarket, db.bottom1, db.bottom2, db.neckline, db.broken);
             }
           }
 
           // 회복 감지 — 급락 후 안정화
+          removeSignalByTypeAndSymbol('recovery_detection', symbol);
           if (closes?.length >= 25 && volumes?.length >= 25) {
             const rec = detectRecovery(closes, volumes);
             if (rec) {
-              createRecoverySignal(symbol, name, market, rec.drawdown, rec.bbShrink, rec.volRatio);
+              createRecoverySignal(symbol, tName, tMarket, rec.drawdown, rec.bbShrink, rec.volRatio);
             }
           }
         }
