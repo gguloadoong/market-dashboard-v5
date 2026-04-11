@@ -9,6 +9,27 @@
 -- 호출자 인증 흐름:
 --   브라우저 → /api/signal-accuracy (Vercel API route, SIGNAL_RPC_SECRET 주입)
 --            → Supabase RPC (anon 키 + p_secret) → verify_signal_rpc_secret()
+--
+-- ────────────────────────────────────────────────────────────
+-- ⚠️ 배포 순서 (runbook)
+-- ────────────────────────────────────────────────────────────
+-- 이 마이그레이션의 hardcoded rpc_secret_sha256 과 Vercel env 의
+-- SIGNAL_RPC_SECRET plaintext 는 반드시 1:1 로 일치해야 한다.
+-- 순서를 어기면 모든 RPC 가 42501 unauthorized 로 떨어진다.
+--
+--   1) 신규 환경:
+--      a) DB 에 이 마이그레이션 적용 (hardcoded 해시가 seed 됨)
+--      b) Vercel env 에 SIGNAL_RPC_SECRET 세팅 (위 해시의 원본 plaintext)
+--      c) /api/signal-accuracy 가 포함된 빌드 배포
+--
+--   2) secret 로테이션:
+--      a) 새 plaintext 32 bytes 생성 → 새 SHA256 해시 계산
+--      b) 새 마이그레이션 파일 추가 (INSERT ... ON CONFLICT DO UPDATE 로 해시 교체)
+--      c) Vercel env 의 SIGNAL_RPC_SECRET 을 새 plaintext 로 교체
+--      d) 위 두 가지를 같은 배포로 묶어 올림 (b 먼저 → 즉시 c → 재배포)
+--
+-- 3) hardcoded 해시가 누락된 fresh 환경: set_signal_rpc_secret() 으로 수동 seed
+--      SELECT private.set_signal_rpc_secret('<plaintext>');
 
 -- ────────────────────────────────────────────────────────────
 -- 0) private 스키마 + shared secret 저장소
@@ -301,6 +322,18 @@ $$;
 
 REVOKE ALL ON FUNCTION public.list_pending_signals(text, text, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, text, int) TO anon, authenticated;
+
+-- list_pending_signals 성능: (fired_at) 풀스캔 방지용 partial index.
+-- hit_*=NULL 은 evaluated 끝난 row 를 자연스럽게 제외.
+CREATE INDEX IF NOT EXISTS idx_signal_history_pending_1h
+  ON public.signal_history (fired_at)
+  WHERE hit_1h IS NULL;
+CREATE INDEX IF NOT EXISTS idx_signal_history_pending_4h
+  ON public.signal_history (fired_at)
+  WHERE hit_4h IS NULL;
+CREATE INDEX IF NOT EXISTS idx_signal_history_pending_24h
+  ON public.signal_history (fired_at)
+  WHERE hit_24h IS NULL;
 
 -- ────────────────────────────────────────────────────────────
 -- 4) signal_accuracy 뷰 — anon SELECT (권한 드리프트 방지)

@@ -135,8 +135,10 @@ export default async function handler(req) {
   }
 
   // ── GET: 적중률 조회 ──────────────────────────────────────
-  // 에러는 500/502 로 명시적으로 드러내서 모니터링이 "데이터 없음" 과
-  // "DB 접근 실패" 를 구분할 수 있게 한다 (#102 Copilot).
+  // 성공: 200 { accuracy: [...], ts }
+  // 실패: 200 { accuracy: [], ts, _error: {...} }
+  //      → 프론트의 useSignalAccuracy 는 accuracy 만 보므로 UX 는 그대로 유지되고,
+  //        모니터링/로그는 _error 필드로 실패를 감지할 수 있다.
   try {
     const accuracy = await fetchAccuracyView();
     return new Response(
@@ -151,12 +153,21 @@ export default async function handler(req) {
   } catch (e) {
     return new Response(
       JSON.stringify({
-        error: 'accuracy fetch failed',
-        status: e?.status ?? null,
-        detail: e?.detail ?? (e?.message || '').slice(0, 200),
+        accuracy: [],
         ts: new Date().toISOString(),
+        _error: {
+          message: 'accuracy fetch failed',
+          status: e?.status ?? null,
+          detail: e?.detail ?? (e?.message || '').slice(0, 200),
+        },
       }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } },
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      },
     );
   }
 }
