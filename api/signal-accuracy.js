@@ -40,7 +40,13 @@ async function fetchAccuracyView() {
     headers: supabaseHeaders(),
     signal: AbortSignal.timeout(5000),
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(`signal_accuracy fetch failed: ${res.status}`);
+    err.status = res.status;
+    err.detail = body.slice(0, 200);
+    throw err;
+  }
   return res.json();
 }
 
@@ -129,17 +135,28 @@ export default async function handler(req) {
   }
 
   // ── GET: 적중률 조회 ──────────────────────────────────────
+  // 에러는 500/502 로 명시적으로 드러내서 모니터링이 "데이터 없음" 과
+  // "DB 접근 실패" 를 구분할 수 있게 한다 (#102 Copilot).
   try {
     const accuracy = await fetchAccuracyView();
-    return new Response(JSON.stringify({ accuracy: accuracy || [], ts: Date.now() }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+    return new Response(
+      JSON.stringify({ accuracy: accuracy || [], ts: new Date().toISOString() }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+        },
       },
-    });
-  } catch {
-    return new Response(JSON.stringify({ accuracy: [], ts: Date.now() }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    );
+  } catch (e) {
+    return new Response(
+      JSON.stringify({
+        error: 'accuracy fetch failed',
+        status: e?.status ?? null,
+        detail: e?.detail ?? (e?.message || '').slice(0, 200),
+        ts: new Date().toISOString(),
+      }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } },
+    );
   }
 }

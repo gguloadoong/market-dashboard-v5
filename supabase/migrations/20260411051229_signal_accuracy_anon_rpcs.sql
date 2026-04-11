@@ -89,7 +89,7 @@ CREATE OR REPLACE FUNCTION public.record_signal_batch(p_secret text, signals jso
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   total_count    int;
@@ -150,7 +150,7 @@ CREATE OR REPLACE FUNCTION public.update_signal_evaluation_batch(
 RETURNS int
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   affected int := 0;
@@ -254,7 +254,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   IF NOT private.verify_signal_rpc_secret(p_secret) THEN
@@ -304,6 +304,21 @@ GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, text, int) TO anon, 
 
 -- ────────────────────────────────────────────────────────────
 -- 4) signal_accuracy 뷰 — anon SELECT (권한 드리프트 방지)
+-- 뷰 자체는 이전 마이그레이션(20260409062531_create_signal_history)에서
+-- 생성됐으므로 여기서는 권한만 재조정. 뷰가 아직 없는 fresh DB 에서는
+-- 이 블록을 조용히 skip 한다 (ERROR 로 마이그레이션 전체가 깨지는 것 방지).
 -- ────────────────────────────────────────────────────────────
-REVOKE ALL ON public.signal_accuracy FROM anon;
-GRANT SELECT ON public.signal_accuracy TO anon;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'signal_accuracy' AND c.relkind = 'v'
+  ) THEN
+    EXECUTE 'REVOKE ALL ON public.signal_accuracy FROM anon';
+    EXECUTE 'GRANT SELECT ON public.signal_accuracy TO anon';
+  ELSE
+    RAISE NOTICE '[#102] public.signal_accuracy view not present — skipped GRANT';
+  END IF;
+END
+$$;

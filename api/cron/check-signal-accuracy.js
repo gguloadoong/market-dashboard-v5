@@ -126,7 +126,21 @@ async function evaluateHorizon(horizon, prices) {
   return updateEvaluationBatch(horizon, items);
 }
 
-export default async function handler() {
+export default async function handler(request) {
+  // Vercel Cron Bearer 인증 — 다른 /api/cron/* 와 동일한 패턴.
+  // CRON_SECRET 미설정 시에만 허용(로컬). 프로덕션은 항상 설정돼 있으므로
+  // 외부 호출은 401.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const auth = request?.headers?.get('authorization') || '';
+    if (auth !== `Bearer ${cronSecret}`) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   if (!SUPABASE_URL || !SUPABASE_KEY || !SIGNAL_RPC_SECRET) {
     return new Response(JSON.stringify({ error: 'supabase not configured' }), { status: 500 });
   }
