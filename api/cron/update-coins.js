@@ -22,10 +22,10 @@ const COIN_KR_NAMES_FALLBACK = {
 };
 
 // Upbit 전종목 KRW 마켓 목록 조회
-async function fetchUpbitMarkets() {
+async function fetchUpbitMarkets(timeoutMs = 5000) {
   const res = await fetch('https://api.upbit.com/v1/market/all?isDetails=false', {
     headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`Upbit markets HTTP ${res.status}`);
   const data = await res.json();
@@ -36,7 +36,9 @@ async function fetchUpbitMarkets() {
 // Upbit 티커 배치 조회 — 100개씩 청크 분할 (URL 길이 제한 대비)
 const TICKER_BATCH_SIZE = 100;
 
-async function fetchUpbitTickers(markets) {
+async function fetchUpbitTickers(markets, timeoutMs = 6000) {
+  // #104 Codex P1: Edge runtime 10s 총 예산 — primary 10s 타임아웃이면
+  // Bithumb fallback 에 쓸 시간이 0 이 됨. 6s 로 타이트하게.
   const chunks = [];
   for (let i = 0; i < markets.length; i += TICKER_BATCH_SIZE) {
     chunks.push(markets.slice(i, i + TICKER_BATCH_SIZE));
@@ -47,7 +49,7 @@ async function fetchUpbitTickers(markets) {
       const marketStr = chunk.map((m) => m.market).join(',');
       const res = await fetch(`https://api.upbit.com/v1/ticker?markets=${marketStr}`, {
         headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!res.ok) throw new Error(`Upbit ticker HTTP ${res.status}`);
       return res.json();
@@ -143,8 +145,7 @@ export default async function handler(request) {
       fetchUpbitMarkets(),
       fetchCoinPaprika(),
     ]);
-    // `let` — 아래 Bithumb fallback 분기에서 markets 재시도 가능.
-    let markets = marketsRes.status === 'fulfilled' ? marketsRes.value : null;
+    const markets = marketsRes.status === 'fulfilled' ? marketsRes.value : null;
     const paprikaData = paprikaRes.status === 'fulfilled' ? paprikaRes.value : [];
     if (marketsRes.status === 'rejected') {
       console.warn('[update-coins] Upbit markets 실패:', marketsRes.reason?.message);
@@ -177,24 +178,16 @@ export default async function handler(request) {
     }
 
     // 마켓 이름 매핑 (market code → korean_name)
-    // #104 Opus 리뷰: Bithumb fallback 경로에서도 한글명 노출을 위해 markets
-    // 호출을 한 번 더 재시도 (보통 markets 는 ticker 보다 훨씬 가벼워 두 번째 시도 성공률 높음).
-    // 그래도 실패하면 static COIN_KR_NAMES 로 주요 코인만 커버.
-    if (!markets) {
-      try {
-        markets = await fetchUpbitMarkets();
-        console.log('[update-coins] Upbit markets 재시도 성공 — 한글명 주입');
-      } catch (e) {
-        console.warn('[update-coins] Upbit markets 재시도 실패, static 한글명 map 사용:', e.message);
-      }
-    }
+    // #104 Codex P2: Bithumb fallback 경로에서 Upbit markets 재시도는 Edge 10s
+    // 예산을 추가로 5~8s 깎아 먹을 수 있음. 따라서 markets 가 없어도 재시도하지 않고
+    // 바로 static COIN_KR_NAMES_FALLBACK 으로 주요 코인을 커버.
     const nameMap = new Map();
     if (markets) {
       for (const m of markets) {
         nameMap.set(m.market, m.korean_name || m.english_name || m.market);
       }
     }
-    // static fallback: 주요 상위 코인 한글명 (markets 전부 실패 시 최소 커버리지)
+    // static fallback: 주요 상위 코인 한글명 (markets 실패 시 최소 커버리지)
     for (const [sym, kr] of Object.entries(COIN_KR_NAMES_FALLBACK)) {
       const key = `KRW-${sym}`;
       if (!nameMap.has(key)) nameMap.set(key, kr);
