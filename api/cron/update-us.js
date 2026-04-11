@@ -13,6 +13,9 @@ const SYMBOL_LIST_KEY = 'us:symbols'; // Redis 키
 const SHARD_CURSOR_KEY = 'us:cron:shard'; // 현재 샤드 인덱스
 
 // NASDAQ API에서 시가총액 상위 종목 수집
+// #104 B3: 반환값에 { symbol, marketCap } 맵을 포함시켜 snapshot 까지 전파.
+//          Yahoo v8 chart API 는 marketCap 을 돌려주지 않기 때문에 NASDAQ 수집
+//          단계의 값을 잃어버리면 /api/snapshot us 전종목 marketCap=0 이 된다.
 async function fetchNasdaqSymbols(limit = 1000) {
   const exchanges = ['NASDAQ', 'NYSE', 'AMEX'];
   const allSymbols = [];
@@ -50,48 +53,79 @@ async function fetchNasdaqSymbols(limit = 1000) {
   allSymbols.sort((a, b) => b.marketCap - a.marketCap);
   // 중복 심볼 제거 (GOOG vs GOOGL 등)
   const seen = new Set();
-  const unique = [];
+  const symbols = [];
+  const mcMap = {};
   for (const s of allSymbols) {
     if (seen.has(s.symbol)) continue;
     seen.add(s.symbol);
-    unique.push(s.symbol);
+    symbols.push(s.symbol);
+    mcMap[s.symbol] = s.marketCap;
   }
-  return unique.slice(0, limit);
+  return {
+    symbols: symbols.slice(0, limit),
+    mcMap, // symbol → marketCap (USD)
+  };
 }
 
-// Redis에서 종목 리스트 가져오기 (없으면 NASDAQ API 호출 후 캐시)
+// Redis에서 종목 리스트 + marketCap 맵 가져오기 (없으면 NASDAQ API 호출 후 캐시)
+// 반환: { symbols: string[], mcMap: Record<symbol, number> }
 async function getSymbolList() {
+  let legacyArrayCache = null;
   if (redis) {
     try {
       const cached = await redis.get(SYMBOL_LIST_KEY);
-      if (Array.isArray(cached) && cached.length > 100) return cached;
+      // #104 B3: 새 캐시 형태 {symbols, mcMap} 우선.
+      // 임계값 저장(>=100)과 통일해서 정확히 100개일 때도 캐시 재사용.
+      if (cached && typeof cached === 'object' && !Array.isArray(cached)
+          && Array.isArray(cached.symbols) && cached.symbols.length >= 100) {
+        return { symbols: cached.symbols, mcMap: cached.mcMap || {} };
+      }
+      // 구형 캐시 (plain array) — rollout 과도기 호환.
+      // 여기서 즉시 return 하면 새 형식으로 갱신이 24h(TTL) 지연되므로,
+      // 폴백 변수로 보관만 하고 NASDAQ 재수집을 시도한다 (#104 Opus 리뷰).
+      if (Array.isArray(cached) && cached.length >= 100) {
+        console.log('[update-us] 구형 array 캐시 감지 → NASDAQ 재수집 시도 (성공 시 새 형식으로 교체)');
+        legacyArrayCache = cached;
+      }
     } catch (_) { /* fallback */ }
   }
 
   // NASDAQ API에서 수집 (총 30초 타임아웃)
-  let symbols = [];
+  let collected = { symbols: [], mcMap: {} };
   try {
-    symbols = await Promise.race([
+    collected = await Promise.race([
       fetchNasdaqSymbols(1000),
       new Promise((_, reject) => setTimeout(() => reject(new Error('NASDAQ API 총 타임아웃')), 30000)),
     ]);
   } catch (e) {
     console.warn('[update-us] NASDAQ 수집 실패:', e.message);
-    symbols = [];
+    collected = { symbols: [], mcMap: {} };
   }
-  if (symbols.length > 100 && redis) {
-    try {
-      await redis.set(SYMBOL_LIST_KEY, symbols, { ex: SYMBOL_LIST_TTL });
-      console.log(`[update-us] 종목 리스트 갱신: ${symbols.length}개 → Redis 캐시`);
-    } catch (_) { /* 저장 실패해도 진행 */ }
+  // #104 Opus: 임계값 일관성 — 100 미만이면 의심스러운 수집이라 판단하고
+  //           legacy/FALLBACK 중 더 나은 쪽을 사용. 캐시 저장 기준(>=100)과 통일.
+  //           Redis 미구성 환경(로컬 등) 에서도 수집 성공 시 그대로 반환 (버그 수정).
+  if (collected.symbols.length >= 100) {
+    if (redis) {
+      try {
+        await redis.set(SYMBOL_LIST_KEY, collected, { ex: SYMBOL_LIST_TTL });
+        console.log(`[update-us] 종목 리스트 갱신: ${collected.symbols.length}개 (marketCap 포함) → Redis 캐시`);
+      } catch (_) { /* 저장 실패해도 진행 */ }
+    }
+    return collected;
   }
 
-  // NASDAQ API 실패 시 하드코딩 fallback
-  if (symbols.length < 50) {
-    console.warn('[update-us] NASDAQ API 수집 부족 — 하드코딩 fallback');
-    return FALLBACK_SYMBOLS;
+  // NASDAQ 수집 결과가 100 미만 (장애/레이트리밋/타임아웃):
+  //   1) 구형 캐시(array)가 남아 있으면 coverage 보존
+  //   2) 없으면 FALLBACK_SYMBOLS 122개
+  // #104 Codex: 부분 수집한 mcMap 이 있으면 같이 전달해서 legacy 경로도
+  //           가능한 범위에서 marketCap 복구 (모두 0 으로 떨어지지 않도록).
+  const partialMcMap = collected.mcMap || {};
+  if (legacyArrayCache) {
+    console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 구형 array 캐시 사용 (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
+    return { symbols: legacyArrayCache, mcMap: partialMcMap };
   }
-  return symbols;
+  console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 하드코딩 FALLBACK_SYMBOLS (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
+  return { symbols: FALLBACK_SYMBOLS, mcMap: partialMcMap };
 }
 
 // 하드코딩 fallback (기존 122개)
@@ -115,7 +149,7 @@ const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 let _hostIdx = 0;
 function nextHost() { return YAHOO_HOSTS[(_hostIdx++) % YAHOO_HOSTS.length]; }
 
-async function fetchYahooV8Single(symbol, timeoutMs = 10000) {
+async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
   const host = nextHost();
   const url = `https://${host}/v8/finance/chart/${symbol}?interval=1d&range=5d&includePrePost=false`;
   const res = await fetch(url, {
@@ -138,26 +172,33 @@ async function fetchYahooV8Single(symbol, timeoutMs = 10000) {
     }
   }
   if (!prev) prev = price;
+  const resolvedSymbol = meta.symbol?.split('.')[0] ?? symbol;
+  // #104 B3: Yahoo chart API 는 marketCap 을 돌려주지 않으므로 NASDAQ 수집값을 merge.
+  //          meta.marketCap 은 거의 항상 undefined → 기존 fallback 은 전부 0 이었음.
+  //          NASDAQ 은 시총 순 정렬이라 상위 1000 내에 0 인 종목이 극소수지만,
+  //          있다면 "누락값" 으로 간주하고 Yahoo meta 로 넘어가도록 `||` 사용.
+  const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] || mcMap[symbol]) : 0;
+  const marketCap = mcFromNasdaq || meta.marketCap || 0;
   return {
-    symbol: meta.symbol?.split('.')[0] ?? symbol,
+    symbol: resolvedSymbol,
     price: parseFloat(price.toFixed(2)),
     change: parseFloat((price - prev).toFixed(2)),
     changePct: prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0,
     volume: meta.regularMarketVolume ?? 0,
-    marketCap: meta.marketCap ?? 0,
+    marketCap,
     name: meta.shortName || meta.longName || symbol,
     market: 'us',
   };
 }
 
 // 동시성 제한 배치 실행
-async function fetchBatch(symbols, timeoutMs = 10000) {
+async function fetchBatch(symbols, timeoutMs = 10000, mcMap = null) {
   const results = [];
   const failed = [];
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
     const chunk = symbols.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(
-      chunk.map(sym => fetchYahooV8Single(sym, timeoutMs))
+      chunk.map(sym => fetchYahooV8Single(sym, timeoutMs, mcMap))
     );
     for (let j = 0; j < settled.length; j++) {
       if (settled[j].status === 'fulfilled') results.push(settled[j].value);
@@ -181,8 +222,8 @@ export default async function handler(request) {
   }
 
   try {
-    // 1. 종목 리스트 가져오기
-    const allSymbols = await getSymbolList();
+    // 1. 종목 리스트 + marketCap 맵 가져오기 (#104 B3)
+    const { symbols: allSymbols, mcMap } = await getSymbolList();
     const totalShards = Math.ceil(allSymbols.length / SHARD_SIZE);
 
     // 2. 현재 샤드 커서 읽기
@@ -199,15 +240,15 @@ export default async function handler(request) {
     const shardSymbols = allSymbols.slice(start, start + SHARD_SIZE);
     console.log(`[update-us] 샤드 ${shard}/${totalShards - 1} (${shardSymbols.length}개, 전체 ${allSymbols.length}개)`);
 
-    // 4. Yahoo v8로 가격 조회
-    const { results: firstResults, failed } = await fetchBatch(shardSymbols);
+    // 4. Yahoo v8로 가격 조회 (#104 B3: NASDAQ mcMap 을 함께 전파)
+    const { results: firstResults, failed } = await fetchBatch(shardSymbols, 10000, mcMap);
 
     // 5. 실패분 재시도 (50% 미만일 때만)
     let retryResults = [];
     const failRatio = failed.length / shardSymbols.length;
     if (failed.length > 0 && failRatio < 0.5) {
       console.log(`[update-us] 재시도: ${failed.length}개`);
-      const { results: retried } = await fetchBatch(failed, 12000);
+      const { results: retried } = await fetchBatch(failed, 12000, mcMap);
       retryResults = retried;
     }
 
