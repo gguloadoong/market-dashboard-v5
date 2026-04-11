@@ -73,9 +73,17 @@ async function getSymbolList() {
   if (redis) {
     try {
       const cached = await redis.get(SYMBOL_LIST_KEY);
-      // #104 B3: 새 캐시 형태 {symbols, mcMap} 우선, 구형 array 는 무시하고 갱신.
-      if (cached && typeof cached === 'object' && Array.isArray(cached.symbols) && cached.symbols.length > 100) {
+      // #104 B3: 새 캐시 형태 {symbols, mcMap} 우선.
+      if (cached && typeof cached === 'object' && !Array.isArray(cached)
+          && Array.isArray(cached.symbols) && cached.symbols.length > 100) {
         return { symbols: cached.symbols, mcMap: cached.mcMap || {} };
+      }
+      // 구형 캐시 (plain array) — rollout 과도기 호환.
+      // marketCap 맵은 없지만 symbol 리스트 자체는 유효하므로 그대로 재사용.
+      // NASDAQ 재수집이 성공하면 다음 cron 호출에서 새 형식으로 자동 갱신됨.
+      if (Array.isArray(cached) && cached.length > 100) {
+        console.log('[update-us] 구형 array 캐시 호환 사용 (marketCap=0, 다음 갱신 시 교체)');
+        return { symbols: cached, mcMap: {} };
       }
     } catch (_) { /* fallback */ }
   }
