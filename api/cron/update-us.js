@@ -70,6 +70,7 @@ async function fetchNasdaqSymbols(limit = 1000) {
 // Redis에서 종목 리스트 + marketCap 맵 가져오기 (없으면 NASDAQ API 호출 후 캐시)
 // 반환: { symbols: string[], mcMap: Record<symbol, number> }
 async function getSymbolList() {
+  let legacyArrayCache = null;
   if (redis) {
     try {
       const cached = await redis.get(SYMBOL_LIST_KEY);
@@ -79,11 +80,11 @@ async function getSymbolList() {
         return { symbols: cached.symbols, mcMap: cached.mcMap || {} };
       }
       // 구형 캐시 (plain array) — rollout 과도기 호환.
-      // marketCap 맵은 없지만 symbol 리스트 자체는 유효하므로 그대로 재사용.
-      // NASDAQ 재수집이 성공하면 다음 cron 호출에서 새 형식으로 자동 갱신됨.
+      // 여기서 즉시 return 하면 새 형식으로 갱신이 24h(TTL) 지연되므로,
+      // 폴백 변수로 보관만 하고 NASDAQ 재수집을 시도한다 (#104 Opus 리뷰).
       if (Array.isArray(cached) && cached.length > 100) {
-        console.log('[update-us] 구형 array 캐시 호환 사용 (marketCap=0, 다음 갱신 시 교체)');
-        return { symbols: cached, mcMap: {} };
+        console.log('[update-us] 구형 array 캐시 감지 → NASDAQ 재수집 시도 (성공 시 새 형식으로 교체)');
+        legacyArrayCache = cached;
       }
     } catch (_) { /* fallback */ }
   }
@@ -106,8 +107,14 @@ async function getSymbolList() {
     } catch (_) { /* 저장 실패해도 진행 */ }
   }
 
-  // NASDAQ API 실패 시 하드코딩 fallback (marketCap 없음)
+  // NASDAQ API 실패 시:
+  //   1) 구형 캐시(array)가 남아 있으면 그걸 사용 (coverage 보존, 다음 cron 에서 재시도)
+  //   2) 그것도 없으면 하드코딩 FALLBACK_SYMBOLS 122개
   if (collected.symbols.length < 50) {
+    if (legacyArrayCache) {
+      console.warn('[update-us] NASDAQ 실패 — 구형 array 캐시로 fallback');
+      return { symbols: legacyArrayCache, mcMap: {} };
+    }
     console.warn('[update-us] NASDAQ API 수집 부족 — 하드코딩 fallback');
     return { symbols: FALLBACK_SYMBOLS, mcMap: {} };
   }
@@ -161,7 +168,9 @@ async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
   const resolvedSymbol = meta.symbol?.split('.')[0] ?? symbol;
   // #104 B3: Yahoo chart API 는 marketCap 을 돌려주지 않으므로 NASDAQ 수집값을 merge.
   //          meta.marketCap 은 거의 항상 undefined → 기존 fallback 은 전부 0 이었음.
-  const marketCap = (mcMap && mcMap[resolvedSymbol]) || (mcMap && mcMap[symbol]) || meta.marketCap || 0;
+  //          `??` 를 써야 mcMap 의 0 을 "데이터 없음" 으로 의도적으로 구분할 수 있다.
+  const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] ?? mcMap[symbol]) : undefined;
+  const marketCap = mcFromNasdaq ?? meta.marketCap ?? 0;
   return {
     symbol: resolvedSymbol,
     price: parseFloat(price.toFixed(2)),
