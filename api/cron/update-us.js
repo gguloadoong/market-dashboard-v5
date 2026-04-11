@@ -101,12 +101,15 @@ async function getSymbolList() {
     collected = { symbols: [], mcMap: {} };
   }
   // #104 Opus: 임계값 일관성 — 100 미만이면 의심스러운 수집이라 판단하고
-  //           legacy/FALLBACK 중 더 나은 쪽을 사용. 캐시 저장 기준(>100)과 통일.
-  if (collected.symbols.length >= 100 && redis) {
-    try {
-      await redis.set(SYMBOL_LIST_KEY, collected, { ex: SYMBOL_LIST_TTL });
-      console.log(`[update-us] 종목 리스트 갱신: ${collected.symbols.length}개 (marketCap 포함) → Redis 캐시`);
-    } catch (_) { /* 저장 실패해도 진행 */ }
+  //           legacy/FALLBACK 중 더 나은 쪽을 사용. 캐시 저장 기준(>=100)과 통일.
+  //           Redis 미구성 환경(로컬 등) 에서도 수집 성공 시 그대로 반환 (버그 수정).
+  if (collected.symbols.length >= 100) {
+    if (redis) {
+      try {
+        await redis.set(SYMBOL_LIST_KEY, collected, { ex: SYMBOL_LIST_TTL });
+        console.log(`[update-us] 종목 리스트 갱신: ${collected.symbols.length}개 (marketCap 포함) → Redis 캐시`);
+      } catch (_) { /* 저장 실패해도 진행 */ }
+    }
     return collected;
   }
 

@@ -2,8 +2,14 @@
 // Upbit REST (primary) → Bithumb REST (fallback), CoinPaprika 병렬 보강.
 // #104 B1/B2/B4 수정:
 //   B1 — Promise.all 단일 실패점 → allSettled 로 부분 성공 허용
-//   B2 — CoinPaprika limit=100 → 500 + priceUsd=0 필터링
+//   B2 — CoinPaprika limit=100 → 300 + priceUsd=0 필터링
 //   B4 — Upbit ticker 전종목 실패 시 Bithumb public/ticker/ALL_KRW fallback
+//
+// 타임아웃 예산 (Edge runtime 기본 30s maxDuration):
+//   Phase 1: markets(5s) || paprika(4s) 병렬 → ~5s
+//   Phase 2: upbit tickers chunks(6s) 병렬   → ~6s
+//   Phase 3: bithumb(10s) — Phase 2 전부 실패시에만 실행 → 최대 +10s
+//   Worst case (primary 타임아웃 후 fallback): ~5 + 6 + 10 = ~21s < 30s
 export const config = { runtime: 'edge' };
 
 import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache.js';
@@ -40,8 +46,8 @@ async function fetchUpbitMarkets(timeoutMs = 5000) {
 const TICKER_BATCH_SIZE = 100;
 
 async function fetchUpbitTickers(markets, timeoutMs = 6000) {
-  // #104 Codex P1: Edge runtime 10s 총 예산 — primary 10s 타임아웃이면
-  // Bithumb fallback 에 쓸 시간이 0 이 됨. 6s 로 타이트하게.
+  // #104 Codex P1: 청크 병렬 실행이라 상한은 6s. 남은 ~24s 중 10s 를 Bithumb
+  // fallback 에 할당하고 나머지는 Phase 4 의 파이프라인 처리에 사용.
   const chunks = [];
   for (let i = 0; i < markets.length; i += TICKER_BATCH_SIZE) {
     chunks.push(markets.slice(i, i + TICKER_BATCH_SIZE));
