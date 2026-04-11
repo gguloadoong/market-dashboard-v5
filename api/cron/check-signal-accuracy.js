@@ -70,10 +70,13 @@ async function updateEvaluationBatch(horizon, items) {
 }
 
 // 현재 가격 조회 (snapshot API 재활용)
+// VERCEL_URL 은 preview 배포의 hashed URL 이라 preview 에서 cron 이 돌면
+// preview snapshot 을 긁게 된다. 프로덕션 고정 URL 을 우선하고,
+// VERCEL_PROJECT_PRODUCTION_URL 이 있으면 그걸 사용.
 async function getCurrentPrices() {
   try {
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
+    const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : 'https://market-dashboard-v5.vercel.app';
     const res = await fetch(`${base}/api/snapshot`, {
       signal: AbortSignal.timeout(5000),
@@ -153,22 +156,28 @@ export default async function handler(request) {
   // allSettled 로 horizon 별 결과/에러를 독립 수집.
   // RPC 실패(시크릿 불일치, 권한 드리프트 등)는 반드시 non-2xx 로 드러나야
   // 모니터링이 "조용한 0건" 과 "DB 전면 거절" 을 구분할 수 있다.
-  const settled = await Promise.allSettled([
-    evaluateHorizon('1h', prices),
-    evaluateHorizon('4h', prices),
-    evaluateHorizon('24h', prices),
-  ]);
+  //
+  // horizon/label 매핑을 인덱스로 묶지 않고 한 배열 안에서 관리 — horizon
+  // 추가 시 label 배열을 따로 고치다 실수할 여지 제거.
+  const horizons = [
+    { key: 'h1',  horizon: '1h'  },
+    { key: 'h4',  horizon: '4h'  },
+    { key: 'h24', horizon: '24h' },
+  ];
+  const settled = await Promise.allSettled(
+    horizons.map(({ horizon }) => evaluateHorizon(horizon, prices)),
+  );
 
-  const labels = ['h1', 'h4', 'h24'];
   const updated = {};
   const errors = [];
   settled.forEach((r, i) => {
+    const { key } = horizons[i];
     if (r.status === 'fulfilled') {
-      updated[labels[i]] = r.value;
+      updated[key] = r.value;
     } else {
-      updated[labels[i]] = 0;
+      updated[key] = 0;
       errors.push({
-        horizon: labels[i],
+        horizon: horizons[i].horizon,
         message: r.reason?.message || String(r.reason),
         status: r.reason?.status ?? null,
       });

@@ -69,19 +69,18 @@ export default async function handler(req) {
       );
     }
 
-    // 허용 Origin:
-    //   1) 프로덕션: https://market-dashboard-v5.vercel.app
-    //   2) 프리뷰:   https://market-dashboard-v5-*.vercel.app (이 프로젝트의 preview 배포만)
-    //   3) 로컬 개발: http://localhost:* / http://127.0.0.1:*
-    //   4) x-cron-secret 일치 (서버 간 호출)
-    // `includes('vercel.app')` 같은 substring 매칭은 evil.vercel.app.com 도 통과시키므로
-    // 정규식 suffix 매칭으로 교체.
+    // 허용 Origin (엄격 — 프로덕션 단일 hostname 만):
+    //   1) https://market-dashboard-v5.vercel.app  (프로덕션)
+    //   2) http://localhost:* / http://127.0.0.1:*  (로컬 개발)
+    //   3) x-cron-secret 일치 (서버 간 호출)
+    // preview 배포는 브라우저 트래픽이 없다고 가정 → 허용하지 않음.
+    // 실제 방어는 Supabase 쪽 SIGNAL_RPC_SECRET 검증이 수행하며, origin
+    // 체크는 defense-in-depth.
     const origin = req.headers.get('origin') || '';
     const cronSecret = req.headers.get('x-cron-secret') || '';
     const hasSecret = cronSecret && cronSecret === (process.env.CRON_SECRET || '');
     const originAllowed =
       origin === 'https://market-dashboard-v5.vercel.app' ||
-      /^https:\/\/market-dashboard-v5(-[a-z0-9-]+)?\.vercel\.app$/.test(origin) ||
       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     if (!originAllowed && !hasSecret) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 403 });
@@ -97,17 +96,23 @@ export default async function handler(req) {
       return new Response(JSON.stringify({ error: 'signals array required' }), { status: 400 });
     }
 
-    // 클라이언트 페이로드 → DB 컬럼명으로 정규화 (RPC 내부에서 다시 검증)
-    const rows = signals.slice(0, 50).map((s) => ({
-      signal_type: s.type,
-      symbol: s.symbol,
-      market: s.market || 'unknown',
-      direction: s.direction || 'neutral',
-      strength: s.strength || 1,
-      title: s.title || '',
-      price_at_fire: s.priceAtFire ?? null,
-      meta: s.meta || {},
-    }));
+    // 클라이언트 페이로드 → DB 컬럼명으로 정규화 (RPC 내부에서 다시 검증).
+    // price_at_fire 는 RPC 의 ::numeric 캐스트에서 invalid input 으로 전체
+    // 배치를 터뜨릴 수 있으므로 finite number 만 허용, 그 외는 null.
+    const rows = signals.slice(0, 50).map((s) => {
+      const priceRaw = s.priceAtFire;
+      const priceNum = priceRaw == null ? null : Number(priceRaw);
+      return {
+        signal_type: s.type,
+        symbol: s.symbol,
+        market: s.market || 'unknown',
+        direction: s.direction || 'neutral',
+        strength: s.strength || 1,
+        title: s.title || '',
+        price_at_fire: Number.isFinite(priceNum) ? priceNum : null,
+        meta: s.meta || {},
+      };
+    });
 
     try {
       const res = await callRpc('record_signal_batch', {
@@ -151,6 +156,8 @@ export default async function handler(req) {
       },
     );
   } catch (e) {
+    // 모니터링이 JSON body 만 보지 않아도 감지할 수 있도록
+    // custom header 로 실패를 표시 (#102 Opus LOW).
     return new Response(
       JSON.stringify({
         accuracy: [],
@@ -166,6 +173,7 @@ export default async function handler(req) {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
+          'X-Signal-Accuracy-Error': '1',
         },
       },
     );

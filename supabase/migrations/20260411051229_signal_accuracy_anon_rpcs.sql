@@ -43,10 +43,11 @@ CREATE TABLE IF NOT EXISTS private.signal_rpc_config (
 );
 REVOKE ALL ON TABLE private.signal_rpc_config FROM PUBLIC, anon, authenticated;
 
--- pgcrypto 는 Supabase 기본에서 `extensions` 스키마에 설치돼 있다.
--- fresh DB 대비 IF NOT EXISTS (이미 있으면 no-op).
--- digest() 호출은 extensions.digest(...) 로 fully-qualify → search_path 에 의존 안 함.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto 는 Supabase 기본에서 `extensions` 스키마에 설치돼 있고,
+-- 이 파일의 digest() 호출은 모두 `extensions.digest(...)` 로 fully-qualify.
+-- 비-Supabase fresh DB 대비로 extensions 스키마를 선행 생성한 뒤 설치.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 -- 배포 헬퍼: plaintext 비밀 → SHA256 해시 저장.
 -- 실행 방법 (psql 또는 Supabase SQL Editor, service_role/postgres 권한으로):
