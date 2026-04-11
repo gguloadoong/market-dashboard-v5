@@ -22,12 +22,41 @@ CREATE TABLE IF NOT EXISTS private.signal_rpc_config (
 );
 REVOKE ALL ON TABLE private.signal_rpc_config FROM PUBLIC, anon, authenticated;
 
--- NOTE: 초기 rpc_secret_sha256 값은 배포 시 별도로 주입한다.
---       (예: SQL 콘솔에서 INSERT ... ON CONFLICT DO UPDATE)
---       비밀 원본은 저장하지 않고 SHA256 해시만 보관한다.
---       이 파일에는 해시 값을 커밋하지 않는다 — 환경마다 다름.
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+-- 배포 헬퍼: plaintext 비밀 → SHA256 해시 저장.
+-- 실행 방법 (psql 또는 Supabase SQL Editor, service_role/postgres 권한으로):
+--   SELECT private.set_signal_rpc_secret('<SIGNAL_RPC_SECRET 값>');
+-- 같은 비밀은 Vercel env 의 SIGNAL_RPC_SECRET 에도 넣어야 한다.
+-- 이 함수는 외부 role 에 EXECUTE 권한을 주지 않으므로 운영자만 호출 가능.
+CREATE OR REPLACE FUNCTION private.set_signal_rpc_secret(p_plaintext text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = private, pg_catalog, public
+AS $$
+BEGIN
+  IF p_plaintext IS NULL OR length(p_plaintext) < 32 THEN
+    RAISE EXCEPTION 'signal rpc secret must be at least 32 chars';
+  END IF;
+  INSERT INTO private.signal_rpc_config (key, value)
+  VALUES ('rpc_secret_sha256', encode(digest(p_plaintext, 'sha256'), 'hex'))
+  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.set_signal_rpc_secret(text) FROM PUBLIC;
+-- 외부 role 에 EXECUTE 권한 부여하지 않음.
+
+-- 마이그레이션 적용 후에도 rpc_secret_sha256 이 비어 있으면 모든 RPC 가
+-- unauthorized 를 돌려주므로, 운영자가 아래 NOTICE 를 보고 반드시 seed 해야 한다.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM private.signal_rpc_config WHERE key = 'rpc_secret_sha256') THEN
+    RAISE NOTICE '[#102] rpc_secret_sha256 not seeded. Run: SELECT private.set_signal_rpc_secret(''<secret>'')';
+  END IF;
+END
+$$;
 
 CREATE OR REPLACE FUNCTION private.verify_signal_rpc_secret(p_secret text)
 RETURNS boolean
@@ -201,10 +230,14 @@ GRANT EXECUTE ON FUNCTION public.update_signal_evaluation_batch(text, text, json
 
 -- ────────────────────────────────────────────────────────────
 -- 3) 평가 대상 신호 조회 RPC
---    horizon 별 상·하한으로 오래된 신호를 "현재가 기준" 잘못 평가 방지.
---      1h:  fired_at ∈ (now-3h,  now-1h]
---      4h:  fired_at ∈ (now-12h, now-4h]
---      24h: fired_at ∈ (now-48h, now-24h]
+--    cron 은 현재 스냅샷 가격만 쓰므로, 너무 오래된 신호를 평가하면
+--    "실제 horizon 이 1h 인데 2.5h 뒤의 가격으로 적중 판정" 같은 스태일
+--    데이터가 생긴다. 그래서 window 에 1h 의 슬랙만 허용하고, 그보다
+--    오래된 신호는 hit_*=NULL 로 pending 인 채 남겨 두어 통계에서 제외.
+--    (Vercel cron 은 30 분마다 돌므로 1h 슬랙 = 최대 3 번의 시도 기회)
+--      1h:  fired_at ∈ (now-2h,  now-1h]
+--      4h:  fired_at ∈ (now-5h,  now-4h]
+--      24h: fired_at ∈ (now-25h, now-24h]
 -- ────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.list_pending_signals(
   p_secret  text,
@@ -239,7 +272,7 @@ BEGIN
         FROM public.signal_history sh
        WHERE sh.hit_1h IS NULL
          AND sh.fired_at <= now() - interval '1 hour'
-         AND sh.fired_at >  now() - interval '3 hours'
+         AND sh.fired_at >  now() - interval '2 hours'
          AND sh.price_at_fire IS NOT NULL
        ORDER BY sh.fired_at ASC
        LIMIT p_limit;
@@ -249,7 +282,7 @@ BEGIN
         FROM public.signal_history sh
        WHERE sh.hit_4h IS NULL
          AND sh.fired_at <= now() - interval '4 hours'
-         AND sh.fired_at >  now() - interval '12 hours'
+         AND sh.fired_at >  now() - interval '5 hours'
          AND sh.price_at_fire IS NOT NULL
        ORDER BY sh.fired_at ASC
        LIMIT p_limit;
@@ -259,7 +292,7 @@ BEGIN
         FROM public.signal_history sh
        WHERE sh.hit_24h IS NULL
          AND sh.fired_at <= now() - interval '24 hours'
-         AND sh.fired_at >  now() - interval '48 hours'
+         AND sh.fired_at >  now() - interval '25 hours'
          AND sh.price_at_fire IS NOT NULL
        ORDER BY sh.fired_at ASC
        LIMIT p_limit;
