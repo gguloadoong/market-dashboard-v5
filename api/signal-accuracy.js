@@ -45,7 +45,7 @@ async function fetchAccuracyView() {
 }
 
 export default async function handler(req) {
-  if (!SUPABASE_URL || !SUPABASE_KEY || !SIGNAL_RPC_SECRET) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(
       JSON.stringify({ error: 'supabase not configured' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
@@ -54,6 +54,15 @@ export default async function handler(req) {
 
   // ── POST: 시그널 발화 기록 ─────────────────────────────────
   if (req.method === 'POST') {
+    // 쓰기 경로는 shared secret 필수 — secret 없이 기동된 환경에서는
+    // 기록은 막되 GET 은 계속 동작하도록 POST 진입 시점에만 체크.
+    if (!SIGNAL_RPC_SECRET) {
+      return new Response(
+        JSON.stringify({ error: 'signal rpc secret not configured' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
     // 허용 Origin:
     //   1) 프로덕션: https://market-dashboard-v5.vercel.app
     //   2) 프리뷰:   https://market-dashboard-v5-*.vercel.app (이 프로젝트의 preview 배포만)
