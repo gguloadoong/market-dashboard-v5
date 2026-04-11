@@ -75,14 +75,15 @@ async function getSymbolList() {
     try {
       const cached = await redis.get(SYMBOL_LIST_KEY);
       // #104 B3: 새 캐시 형태 {symbols, mcMap} 우선.
+      // 임계값 저장(>=100)과 통일해서 정확히 100개일 때도 캐시 재사용.
       if (cached && typeof cached === 'object' && !Array.isArray(cached)
-          && Array.isArray(cached.symbols) && cached.symbols.length > 100) {
+          && Array.isArray(cached.symbols) && cached.symbols.length >= 100) {
         return { symbols: cached.symbols, mcMap: cached.mcMap || {} };
       }
       // 구형 캐시 (plain array) — rollout 과도기 호환.
       // 여기서 즉시 return 하면 새 형식으로 갱신이 24h(TTL) 지연되므로,
       // 폴백 변수로 보관만 하고 NASDAQ 재수집을 시도한다 (#104 Opus 리뷰).
-      if (Array.isArray(cached) && cached.length > 100) {
+      if (Array.isArray(cached) && cached.length >= 100) {
         console.log('[update-us] 구형 array 캐시 감지 → NASDAQ 재수집 시도 (성공 시 새 형식으로 교체)');
         legacyArrayCache = cached;
       }
