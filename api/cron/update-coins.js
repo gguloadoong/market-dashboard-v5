@@ -10,14 +10,17 @@ import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../_price-cache
 
 // #104 Opus: Upbit markets 전량 실패 + Bithumb fallback 경로에서도 최소한의 한글명 보장.
 // 라이브 Upbit 한글명 매핑을 1-off 로 추출 (Top 40 KRW 마켓).
+// ※ 리브랜드 반영: MATIC → POL, RNDR → RENDER (2024 마이그레이션).
+//   fetchUpbitMarkets 가 성공한 정상 경로는 이 정적 맵을 덮어쓰지 않으므로
+//   Upbit 공식 한글명과의 표기 drift 위험은 최소화됨.
 const COIN_KR_NAMES_FALLBACK = {
   BTC: '비트코인', ETH: '이더리움', XRP: '리플', SOL: '솔라나', DOGE: '도지코인',
   ADA: '에이다', AVAX: '아발란체', DOT: '폴카닷', TRX: '트론', LINK: '체인링크',
-  MATIC: '폴리곤', NEAR: '니어프로토콜', BCH: '비트코인캐시', LTC: '라이트코인', SHIB: '시바이누',
+  POL: '폴리곤 에코시스템 토큰', NEAR: '니어프로토콜', BCH: '비트코인캐시', LTC: '라이트코인', SHIB: '시바이누',
   ATOM: '코스모스', UNI: '유니스왑', XLM: '스텔라루멘', ETC: '이더리움클래식', FIL: '파일코인',
   APT: '앱토스', ARB: '아비트럼', OP: '옵티미즘', STX: '스택스', HBAR: '헤데라',
-  SUI: '수이', TIA: '셀레스티아', INJ: '인젝티브', SEI: '세이', PYTH: '피스네트워크',
-  JUP: '주피터', IMX: '이뮤터블엑스', RNDR: '렌더토큰', GRT: '더그래프', AAVE: '에이브',
+  SUI: '수이', TIA: '셀레스티아', INJ: '인젝티브', SEI: '세이', PYTH: '파이스네트워크',
+  JUP: '주피터', IMX: '이뮤터블엑스', RENDER: '렌더토큰', GRT: '더그래프', AAVE: '에이브',
   SAND: '샌드박스', MANA: '디센트럴랜드', AXS: '엑시인피니티', APE: '에이프코인', GMT: '스테픈',
 };
 
@@ -90,14 +93,13 @@ async function fetchBithumbTickers() {
     if (!row || typeof row !== 'object' || row.closing_price == null) continue;
     const close = parseFloat(row.closing_price);
     if (!Number.isFinite(close) || close <= 0) continue;
-    // 24h 변동률: fluctate_rate_24H(%) 우선, 없으면 prev_closing_price 기반 계산.
+    // 24h 변동률: fluctate_rate_24H(%) 만 사용.
+    // prev_closing_price 는 "전일 종가" 로 00:00 KST 리셋되는 일일 기준이라
+    // "24h 롤링" 의미가 아님 → Upbit signed_change_rate 와 드리프트. 없으면 0.
     let changeRate = 0;
     const rate24H = parseFloat(row.fluctate_rate_24H);
     if (Number.isFinite(rate24H)) {
       changeRate = rate24H / 100; // Upbit 와 동일하게 0.05 = 5%
-    } else {
-      const prev = parseFloat(row.prev_closing_price);
-      if (prev > 0) changeRate = (close - prev) / prev;
     }
     tickers.push({
       market: `KRW-${symbol}`,
@@ -115,12 +117,12 @@ async function fetchBithumbTickers() {
 
 // CoinPaprika 글로벌 시세 조회 (USD + KRW)
 // #104 B2: limit 100 → 300 으로 상향해 Upbit KRW 244 개 커버 (+ 마진).
-// 500 은 과다 → rate limit 소진 가속 우려 (Opus 리뷰).
-// 실패·부분응답은 호출자가 처리.
+// #104 Opus: paprika 는 보강 데이터라 실패해도 snapshot 저장에 영향 없음.
+// Edge 10s 예산을 지키기 위해 타임아웃 10s → 4s 로 축소. 실패는 allSettled 가 흡수.
 async function fetchCoinPaprika() {
   const res = await fetch('https://api.coinpaprika.com/v1/tickers?limit=300&quotes=KRW,USD', {
     headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(4000),
   });
   if (!res.ok) return [];
   return res.json();

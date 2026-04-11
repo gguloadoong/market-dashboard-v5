@@ -100,25 +100,25 @@ async function getSymbolList() {
     console.warn('[update-us] NASDAQ 수집 실패:', e.message);
     collected = { symbols: [], mcMap: {} };
   }
-  if (collected.symbols.length > 100 && redis) {
+  // #104 Opus: 임계값 일관성 — 100 미만이면 의심스러운 수집이라 판단하고
+  //           legacy/FALLBACK 중 더 나은 쪽을 사용. 캐시 저장 기준(>100)과 통일.
+  if (collected.symbols.length >= 100 && redis) {
     try {
       await redis.set(SYMBOL_LIST_KEY, collected, { ex: SYMBOL_LIST_TTL });
       console.log(`[update-us] 종목 리스트 갱신: ${collected.symbols.length}개 (marketCap 포함) → Redis 캐시`);
     } catch (_) { /* 저장 실패해도 진행 */ }
+    return collected;
   }
 
-  // NASDAQ API 실패 시:
-  //   1) 구형 캐시(array)가 남아 있으면 그걸 사용 (coverage 보존, 다음 cron 에서 재시도)
-  //   2) 그것도 없으면 하드코딩 FALLBACK_SYMBOLS 122개
-  if (collected.symbols.length < 50) {
-    if (legacyArrayCache) {
-      console.warn('[update-us] NASDAQ 실패 — 구형 array 캐시로 fallback');
-      return { symbols: legacyArrayCache, mcMap: {} };
-    }
-    console.warn('[update-us] NASDAQ API 수집 부족 — 하드코딩 fallback');
-    return { symbols: FALLBACK_SYMBOLS, mcMap: {} };
+  // NASDAQ 수집 결과가 100 미만 (장애/레이트리밋/타임아웃):
+  //   1) 구형 캐시(array)가 남아 있으면 coverage 보존
+  //   2) 없으면 FALLBACK_SYMBOLS 122개
+  if (legacyArrayCache) {
+    console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 구형 array 캐시 사용`);
+    return { symbols: legacyArrayCache, mcMap: {} };
   }
-  return collected;
+  console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 하드코딩 FALLBACK_SYMBOLS`);
+  return { symbols: FALLBACK_SYMBOLS, mcMap: {} };
 }
 
 // 하드코딩 fallback (기존 122개)
@@ -168,9 +168,10 @@ async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
   const resolvedSymbol = meta.symbol?.split('.')[0] ?? symbol;
   // #104 B3: Yahoo chart API 는 marketCap 을 돌려주지 않으므로 NASDAQ 수집값을 merge.
   //          meta.marketCap 은 거의 항상 undefined → 기존 fallback 은 전부 0 이었음.
-  //          `??` 를 써야 mcMap 의 0 을 "데이터 없음" 으로 의도적으로 구분할 수 있다.
-  const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] ?? mcMap[symbol]) : undefined;
-  const marketCap = mcFromNasdaq ?? meta.marketCap ?? 0;
+  //          NASDAQ 은 시총 순 정렬이라 상위 1000 내에 0 인 종목이 극소수지만,
+  //          있다면 "누락값" 으로 간주하고 Yahoo meta 로 넘어가도록 `||` 사용.
+  const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] || mcMap[symbol]) : 0;
+  const marketCap = mcFromNasdaq || meta.marketCap || 0;
   return {
     symbol: resolvedSymbol,
     price: parseFloat(price.toFixed(2)),
