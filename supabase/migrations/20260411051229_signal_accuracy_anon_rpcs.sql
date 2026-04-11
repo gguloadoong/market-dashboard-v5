@@ -43,7 +43,10 @@ CREATE TABLE IF NOT EXISTS private.signal_rpc_config (
 );
 REVOKE ALL ON TABLE private.signal_rpc_config FROM PUBLIC, anon, authenticated;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+-- pgcrypto 는 Supabase 기본에서 `extensions` 스키마에 설치돼 있다.
+-- fresh DB 대비 IF NOT EXISTS (이미 있으면 no-op).
+-- digest() 호출은 extensions.digest(...) 로 fully-qualify → search_path 에 의존 안 함.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 배포 헬퍼: plaintext 비밀 → SHA256 해시 저장.
 -- 실행 방법 (psql 또는 Supabase SQL Editor, service_role/postgres 권한으로):
@@ -54,14 +57,14 @@ CREATE OR REPLACE FUNCTION private.set_signal_rpc_secret(p_plaintext text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = private, pg_catalog, public
+SET search_path = pg_catalog, private, public, extensions
 AS $$
 BEGIN
   IF p_plaintext IS NULL OR length(p_plaintext) < 32 THEN
     RAISE EXCEPTION 'signal rpc secret must be at least 32 chars';
   END IF;
   INSERT INTO private.signal_rpc_config (key, value)
-  VALUES ('rpc_secret_sha256', encode(digest(p_plaintext, 'sha256'), 'hex'))
+  VALUES ('rpc_secret_sha256', encode(extensions.digest(p_plaintext, 'sha256'), 'hex'))
   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 END;
 $$;
@@ -82,7 +85,7 @@ CREATE OR REPLACE FUNCTION private.verify_signal_rpc_secret(p_secret text)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = private, pg_catalog, public
+SET search_path = pg_catalog, private, public, extensions
 AS $$
 DECLARE
   stored text;
@@ -96,7 +99,8 @@ BEGIN
   IF stored IS NULL THEN
     RETURN false;
   END IF;
-  RETURN stored = encode(digest(p_secret, 'sha256'), 'hex');
+  -- extensions.digest 로 fully-qualify (Supabase 기본 pgcrypto 설치 스키마)
+  RETURN stored = encode(extensions.digest(p_secret, 'sha256'), 'hex');
 END;
 $$;
 
@@ -131,6 +135,8 @@ BEGIN
     RAISE EXCEPTION 'batch too large: max 50';
   END IF;
 
+  -- direction/market 화이트리스트 검증 — 잘못된 값이 DB 로 들어가면
+  -- 집계 뷰 / cron / 프론트 UI 모두 파싱 에러나 잘못된 라벨링을 낼 수 있음.
   INSERT INTO public.signal_history (
     signal_type, symbol, market, direction, strength, title, price_at_fire, meta
   )
@@ -146,8 +152,8 @@ BEGIN
   FROM jsonb_array_elements(signals) AS s
   WHERE s->>'signal_type' IS NOT NULL
     AND s->>'symbol'      IS NOT NULL
-    AND s->>'market'      IS NOT NULL
-    AND s->>'direction'   IS NOT NULL;
+    AND s->>'market'    IN ('kr','us','crypto','coin','unknown')
+    AND s->>'direction' IN ('bullish','bearish','neutral');
 
   GET DIAGNOSTICS inserted_count = ROW_COUNT;
   RETURN jsonb_build_object(
@@ -325,15 +331,25 @@ GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, text, int) TO anon, 
 
 -- list_pending_signals 성능: (fired_at) 풀스캔 방지용 partial index.
 -- hit_*=NULL 은 evaluated 끝난 row 를 자연스럽게 제외.
-CREATE INDEX IF NOT EXISTS idx_signal_history_pending_1h
-  ON public.signal_history (fired_at)
-  WHERE hit_1h IS NULL;
-CREATE INDEX IF NOT EXISTS idx_signal_history_pending_4h
-  ON public.signal_history (fired_at)
-  WHERE hit_4h IS NULL;
-CREATE INDEX IF NOT EXISTS idx_signal_history_pending_24h
-  ON public.signal_history (fired_at)
-  WHERE hit_24h IS NULL;
+-- 테이블 자체가 아직 없는 fresh DB 에서는 조용히 skip.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'signal_history' AND c.relkind = 'r'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_1h '
+         || 'ON public.signal_history (fired_at) WHERE hit_1h IS NULL';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_4h '
+         || 'ON public.signal_history (fired_at) WHERE hit_4h IS NULL';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_24h '
+         || 'ON public.signal_history (fired_at) WHERE hit_24h IS NULL';
+  ELSE
+    RAISE NOTICE '[#102] public.signal_history table not present — indexes skipped';
+  END IF;
+END
+$$;
 
 -- ────────────────────────────────────────────────────────────
 -- 4) signal_accuracy 뷰 — anon SELECT (권한 드리프트 방지)
