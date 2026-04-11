@@ -2,9 +2,9 @@
 // 1h/4h/24h 경과한 시그널의 현재 가격을 대조하여 적중 여부 판정
 // Vercel Cron: 매 30분 실행
 //
-// 인증 모델: anon 키 + SECURITY DEFINER RPC (#102)
-//   list_pending_signals(horizon, limit)        — 평가 대상 조회
-//   update_signal_evaluation_batch(horizon, []) — 배치 UPDATE (순차 await 회피)
+// 인증 모델: anon 키 + SECURITY DEFINER RPC + SIGNAL_RPC_SECRET (#102)
+//   list_pending_signals(secret, horizon, limit)         — 평가 대상 조회
+//   update_signal_evaluation_batch(secret, horizon, [])  — 배치 UPDATE
 
 export const config = { runtime: 'edge' };
 
@@ -14,6 +14,7 @@ const SUPABASE_KEY =
   process.env.SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SIGNAL_RPC_SECRET = process.env.SIGNAL_RPC_SECRET;
 
 function supabaseHeaders() {
   return {
@@ -33,7 +34,11 @@ async function postRpc(name, body, timeoutMs = 8000) {
 }
 
 async function listPending(horizon, limit = 100) {
-  const res = await postRpc('list_pending_signals', { p_horizon: horizon, p_limit: limit });
+  const res = await postRpc('list_pending_signals', {
+    p_secret: SIGNAL_RPC_SECRET,
+    p_horizon: horizon,
+    p_limit: limit,
+  });
   if (!res.ok) return [];
   return res.json();
 }
@@ -41,6 +46,7 @@ async function listPending(horizon, limit = 100) {
 async function updateEvaluationBatch(horizon, items) {
   if (!items.length) return 0;
   const res = await postRpc('update_signal_evaluation_batch', {
+    p_secret: SIGNAL_RPC_SECRET,
     p_horizon: horizon,
     p_items: items,
   });
@@ -107,7 +113,7 @@ async function evaluateHorizon(horizon, prices) {
 }
 
 export default async function handler() {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !SIGNAL_RPC_SECRET) {
     return new Response(JSON.stringify({ error: 'supabase not configured' }), { status: 500 });
   }
 

@@ -2,8 +2,9 @@
 // POST: 시그널 발화 기록 (record_signal_batch RPC)
 // GET:  적중률 조회 (signal_accuracy 뷰)
 //
-// 인증 모델: anon 키만 사용. 쓰기 경로는 SECURITY DEFINER RPC가
-//           RLS를 우회하면서 페이로드를 검증한다 (#102).
+// 인증 모델: anon 키 + SECURITY DEFINER RPC + SIGNAL_RPC_SECRET shared secret.
+// anon 키는 공개이므로 공격자가 Supabase REST 로 직접 RPC 를 호출해도
+// secret 검증에서 unauthorized 로 차단된다 (#102).
 
 export const config = { runtime: 'edge' };
 
@@ -13,6 +14,8 @@ const SUPABASE_KEY =
   process.env.SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// 서버 전용 — 프론트 번들에 절대 노출 금지 (VITE_ 프리픽스 사용 X)
+const SIGNAL_RPC_SECRET = process.env.SIGNAL_RPC_SECRET;
 
 function supabaseHeaders() {
   return {
@@ -42,7 +45,7 @@ async function fetchAccuracyView() {
 }
 
 export default async function handler(req) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !SIGNAL_RPC_SECRET) {
     return new Response(
       JSON.stringify({ error: 'supabase not configured' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
@@ -92,7 +95,10 @@ export default async function handler(req) {
     }));
 
     try {
-      const res = await callRpc('record_signal_batch', { signals: rows });
+      const res = await callRpc('record_signal_batch', {
+        p_secret: SIGNAL_RPC_SECRET,
+        signals: rows,
+      });
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
         return new Response(

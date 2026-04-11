@@ -1,11 +1,63 @@
--- 시그널 적중률 기록/평가용 SECURITY DEFINER RPC + anon 권한 (#102)
--- 목적: Vercel 프로덕션에 service_role 키 없이도 /api/signal-accuracy가
---       동작하도록 anon 키 + SECURITY DEFINER RPC로 RLS 우회.
---       페이로드 검증은 함수 내부에서 강제.
+-- 시그널 적중률 기록/평가용 SECURITY DEFINER RPC + shared secret 검증 (#102)
+--
+-- 목적: Vercel 프로덕션에 service_role 키 없이도 /api/signal-accuracy 가
+--       동작하도록 anon 키 + SECURITY DEFINER RPC 로 RLS 우회.
+--       anon 키는 공개라서 프론트엔드 번들에도 들어가므로,
+--       공격자가 RPC 에 직접 접근해 DB 를 오염시키지 못하도록
+--       shared secret (SHA256 해시 비교) 를 함수 내부에서 강제.
+--
+-- 호출자 인증 흐름:
+--   브라우저 → /api/signal-accuracy (Vercel API route, SIGNAL_RPC_SECRET 주입)
+--            → Supabase RPC (anon 키 + p_secret) → verify_signal_rpc_secret()
 
+-- ────────────────────────────────────────────────────────────
+-- 0) private 스키마 + shared secret 저장소
+-- ────────────────────────────────────────────────────────────
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
+
+CREATE TABLE IF NOT EXISTS private.signal_rpc_config (
+  key   text PRIMARY KEY,
+  value text NOT NULL
+);
+REVOKE ALL ON TABLE private.signal_rpc_config FROM PUBLIC, anon, authenticated;
+
+-- NOTE: 초기 rpc_secret_sha256 값은 배포 시 별도로 주입한다.
+--       (예: SQL 콘솔에서 INSERT ... ON CONFLICT DO UPDATE)
+--       비밀 원본은 저장하지 않고 SHA256 해시만 보관한다.
+--       이 파일에는 해시 값을 커밋하지 않는다 — 환경마다 다름.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+CREATE OR REPLACE FUNCTION private.verify_signal_rpc_secret(p_secret text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = private, pg_catalog, public
+AS $$
+DECLARE
+  stored text;
+BEGIN
+  IF p_secret IS NULL OR length(p_secret) < 32 THEN
+    RETURN false;
+  END IF;
+  SELECT value INTO stored
+    FROM private.signal_rpc_config
+   WHERE key = 'rpc_secret_sha256';
+  IF stored IS NULL THEN
+    RETURN false;
+  END IF;
+  RETURN stored = encode(digest(p_secret, 'sha256'), 'hex');
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.verify_signal_rpc_secret(text) FROM PUBLIC;
+-- 외부 role 에 EXECUTE 권한 부여하지 않음. 아래 SECURITY DEFINER 함수들만 호출.
+
+-- ────────────────────────────────────────────────────────────
 -- 1) 배치 INSERT RPC
---    반환: {inserted, skipped} — 호출자가 drop된 행을 감지할 수 있도록
-CREATE OR REPLACE FUNCTION public.record_signal_batch(signals jsonb)
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.record_signal_batch(p_secret text, signals jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -15,6 +67,10 @@ DECLARE
   total_count    int;
   inserted_count int;
 BEGIN
+  IF NOT private.verify_signal_rpc_secret(p_secret) THEN
+    RAISE EXCEPTION 'unauthorized' USING ERRCODE = '42501';
+  END IF;
+
   IF signals IS NULL OR jsonb_typeof(signals) <> 'array' THEN
     RAISE EXCEPTION 'signals must be a JSON array';
   END IF;
@@ -52,13 +108,14 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.record_signal_batch(jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.record_signal_batch(jsonb) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.record_signal_batch(text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.record_signal_batch(text, jsonb) TO anon, authenticated;
 
+-- ────────────────────────────────────────────────────────────
 -- 2) 배치 UPDATE RPC (적중률 평가 크론 용)
---    페이로드: {horizon, items: [{id, price, change, hit}, ...]}
---    반환: 실제로 UPDATE된 행 수 (int)
+-- ────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.update_signal_evaluation_batch(
+  p_secret  text,
   p_horizon text,
   p_items   jsonb
 )
@@ -70,6 +127,10 @@ AS $$
 DECLARE
   affected int := 0;
 BEGIN
+  IF NOT private.verify_signal_rpc_secret(p_secret) THEN
+    RAISE EXCEPTION 'unauthorized' USING ERRCODE = '42501';
+  END IF;
+
   IF p_horizon NOT IN ('1h','4h','24h') THEN
     RAISE EXCEPTION 'invalid horizon: %', p_horizon;
   END IF;
@@ -85,10 +146,10 @@ BEGIN
 
   IF p_horizon = '1h' THEN
     WITH src AS (
-      SELECT (e->>'id')::bigint        AS id,
-             (e->>'price')::numeric    AS price,
-             (e->>'change')::numeric   AS change,
-             (e->>'hit')::boolean      AS hit
+      SELECT (e->>'id')::bigint      AS id,
+             (e->>'price')::numeric  AS price,
+             (e->>'change')::numeric AS change,
+             (e->>'hit')::boolean    AS hit
         FROM jsonb_array_elements(p_items) e
     )
     UPDATE public.signal_history sh
@@ -100,10 +161,10 @@ BEGIN
      WHERE sh.id = src.id AND sh.hit_1h IS NULL;
   ELSIF p_horizon = '4h' THEN
     WITH src AS (
-      SELECT (e->>'id')::bigint        AS id,
-             (e->>'price')::numeric    AS price,
-             (e->>'change')::numeric   AS change,
-             (e->>'hit')::boolean      AS hit
+      SELECT (e->>'id')::bigint      AS id,
+             (e->>'price')::numeric  AS price,
+             (e->>'change')::numeric AS change,
+             (e->>'hit')::boolean    AS hit
         FROM jsonb_array_elements(p_items) e
     )
     UPDATE public.signal_history sh
@@ -115,10 +176,10 @@ BEGIN
      WHERE sh.id = src.id AND sh.hit_4h IS NULL;
   ELSE
     WITH src AS (
-      SELECT (e->>'id')::bigint        AS id,
-             (e->>'price')::numeric    AS price,
-             (e->>'change')::numeric   AS change,
-             (e->>'hit')::boolean      AS hit
+      SELECT (e->>'id')::bigint      AS id,
+             (e->>'price')::numeric  AS price,
+             (e->>'change')::numeric AS change,
+             (e->>'hit')::boolean    AS hit
         FROM jsonb_array_elements(p_items) e
     )
     UPDATE public.signal_history sh
@@ -135,15 +196,21 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.update_signal_evaluation_batch(text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.update_signal_evaluation_batch(text, jsonb) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_signal_evaluation_batch(text, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.update_signal_evaluation_batch(text, text, jsonb) TO anon, authenticated;
 
+-- ────────────────────────────────────────────────────────────
 -- 3) 평가 대상 신호 조회 RPC
---    각 horizon마다 상·하한을 둬서 오래된 신호를 "현재가 기준"으로 잘못 평가하지 않도록 한다.
---    1h:  fired_at ∈ [now-3h,  now-1h]
---    4h:  fired_at ∈ [now-12h, now-4h]
---    24h: fired_at ∈ [now-48h, now-24h]
-CREATE OR REPLACE FUNCTION public.list_pending_signals(p_horizon text, p_limit int DEFAULT 100)
+--    horizon 별 상·하한으로 오래된 신호를 "현재가 기준" 잘못 평가 방지.
+--      1h:  fired_at ∈ (now-3h,  now-1h]
+--      4h:  fired_at ∈ (now-12h, now-4h]
+--      24h: fired_at ∈ (now-48h, now-24h]
+-- ────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.list_pending_signals(
+  p_secret  text,
+  p_horizon text,
+  p_limit   int DEFAULT 100
+)
 RETURNS TABLE (
   id bigint,
   signal_type text,
@@ -158,6 +225,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF NOT private.verify_signal_rpc_secret(p_secret) THEN
+    RAISE EXCEPTION 'unauthorized' USING ERRCODE = '42501';
+  END IF;
+
   IF p_horizon NOT IN ('1h','4h','24h') THEN
     RAISE EXCEPTION 'invalid horizon: %', p_horizon;
   END IF;
@@ -196,9 +267,11 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.list_pending_signals(text, int) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, int) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.list_pending_signals(text, text, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, text, int) TO anon, authenticated;
 
--- 4) signal_accuracy 뷰 — anon에 SELECT 권한 (권한 드리프트 방지 위해 REVOKE 선행)
+-- ────────────────────────────────────────────────────────────
+-- 4) signal_accuracy 뷰 — anon SELECT (권한 드리프트 방지)
+-- ────────────────────────────────────────────────────────────
 REVOKE ALL ON public.signal_accuracy FROM anon;
 GRANT SELECT ON public.signal_accuracy TO anon;
