@@ -1,37 +1,48 @@
 // api/cron/check-signal-accuracy.js — 시그널 적중률 자동 검증 크론
 // 1h/4h/24h 경과한 시그널의 현재 가격을 대조하여 적중 여부 판정
 // Vercel Cron: 매 30분 실행
+//
+// 인증 모델: anon 키 + SECURITY DEFINER RPC (#102)
 
 export const config = { runtime: 'edge' };
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-async function supabaseRpc(query) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-    },
+function supabaseHeaders() {
+  return {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function listPending(horizon, limit = 200) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/list_pending_signals`, {
+    method: 'POST',
+    headers: supabaseHeaders(),
+    body: JSON.stringify({ p_horizon: horizon, p_limit: limit }),
     signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   return res.json();
 }
 
-async function supabaseUpdate(id, data) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return false;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/signal_history?id=eq.${id}`, {
-    method: 'PATCH',
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal',
-    },
-    body: JSON.stringify(data),
+async function updateEvaluation(id, horizon, price, changePct, hit) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_signal_evaluation`, {
+    method: 'POST',
+    headers: supabaseHeaders(),
+    body: JSON.stringify({
+      p_id: id,
+      p_horizon: horizon,
+      p_price: price,
+      p_change: changePct,
+      p_hit: hit,
+    }),
     signal: AbortSignal.timeout(5000),
   });
   return res.ok;
@@ -40,22 +51,22 @@ async function supabaseUpdate(id, data) {
 // 현재 가격 조회 (snapshot API 재활용)
 async function getCurrentPrices() {
   try {
-    const res = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://market-dashboard-v5.vercel.app'}/api/snapshot`, {
+    const base = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://market-dashboard-v5.vercel.app';
+    const res = await fetch(`${base}/api/snapshot`, {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return {};
     const data = await res.json();
     const prices = {};
 
-    // 코인
     for (const c of data.coins || []) {
       prices[c.symbol] = c.priceKrw || c.priceUsd || 0;
     }
-    // 국장
     for (const s of data.kr || []) {
       prices[s.symbol] = s.price || 0;
     }
-    // 미장
     for (const s of data.us || []) {
       prices[s.symbol] = s.price || 0;
     }
@@ -73,6 +84,27 @@ function isHit(direction, changePct) {
   return false;
 }
 
+async function evaluateHorizon(horizon, prices) {
+  const pending = await listPending(horizon, 100);
+  let updated = 0;
+  for (const sig of pending || []) {
+    const curPrice = prices[sig.symbol];
+    if (!curPrice || !sig.price_at_fire) continue;
+    const base = Number(sig.price_at_fire);
+    if (!base) continue;
+    const changePct = ((curPrice - base) / base) * 100;
+    const ok = await updateEvaluation(
+      sig.id,
+      horizon,
+      curPrice,
+      +changePct.toFixed(2),
+      isHit(sig.direction, changePct),
+    );
+    if (ok) updated++;
+  }
+  return updated;
+}
+
 export default async function handler() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(JSON.stringify({ error: 'supabase not configured' }), { status: 500 });
@@ -83,61 +115,14 @@ export default async function handler() {
     return new Response(JSON.stringify({ error: 'no prices' }), { status: 500 });
   }
 
-  const now = new Date();
-  let updated = { h1: 0, h4: 0, h24: 0 };
+  const [h1, h4, h24] = await Promise.all([
+    evaluateHorizon('1h', prices),
+    evaluateHorizon('4h', prices),
+    evaluateHorizon('24h', prices),
+  ]);
 
-  // 1시간 체크: fired_at이 1~2시간 전이고 hit_1h가 null인 시그널
-  const unchecked1h = await supabaseRpc(
-    `signal_history?hit_1h=is.null&fired_at=lt.${new Date(now - 3600000).toISOString()}&fired_at=gt.${new Date(now - 7200000).toISOString()}&select=id,symbol,direction,price_at_fire&limit=50`
+  return new Response(
+    JSON.stringify({ ok: true, updated: { h1, h4, h24 }, ts: new Date().toISOString() }),
+    { headers: { 'Content-Type': 'application/json' } },
   );
-  for (const sig of unchecked1h || []) {
-    const curPrice = prices[sig.symbol];
-    if (!curPrice || !sig.price_at_fire) continue;
-    const changePct = ((curPrice - sig.price_at_fire) / sig.price_at_fire) * 100;
-    await supabaseUpdate(sig.id, {
-      price_1h: curPrice,
-      change_1h: +changePct.toFixed(2),
-      hit_1h: isHit(sig.direction, changePct),
-      checked_1h_at: now.toISOString(),
-    });
-    updated.h1++;
-  }
-
-  // 4시간 체크
-  const unchecked4h = await supabaseRpc(
-    `signal_history?hit_4h=is.null&fired_at=lt.${new Date(now - 14400000).toISOString()}&fired_at=gt.${new Date(now - 28800000).toISOString()}&select=id,symbol,direction,price_at_fire&limit=50`
-  );
-  for (const sig of unchecked4h || []) {
-    const curPrice = prices[sig.symbol];
-    if (!curPrice || !sig.price_at_fire) continue;
-    const changePct = ((curPrice - sig.price_at_fire) / sig.price_at_fire) * 100;
-    await supabaseUpdate(sig.id, {
-      price_4h: curPrice,
-      change_4h: +changePct.toFixed(2),
-      hit_4h: isHit(sig.direction, changePct),
-      checked_4h_at: now.toISOString(),
-    });
-    updated.h4++;
-  }
-
-  // 24시간 체크
-  const unchecked24h = await supabaseRpc(
-    `signal_history?hit_24h=is.null&fired_at=lt.${new Date(now - 86400000).toISOString()}&fired_at=gt.${new Date(now - 172800000).toISOString()}&select=id,symbol,direction,price_at_fire&limit=50`
-  );
-  for (const sig of unchecked24h || []) {
-    const curPrice = prices[sig.symbol];
-    if (!curPrice || !sig.price_at_fire) continue;
-    const changePct = ((curPrice - sig.price_at_fire) / sig.price_at_fire) * 100;
-    await supabaseUpdate(sig.id, {
-      price_24h: curPrice,
-      change_24h: +changePct.toFixed(2),
-      hit_24h: isHit(sig.direction, changePct),
-      checked_24h_at: now.toISOString(),
-    });
-    updated.h24++;
-  }
-
-  return new Response(JSON.stringify({ ok: true, updated, ts: now.toISOString() }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
