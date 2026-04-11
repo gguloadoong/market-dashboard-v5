@@ -70,14 +70,26 @@ async function updateEvaluationBatch(horizon, items) {
 }
 
 // 현재 가격 조회 (snapshot API 재활용)
-// VERCEL_URL 은 preview 배포의 hashed URL 이라 preview 에서 cron 이 돌면
-// preview snapshot 을 긁게 된다. 프로덕션 고정 URL 을 우선하고,
-// VERCEL_PROJECT_PRODUCTION_URL 이 있으면 그걸 사용.
+//
+// 환경 별 base URL:
+//   - production cron  : 프로덕션 도메인 고정 (VERCEL_PROJECT_PRODUCTION_URL 우선)
+//   - preview/dev cron : 현재 deployment 의 VERCEL_URL (자체 DB 와 일관)
+//   - 로컬             : localhost
+// preview 환경의 cron 이 프로덕션 스냅샷을 긁어서 staging DB 를 오염시키는
+// 일이 없어야 한다 (#102 Codex P2).
 async function getCurrentPrices() {
   try {
-    const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : 'https://market-dashboard-v5.vercel.app';
+    const isProd = process.env.VERCEL_ENV === 'production';
+    let base;
+    if (isProd) {
+      base = process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : 'https://market-dashboard-v5.vercel.app';
+    } else if (process.env.VERCEL_URL) {
+      base = `https://${process.env.VERCEL_URL}`;
+    } else {
+      base = 'http://localhost:5173';
+    }
     const res = await fetch(`${base}/api/snapshot`, {
       signal: AbortSignal.timeout(5000),
     });
