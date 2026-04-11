@@ -117,12 +117,15 @@ async function getSymbolList() {
   // NASDAQ 수집 결과가 100 미만 (장애/레이트리밋/타임아웃):
   //   1) 구형 캐시(array)가 남아 있으면 coverage 보존
   //   2) 없으면 FALLBACK_SYMBOLS 122개
+  // #104 Codex: 부분 수집한 mcMap 이 있으면 같이 전달해서 legacy 경로도
+  //           가능한 범위에서 marketCap 복구 (모두 0 으로 떨어지지 않도록).
+  const partialMcMap = collected.mcMap || {};
   if (legacyArrayCache) {
-    console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 구형 array 캐시 사용`);
-    return { symbols: legacyArrayCache, mcMap: {} };
+    console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 구형 array 캐시 사용 (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
+    return { symbols: legacyArrayCache, mcMap: partialMcMap };
   }
-  console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 하드코딩 FALLBACK_SYMBOLS`);
-  return { symbols: FALLBACK_SYMBOLS, mcMap: {} };
+  console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 하드코딩 FALLBACK_SYMBOLS (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
+  return { symbols: FALLBACK_SYMBOLS, mcMap: partialMcMap };
 }
 
 // 하드코딩 fallback (기존 122개)

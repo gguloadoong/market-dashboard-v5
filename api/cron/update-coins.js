@@ -204,14 +204,18 @@ export default async function handler(request) {
     // CoinPaprika 심볼 매핑 (symbol → { priceUsd, marketCap, volume24h })
     // #104 B2: priceUsd=0 인 row 는 맵에 넣지 않음 — 조용한 0 값 차단.
     //         호출자는 paprika 누락을 "데이터 없음(0)" 으로 깔끔하게 처리.
+    // #104 Codex: 동일 티커 중복(다른 프로젝트가 같은 심볼) 시 시가총액 큰 쪽을
+    //            유지. paprika 는 market cap 내림차순 정렬이므로 first-wins 로 충분.
     const paprikaMap = new Map();
     for (const coin of paprikaData) {
       if (!coin.symbol) continue;
+      const key = coin.symbol.toUpperCase();
+      if (paprikaMap.has(key)) continue; // 먼저 들어온(=더 큰 시총) row 유지
       const priceUsd  = coin.quotes?.USD?.price ?? 0;
       const marketCap = coin.quotes?.USD?.market_cap ?? 0;
       const volume24h = coin.quotes?.USD?.volume_24h ?? 0;
       if (priceUsd <= 0) continue;
-      paprikaMap.set(coin.symbol.toUpperCase(), { priceUsd, marketCap, volume24h });
+      paprikaMap.set(key, { priceUsd, marketCap, volume24h });
     }
 
     // Upbit/Bithumb 티커 → 통합 형태 변환
