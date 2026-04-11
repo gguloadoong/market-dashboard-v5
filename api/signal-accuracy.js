@@ -69,19 +69,18 @@ export default async function handler(req) {
       );
     }
 
-    // 허용 Origin (엄격 — 프로덕션 단일 hostname 만):
-    //   1) https://market-dashboard-v5.vercel.app  (프로덕션)
+    // 허용 Origin:
+    //   1) same-origin (페이지의 Host 와 동일 origin) — 프로덕션·preview·커스텀 도메인 전부 자연스레 허용
     //   2) http://localhost:* / http://127.0.0.1:*  (로컬 개발)
     //   3) x-cron-secret 일치 (서버 간 호출)
-    // preview 배포는 브라우저 트래픽이 없다고 가정 → 허용하지 않음.
-    // 실제 방어는 Supabase 쪽 SIGNAL_RPC_SECRET 검증이 수행하며, origin
-    // 체크는 defense-in-depth.
+    // origin 체크는 defense-in-depth 이고 실제 쓰기 인증은
+    // Supabase RPC 내부의 SIGNAL_RPC_SECRET 검증이 맡는다.
     const origin = req.headers.get('origin') || '';
+    const host = req.headers.get('host') || '';
     const cronSecret = req.headers.get('x-cron-secret') || '';
     const hasSecret = cronSecret && cronSecret === (process.env.CRON_SECRET || '');
-    const originAllowed =
-      origin === 'https://market-dashboard-v5.vercel.app' ||
-      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    const sameOrigin = !!host && (origin === `https://${host}` || origin === `http://${host}`);
+    const originAllowed = sameOrigin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     if (!originAllowed && !hasSecret) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 403 });
     }

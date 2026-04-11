@@ -138,6 +138,11 @@ BEGIN
 
   -- direction/market 화이트리스트 검증 — 잘못된 값이 DB 로 들어가면
   -- 집계 뷰 / cron / 프론트 UI 모두 파싱 에러나 잘못된 라벨링을 낼 수 있음.
+  -- 허용값은 src/engine/signalEngine.js 의 실제 발화 마켓과 1:1 매칭:
+  --   kr / us / crypto / coin — 종목 고유 시장
+  --   cross                   — 교차시장 상관 시그널
+  --   all                     — 시장분위기 전환처럼 전체 대상
+  --   unknown                 — 마켓 미상 (서버 디폴트)
   INSERT INTO public.signal_history (
     signal_type, symbol, market, direction, strength, title, price_at_fire, meta
   )
@@ -153,7 +158,7 @@ BEGIN
   FROM jsonb_array_elements(signals) AS s
   WHERE s->>'signal_type' IS NOT NULL
     AND s->>'symbol'      IS NOT NULL
-    AND s->>'market'    IN ('kr','us','crypto','coin','unknown')
+    AND s->>'market'    IN ('kr','us','crypto','coin','cross','all','unknown')
     AND s->>'direction' IN ('bullish','bearish','neutral');
 
   GET DIAGNOSTICS inserted_count = ROW_COUNT;
