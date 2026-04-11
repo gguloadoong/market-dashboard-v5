@@ -48,15 +48,14 @@ $$;
 REVOKE ALL ON FUNCTION private.set_signal_rpc_secret(text) FROM PUBLIC;
 -- 외부 role 에 EXECUTE 권한 부여하지 않음.
 
--- 마이그레이션 적용 후에도 rpc_secret_sha256 이 비어 있으면 모든 RPC 가
--- unauthorized 를 돌려주므로, 운영자가 아래 NOTICE 를 보고 반드시 seed 해야 한다.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM private.signal_rpc_config WHERE key = 'rpc_secret_sha256') THEN
-    RAISE NOTICE '[#102] rpc_secret_sha256 not seeded. Run: SELECT private.set_signal_rpc_secret(''<secret>'')';
-  END IF;
-END
-$$;
+-- 현재 프로덕션 shared secret 의 SHA256 해시 — 마이그레이션 자동 seed.
+-- * 해시는 단방향이고 원본 secret 이 32 바이트 crypto-random 이므로 repo 에 커밋 안전.
+-- * secret 을 로테이트할 때는 새 마이그레이션을 추가해 (plaintext →
+--   private.set_signal_rpc_secret 호출 or hash 상수 교체) DB 와 Vercel env 를
+--   한 쌍으로 함께 갱신해야 한다.
+INSERT INTO private.signal_rpc_config (key, value)
+VALUES ('rpc_secret_sha256', '6331beb2cb3506a58a56a6593d97e9df2b4afcdd2c0a88083688995a28e4f75f')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 CREATE OR REPLACE FUNCTION private.verify_signal_rpc_secret(p_secret text)
 RETURNS boolean

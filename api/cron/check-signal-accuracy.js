@@ -33,13 +33,24 @@ async function postRpc(name, body, timeoutMs = 8000) {
   });
 }
 
+class RpcError extends Error {
+  constructor(name, status, body) {
+    super(`rpc ${name} failed: ${status} ${body.slice(0, 200)}`);
+    this.rpcName = name;
+    this.status = status;
+  }
+}
+
 async function listPending(horizon, limit = 100) {
   const res = await postRpc('list_pending_signals', {
     p_secret: SIGNAL_RPC_SECRET,
     p_horizon: horizon,
     p_limit: limit,
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new RpcError('list_pending_signals', res.status, body);
+  }
   return res.json();
 }
 
@@ -50,7 +61,10 @@ async function updateEvaluationBatch(horizon, items) {
     p_horizon: horizon,
     p_items: items,
   });
-  if (!res.ok) return 0;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new RpcError('update_signal_evaluation_batch', res.status, body);
+  }
   const affected = await res.json().catch(() => 0);
   return typeof affected === 'number' ? affected : 0;
 }
@@ -122,14 +136,36 @@ export default async function handler() {
     return new Response(JSON.stringify({ error: 'no prices' }), { status: 500 });
   }
 
-  const [h1, h4, h24] = await Promise.all([
+  // allSettled 로 horizon 별 결과/에러를 독립 수집.
+  // RPC 실패(시크릿 불일치, 권한 드리프트 등)는 반드시 non-2xx 로 드러나야
+  // 모니터링이 "조용한 0건" 과 "DB 전면 거절" 을 구분할 수 있다.
+  const settled = await Promise.allSettled([
     evaluateHorizon('1h', prices),
     evaluateHorizon('4h', prices),
     evaluateHorizon('24h', prices),
   ]);
 
-  return new Response(
-    JSON.stringify({ ok: true, updated: { h1, h4, h24 }, ts: new Date().toISOString() }),
-    { headers: { 'Content-Type': 'application/json' } },
-  );
+  const labels = ['h1', 'h4', 'h24'];
+  const updated = {};
+  const errors = [];
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      updated[labels[i]] = r.value;
+    } else {
+      updated[labels[i]] = 0;
+      errors.push({
+        horizon: labels[i],
+        message: r.reason?.message || String(r.reason),
+        status: r.reason?.status ?? null,
+      });
+    }
+  });
+
+  const payload = { ok: errors.length === 0, updated, ts: new Date().toISOString() };
+  if (errors.length) payload.errors = errors;
+
+  return new Response(JSON.stringify(payload), {
+    status: errors.length ? 500 : 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
