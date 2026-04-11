@@ -51,12 +51,21 @@ export default async function handler(req) {
 
   // ── POST: 시그널 발화 기록 ─────────────────────────────────
   if (req.method === 'POST') {
-    // 서버 사이드/같은 출처/로컬에서만 허용 — 외부 abuse 1차 차단
+    // 허용 Origin:
+    //   1) 프로덕션: https://market-dashboard-v5.vercel.app
+    //   2) 프리뷰:   https://market-dashboard-v5-*.vercel.app (이 프로젝트의 preview 배포만)
+    //   3) 로컬 개발: http://localhost:* / http://127.0.0.1:*
+    //   4) x-cron-secret 일치 (서버 간 호출)
+    // `includes('vercel.app')` 같은 substring 매칭은 evil.vercel.app.com 도 통과시키므로
+    // 정규식 suffix 매칭으로 교체.
     const origin = req.headers.get('origin') || '';
     const cronSecret = req.headers.get('x-cron-secret') || '';
-    const isInternal = !origin || origin.includes('vercel.app') || origin.includes('localhost');
     const hasSecret = cronSecret && cronSecret === (process.env.CRON_SECRET || '');
-    if (!isInternal && !hasSecret) {
+    const originAllowed =
+      origin === 'https://market-dashboard-v5.vercel.app' ||
+      /^https:\/\/market-dashboard-v5(-[a-z0-9-]+)?\.vercel\.app$/.test(origin) ||
+      /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    if (!originAllowed && !hasSecret) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 403 });
     }
 
@@ -91,10 +100,14 @@ export default async function handler(req) {
           { status: 500, headers: { 'Content-Type': 'application/json' } },
         );
       }
-      const inserted = await res.json().catch(() => 0);
-      return new Response(JSON.stringify({ ok: true, inserted }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      // RPC는 {inserted, skipped} jsonb를 돌려준다.
+      const payload = await res.json().catch(() => ({}));
+      const inserted = Number(payload?.inserted ?? 0);
+      const skipped = Number(payload?.skipped ?? 0);
+      return new Response(
+        JSON.stringify({ ok: true, inserted, skipped, requested: rows.length }),
+        { headers: { 'Content-Type': 'application/json' } },
+      );
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message || 'rpc failed' }), { status: 500 });
     }

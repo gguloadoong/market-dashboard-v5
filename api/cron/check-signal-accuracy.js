@@ -3,6 +3,8 @@
 // Vercel Cron: 매 30분 실행
 //
 // 인증 모델: anon 키 + SECURITY DEFINER RPC (#102)
+//   list_pending_signals(horizon, limit)        — 평가 대상 조회
+//   update_signal_evaluation_batch(horizon, []) — 배치 UPDATE (순차 await 회피)
 
 export const config = { runtime: 'edge' };
 
@@ -21,31 +23,30 @@ function supabaseHeaders() {
   };
 }
 
-async function listPending(horizon, limit = 200) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/list_pending_signals`, {
+async function postRpc(name, body, timeoutMs = 8000) {
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: supabaseHeaders(),
-    body: JSON.stringify({ p_horizon: horizon, p_limit: limit }),
-    signal: AbortSignal.timeout(8000),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+}
+
+async function listPending(horizon, limit = 100) {
+  const res = await postRpc('list_pending_signals', { p_horizon: horizon, p_limit: limit });
   if (!res.ok) return [];
   return res.json();
 }
 
-async function updateEvaluation(id, horizon, price, changePct, hit) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_signal_evaluation`, {
-    method: 'POST',
-    headers: supabaseHeaders(),
-    body: JSON.stringify({
-      p_id: id,
-      p_horizon: horizon,
-      p_price: price,
-      p_change: changePct,
-      p_hit: hit,
-    }),
-    signal: AbortSignal.timeout(5000),
+async function updateEvaluationBatch(horizon, items) {
+  if (!items.length) return 0;
+  const res = await postRpc('update_signal_evaluation_batch', {
+    p_horizon: horizon,
+    p_items: items,
   });
-  return res.ok;
+  if (!res.ok) return 0;
+  const affected = await res.json().catch(() => 0);
+  return typeof affected === 'number' ? affected : 0;
 }
 
 // 현재 가격 조회 (snapshot API 재활용)
@@ -78,7 +79,7 @@ async function getCurrentPrices() {
 
 // 적중 판정: 시그널 방향과 가격 변동 방향 일치 여부
 function isHit(direction, changePct) {
-  if (direction === 'neutral') return Math.abs(changePct) < 1; // 중립은 변동 1% 미만이면 적중
+  if (direction === 'neutral') return Math.abs(changePct) < 1;
   if (direction === 'bullish') return changePct > 0;
   if (direction === 'bearish') return changePct < 0;
   return false;
@@ -86,23 +87,23 @@ function isHit(direction, changePct) {
 
 async function evaluateHorizon(horizon, prices) {
   const pending = await listPending(horizon, 100);
-  let updated = 0;
-  for (const sig of pending || []) {
+  if (!pending.length) return 0;
+
+  const items = [];
+  for (const sig of pending) {
     const curPrice = prices[sig.symbol];
     if (!curPrice || !sig.price_at_fire) continue;
     const base = Number(sig.price_at_fire);
     if (!base) continue;
     const changePct = ((curPrice - base) / base) * 100;
-    const ok = await updateEvaluation(
-      sig.id,
-      horizon,
-      curPrice,
-      +changePct.toFixed(2),
-      isHit(sig.direction, changePct),
-    );
-    if (ok) updated++;
+    items.push({
+      id: sig.id,
+      price: curPrice,
+      change: +changePct.toFixed(2),
+      hit: isHit(sig.direction, changePct),
+    });
   }
-  return updated;
+  return updateEvaluationBatch(horizon, items);
 }
 
 export default async function handler() {
