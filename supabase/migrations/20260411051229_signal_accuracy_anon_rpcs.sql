@@ -335,27 +335,11 @@ $$;
 REVOKE ALL ON FUNCTION public.list_pending_signals(text, text, int) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.list_pending_signals(text, text, int) TO anon, authenticated;
 
--- list_pending_signals 성능: (fired_at) 풀스캔 방지용 partial index.
--- hit_*=NULL 은 evaluated 끝난 row 를 자연스럽게 제외.
--- 테이블 자체가 아직 없는 fresh DB 에서는 조용히 skip.
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_catalog.pg_class c
-    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = 'signal_history' AND c.relkind = 'r'
-  ) THEN
-    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_1h '
-         || 'ON public.signal_history (fired_at) WHERE hit_1h IS NULL';
-    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_4h '
-         || 'ON public.signal_history (fired_at) WHERE hit_4h IS NULL';
-    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_signal_history_pending_24h '
-         || 'ON public.signal_history (fired_at) WHERE hit_24h IS NULL';
-  ELSE
-    RAISE NOTICE '[#102] public.signal_history table not present — indexes skipped';
-  END IF;
-END
-$$;
+-- 참고: list_pending_signals 가 쓰는 `WHERE hit_1h IS NULL` 등의 partial
+-- index 는 이미 base migration (20260409062531_create_signal_history) 에서
+-- idx_signal_history_unchecked_{1h,4h,24h} 로 동일하게 생성됨. 이 파일에서
+-- 중복 정의하지 않는다 (Opus 리뷰 지적: 동일 정의 중복 인덱스는 저장/유지비
+-- 2배 + 플래너가 어느 쪽을 고를지 불안정).
 
 -- ────────────────────────────────────────────────────────────
 -- 4) signal_accuracy 뷰 — anon SELECT (권한 드리프트 방지)

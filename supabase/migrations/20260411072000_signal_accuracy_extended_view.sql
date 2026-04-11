@@ -49,11 +49,11 @@ trend AS (
   GROUP BY signal_type
 ),
 recent_arr AS (
-  -- 최신순 전체 집계 후 바깥에서 상위 10/5 만 선택
+  -- 평가 완료(hit_1h IS NOT NULL) 시그널만 최신순 집계.
+  -- 평가 전 시그널을 섞으면 UI 에서 "빨간 미스" 로 잘못 표시됨 (Codex P2).
   SELECT
     signal_type,
-    jsonb_agg(hit_1h ORDER BY fired_at DESC)
-      FILTER (WHERE hit_1h IS NOT NULL) AS recent_results_all,
+    jsonb_agg(hit_1h ORDER BY fired_at DESC) AS recent_results_all,
     jsonb_agg(
       jsonb_build_object(
         'symbol',    symbol,
@@ -65,12 +65,15 @@ recent_arr AS (
     ) AS recent_signals_all
   FROM public.signal_history
   WHERE fired_at > NOW() - INTERVAL '30 days'
+    AND hit_1h IS NOT NULL
   GROUP BY signal_type
 )
 SELECT
   b.signal_type,
   b.total_signals,
-  b.total_signals                                                        AS total_fired,
+  -- total_fired 는 hit_count 와 같은 denominator (평가 완료 1h) 로 맞춰야
+  -- hit_count / total_fired 비율이 뜻대로 나옴. 전체 발화 수는 total_signals 에 남김.
+  COALESCE(b.checked_1h, 0)                                              AS total_fired,
   COALESCE(b.hits_1h, 0)                                                 AS hit_count,
   COALESCE(b.accuracy_1h, 0)                                             AS accuracy,
   b.checked_1h, b.hits_1h, b.accuracy_1h,
