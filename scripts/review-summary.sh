@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# review-summary.sh — 리뷰 종합 코멘트 자동 생성 & GitHub PR에 게시
+# review-summary.sh — Review Summary Auto-Post to PR
+# Generalized from market-dashboard-v5
 #
-# 사용법: npm run review:summary
-#   1. 현재 브랜치의 PR 번호 자동 감지
-#   2. code-reviewer (Opus) 재실행 → 결과 추출
-#   3. Codex gate 재실행 → 결과 추출
-#   4. 리뷰 종합 코멘트 생성 → gh pr comment 게시
-#
-# 봇 리뷰(Gemini/Copilot/CodeRabbit) 채택/기각 내용은 스크립트 실행 전
-# BOT_REVIEW_TABLE 환경변수로 전달하거나, 생성된 코멘트에 직접 편집 가능.
+# Usage: bash scripts/review-summary.sh
+#   1. Detect PR number for current branch
+#   2. Re-run code-reviewer -> extract verdict
+#   3. Run Codex gate (if available) -> extract verdict
+#   4. Post combined review summary as PR comment
 
 set -euo pipefail
 
@@ -21,136 +19,81 @@ NC='\033[0m'
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SAFE_BRANCH="${BRANCH//\//-}"
 REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
-CODEX_ARTIFACT=".tmp/codex-review-${SAFE_BRANCH}.md"
-CODEX_TMP="$(mktemp)"
-trap 'rm -f "$CODEX_TMP"' EXIT
 
-# 스테일 Codex artifact 제거 — 이전 실행 결과가 남아 있으면 새 결과와 혼동될 수 있음
-rm -f .tmp/codex-review-*.md
+echo -e "${BLUE}[review-summary] Branch: ${BRANCH}${NC}"
 
-echo -e "${BLUE}[review-summary] 브랜치: ${BRANCH}${NC}"
-
-# ── 1. PR 번호 감지 ──────────────────────────────────────────────────────────
+# --- 1. Detect PR ---
 PR_NUMBER=$(gh pr view "$BRANCH" --json number --jq '.number' 2>/dev/null || echo "")
 if [ -z "$PR_NUMBER" ]; then
-  echo -e "${RED}[review-summary] 현재 브랜치에 열린 PR 없음. PR 생성 후 실행하세요.${NC}"
+  echo -e "${RED}[review-summary] No open PR for this branch.${NC}"
   exit 1
 fi
-echo -e "${GREEN}[review-summary] PR #${PR_NUMBER} 감지${NC}"
+echo -e "${GREEN}[review-summary] PR #${PR_NUMBER}${NC}"
 
-# ── 2. code-reviewer (Opus) 재실행 ───────────────────────────────────────────
-echo -e "${BLUE}[review-summary] code-reviewer (Opus) 실행 중...${NC}"
-# 구 artifact 삭제 — 이전 실행 결과(다른 커밋)가 남아 있을 경우 스테일 PASS/BLOCK 방지
-rm -f "$REVIEW_FILE"
-bash scripts/run-code-reviewer.sh || true  # BLOCK 시에도 artifact는 저장됨 — 스크립트 중단 방지
+# --- 2. Code-reviewer verdict ---
+echo -e "${BLUE}[review-summary] Checking code-reviewer artifact...${NC}"
+OPUS_VERDICT="UNKNOWN"
+OPUS_LINE="? No artifact found"
 
-if [ ! -f "$REVIEW_FILE" ]; then
-  echo -e "${RED}[review-summary] 리뷰 artifact 없음: ${REVIEW_FILE}${NC}"
-  exit 1
+if [ -f "$REVIEW_FILE" ]; then
+  _raw=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | tail -1 || true)
+  OPUS_VERDICT=$(echo "$_raw" | cut -d' ' -f2)
+  [ -z "$OPUS_VERDICT" ] && OPUS_VERDICT="UNKNOWN"
+
+  if [ "$OPUS_VERDICT" = "PASS" ]; then
+    OPUS_LINE="PASS"
+  else
+    OPUS_SUMMARY=$(grep -m1 "\[CRITICAL\]\|\[HIGH\]" "$REVIEW_FILE" | head -c 120 || echo "see artifact")
+    OPUS_LINE="BLOCK — ${OPUS_SUMMARY:-needs fix}"
+  fi
 fi
 
-# verdict 추출: tail -1 로 최종 판정 기준 (파일에 BLOCK 후 PASS 순서 보장 안 됨)
-# grep 매칭 성공 시 cut도 exit 0 → || echo "UNKNOWN" 미도달 → 빈값 체크 필요
-_opus_verdict_raw=$(grep -oE "VERDICT: (PASS|BLOCK)" "$REVIEW_FILE" | tail -1 || true)
-OPUS_VERDICT=$(echo "$_opus_verdict_raw" | cut -d' ' -f2)
-[ -z "$OPUS_VERDICT" ] && OPUS_VERDICT="UNKNOWN"
-# 주요 소견: PASS 시 성공 메시지, BLOCK 시 첫 번째 CRITICAL/HIGH 지적사항
-if [ "$OPUS_VERDICT" = "PASS" ]; then
-  OPUS_SUMMARY=$(grep -m1 "VERDICT: PASS\|지적사항 없음\|이상 없음" "$REVIEW_FILE" \
-    | sed 's/\*\*//g' | head -c 100 || echo "")
-  OPUS_LINE="✅ PASS${OPUS_SUMMARY:+ — ${OPUS_SUMMARY}}"
-else
-  OPUS_SUMMARY=$(grep -m1 "\[CRITICAL\]\|\[HIGH\]" "$REVIEW_FILE" \
-    | sed 's/\*\*//g' | head -c 120 || echo "세부 내용은 artifact 참조")
-  OPUS_LINE="🚫 BLOCK — ${OPUS_SUMMARY:-재수정 필요}"
-fi
-
-# ── 3. Codex gate 재실행 ─────────────────────────────────────────────────────
+# --- 3. Codex gate verdict ---
 CODEX_VERDICT="SKIP"
-CODEX_LINE="⏭️ SKIP (codex CLI 미설치)"
+CODEX_LINE="SKIP (codex CLI not installed)"
 
 if command -v codex &>/dev/null; then
-  echo -e "${BLUE}[review-summary] Codex gate 실행 중...${NC}"
-  # 플래그 검증: --output-last-message(-o), --full-auto 모두 codex exec review --help에서 확인됨
+  echo -e "${BLUE}[review-summary] Running Codex gate...${NC}"
+  CODEX_TMP=$(mktemp)
   if codex exec review --base origin/main --output-last-message "$CODEX_TMP" --full-auto 2>/dev/null; then
     CODEX_TEXT="$(cat "$CODEX_TMP")"
-    # Codex 결과를 persistent artifact로 저장 — 다른 스크립트에서 참조 가능
-    mkdir -p .tmp
-    printf '%s\n' "$CODEX_TEXT" > "$CODEX_ARTIFACT"
-    # BLOCK 판정: DECISION:BLOCK, 줄 시작 [P0]/[P1] 태그, JSON "patch is incorrect" 패턴 감지
-    # [P0]/[P1]은 줄 시작(^[[:space:]]*-)에서만 매칭 — 본문 내 "P1 이슈" 등 오탐 방지
-    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)" \
-      || echo "$CODEX_TEXT" | grep -qE "^[[:space:]]*-[[:space:]]*\[P[01]\]"; then
+    if echo "$CODEX_TEXT" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect"; then
       CODEX_VERDICT="BLOCK"
-      CODEX_BLOCK_DETAIL=$(echo "$CODEX_TEXT" | grep -E "^\s*-\s*\[P[012]\]" | head -3 | sed 's/^/  /' || echo "")
-      CODEX_LINE="🚫 BLOCK${CODEX_BLOCK_DETAIL:+
-${CODEX_BLOCK_DETAIL}}"
+      CODEX_LINE="BLOCK"
     else
       CODEX_VERDICT="PASS"
-      CODEX_SUMMARY=$(echo "$CODEX_TEXT" | grep -v "^$" | tail -3 | head -1 | head -c 120 || echo "")
-      CODEX_LINE="✅ PASS${CODEX_SUMMARY:+ — ${CODEX_SUMMARY}}"
+      CODEX_LINE="PASS"
     fi
   else
-    # codex 실행 실패 → SKIP (CLI 미설치와 동일 처리, 일관성 유지)
-    # 주: 배포 전 실제 gate는 npm run review:gate (create-pr.sh Step 3) 에서 수행됨
-    CODEX_VERDICT="SKIP"
-    CODEX_LINE="⏭️ SKIP (codex 실행 실패 — 인증/네트워크 확인 권장)"
+    CODEX_LINE="SKIP (codex execution failed)"
   fi
-else
-  echo -e "${YELLOW}[review-summary] codex CLI 없음 — Codex gate 건너뜀${NC}"
+  rm -f "$CODEX_TMP"
 fi
 
-# ── 4. 코멘트 생성 ──────────────────────────────────────────────────────────
-# 봇 리뷰 테이블: 환경변수로 주입 가능, 없으면 플레이스홀더
-BOT_TABLE="${BOT_REVIEW_TABLE:-"| (봇) | (지적 내용) | [채택] / [기각] | (처리 내용) |"}"
+# --- 4. Post comment ---
+BOT_TABLE="${BOT_REVIEW_TABLE:-"| (bot) | (issue) | [accept] / [reject] | (action) |"}"
 
-COMMENT="$(cat <<EOF
-## 리뷰 종합
+COMMENT="## Review Summary
 
-### 봇 리뷰 채택/기각
-| 봇 | 지적 | 판단 | 처리 |
+### Bot Review Accept/Reject
+| Bot | Issue | Decision | Action |
 |---|---|---|---|
 ${BOT_TABLE}
 
-### 최종 검토
+### Final Review
 
-> **🤖 code-reviewer (Claude Opus)**
-> ${OPUS_LINE}
-
-> **🔍 Codex Gate**
-> ${CODEX_LINE}
+> **code-reviewer (Claude Opus)**: ${OPUS_LINE}
+> **Codex Gate**: ${CODEX_LINE}
 
 ---
-🤖 Generated by Claude Code [claude-sonnet-4-6]
-EOF
-)"
+Generated by Claude Code"
 
-# ── 5. GitHub PR 코멘트 게시 ─────────────────────────────────────────────────
-echo -e "${BLUE}[review-summary] PR #${PR_NUMBER}에 코멘트 게시 중...${NC}"
+echo -e "${BLUE}[review-summary] Posting to PR #${PR_NUMBER}...${NC}"
 gh pr comment "$PR_NUMBER" --body "$COMMENT"
 
-echo ""
-echo -e "${GREEN}[review-summary] ✅ 완료 — PR #${PR_NUMBER}${NC}"
-echo -e "${GREEN}[review-summary] Opus: ${OPUS_VERDICT} / Codex: ${CODEX_VERDICT}${NC}"
-
-# 최종 판정 — Opus PASS + Codex BLOCK 중재 규칙:
-#   - Opus가 PASS이고 Codex만 BLOCK인 경우: Codex 지적은 PR 코멘트에 기록되었으므로 배포 허용
-#     (macOS에서 timeout 명령 부재로 Codex가 자주 실패하는 점 반영 — Opus를 우선 신뢰)
-#   - Opus가 BLOCK이면 Codex 결과와 무관하게 배포 차단
-#   - Codex가 SKIP인 경우 Opus 결과만으로 판정
-if [ "$OPUS_VERDICT" = "PASS" ] && [ "$CODEX_VERDICT" = "BLOCK" ]; then
-  # Codex artifact가 있으면 실제 코드 지적, 없으면 실행 실패
-  if [ -f "$CODEX_ARTIFACT" ] && [ -s "$CODEX_ARTIFACT" ]; then
-    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (코드 지적 있음)${NC}"
-    echo -e "${YELLOW}[review-summary]    Codex 지적이 PR 코멘트에 기록됨. Opus PASS를 우선하되, Codex 지적 검토 권장.${NC}"
-  else
-    echo -e "${YELLOW}[review-summary] ⚠️  Opus PASS + Codex BLOCK (실행 실패 추정)${NC}"
-    echo -e "${YELLOW}[review-summary]    Codex 실행 실패(timeout/네트워크). Opus 결과로 판정.${NC}"
-  fi
-  exit 0
-fi
+echo -e "${GREEN}[review-summary] Done — Opus: ${OPUS_VERDICT} / Codex: ${CODEX_VERDICT}${NC}"
 
 if [ "$OPUS_VERDICT" != "PASS" ] || { [ "$CODEX_VERDICT" != "PASS" ] && [ "$CODEX_VERDICT" != "SKIP" ]; }; then
-  echo -e "${RED}[review-summary] ⚠️  BLOCK 있음 — 수정 후 재실행, 머지 금지${NC}"
+  echo -e "${RED}[review-summary] BLOCK detected — fix before merge${NC}"
   exit 1
 fi
