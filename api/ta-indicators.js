@@ -169,9 +169,10 @@ const KR_SYMBOLS = { '005930': '삼성전자', '000660': 'SK하이닉스', '0053
 const US_SYMBOLS = ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'META', 'GOOGL', 'AMZN', 'AMD', 'COIN', 'MSTR'];
 
 async function fetchCandles(symbol, market) {
-  if (market === 'coin') return await fetchUpbitCandles(symbol) || await fetchBinanceCandles(symbol);
+  if (market === 'crypto') return await fetchUpbitCandles(symbol) || await fetchBinanceCandles(symbol);
   if (market === 'us') return await fetchYahooCandles(symbol);
-  if (market === 'kr') return await fetchYahooCandles(`${symbol}.KS`);
+  // 코스피 .KS 우선, 실패 시 코스닥 .KQ 폴백 (_ta-compute.js 와 동기화)
+  if (market === 'kr') return await fetchYahooCandles(`${symbol}.KS`) || await fetchYahooCandles(`${symbol}.KQ`);
   return null;
 }
 
@@ -186,11 +187,12 @@ export default async function handler(req) {
   let targets = [];
   if (symbolsParam) {
     const syms = symbolsParam.split(',').map(s => s.trim().toUpperCase());
-    const market = marketParam || 'coin';
+    // 하위 호환: 프론트가 'coin' 으로 보내도 Redis 키는 'crypto' 로 통일
+    const market = (marketParam === 'coin') ? 'crypto' : (marketParam || 'crypto');
     targets = syms.map(s => ({ symbol: s, market }));
   } else {
     targets = [
-      ...COIN_SYMBOLS.map(s => ({ symbol: s, market: 'coin' })),
+      ...COIN_SYMBOLS.map(s => ({ symbol: s, market: 'crypto' })),
       ...US_SYMBOLS.map(s => ({ symbol: s, market: 'us' })),
       ...Object.keys(KR_SYMBOLS).map(s => ({ symbol: s, market: 'kr' })),
     ];
