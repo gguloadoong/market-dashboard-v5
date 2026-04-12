@@ -2,17 +2,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "regions": ["icn1"],
-  "ignoreCommand": "exit 0",
-  "crons": [
-    { "path": "/api/cron/update-kr",    "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/update-us",    "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/update-coins", "schedule": "*/1 * * * *" },
-    { "path": "/api/morning-briefing",  "schedule": "50 23 * * *" },
-    { "path": "/api/cron/whale-telegram", "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/check-signal-accuracy", "schedule": "*/30 * * * *" }
-  ]
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" != \"production\" ]; then exit 0; fi; exit 1",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "feature/*": false,
+      "fix/*": false,
+      "chore/*": false
+    }
+  }
 }
