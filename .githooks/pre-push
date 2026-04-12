@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# .githooks/pre-push — code-review artifact 존재/최신성 경고
+# .githooks/pre-push — Code-review artifact freshness warning
+# Generalized from market-dashboard-v5
+#
+# Soft warning only (does not block push).
+# Activate: git config core.hooksPath .githooks
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-# main, refactor, docs, chore 브랜치는 스킵
+# Skip main and non-feature branches
 if [[ "$BRANCH" == "main" ]]; then
   exit 0
 fi
 
-REVIEW_FILE=".tmp/code-review-${BRANCH}.md"
+SAFE_BRANCH="${BRANCH//\//-}"
+REVIEW_FILE=".tmp/code-review-${SAFE_BRANCH}.md"
 
 if [ ! -f "$REVIEW_FILE" ]; then
   echo ""
-  echo "⚠️  [pre-push] code-review artifact 없음: ${REVIEW_FILE}"
-  echo "    npm run review:code 실행 권장 (PR 생성 시 필수)"
+  echo "[pre-push] WARNING: code-review artifact missing: ${REVIEW_FILE}"
+  echo "  Run code-reviewer before creating PR"
   echo ""
-  exit 0  # soft warning — 블로킹 안 함
+  exit 0
 fi
 
 REVIEW_COMMIT=$(grep -oE 'commit: [a-f0-9]+' "$REVIEW_FILE" | awk '{print $2}' || echo "")
@@ -23,10 +28,10 @@ HEAD_COMMIT=$(git rev-parse HEAD)
 
 if [ "$REVIEW_COMMIT" != "$HEAD_COMMIT" ]; then
   echo ""
-  echo "⚠️  [pre-push] code-review가 현재 HEAD와 불일치"
-  echo "    리뷰 기준: ${REVIEW_COMMIT:-없음}"
-  echo "    현재 HEAD: ${HEAD_COMMIT}"
-  echo "    npm run review:code 재실행 권장"
+  echo "[pre-push] WARNING: code-review is stale"
+  echo "  Review commit: ${REVIEW_COMMIT:-none}"
+  echo "  Current HEAD:  ${HEAD_COMMIT}"
+  echo "  Re-run code-reviewer before creating PR"
   echo ""
 fi
 
