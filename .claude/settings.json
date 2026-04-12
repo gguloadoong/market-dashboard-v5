@@ -2,29 +2,55 @@
   "permissions": {
     "defaultMode": "bypassPermissions",
     "deny": [
-      "Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(sudo *)",
-      "Read(.env*)", "Read(**/credentials*)", "Read(**/*secret*)"
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(sudo *)",
+      "Read(.env*)",
+      "Read(**/credentials*)",
+      "Read(**/*secret*)",
+      "Bash(vercel --prod*)",
+      "Bash(vercel deploy --prod*)"
     ]
   },
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-quality.sh",
+            "timeout": 30000
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/stop-cost-summary.sh",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/stop-learning-capture.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/check-audit.sh",
+            "command": "bash .claude/hooks/check-audit.sh",
             "timeout": 3000
           }
         ]
       },
       {
-        "matcher": "Agent",
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/check-gate-isolation.sh",
-            "timeout": 5000
+            "command": "bash .claude/hooks/check-decay-counter.sh",
+            "timeout": 3000
           }
         ]
       }
@@ -35,19 +61,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/check-claudemd-size.sh",
+            "command": "bash .claude/hooks/check-claudemd-size.sh",
             "timeout": 10000
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/stop-cost-summary.sh",
+            "command": "bash .claude/hooks/check-config-protection.sh",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-loop-breaker.sh",
+            "timeout": 3000
           }
         ]
       }
