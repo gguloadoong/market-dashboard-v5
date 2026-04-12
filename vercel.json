@@ -6,12 +6,5 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "regions": ["icn1"],
-  "ignoreCommand": "exit 0",
-  "crons": [
-    { "path": "/api/cron/update-kr",    "schedule": "*/5 0-11,23 * * 0-5" },
-    { "path": "/api/cron/update-us",    "schedule": "*/5 0-1,8-23 * * 1-6" },
-    { "path": "/api/cron/update-coins", "schedule": "*/5 * * * *" },
-    { "path": "/api/morning-briefing",  "schedule": "50 23 * * *" },
-    { "path": "/api/cron/check-signal-accuracy", "schedule": "*/30 * * * *" }
-  ]
+  "ignoreCommand": "exit 0"
 }

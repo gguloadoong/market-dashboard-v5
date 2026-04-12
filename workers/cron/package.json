@@ -1,0 +1,14 @@
+{
+  "name": "mdv5-cron",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.0"
+  }
+}
