@@ -116,7 +116,10 @@ export function getLogoUrls(item) {
     // 코인: 원본 이미지 → CoinPaprika → CoinCap → cryptocurrency-icons
     const urls = [];
     if (item.image) urls.push(item.image);
-    const paprikaId = item.id?.includes('-') ? item.id : COIN_PAPRIKA_IDS[sym.toUpperCase()];
+    const normalizedSymbol = sym.toLowerCase();
+    const paprikaId = item.id?.toLowerCase()?.startsWith(`${normalizedSymbol}-`)
+      ? item.id
+      : COIN_PAPRIKA_IDS[sym.toUpperCase()];
     if (paprikaId) urls.push(`https://static.coinpaprika.com/coin/${paprikaId}/logo.png`);
     urls.push(`https://assets.coincap.io/assets/icons/${sym.toLowerCase()}@2x.png`);
     urls.push(`https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/${sym.toLowerCase()}.png`);

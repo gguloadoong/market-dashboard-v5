@@ -120,11 +120,15 @@ export function calcFallbackTemperature(allItems) {
     recentDirectionalCount: marketScores.length * 2,
   });
 
-  return { score, label, avgPct, marketScores };
+  return { score, label, avgPct, marketScores, partial: marketScores.length < 2 };
 }
 
 export function mergeTemperature(signalTemp, fallbackTemp) {
   if (!fallbackTemp) return { ...signalTemp, source: 'signals' };
+  if (fallbackTemp.partial) {
+    if (!signalTemp?.count) return { score: 0, label: '중립', count: 0, source: 'pending' };
+    return { ...signalTemp, source: 'signals' };
+  }
   if (!signalTemp?.count) return { ...fallbackTemp, count: 0, source: 'fallback' };
 
   const directionalCount = signalTemp.directionalCount ?? 0;
