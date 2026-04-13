@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useSignals } from '../../../hooks/useSignals';
 import { useFearGreed, getFgColor } from '../../../hooks/useFearGreed';
 import { TYPE_META } from '../../../engine/signalTypes';
-import { calcTemperature, calcFallbackTemperature } from '../../../utils/temperature';
+import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../../utils/temperature';
 
 // ── 게이지 존 스타일 (5단계) ──
 const ZONE = {
@@ -75,9 +75,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
   const fallback = useMemo(() => calcFallbackTemperature(allItems), [allItems]);
   const { crypto, us, kr } = useFearGreed();
 
-  // 시그널 0건일 때 가격 기반 fallback 사용 여부
-  const isFallback = temp.count === 0;
-  const displayTemp = isFallback && fallback ? { ...temp, score: fallback.score, label: fallback.label } : temp;
+  const displayTemp = useMemo(() => mergeTemperature(temp, fallback), [temp, fallback]);
   const zone = ZONE[displayTemp.label] || ZONE['중립'];
   const message = MESSAGE_MAP[displayTemp.label] || MESSAGE_MAP['중립'];
   const gaugeWidth = Math.round(((displayTemp.score + 1) / 2) * 100);
@@ -96,7 +94,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
   }, [signals]);
 
   // 시그널 0건 + fallback도 없으면 스켈레톤
-  if (isFallback && !fallback) {
+  if (temp.count === 0 && !fallback) {
     return (
       <div
         data-testid="market-sentiment"
@@ -135,7 +133,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
 
       {/* 한 줄 해석 */}
       <p className="text-[13px] font-medium text-[#333D4B] mb-3">
-        "{isFallback ? '시그널 수집 중... 가격 기준 임시 온도에요' : message}"
+        "{displayTemp.source !== 'signals' ? '시그널과 가격 흐름을 함께 반영한 온도에요' : message}"
       </p>
 
       {/* 게이지 바 */}

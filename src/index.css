@@ -151,6 +151,9 @@
   .ticker-wrap { overflow: hidden; }
   .ticker-track {
     display: inline-flex;
+    width: max-content;
+    white-space: nowrap;
+    will-change: transform;
     animation: ticker var(--dur, 40s) linear infinite;
   }
   .ticker-track:hover { animation-play-state: paused; }

@@ -49,9 +49,17 @@ export default function SignalBoardWidget({ onItemClick }) {
   // 통합 리스트: 모든 시그널 (세력 포착 포함)
   const combinedList = useMemo(() => {
     const all = [...bullSignals, ...bearSignals, ...neutralSignals];
-    // 강도순 재정렬
-    all.sort((a, b) => (b.strength || 0) - (a.strength || 0));
-    return all;
+    all.sort((a, b) => (b.strength || 0) - (a.strength || 0) || (b.timestamp || 0) - (a.timestamp || 0));
+
+    const deduped = [];
+    const seen = new Set();
+    for (const signal of all) {
+      const dedupeKey = signal.symbol || `${signal.market || 'meta'}:${signal.type}:${signal.name || signal.label || ''}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      deduped.push(signal);
+    }
+    return deduped;
   }, [bullSignals, bearSignals, neutralSignals]);
 
   const displayList = expanded ? combinedList : combinedList.slice(0, 5);
