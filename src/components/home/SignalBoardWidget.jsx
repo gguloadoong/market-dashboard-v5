@@ -50,16 +50,7 @@ export default function SignalBoardWidget({ onItemClick }) {
   const combinedList = useMemo(() => {
     const all = [...bullSignals, ...bearSignals, ...neutralSignals];
     all.sort((a, b) => (b.strength || 0) - (a.strength || 0) || (b.timestamp || 0) - (a.timestamp || 0));
-
-    const deduped = [];
-    const seen = new Set();
-    for (const signal of all) {
-      const dedupeKey = signal.symbol || `${signal.market || 'meta'}:${signal.type}:${signal.name || signal.label || ''}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
-      deduped.push(signal);
-    }
-    return deduped;
+    return all;
   }, [bullSignals, bearSignals, neutralSignals]);
 
   const displayList = expanded ? combinedList : combinedList.slice(0, 5);
