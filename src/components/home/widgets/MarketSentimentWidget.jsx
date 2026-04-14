@@ -133,7 +133,9 @@ export default function MarketSentimentWidget({ allItems = [] }) {
 
       {/* 한 줄 해석 */}
       <p className="text-[13px] font-medium text-[#333D4B] mb-3">
-        "{displayTemp.source !== 'signals' ? '시그널과 가격 흐름을 함께 반영한 온도에요' : message}"
+        "{displayTemp.source === 'blended' || displayTemp.source === 'fallback'
+          ? '시그널과 가격 흐름을 함께 반영한 온도에요'
+          : message}"
       </p>
 
       {/* 게이지 바 */}

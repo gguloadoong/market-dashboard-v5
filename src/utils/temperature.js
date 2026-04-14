@@ -1,5 +1,4 @@
 // 시장 온도 계산 유틸리티 — MarketSentimentWidget에서 추출
-import { getPct } from '../components/home/utils';
 
 function labelFromScore(score, { directionalCount = 0, recentDirectionalCount = 0 } = {}) {
   const hasModerateCoverage = directionalCount >= 4;
@@ -95,7 +94,9 @@ export function calcFallbackTemperature(allItems) {
   const groups = { KR: [], US: [], COIN: [] };
 
   for (const item of allItems) {
-    const pct = getPct(item);
+    const isCoin = !!(item.id || item._market === 'COIN' || item.market === 'coin');
+    const rawPct = isCoin ? item.change24h : item.changePct;
+    const pct = Number.isFinite(rawPct) ? rawPct : NaN;
     if (!Number.isFinite(pct)) continue;
     const market = item._market || (item.id || item.market === 'coin' ? 'COIN' : item.market === 'kr' ? 'KR' : item.market === 'us' ? 'US' : null);
     if (market && groups[market]) groups[market].push(pct);

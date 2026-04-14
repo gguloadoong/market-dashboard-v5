@@ -148,7 +148,7 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
       </div>
 
       <div className="flex-1 min-w-0 overflow-hidden">
-        {/* ticker track */}
+        {/* 티커 이동 영역 */}
         <div className="ticker-track" style={{ '--dur': `${dur}s` }}>
           {items.map((item, i) => {
             // afterHours 표시: 정규장 외 시간에 시간외 데이터가 있을 때
