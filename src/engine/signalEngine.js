@@ -77,6 +77,7 @@ export function addSignal(signal) {
         priceKrw: signal.meta?.priceKrw ?? existing.meta?.priceKrw ?? null,
       };
       _recordForAccuracy(existing);
+      existing._accuracyRecorded = true;
       _notify();
       return existing;
     }
@@ -90,13 +91,23 @@ export function addSignal(signal) {
         priceKrw: existing.meta?.priceKrw ?? signal.meta?.priceKrw ?? null,
       };
     }
+    // 기존이 이미 accuracy에 기록됐다면 신규 기록을 스킵하여 이중 집계 방지 (#116)
+    if (existing._accuracyRecorded) signal._accuracyRecorded = true;
     _signals.splice(existIdx, 1);
   }
 
   _signals.push(signal);
 
   // 적중률 트래킹 — 비동기 fire-and-forget (실패해도 시그널 영향 없음)
-  _recordForAccuracy(signal);
+  // null 가격이면 _recordForAccuracy 내부에서 스킵되고 플래그도 세우지 않음 —
+  // 이후 가격 업그레이드 호출에서 최초 기록 가능.
+  if (!signal._accuracyRecorded) {
+    const priceAtFire = _resolvePrice(signal.meta);
+    if (priceAtFire != null) {
+      _recordForAccuracy(signal);
+      signal._accuracyRecorded = true;
+    }
+  }
 
   // 최대 개수 초과 시 오래된 것부터 제거
   if (_signals.length > MAX_SIGNALS) {
