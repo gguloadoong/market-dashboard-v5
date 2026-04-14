@@ -295,10 +295,15 @@ export default function App() {
       const krx = krxBySymbol.get(sym);
       const stat = staticBySymbol.get(sym);
       if (krx && stat) {
-          // stat(정적 메타)으로 베이스 — sector/category/name 보존
-          // krx(실시간)로 가격/AUM 덮어씀, stat의 sector/category/name은 krx 이후에도 유지
-          return { ...krx, sector: stat.sector, category: stat.category, name: stat.name };
-        }
+        // 가격/AUM 등 실시간 필드는 KRX 우선, sector/category/name은 정적 메타 우선
+        // stat 필드가 없을 경우 KRX 값 fallback (undefined 전파 방지)
+        return {
+          ...krx,
+          ...(stat.sector   && { sector: stat.sector }),
+          ...(stat.category && { category: stat.category }),
+          ...(stat.name     && { name: stat.name }),
+        };
+      }
       return krx || stat;
     });
   }, [etfs, krxEtfs]);
