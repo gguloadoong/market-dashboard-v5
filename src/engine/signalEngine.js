@@ -53,13 +53,19 @@ export function addSignal(signal) {
     const existing = _signals[existIdx];
     const existingPrice = existing.meta?.currentPrice ?? existing.meta?.priceKrw ?? null;
     const newPrice = signal.meta?.currentPrice ?? signal.meta?.priceKrw ?? null;
+    // 가격 0은 데이터 오류 — 유효 가격으로 인정하지 않음 (BLOCK-2)
     const isPriceUpgradeOnly = existing.strength >= signal.strength
-      && existingPrice == null && newPrice != null;
+      && existingPrice == null && newPrice != null && newPrice > 0;
 
-    // 가격 업그레이드 케이스 (#116): 기존 meta만 갱신하고 timestamp/expiresAt은 보존.
-    // 적중률 DB에는 재기록하여 이번에 확보한 price_at_fire가 평가 가능하도록 한다.
+    // 가격 업그레이드 케이스 (#116): 가격 필드만 선택적으로 갱신하고
+    // 기존 비즈니스 메타(consecutiveDays, amount 등)는 보존 (BLOCK-1).
+    // timestamp/expiresAt도 보존하여 UI 튐 방지.
     if (isPriceUpgradeOnly) {
-      existing.meta = { ...existing.meta, ...signal.meta };
+      existing.meta = {
+        ...existing.meta,
+        currentPrice: signal.meta?.currentPrice ?? existing.meta?.currentPrice ?? null,
+        priceKrw: signal.meta?.priceKrw ?? existing.meta?.priceKrw ?? null,
+      };
       _recordForAccuracy(existing);
       _notify();
       return existing;
