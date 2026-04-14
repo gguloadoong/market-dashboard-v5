@@ -410,16 +410,19 @@ function scanVolumeAnomalies(allItems) {
       if (vol <= 0) continue;
       if (vol >= threshold) {
         const pct = clampPct(item.changePct ?? item.change24h ?? 0);
-        const curPrice = item.price ?? item.priceKrw ?? item.priceUsd ?? item.close ?? item.currentPrice ?? null;
-        createVolumeSignal(
-          item.symbol,
-          item.name ?? item.symbol,
-          market.toLowerCase(),
-          vol,
-          threshold,
-          pct,
-          curPrice,
-        );
+        const curPrice = getPriceFromItems(item.symbol, [item]);
+        // 가격 미확보 시 발화 보류 — priceAtFire 영구 누락 방지 (#116)
+        if (curPrice != null) {
+          createVolumeSignal(
+            item.symbol,
+            item.name ?? item.symbol,
+            market.toLowerCase(),
+            vol,
+            threshold,
+            pct,
+            curPrice,
+          );
+        }
       }
 
       // 거래량-가격 괴리 — 거래량 폭발인데 가격 정체 (accumulation), 또는 큰 가격 변동인데 거래량 부족 (weak_move)
