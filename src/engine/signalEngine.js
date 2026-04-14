@@ -44,6 +44,15 @@ export function createSignal({ type, symbol, name, market, direction, strength, 
  * 시그널 추가 — 중복 제거 (같은 type+symbol은 strength 높은 것만 유지)
  * 저장소 최대 100개, 초과 시 오래된 것부터 제거
  */
+// 유효 가격 해석 — 0은 데이터 오류로 간주하고 건너뜀 (#116)
+function _resolvePrice(meta) {
+  const a = meta?.currentPrice;
+  if (a != null && a > 0) return a;
+  const b = meta?.priceKrw;
+  if (b != null && b > 0) return b;
+  return null;
+}
+
 export function addSignal(signal) {
   // 중복 제거: 같은 type+symbol 조합
   const existIdx = _signals.findIndex(
@@ -51,15 +60,16 @@ export function addSignal(signal) {
   );
   if (existIdx !== -1) {
     const existing = _signals[existIdx];
-    const existingPrice = existing.meta?.currentPrice ?? existing.meta?.priceKrw ?? null;
-    const newPrice = signal.meta?.currentPrice ?? signal.meta?.priceKrw ?? null;
-    // 가격 0은 데이터 오류 — 유효 가격으로 인정하지 않음 (BLOCK-2)
+    const existingPrice = _resolvePrice(existing.meta);
+    const newPrice = _resolvePrice(signal.meta);
     const isPriceUpgradeOnly = existing.strength >= signal.strength
-      && existingPrice == null && newPrice != null && newPrice > 0;
+      && existingPrice == null && newPrice != null;
 
     // 가격 업그레이드 케이스 (#116): 가격 필드만 선택적으로 갱신하고
-    // 기존 비즈니스 메타(consecutiveDays, amount 등)는 보존 (BLOCK-1).
+    // 기존 비즈니스 메타(consecutiveDays, amount 등)는 보존.
     // timestamp/expiresAt도 보존하여 UI 튐 방지.
+    // 최초 발화 시 null 가격은 _recordForAccuracy에서 차단되므로, 이번 업그레이드 호출이
+    // 해당 시그널의 첫 적중률 기록이 된다 (이중 집계 없음).
     if (isPriceUpgradeOnly) {
       existing.meta = {
         ...existing.meta,
@@ -143,6 +153,10 @@ function _recordForAccuracy(signal) {
   // symbol 없는 시그널은 적중률 추적 의미 없음 (NEUTRAL도 추적 — stealth activity 등)
   if (!signal.symbol) return;
 
+  // priceAtFire 없으면 기록 보류 — 가격 업그레이드 시 다시 호출돼 최초 기록 생성 (#116)
+  const priceAtFire = _resolvePrice(signal.meta);
+  if (priceAtFire == null) return;
+
   _accuracyBuffer.push({
     type: signal.type,
     symbol: signal.symbol,
@@ -150,7 +164,7 @@ function _recordForAccuracy(signal) {
     direction: signal.direction,
     strength: signal.strength || 1,
     title: signal.title || '',
-    priceAtFire: signal.meta?.currentPrice || signal.meta?.priceKrw || null,
+    priceAtFire,
     meta: { compositeScore: signal.meta?.compositeScore, rsi: signal.meta?.rsi },
   });
 

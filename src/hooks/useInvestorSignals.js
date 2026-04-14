@@ -37,15 +37,19 @@ const KR_TOP_SYMBOLS = [
 ];
 
 // 현재가 조회 헬퍼 — symbol 매칭 후 가격 필드 우선순위대로 반환
-// 시그널 적중률 추적을 위한 priceAtFire 전달용
+// 시그널 적중률 추적용 priceAtFire 전달 — 0은 데이터 오류로 간주하고 건너뜀 (#116)
 function getPriceFromItems(symbol, items) {
   if (!symbol || !items?.length) return null;
   const up = String(symbol).toUpperCase();
-  const item = items.find(i => i.symbol === symbol
-    || i.id === symbol
-    || String(i.symbol || '').toUpperCase() === up);
+  const item = items.find(i =>
+    String(i.symbol || '').toUpperCase() === up || i.id === symbol,
+  );
   if (!item) return null;
-  return item.price ?? item.priceKrw ?? item.priceUsd ?? item.close ?? item.currentPrice ?? null;
+  const candidates = [item.price, item.priceKrw, item.priceUsd, item.close, item.currentPrice];
+  for (const v of candidates) {
+    if (v != null && v > 0) return v;
+  }
+  return null;
 }
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5분
