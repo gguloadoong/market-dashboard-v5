@@ -36,6 +36,15 @@ export default function HomeDashboard({
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
   const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
 
+  // 레버리지·인버스·미분류 ETF 제외 — 시그널 엔진 오발화 방지
+  // _isEtf 플래그는 krItems/usItems spread 시 항상 true로 세팅됨 (보장)
+  // KRX 동적 ETF는 category:'ETF'로 오므로 허용 목록이 아닌 차단 목록 방식 사용
+  // 차단: 레버리지, 인버스, 'ETF'(KRX 미분류). 허용: 코인ETF(IBIT 크로스마켓 페어 등)
+  const stockItems = useMemo(
+    () => allItems.filter(i => !i._isEtf || (i.category !== '레버리지' && i.category !== '인버스' && i.category !== 'ETF')),
+    [allItems],
+  );
+
   // 7일 이내 뉴스
   const recentNews = useMemo(() => {
     if (!allNews.length) return [];
@@ -76,18 +85,18 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
-  // 투자자 시그널 스캔 (5분 간격 폴링)
-  useInvestorSignals(allItems);
+  // 투자자 시그널 스캔 (5분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
+  useInvestorSignals(stockItems);
 
   // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
 
-  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지)
-  useNewsSignals(allNews, allItems);
+  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — 레버리지/인버스 ETF 제외
+  useNewsSignals(allNews, stockItems);
 
-  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수)
-  useCompositeSignals(allItems);
+  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수) — 레버리지/인버스 ETF 제외
+  useCompositeSignals(stockItems);
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 

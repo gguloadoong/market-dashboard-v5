@@ -285,12 +285,35 @@ export default function App() {
     history.back();
   }, []);
 
-  // KRX ETF 병합 — snapshot ETF + KRX 신규 ETF (중복 symbol 제거)
+  // KRX ETF 병합 — KRX 실제 데이터 우선, 정적 메타는 sector/category 보강용
   const mergedEtfs = useMemo(() => {
     if (!krxEtfs.length) return etfs;
-    const existingSymbols = new Set(etfs.map(e => e.symbol));
-    const newEtfs = krxEtfs.filter(e => !existingSymbols.has(e.symbol));
-    return [...etfs, ...newEtfs];
+    const krxBySymbol = new Map(krxEtfs.map(e => [e.symbol, e]));
+    const staticBySymbol = new Map(etfs.map(e => [e.symbol, e]));
+    const allSymbols = new Set([...etfs.map(e => e.symbol), ...krxEtfs.map(e => e.symbol)]);
+    return Array.from(allSymbols).map(sym => {
+      const krx = krxBySymbol.get(sym);
+      const stat = staticBySymbol.get(sym);
+      if (krx && stat) {
+        // KRX: aum/nav 등 KRX 전용 필드 보강
+        // stat(60초 폴링): price/change/changePct/sparkline 실시간 가격 우선 유지
+        // sector/category/name은 stat(정적 메타) 우선
+        return {
+          ...krx,
+          ...(stat.sector   && { sector: stat.sector }),
+          ...(stat.category && { category: stat.category }),
+          ...(stat.name     && { name: stat.name }),
+          // stat(60초 폴링) 실시간 필드 우선 — price > 0이면 폴링 수신 완료로 판단
+          // volume도 stat 우선 (KRX는 전일 데이터, stat은 60초 폴링)
+          ...(stat.price > 0 && {
+            price: stat.price, change: stat.change, changePct: stat.changePct,
+            ...(stat.volume  > 0 && { volume: stat.volume }),
+          }),
+          ...(stat.sparkline?.length && { sparkline: stat.sparkline }),
+        };
+      }
+      return krx || stat;
+    });
   }, [etfs, krxEtfs]);
 
   // 탭별 데이터
