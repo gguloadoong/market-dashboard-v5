@@ -304,9 +304,8 @@ export default function App() {
           ...(stat.category && { category: stat.category }),
           ...(stat.name     && { name: stat.name }),
           // price > 0일 때만 stat 우선 — ETF_LIST 초기값(0)은 미수신이므로 KRX 값 사용
-          ...(stat.price    > 0 && { price: stat.price }),
-          ...(stat.change   !== 0 && stat.price > 0 && { change: stat.change }),
-          ...(stat.changePct !== 0 && stat.price > 0 && { changePct: stat.changePct }),
+          // change/changePct는 flat-day(0)도 유효값이므로 price > 0 조건만 체크
+          ...(stat.price > 0 && { price: stat.price, change: stat.change, changePct: stat.changePct }),
           ...(stat.sparkline?.length && { sparkline: stat.sparkline }),
         };
       }
