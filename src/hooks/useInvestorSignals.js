@@ -213,8 +213,12 @@ async function scanInvestorTrends(allItems = []) {
       const data = result?.data;
       if (!Array.isArray(data) || data.length === 0) return;
 
-      // 적중률 추적용 현재가 (없으면 null)
+      // 적중률 추적용 현재가 — 없으면 시그널 발화 보류 (#116)
+      // addSignal은 type+symbol 중복 제거 시 기존(null) 시그널을 유지하므로,
+      // 가격 없는 상태로 먼저 발화되면 이후 가격이 들어와도 priceAtFire가 갱신되지 않아
+      // 적중률 추적에서 영구 제외된다. 다음 폴링(5분) 또는 재시도(4초)에서 가격 확보 후 재스캔.
       const currentPrice = getPriceFromItems(symbol, allItems);
+      if (currentPrice == null) return;
 
       // 외국인
       const foreign = calcConsecutive(data, 'foreign');
