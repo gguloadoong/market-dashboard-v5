@@ -84,17 +84,17 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
-  // 투자자 시그널 스캔 (5분 간격 폴링) — ETF 제외 순수 종목만 전달
+  // 투자자 시그널 스캔 (5분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
   useInvestorSignals(stockItems);
 
   // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
 
-  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — ETF 제외 순수 종목만 전달
+  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — 레버리지/인버스 ETF 제외
   useNewsSignals(allNews, stockItems);
 
-  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수) — ETF 제외 순수 종목만 전달
+  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수) — 레버리지/인버스 ETF 제외
   useCompositeSignals(stockItems);
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
