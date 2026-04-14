@@ -36,6 +36,9 @@ export default function HomeDashboard({
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
   const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
 
+  // ETF 제외한 순수 종목 목록 — 시그널 엔진 입력용 (레버리지/인버스 ETF 오발화 방지)
+  const stockItems = useMemo(() => allItems.filter(i => !i._isEtf), [allItems]);
+
   // 7일 이내 뉴스
   const recentNews = useMemo(() => {
     if (!allNews.length) return [];
@@ -76,18 +79,18 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
-  // 투자자 시그널 스캔 (5분 간격 폴링)
-  useInvestorSignals(allItems);
+  // 투자자 시그널 스캔 (5분 간격 폴링) — ETF 제외 순수 종목만 전달
+  useInvestorSignals(stockItems);
 
   // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
   useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
 
-  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지)
-  useNewsSignals(allNews, allItems);
+  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — ETF 제외 순수 종목만 전달
+  useNewsSignals(allNews, stockItems);
 
-  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수)
-  useCompositeSignals(allItems);
+  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수) — ETF 제외 순수 종목만 전달
+  useCompositeSignals(stockItems);
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 

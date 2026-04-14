@@ -285,12 +285,18 @@ export default function App() {
     history.back();
   }, []);
 
-  // KRX ETF 병합 — snapshot ETF + KRX 신규 ETF (중복 symbol 제거)
+  // KRX ETF 병합 — KRX 실제 데이터 우선, 정적 메타는 sector/category 보강용
   const mergedEtfs = useMemo(() => {
     if (!krxEtfs.length) return etfs;
-    const existingSymbols = new Set(etfs.map(e => e.symbol));
-    const newEtfs = krxEtfs.filter(e => !existingSymbols.has(e.symbol));
-    return [...etfs, ...newEtfs];
+    const krxBySymbol = new Map(krxEtfs.map(e => [e.symbol, e]));
+    const staticBySymbol = new Map(etfs.map(e => [e.symbol, e]));
+    const allSymbols = new Set([...etfs.map(e => e.symbol), ...krxEtfs.map(e => e.symbol)]);
+    return Array.from(allSymbols).map(sym => {
+      const krx = krxBySymbol.get(sym);
+      const stat = staticBySymbol.get(sym);
+      if (krx && stat) return { ...stat, ...krx }; // KRX가 정적 메타 덮어씀
+      return krx || stat;
+    });
   }, [etfs, krxEtfs]);
 
   // 탭별 데이터

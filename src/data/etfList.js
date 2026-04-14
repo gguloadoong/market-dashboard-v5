@@ -5,7 +5,6 @@ export const ETF_LIST = [
   { symbol:'148020', name:'KOSEF 국고채10년',        market:'kr', sector:'채권',    category:'채권' },
   { symbol:'411060', name:'ACE 미국나스닥100',       market:'kr', sector:'해외주식', category:'해외' },
   { symbol:'379800', name:'KODEX 미국S&P500',        market:'kr', sector:'해외주식', category:'해외' },
-  { symbol:'373220', name:'KODEX 2차전지산업',        market:'kr', sector:'배터리',  category:'섹터' },
   { symbol:'091230', name:'TIGER 반도체',             market:'kr', sector:'반도체',  category:'섹터' },
   { symbol:'122630', name:'KODEX 레버리지',           market:'kr', sector:'레버리지', category:'레버리지' },
   { symbol:'SPY',   name:'SPDR S&P 500',             market:'us', sector:'Index',   category:'지수' },
