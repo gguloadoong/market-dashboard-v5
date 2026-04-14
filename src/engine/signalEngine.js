@@ -81,6 +81,15 @@ export function addSignal(signal) {
       return existing;
     }
     if (existing.strength >= signal.strength) return existing;
+    // 더 강한 시그널로 교체 시, 신규가 가격을 못 얻었다면 기존 가격을 승계 (#116)
+    // — null-price guard가 accuracy 기록을 스킵하는 문제 방지.
+    if (newPrice == null && existingPrice != null) {
+      signal.meta = {
+        ...signal.meta,
+        currentPrice: existing.meta?.currentPrice ?? signal.meta?.currentPrice ?? null,
+        priceKrw: existing.meta?.priceKrw ?? signal.meta?.priceKrw ?? null,
+      };
+    }
     _signals.splice(existIdx, 1);
   }
 
