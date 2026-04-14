@@ -147,78 +147,80 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
         </span>
       </div>
 
-      {/* ticker track */}
-      <div className="ticker-track" style={{ '--dur': `${dur}s` }}>
-        {items.map((item, i) => {
-          // afterHours 표시: 정규장 외 시간에 시간외 데이터가 있을 때
-          const showAfterHours = item.afterHoursPrice != null && item.afterHoursPct != null;
-          const displayPct     = showAfterHours ? item.afterHoursPct : item.pct;
-          const isUp           = displayPct > 0;
-          const isDown         = displayPct < 0;
+      <div className="flex-1 min-w-0 overflow-hidden">
+        {/* 티커 이동 영역 */}
+        <div className="ticker-track" style={{ '--dur': `${dur}s` }}>
+          {items.map((item, i) => {
+            // afterHours 표시: 정규장 외 시간에 시간외 데이터가 있을 때
+            const showAfterHours = item.afterHoursPrice != null && item.afterHoursPct != null;
+            const displayPct     = showAfterHours ? item.afterHoursPct : item.pct;
+            const isUp           = displayPct > 0;
+            const isDown         = displayPct < 0;
 
-          return (
-            <button
-              key={`${i}-${item.symbol}`}
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 h-full cursor-pointer transition-opacity hover:opacity-70 focus:outline-none bg-transparent border-0"
-              onClick={() => item._raw && onClick?.(item._raw)}
-            >
-              {/* 시장 컬러 도트 */}
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: MARKET_DOT[item.market] ?? C.dotIdleSolid }}
-              />
-
-              {/* 종목명 (국내는 이름, 해외/코인은 심볼) */}
-              <span
-                className="text-[11px] font-bold tracking-tight"
-                style={{ color: C.symbolText }}
+            return (
+              <button
+                key={`${i}-${item.symbol}`}
+                type="button"
+                className="inline-flex items-center gap-1.5 px-3 h-full cursor-pointer transition-opacity hover:opacity-70 focus:outline-none bg-transparent border-0 whitespace-nowrap"
+                onClick={() => item._raw && onClick?.(item._raw)}
               >
-                {item.market === 'kr' ? (item.name || item.symbol) : item.symbol}
-              </span>
-
-              {/* 지수 모드: 지수 값 */}
-              {item._value > 0 && (
+                {/* 시장 컬러 도트 */}
                 <span
-                  className="text-[11px] font-mono tabular-nums"
-                  style={{ color: C.valueText }}
-                >
-                  {item._value >= 1000
-                    ? item._value.toLocaleString('ko-KR', { maximumFractionDigits: 0 })
-                    : item._value.toFixed(2)}
-                </span>
-              )}
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ background: MARKET_DOT[item.market] ?? C.dotIdleSolid }}
+                />
 
-              {/* 시간외 배지 */}
-              {showAfterHours && (
+                {/* 종목명 (국내는 이름, 해외/코인은 심볼) */}
                 <span
-                  className="text-[9px] font-semibold px-1 rounded"
-                  style={{
-                    background: C.afterHoursBg,
-                    color: C.afterHoursText,
-                    letterSpacing: '0.04em',
-                  }}
+                  className="text-[11px] font-bold tracking-tight"
+                  style={{ color: C.symbolText }}
                 >
-                  시간외
+                  {item.market === 'kr' ? (item.name || item.symbol) : item.symbol}
                 </span>
-              )}
 
-              {/* 등락률 */}
-              <span
-                className="text-[11px] font-semibold tabular-nums font-mono"
-                style={{ color: isUp ? C.pctUp : isDown ? C.pctDown : C.pctFlat }}
-              >
-                {isUp ? '+' : ''}{displayPct.toFixed(2)}%
-              </span>
+                {/* 지수 모드: 지수 값 */}
+                {item._value > 0 && (
+                  <span
+                    className="text-[11px] font-mono tabular-nums"
+                    style={{ color: C.valueText }}
+                  >
+                    {item._value >= 1000
+                      ? item._value.toLocaleString('ko-KR', { maximumFractionDigits: 0 })
+                      : item._value.toFixed(2)}
+                  </span>
+                )}
 
-              {/* 구분선 */}
-              <span
-                className="w-px h-3 flex-shrink-0 ml-1"
-                style={{ background: C.separator }}
-              />
-            </button>
-          );
-        })}
+                {/* 시간외 배지 */}
+                {showAfterHours && (
+                  <span
+                    className="text-[9px] font-semibold px-1 rounded"
+                    style={{
+                      background: C.afterHoursBg,
+                      color: C.afterHoursText,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    시간외
+                  </span>
+                )}
+
+                {/* 등락률 */}
+                <span
+                  className="text-[11px] font-semibold tabular-nums font-mono"
+                  style={{ color: isUp ? C.pctUp : isDown ? C.pctDown : C.pctFlat }}
+                >
+                  {isUp ? '+' : ''}{displayPct.toFixed(2)}%
+                </span>
+
+                {/* 구분선 */}
+                <span
+                  className="w-px h-3 flex-shrink-0 ml-1"
+                  style={{ background: C.separator }}
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

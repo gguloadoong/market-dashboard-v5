@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
 import { useFearGreed } from '../../hooks/useFearGreed';
-import { calcTemperature, calcFallbackTemperature } from '../../utils/temperature';
+import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { TYPE_META } from '../../engine/signalTypes';
 import MarketIndexSection from './MarketIndexSection';
@@ -28,8 +28,7 @@ function TemperatureBar({ indices, krwRate, allItems }) {
   const fallback = useMemo(() => calcFallbackTemperature(allItems), [allItems]);
   const { crypto, us, kr } = useFearGreed();
 
-  const isFallback = temp.count === 0;
-  const displayTemp = isFallback && fallback ? { ...temp, score: fallback.score, label: fallback.label } : temp;
+  const displayTemp = useMemo(() => mergeTemperature(temp, fallback), [temp, fallback]);
   const zone = ZONE[displayTemp.label] || ZONE['중립'];
   const gaugeWidth = Math.round(((displayTemp.score + 1) / 2) * 100);
 
@@ -50,6 +49,11 @@ function TemperatureBar({ indices, krwRate, allItems }) {
         <span className="text-[13px] font-bold flex-shrink-0" style={{ color: zone.text }}>
           {displayTemp.label} {gaugeWidth}%
         </span>
+        {displayTemp.source === 'blended' && (
+          <span className="text-[11px] font-medium flex-shrink-0 text-[#8B95A1]">
+            실시간 보정
+          </span>
+        )}
         {fgScore != null && (
           <span className="text-[12px] font-semibold flex-shrink-0 px-2.5 py-0.5 rounded-xl" style={{ background: 'rgba(255,149,0,0.06)', color: '#FF9500' }}>
             탐욕 {fgScore}
@@ -266,7 +270,8 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-[#F2F3F5] cursor-pointer hover:bg-[#F2F4F6] transition-colors"
                   onClick={() => onItemClick?.(item)}
                 >
-                  <span className="text-[11px] font-semibold text-[#191F28] whitespace-nowrap">{item.name?.slice(0, 6)}</span>
+                  <TickerLogo item={item} size={18} />
+                  <span className="text-[11px] font-semibold text-[#191F28] whitespace-nowrap max-w-[96px] truncate">{item.name || item.symbol}</span>
                   <span className="text-[10px] font-bold tabular-nums font-mono whitespace-nowrap" style={{ color }}>
                     {isUp ? '+' : ''}{(Number.isFinite(pct) ? pct : 0).toFixed(1)}%
                   </span>

@@ -83,6 +83,29 @@ export function getAvatarBg(symbol) {
   return PALETTE[Math.abs((symbol || '').split('').reduce((h, c) => c.charCodeAt(0) + ((h << 5) - h), 0)) % PALETTE.length] || '#8B95A1';
 }
 
+const COIN_PAPRIKA_IDS = {
+  BTC: 'btc-bitcoin',
+  ETH: 'eth-ethereum',
+  XRP: 'xrp-xrp',
+  SOL: 'sol-solana',
+  DOGE: 'doge-dogecoin',
+  ADA: 'ada-cardano',
+  BNB: 'bnb-binance-coin',
+  AVAX: 'avax-avalanche',
+  DOT: 'dot-polkadot',
+  LINK: 'link-chainlink',
+  TON: 'ton-toncoin',
+  TRX: 'trx-tron',
+  BCH: 'bch-bitcoin-cash',
+  LTC: 'ltc-litecoin',
+  SHIB: 'shib-shiba-inu',
+  UNI: 'uni-uniswap',
+  ATOM: 'atom-cosmos',
+  ETC: 'etc-ethereum-classic',
+  XLM: 'xlm-stellar',
+  HBAR: 'hbar-hedera-hashgraph',
+};
+
 // ─── 종목/코인 로고 URL fallback 체인 ─────────────────────────
 // 반환: [url1, url2, ...] — 순서대로 시도, 모두 실패 시 이니셜 아바타
 export function getLogoUrls(item) {
@@ -90,10 +113,16 @@ export function getLogoUrls(item) {
   const market = item._market || (item.market === 'coin' ? 'COIN' : item.market === 'kr' ? 'KR' : item.market === 'us' ? 'US' : '');
 
   if (market === 'COIN' || item.id) {
-    // 코인: CoinGecko → CoinCap → cryptocurrency-icons
+    // 코인: 원본 이미지 → CoinPaprika → CoinCap → cryptocurrency-icons
     const urls = [];
     if (item.image) urls.push(item.image);
+    const normalizedSymbol = sym.toLowerCase();
+    const paprikaId = item.id?.toLowerCase()?.startsWith(`${normalizedSymbol}-`)
+      ? item.id
+      : COIN_PAPRIKA_IDS[sym.toUpperCase()];
+    if (paprikaId) urls.push(`https://static.coinpaprika.com/coin/${paprikaId}/logo.png`);
     urls.push(`https://assets.coincap.io/assets/icons/${sym.toLowerCase()}@2x.png`);
+    urls.push(`https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/${sym.toLowerCase()}.png`);
     urls.push(`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/${sym.toLowerCase()}.png`);
     return urls;
   }

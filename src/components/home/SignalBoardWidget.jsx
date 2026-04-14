@@ -49,8 +49,7 @@ export default function SignalBoardWidget({ onItemClick }) {
   // 통합 리스트: 모든 시그널 (세력 포착 포함)
   const combinedList = useMemo(() => {
     const all = [...bullSignals, ...bearSignals, ...neutralSignals];
-    // 강도순 재정렬
-    all.sort((a, b) => (b.strength || 0) - (a.strength || 0));
+    all.sort((a, b) => (b.strength || 0) - (a.strength || 0) || (b.timestamp || 0) - (a.timestamp || 0));
     return all;
   }, [bullSignals, bearSignals, neutralSignals]);
 
