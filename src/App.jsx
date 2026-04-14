@@ -303,10 +303,11 @@ export default function App() {
           ...(stat.sector   && { sector: stat.sector }),
           ...(stat.category && { category: stat.category }),
           ...(stat.name     && { name: stat.name }),
-          ...(stat.price    != null && { price: stat.price }),
-          ...(stat.change   != null && { change: stat.change }),
-          ...(stat.changePct != null && { changePct: stat.changePct }),
-          ...(stat.sparkline && { sparkline: stat.sparkline }),
+          // price > 0일 때만 stat 우선 — ETF_LIST 초기값(0)은 미수신이므로 KRX 값 사용
+          ...(stat.price    > 0 && { price: stat.price }),
+          ...(stat.change   !== 0 && stat.price > 0 && { change: stat.change }),
+          ...(stat.changePct !== 0 && stat.price > 0 && { changePct: stat.changePct }),
+          ...(stat.sparkline?.length && { sparkline: stat.sparkline }),
         };
       }
       return krx || stat;
