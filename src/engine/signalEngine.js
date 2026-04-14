@@ -44,20 +44,70 @@ export function createSignal({ type, symbol, name, market, direction, strength, 
  * 시그널 추가 — 중복 제거 (같은 type+symbol은 strength 높은 것만 유지)
  * 저장소 최대 100개, 초과 시 오래된 것부터 제거
  */
+// 유효 가격 해석 — 0은 데이터 오류로 간주하고 건너뜀 (#116)
+function _resolvePrice(meta) {
+  const a = meta?.currentPrice;
+  if (a != null && a > 0) return a;
+  const b = meta?.priceKrw;
+  if (b != null && b > 0) return b;
+  return null;
+}
+
 export function addSignal(signal) {
   // 중복 제거: 같은 type+symbol 조합
   const existIdx = _signals.findIndex(
     s => s.type === signal.type && s.symbol === signal.symbol,
   );
   if (existIdx !== -1) {
-    if (_signals[existIdx].strength >= signal.strength) return _signals[existIdx];
+    const existing = _signals[existIdx];
+    const existingPrice = _resolvePrice(existing.meta);
+    const newPrice = _resolvePrice(signal.meta);
+    const isPriceUpgradeOnly = existing.strength >= signal.strength
+      && existingPrice == null && newPrice != null;
+
+    // 가격 업그레이드 케이스 (#116): 가격 필드만 선택적으로 갱신하고
+    // 기존 비즈니스 메타(consecutiveDays, amount 등)는 보존.
+    // timestamp/expiresAt도 보존하여 UI 튐 방지.
+    // 최초 발화 시 null 가격은 _recordForAccuracy에서 차단되므로, 이번 업그레이드 호출이
+    // 해당 시그널의 첫 적중률 기록이 된다 (이중 집계 없음).
+    if (isPriceUpgradeOnly) {
+      existing.meta = {
+        ...existing.meta,
+        currentPrice: signal.meta?.currentPrice ?? existing.meta?.currentPrice ?? null,
+        priceKrw: signal.meta?.priceKrw ?? existing.meta?.priceKrw ?? null,
+      };
+      _recordForAccuracy(existing);
+      existing._accuracyRecorded = true;
+      _notify();
+      return existing;
+    }
+    if (existing.strength >= signal.strength) return existing;
+    // 더 강한 시그널로 교체 시, 신규가 가격을 못 얻었다면 기존 가격을 승계 (#116)
+    // — null-price guard가 accuracy 기록을 스킵하는 문제 방지.
+    if (newPrice == null && existingPrice != null) {
+      signal.meta = {
+        ...signal.meta,
+        currentPrice: existing.meta?.currentPrice ?? signal.meta?.currentPrice ?? null,
+        priceKrw: existing.meta?.priceKrw ?? signal.meta?.priceKrw ?? null,
+      };
+    }
+    // 기존이 이미 accuracy에 기록됐다면 신규 기록을 스킵하여 이중 집계 방지 (#116)
+    if (existing._accuracyRecorded) signal._accuracyRecorded = true;
     _signals.splice(existIdx, 1);
   }
 
   _signals.push(signal);
 
   // 적중률 트래킹 — 비동기 fire-and-forget (실패해도 시그널 영향 없음)
-  _recordForAccuracy(signal);
+  // null 가격이면 _recordForAccuracy 내부에서 스킵되고 플래그도 세우지 않음 —
+  // 이후 가격 업그레이드 호출에서 최초 기록 가능.
+  if (!signal._accuracyRecorded) {
+    const priceAtFire = _resolvePrice(signal.meta);
+    if (priceAtFire != null) {
+      _recordForAccuracy(signal);
+      signal._accuracyRecorded = true;
+    }
+  }
 
   // 최대 개수 초과 시 오래된 것부터 제거
   if (_signals.length > MAX_SIGNALS) {
@@ -123,6 +173,10 @@ function _recordForAccuracy(signal) {
   // symbol 없는 시그널은 적중률 추적 의미 없음 (NEUTRAL도 추적 — stealth activity 등)
   if (!signal.symbol) return;
 
+  // priceAtFire 없으면 기록 보류 — 가격 업그레이드 시 다시 호출돼 최초 기록 생성 (#116)
+  const priceAtFire = _resolvePrice(signal.meta);
+  if (priceAtFire == null) return;
+
   _accuracyBuffer.push({
     type: signal.type,
     symbol: signal.symbol,
@@ -130,7 +184,7 @@ function _recordForAccuracy(signal) {
     direction: signal.direction,
     strength: signal.strength || 1,
     title: signal.title || '',
-    priceAtFire: signal.meta?.currentPrice || signal.meta?.priceKrw || null,
+    priceAtFire,
     meta: { compositeScore: signal.meta?.compositeScore, rsi: signal.meta?.rsi },
   });
 
@@ -196,8 +250,9 @@ function _formatUsd(usd) {
  * @param {string} type - SIGNAL_TYPES 중 하나
  * @param {number} consecutiveDays - 연속일수
  * @param {number} amount - 누적 금액 (원)
+ * @param {number|null} currentPrice - 시그널 발화 시점 현재가 (적중률 추적용, 선택)
  */
-export function createInvestorSignal(symbol, name, market, type, consecutiveDays, amount) {
+export function createInvestorSignal(symbol, name, market, type, consecutiveDays, amount, currentPrice = null) {
   const isBuy = type === SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY
     || type === SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY;
   const direction = isBuy ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
@@ -220,7 +275,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     direction,
     strength,
     title,
-    meta: { consecutiveDays, amount },
+    meta: { consecutiveDays, amount, currentPrice },
   });
   return addSignal(signal);
 }
@@ -233,7 +288,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
  * @param {number} currentVol - 현재 거래량
  * @param {number} avgVol - 평균 거래량
  */
-export function createVolumeSignal(symbol, name, market, currentVol, avgVol, changePct = 0) {
+export function createVolumeSignal(symbol, name, market, currentVol, avgVol, changePct = 0, currentPrice = null) {
   if (!avgVol || avgVol <= 0) return null;
   const ratio = currentVol / avgVol;
   // 95th percentile 기준으로 외부에서 필터 후 호출되므로 ratio >= 1이면 통과
@@ -258,7 +313,7 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     direction,
     strength,
     title,
-    meta: { currentVol, avgVol, ratio, changePct: pct },
+    meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
   });
   return addSignal(signal);
 }
@@ -575,7 +630,7 @@ export function createSentimentDivergenceSignal(symbol, name, market, pricePct, 
 }
 
 /** 스마트머니 흐름 시그널 — 외국인+기관 동시 매수/매도 */
-export function createSmartMoneySignal(symbol, name, foreignDays, instDays, totalAmt, isBuy) {
+export function createSmartMoneySignal(symbol, name, foreignDays, instDays, totalAmt, isBuy, currentPrice = null) {
   const direction = isBuy ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
   const action = isBuy ? '매수' : '매도';
   const strength = Math.min(Math.max(foreignDays, instDays), 5);
@@ -586,7 +641,7 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
     market: 'kr',
     direction, strength,
     title,
-    meta: { name, foreignDays, instDays, totalAmt, action },
+    meta: { name, foreignDays, instDays, totalAmt, action, currentPrice },
   }));
 }
 

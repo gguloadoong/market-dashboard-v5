@@ -36,6 +36,22 @@ const KR_TOP_SYMBOLS = [
   { symbol: '005380', name: '현대차' },
 ];
 
+// 현재가 조회 헬퍼 — symbol 매칭 후 가격 필드 우선순위대로 반환
+// 시그널 적중률 추적용 priceAtFire 전달 — 0은 데이터 오류로 간주하고 건너뜀 (#116)
+function getPriceFromItems(symbol, items) {
+  if (!symbol || !items?.length) return null;
+  const up = String(symbol).toUpperCase();
+  const item = items.find(i =>
+    String(i.symbol || '').toUpperCase() === up || i.id === symbol,
+  );
+  if (!item) return null;
+  const candidates = [item.price, item.priceKrw, item.priceUsd, item.close, item.currentPrice];
+  for (const v of candidates) {
+    if (v != null && v > 0) return v;
+  }
+  return null;
+}
+
 const POLL_INTERVAL = 5 * 60 * 1000; // 5분
 const CONSECUTIVE_THRESHOLD = 3; // 3일 연속부터 시그널 발화
 // 기획: 20일 평균 대비 3배이나 히스토리 API 한계로 마켓 내 상위 5% 기준 적용
@@ -120,7 +136,7 @@ export function useInvestorSignals(allItems = []) {
       const items = allItemsRef.current;
       try {
         // ── P0-1: 외국인/기관 연속 매수매도 시그널 ──
-        await scanInvestorTrends();
+        await scanInvestorTrends(items);
 
         // ── P0-2: 거래량 이상치 시그널 ──
         scanVolumeAnomalies(items);
@@ -190,8 +206,10 @@ export function useInvestorSignals(allItems = []) {
   }, []);
 }
 
-/** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출 */
-async function scanInvestorTrends() {
+/** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출
+ * @param {Array} allItems - 전체 종목 배열 (현재가 조회용)
+ */
+async function scanInvestorTrends(allItems = []) {
   // Promise.allSettled로 병렬화 (기존 순차 for loop → 로딩 최적화)
   await Promise.allSettled(KR_TOP_SYMBOLS.map(async ({ symbol, name }) => {
     try {
@@ -199,20 +217,24 @@ async function scanInvestorTrends() {
       const data = result?.data;
       if (!Array.isArray(data) || data.length === 0) return;
 
+      // 적중률 추적용 현재가 (없으면 null) — addSignal의 가격 업그레이드 로직이
+      // 이후 폴링에서 가격 확보 시 priceAtFire를 갱신한다 (#116)
+      const currentPrice = getPriceFromItems(symbol, allItems);
+
       // 외국인
       const foreign = calcConsecutive(data, 'foreign');
       if (foreign.buyDays >= CONSECUTIVE_THRESHOLD) {
         createInvestorSignal(
           symbol, name, 'kr',
           SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
-          foreign.buyDays, foreign.totalAmt,
+          foreign.buyDays, foreign.totalAmt, currentPrice,
         );
       }
       if (foreign.sellDays >= CONSECUTIVE_THRESHOLD) {
         createInvestorSignal(
           symbol, name, 'kr',
           SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL,
-          foreign.sellDays, Math.abs(foreign.totalAmt),
+          foreign.sellDays, Math.abs(foreign.totalAmt), currentPrice,
         );
       }
 
@@ -222,23 +244,23 @@ async function scanInvestorTrends() {
         createInvestorSignal(
           symbol, name, 'kr',
           SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY,
-          inst.buyDays, inst.totalAmt,
+          inst.buyDays, inst.totalAmt, currentPrice,
         );
       }
       if (inst.sellDays >= CONSECUTIVE_THRESHOLD) {
         createInvestorSignal(
           symbol, name, 'kr',
           SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
-          inst.sellDays, Math.abs(inst.totalAmt),
+          inst.sellDays, Math.abs(inst.totalAmt), currentPrice,
         );
       }
 
       // 스마트머니 — 외국인+기관 동시 MIN_DAYS일+ 매수 또는 매도
       const smMinDays = THRESHOLDS.SMART_MONEY.MIN_DAYS;
       if (foreign.buyDays >= smMinDays && inst.buyDays >= smMinDays) {
-        createSmartMoneySignal(symbol, name, foreign.buyDays, inst.buyDays, foreign.totalAmt + inst.totalAmt, true);
+        createSmartMoneySignal(symbol, name, foreign.buyDays, inst.buyDays, foreign.totalAmt + inst.totalAmt, true, currentPrice);
       } else if (foreign.sellDays >= smMinDays && inst.sellDays >= smMinDays) {
-        createSmartMoneySignal(symbol, name, foreign.sellDays, inst.sellDays, Math.abs(foreign.totalAmt) + Math.abs(inst.totalAmt), false);
+        createSmartMoneySignal(symbol, name, foreign.sellDays, inst.sellDays, Math.abs(foreign.totalAmt) + Math.abs(inst.totalAmt), false, currentPrice);
       }
     } catch {
       // 개별 종목 실패 시 무시 — 다른 종목은 계속 진행
@@ -389,6 +411,8 @@ function scanVolumeAnomalies(allItems) {
       if (vol <= 0) continue;
       if (vol >= threshold) {
         const pct = clampPct(item.changePct ?? item.change24h ?? 0);
+        // addSignal의 가격 업그레이드 로직이 이후 폴링에서 priceAtFire를 갱신한다 (#116)
+        const curPrice = getPriceFromItems(item.symbol, [item]);
         createVolumeSignal(
           item.symbol,
           item.name ?? item.symbol,
@@ -396,6 +420,7 @@ function scanVolumeAnomalies(allItems) {
           vol,
           threshold,
           pct,
+          curPrice,
         );
       }
 
