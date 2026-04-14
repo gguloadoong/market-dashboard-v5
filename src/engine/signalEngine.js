@@ -196,8 +196,9 @@ function _formatUsd(usd) {
  * @param {string} type - SIGNAL_TYPES 중 하나
  * @param {number} consecutiveDays - 연속일수
  * @param {number} amount - 누적 금액 (원)
+ * @param {number|null} currentPrice - 시그널 발화 시점 현재가 (적중률 추적용, 선택)
  */
-export function createInvestorSignal(symbol, name, market, type, consecutiveDays, amount) {
+export function createInvestorSignal(symbol, name, market, type, consecutiveDays, amount, currentPrice = null) {
   const isBuy = type === SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY
     || type === SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY;
   const direction = isBuy ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
@@ -220,7 +221,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     direction,
     strength,
     title,
-    meta: { consecutiveDays, amount },
+    meta: { consecutiveDays, amount, currentPrice },
   });
   return addSignal(signal);
 }
@@ -233,7 +234,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
  * @param {number} currentVol - 현재 거래량
  * @param {number} avgVol - 평균 거래량
  */
-export function createVolumeSignal(symbol, name, market, currentVol, avgVol, changePct = 0) {
+export function createVolumeSignal(symbol, name, market, currentVol, avgVol, changePct = 0, currentPrice = null) {
   if (!avgVol || avgVol <= 0) return null;
   const ratio = currentVol / avgVol;
   // 95th percentile 기준으로 외부에서 필터 후 호출되므로 ratio >= 1이면 통과
@@ -258,7 +259,7 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     direction,
     strength,
     title,
-    meta: { currentVol, avgVol, ratio, changePct: pct },
+    meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
   });
   return addSignal(signal);
 }
@@ -575,7 +576,7 @@ export function createSentimentDivergenceSignal(symbol, name, market, pricePct, 
 }
 
 /** 스마트머니 흐름 시그널 — 외국인+기관 동시 매수/매도 */
-export function createSmartMoneySignal(symbol, name, foreignDays, instDays, totalAmt, isBuy) {
+export function createSmartMoneySignal(symbol, name, foreignDays, instDays, totalAmt, isBuy, currentPrice = null) {
   const direction = isBuy ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
   const action = isBuy ? '매수' : '매도';
   const strength = Math.min(Math.max(foreignDays, instDays), 5);
@@ -586,7 +587,7 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
     market: 'kr',
     direction, strength,
     title,
-    meta: { name, foreignDays, instDays, totalAmt, action },
+    meta: { name, foreignDays, instDays, totalAmt, action, currentPrice },
   }));
 }
 
