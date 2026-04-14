@@ -295,13 +295,18 @@ export default function App() {
       const krx = krxBySymbol.get(sym);
       const stat = staticBySymbol.get(sym);
       if (krx && stat) {
-        // 가격/AUM 등 실시간 필드는 KRX 우선, sector/category/name은 정적 메타 우선
-        // stat 필드가 없을 경우 KRX 값 fallback (undefined 전파 방지)
+        // KRX: aum/nav 등 KRX 전용 필드 보강
+        // stat(60초 폴링): price/change/changePct/sparkline 실시간 가격 우선 유지
+        // sector/category/name은 stat(정적 메타) 우선
         return {
           ...krx,
           ...(stat.sector   && { sector: stat.sector }),
           ...(stat.category && { category: stat.category }),
           ...(stat.name     && { name: stat.name }),
+          ...(stat.price    != null && { price: stat.price }),
+          ...(stat.change   != null && { change: stat.change }),
+          ...(stat.changePct != null && { changePct: stat.changePct }),
+          ...(stat.sparkline && { sparkline: stat.sparkline }),
         };
       }
       return krx || stat;
