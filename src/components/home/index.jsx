@@ -36,11 +36,12 @@ export default function HomeDashboard({
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
   const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
 
-  // 레버리지/인버스 ETF 제외 목록 — 시그널 엔진 입력용 (오발화 방지)
-  // _isEtf 플래그는 위 krItems/usItems spread에서 etfs 항목에 항상 true로 세팅됨 (보장)
-  // 코인ETF(IBIT 등 category:'코인ETF')는 BTC 크로스마켓 페어 시그널용으로 유지
+  // 레버리지·인버스·미분류 ETF 제외 — 시그널 엔진 오발화 방지
+  // _isEtf 플래그는 krItems/usItems spread 시 항상 true로 세팅됨 (보장)
+  // KRX 동적 ETF는 category:'ETF'로 오므로 허용 목록이 아닌 차단 목록 방식 사용
+  // 차단: 레버리지, 인버스, 'ETF'(KRX 미분류). 허용: 코인ETF(IBIT 크로스마켓 페어 등)
   const stockItems = useMemo(
-    () => allItems.filter(i => !i._isEtf || (i.category !== '레버리지' && i.category !== '인버스')),
+    () => allItems.filter(i => !i._isEtf || (i.category !== '레버리지' && i.category !== '인버스' && i.category !== 'ETF')),
     [allItems],
   );
 
