@@ -49,25 +49,29 @@ export function addSignal(signal) {
   const existIdx = _signals.findIndex(
     s => s.type === signal.type && s.symbol === signal.symbol,
   );
-  // 가격 업그레이드 케이스 (#116): 기존 strength 유지되지만 priceAtFire가 null이고
-  // 새 시그널이 유효 가격을 갖고 있으면 메타만 갱신하여 적중률 추적이 완전해지도록 한다.
-  // 새 row를 삽입하지 않으므로 signal_accuracy가 중복 집계되지 않는다.
-  let isPriceUpgradeOnly = false;
   if (existIdx !== -1) {
     const existing = _signals[existIdx];
     const existingPrice = existing.meta?.currentPrice ?? existing.meta?.priceKrw ?? null;
     const newPrice = signal.meta?.currentPrice ?? signal.meta?.priceKrw ?? null;
-    isPriceUpgradeOnly = existing.strength >= signal.strength
+    const isPriceUpgradeOnly = existing.strength >= signal.strength
       && existingPrice == null && newPrice != null;
-    if (existing.strength >= signal.strength && !isPriceUpgradeOnly) return existing;
+
+    // 가격 업그레이드 케이스 (#116): 기존 meta만 갱신하고 timestamp/expiresAt은 보존.
+    // 적중률 DB에는 재기록하여 이번에 확보한 price_at_fire가 평가 가능하도록 한다.
+    if (isPriceUpgradeOnly) {
+      existing.meta = { ...existing.meta, ...signal.meta };
+      _recordForAccuracy(existing);
+      _notify();
+      return existing;
+    }
+    if (existing.strength >= signal.strength) return existing;
     _signals.splice(existIdx, 1);
   }
 
   _signals.push(signal);
 
   // 적중률 트래킹 — 비동기 fire-and-forget (실패해도 시그널 영향 없음)
-  // 가격만 보강한 경우 중복 집계 방지 위해 재기록하지 않음 (#116)
-  if (!isPriceUpgradeOnly) _recordForAccuracy(signal);
+  _recordForAccuracy(signal);
 
   // 최대 개수 초과 시 오래된 것부터 제거
   if (_signals.length > MAX_SIGNALS) {
