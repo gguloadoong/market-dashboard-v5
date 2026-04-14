@@ -213,12 +213,9 @@ async function scanInvestorTrends(allItems = []) {
       const data = result?.data;
       if (!Array.isArray(data) || data.length === 0) return;
 
-      // 적중률 추적용 현재가 — 없으면 시그널 발화 보류 (#116)
-      // addSignal은 type+symbol 중복 제거 시 기존(null) 시그널을 유지하므로,
-      // 가격 없는 상태로 먼저 발화되면 이후 가격이 들어와도 priceAtFire가 갱신되지 않아
-      // 적중률 추적에서 영구 제외된다. 다음 폴링(5분) 또는 재시도(4초)에서 가격 확보 후 재스캔.
+      // 적중률 추적용 현재가 (없으면 null) — addSignal의 가격 업그레이드 로직이
+      // 이후 폴링에서 가격 확보 시 priceAtFire를 갱신한다 (#116)
       const currentPrice = getPriceFromItems(symbol, allItems);
-      if (currentPrice == null) return;
 
       // 외국인
       const foreign = calcConsecutive(data, 'foreign');
@@ -410,19 +407,17 @@ function scanVolumeAnomalies(allItems) {
       if (vol <= 0) continue;
       if (vol >= threshold) {
         const pct = clampPct(item.changePct ?? item.change24h ?? 0);
+        // addSignal의 가격 업그레이드 로직이 이후 폴링에서 priceAtFire를 갱신한다 (#116)
         const curPrice = getPriceFromItems(item.symbol, [item]);
-        // 가격 미확보 시 발화 보류 — priceAtFire 영구 누락 방지 (#116)
-        if (curPrice != null) {
-          createVolumeSignal(
-            item.symbol,
-            item.name ?? item.symbol,
-            market.toLowerCase(),
-            vol,
-            threshold,
-            pct,
-            curPrice,
-          );
-        }
+        createVolumeSignal(
+          item.symbol,
+          item.name ?? item.symbol,
+          market.toLowerCase(),
+          vol,
+          threshold,
+          pct,
+          curPrice,
+        );
       }
 
       // 거래량-가격 괴리 — 거래량 폭발인데 가격 정체 (accumulation), 또는 큰 가격 변동인데 거래량 부족 (weak_move)

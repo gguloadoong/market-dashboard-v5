@@ -50,7 +50,13 @@ export function addSignal(signal) {
     s => s.type === signal.type && s.symbol === signal.symbol,
   );
   if (existIdx !== -1) {
-    if (_signals[existIdx].strength >= signal.strength) return _signals[existIdx];
+    const existing = _signals[existIdx];
+    // 가격 업그레이드 케이스 (#116): 기존 strength 유지되지만 priceAtFire가 null이고
+    // 새 시그널이 유효 가격을 갖고 있으면 기존을 교체하여 적중률 추적이 완전해지도록 한다.
+    const existingPrice = existing.meta?.currentPrice ?? existing.meta?.priceKrw ?? null;
+    const newPrice = signal.meta?.currentPrice ?? signal.meta?.priceKrw ?? null;
+    const isPriceUpgrade = existingPrice == null && newPrice != null;
+    if (existing.strength >= signal.strength && !isPriceUpgrade) return existing;
     _signals.splice(existIdx, 1);
   }
 
