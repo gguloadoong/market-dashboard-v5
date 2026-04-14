@@ -294,7 +294,11 @@ export default function App() {
     return Array.from(allSymbols).map(sym => {
       const krx = krxBySymbol.get(sym);
       const stat = staticBySymbol.get(sym);
-      if (krx && stat) return { ...stat, ...krx }; // KRX가 정적 메타 덮어씀
+      if (krx && stat) {
+          // stat(정적 메타)으로 베이스 — sector/category/name 보존
+          // krx(실시간)로 가격/AUM 덮어씀, stat의 sector/category/name은 krx 이후에도 유지
+          return { ...krx, sector: stat.sector, category: stat.category, name: stat.name };
+        }
       return krx || stat;
     });
   }, [etfs, krxEtfs]);

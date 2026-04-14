@@ -36,8 +36,11 @@ export default function HomeDashboard({
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
   const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
 
-  // ETF 제외한 순수 종목 목록 — 시그널 엔진 입력용 (레버리지/인버스 ETF 오발화 방지)
-  const stockItems = useMemo(() => allItems.filter(i => !i._isEtf), [allItems]);
+  // 레버리지/인버스 ETF 제외 목록 — 시그널 엔진 입력용 (오발화 방지, 코인ETF는 크로스마켓 페어용으로 유지)
+  const stockItems = useMemo(
+    () => allItems.filter(i => !i._isEtf || (i.category !== '레버리지' && i.category !== '인버스')),
+    [allItems],
+  );
 
   // 7일 이내 뉴스
   const recentNews = useMemo(() => {
