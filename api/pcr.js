@@ -1,7 +1,7 @@
 // Put/Call Ratio — Deribit BTC 옵션 (무료, 키 없음)
 export const config = { runtime: 'edge' };
 
-export default async function handler(request) {
+export default async function handler(_request) {
   try {
     const res = await fetch(
       'https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option',

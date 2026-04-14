@@ -45,7 +45,7 @@ function extractSummary(result) {
   };
 }
 
-export default function AiDebateSection({ watchedItems = [], usStocks = [], krStocks = [], allItems = [] }) {
+export default function AiDebateSection({ watchedItems = [], usStocks = [], allItems = [] }) {
   const [selected, setSelected] = useState(DEFAULT_SYMBOLS[0]);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);

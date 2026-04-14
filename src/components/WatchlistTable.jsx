@@ -620,7 +620,6 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFA
   }, [items, type]);
 
   const hotCount    = items.filter(i => getPct(i) >= 3).length;
-  const hot5Count   = items.filter(i => getPct(i) >= 5).length;
   const drop3Count  = items.filter(i => getPct(i) <= -3).length;
   const volSpikeCount = useMemo(() => {
     const getVol = i => i.id ? (i.volume24h ?? 0) : (i.volume ?? 0);

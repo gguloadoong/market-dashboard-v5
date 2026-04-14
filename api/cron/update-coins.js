@@ -259,7 +259,7 @@ export default async function handler(request) {
     });
   } catch (err) {
     // Cron 실패 기록 (모니터링용) — 기록 실패가 에러 응답을 덮어쓰지 않도록 방어
-    try { await recordCronFailure('coins', String(err?.message || err)); } catch (_) { /* 무시 */ }
+    try { await recordCronFailure('coins', String(err?.message || err)); } catch { /* 무시 */ }
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: {

@@ -87,7 +87,7 @@ async function getSymbolList() {
         console.log('[update-us] 구형 array 캐시 감지 → NASDAQ 재수집 시도 (성공 시 새 형식으로 교체)');
         legacyArrayCache = cached;
       }
-    } catch (_) { /* fallback */ }
+    } catch { /* fallback */ }
   }
 
   // NASDAQ API에서 수집 (총 30초 타임아웃)
@@ -109,7 +109,7 @@ async function getSymbolList() {
       try {
         await redis.set(SYMBOL_LIST_KEY, collected, { ex: SYMBOL_LIST_TTL });
         console.log(`[update-us] 종목 리스트 갱신: ${collected.symbols.length}개 (marketCap 포함) → Redis 캐시`);
-      } catch (_) { /* 저장 실패해도 진행 */ }
+      } catch { /* 저장 실패해도 진행 */ }
     }
     return collected;
   }
@@ -232,7 +232,7 @@ export default async function handler(request) {
       try {
         const cur = await redis.get(SHARD_CURSOR_KEY);
         shard = (parseInt(cur, 10) || 0) % totalShards;
-      } catch (_) { /* 기본값 0 */ }
+      } catch { /* 기본값 0 */ }
     }
 
     // 3. 이번 샤드의 종목 추출
@@ -268,7 +268,7 @@ export default async function handler(request) {
         }
         for (const it of items) merged.set(it.symbol, it);
         await setSnap(SNAP_KEYS.US, [...merged.values()], SHARD_TTL);
-      } catch (_) { /* 레거시 병합 실패해도 샤드 키는 이미 저장됨 */ }
+      } catch { /* 레거시 병합 실패해도 샤드 키는 이미 저장됨 */ }
     }
 
     // 7. 커서 + 샤드 수 저장 (읽기 측에서 동적 참조)
@@ -278,12 +278,12 @@ export default async function handler(request) {
           redis.set(SHARD_CURSOR_KEY, (shard + 1) % totalShards, { ex: 3600 }),
           redis.set('us:cron:shardCount', totalShards, { ex: 3600 }),
         ]);
-      } catch (_) { /* 무시 */ }
+      } catch { /* 무시 */ }
     }
 
     // 8. 전량 실패 모니터링
     if (items.length === 0) {
-      try { await recordCronFailure('us', `샤드 ${shard} 전량 실패`); } catch (_) {}
+      try { await recordCronFailure('us', `샤드 ${shard} 전량 실패`); } catch {}
     }
 
     return new Response(JSON.stringify({
@@ -299,7 +299,7 @@ export default async function handler(request) {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   } catch (err) {
-    try { await recordCronFailure('us', String(err?.message || err)); } catch (_) {}
+    try { await recordCronFailure('us', String(err?.message || err)); } catch {}
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
