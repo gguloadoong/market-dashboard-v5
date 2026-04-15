@@ -97,7 +97,7 @@ function changeText(change) {
 }
 
 // ─── Handler ─────────────────────────────────────────────────────
-export default async function handler(req) {
+export default async function handler(_req) {
   try {
     // 병렬 호출
     const [kospiRes, nasdaqRes, btcRes, usFgRes, cryptoFgRes] = await Promise.allSettled([
@@ -145,7 +145,7 @@ export default async function handler(req) {
         'Access-Control-Allow-Origin': '*',
       },
     });
-  } catch (err) {
+  } catch {
     // 에러 응답에도 CORS 헤더 포함 — 브라우저가 에러 본문을 읽을 수 있도록
     return new Response(JSON.stringify({ error: 'Failed to fetch market data' }), {
       status: 502,

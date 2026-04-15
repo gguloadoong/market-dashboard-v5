@@ -27,7 +27,6 @@ const TABS = [
 
 export default function Header({
   krwRate, lastUpdated, onRefresh, loading, activeTab, onTabChange,
-  krStocks = [], usStocks = [], coins = [],
   dark = false, onDarkToggle,
 }) {
   const kr = getKoreanMarketStatus();

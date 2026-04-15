@@ -137,7 +137,6 @@ export default function EventTicker() {
             style={{ transform: `translateY(-${rollIdx * 20}px)` }}
           >
             {displayItems.map((ev, i) => {
-              const cfg = TYPE_CONFIG[ev.type] || { color: '#8B95A1', bg: '#F2F4F6', emoji: '📅' };
               const dd = dday(ev.date);
               return (
                 <div key={`${ev.date}-${ev.type}-${i}`} className="h-5 flex items-center gap-2 whitespace-nowrap">

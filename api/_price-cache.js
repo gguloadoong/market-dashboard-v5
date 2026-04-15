@@ -113,7 +113,7 @@ export async function getUsSnap() {
             if (!Array.isArray(backup)) continue;
             for (const item of backup) merged.set(item.symbol, item);
           }
-        } catch (_) { /* 백업 일괄 조회 실패 무시 */ }
+        } catch { /* 백업 일괄 조회 실패 무시 */ }
       }
       if (merged.size > 0) return [...merged.values()];
     }

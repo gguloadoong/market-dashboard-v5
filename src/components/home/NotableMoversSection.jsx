@@ -180,7 +180,6 @@ const SLOT_MS = 20 * 60 * 1000;
 export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = DEFAULT_KRW_RATE, onItemClick }) {
   const krOpen = getKoreanMarketStatus().status === 'open';
   const usOpen = getUsMarketStatus().status === 'open';
-  const hasClosedMarket = !krOpen || !usOpen;
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
   // 첫 tick을 다음 20분 경계까지의 남은 시간으로 정렬

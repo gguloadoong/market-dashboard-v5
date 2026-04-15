@@ -131,7 +131,7 @@ export default async function handler(request) {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   } catch (err) {
-    try { await recordCronFailure('whale-telegram', String(err?.message || err)); } catch (_) { /* 무시 */ }
+    try { await recordCronFailure('whale-telegram', String(err?.message || err)); } catch { /* 무시 */ }
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },

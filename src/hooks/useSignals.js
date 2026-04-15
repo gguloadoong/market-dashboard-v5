@@ -1,5 +1,5 @@
 // 시그널 엔진 React Hooks — 시그널 구독 및 조회
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   getActiveSignals,
   getSignalsBySymbol,

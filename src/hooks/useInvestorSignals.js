@@ -9,7 +9,6 @@ import {
   createGapSignal, createRebalancingSignal, createFxImpactSignal,
   createCapitulationSignal, createStealthActivitySignal,
   createBtcLeadingSignal, createSectorOutlierSignal,
-  removeSignalByTypeAndSymbol,
 } from '../engine/signalEngine';
 import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/taCalculator';
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
