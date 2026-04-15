@@ -139,14 +139,10 @@ async function fetchCoinPaprika() {
   try {
     return await fetchCoinPaprikaOnce();
   } catch (e) {
-    // #117: 1회 재시도 (네트워크 일시 실패 대응)
+    // #117: 1회 재시도 (네트워크 일시 실패 대응). 재시도도 실패하면 throw하여
+    // 호출부 allSettled가 rejected로 감지하고 정확히 경고 로그를 남기도록 한다.
     console.warn('[update-coins] CoinPaprika 1차 실패 재시도:', e.message);
-    try {
-      return await fetchCoinPaprikaOnce();
-    } catch (e2) {
-      console.warn('[update-coins] CoinPaprika 재시도 실패:', e2.message);
-      return [];
-    }
+    return await fetchCoinPaprikaOnce();
   }
 }
 
