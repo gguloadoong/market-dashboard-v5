@@ -15,7 +15,6 @@ import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/ta
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
-import { DEFAULT_KRW_RATE } from '../constants/market';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -116,13 +115,14 @@ function calcPercentileVolume(items, market) {
  * @param {Array} allItems - 전체 종목 배열 ({ symbol, name, volume, _market } 포함)
  * @param {number} krwRate - 현재 원/달러 환율 (fx_impact 시그널 발화용, #113)
  */
-export function useInvestorSignals(allItems = [], krwRate = null) {
+export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded = false) {
   const timerRef = useRef(null);
   const runningRef = useRef(false);
   const moodPrevRef = useRef(null); // 시장 무드 이전 상태 (메모리 기반)
   const allItemsRef = useRef(allItems); // 최신 allItems를 ref로 유지 — 타이머 리셋 방지
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
+  const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
   const fxPrevRef = useRef(null); // fx_impact 이전 환율 (첫 호출은 skip, #113)
 
   // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
@@ -134,6 +134,10 @@ export function useInvestorSignals(allItems = [], krwRate = null) {
   useEffect(() => {
     krwRateRef.current = krwRate;
   }, [krwRate]);
+
+  useEffect(() => {
+    krwRateLoadedRef.current = krwRateLoaded;
+  }, [krwRateLoaded]);
 
   useEffect(() => {
     let retryTimer = null; // 재시도 타이머 추적 (언마운트 시 정리)
@@ -169,7 +173,7 @@ export function useInvestorSignals(allItems = [], krwRate = null) {
         detectRebalancingSignal();
 
         // ── 신규: 환율 영향 (#113: useIndices().krwRate 주입) ──
-        detectFxImpactSignal(krwRateRef.current, fxPrevRef);
+        detectFxImpactSignal(krwRateRef.current, fxPrevRef, krwRateLoadedRef.current);
 
         // ── Tier2: 투매 감지 (캐피튤레이션) ──
         detectCapitulation(items);
@@ -593,10 +597,11 @@ function detectRebalancingSignal() {
  * 기존 구현은 allItems에서 USDKRW 심볼을 찾았으나 allItems에는 주식·코인만 포함되어 항상 skip되던 dead path.
  * @param {number|null} krwRate - 현재 원/달러 환율
  * @param {{ current: number|null }} prevRef - 이전 환율 ref (첫 호출은 skip)
+ * @param {boolean} loaded - 환율 fetch 완료 여부 (DEFAULT_KRW_RATE sentinel과 실제값 충돌 회피)
  */
-function detectFxImpactSignal(krwRate, prevRef) {
-  // 환율 없음/폴백값(DEFAULT_KRW_RATE)/동일값은 skip
-  if (!krwRate || krwRate === DEFAULT_KRW_RATE) return;
+function detectFxImpactSignal(krwRate, prevRef, loaded) {
+  // 환율 fetch 미완료 또는 값 자체가 falsy면 skip — DEFAULT_KRW_RATE 값으로는 판정하지 않음 (Codex P2)
+  if (!loaded || !krwRate) return;
 
   const prevRate = prevRef.current;
   // 첫 호출(prev=null) skip — 다음 주기부터 비교
@@ -604,13 +609,15 @@ function detectFxImpactSignal(krwRate, prevRef) {
     prevRef.current = krwRate;
     return;
   }
-  // 값 변동 없으면 ref 갱신 후 skip
+  // 값 변동 없으면 skip (prev 유지)
   if (prevRate === krwRate) return;
 
   const result = detectFxImpact(krwRate, prevRate);
   prevRef.current = krwRate;
   if (!result) return;
 
+  // type+symbol dedupe 우회 — 환율은 자주 변하므로 매 변동마다 최신 시그널로 교체 (Codex P1)
+  removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
   createFxImpactSignal(krwRate, prevRate, result.changePct, result.impact);
 }
 

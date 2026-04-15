@@ -9,6 +9,7 @@ import { DEFAULT_KRW_RATE } from '../constants/market';
 export function useIndices() {
   const [indices, setIndices]   = useState([]);
   const [krwRate, setKrwRate]   = useState(DEFAULT_KRW_RATE);
+  const [krwRateLoaded, setKrwRateLoaded] = useState(false);
 
   const refreshIndices = useCallback(async () => {
     try {
@@ -35,6 +36,7 @@ export function useIndices() {
       const rate = await fetchExchangeRate();
       if (rate) {
         setKrwRate(rate);
+        setKrwRateLoaded(true);
         setWhaleKrwRate(rate);
       }
     } catch (e) { console.warn('[환율] 갱신 실패:', e.message); }
@@ -55,5 +57,5 @@ export function useIndices() {
     };
   }, [refreshIndices, refreshExchangeRate]);
 
-  return { indices, krwRate, refreshIndices };
+  return { indices, krwRate, krwRateLoaded, refreshIndices };
 }

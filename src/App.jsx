@@ -67,7 +67,7 @@ function InstallBanner() {
 export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode();
   const { watchlist, krSymbols, usSymbols } = useWatchlist();
-  const { indices, krwRate }        = useIndices();
+  const { indices, krwRate, krwRateLoaded } = useIndices();
   const krwRateRef                  = useRef(DEFAULT_KRW_RATE);
   useEffect(() => { krwRateRef.current = krwRate; }, [krwRate]);
 
@@ -364,7 +364,7 @@ export default function App() {
           {activeTab === 'home' ? (
             <HomeDashboard
               indices={indices} krStocks={krStocks} usStocks={usStocks}
-              coins={coins} etfs={mergedEtfs} krwRate={krwRate}
+              coins={coins} etfs={mergedEtfs} krwRate={krwRate} krwRateLoaded={krwRateLoaded}
               onItemClick={setSelectedItem} onNewsClick={setSelectedNews}
               onTabChange={setActiveTab}
               dataReady={pricesReady && coinsReady}
