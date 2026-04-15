@@ -122,15 +122,61 @@ async function fetchBithumbTickers() {
 
 // CoinPaprika 글로벌 시세 조회 (USD + KRW)
 // #104 B2: limit 100 → 300 으로 상향해 Upbit KRW 244 개 커버 (+ 마진).
+// #117: limit 300 → 500 으로 추가 상향 + 실패 시 1회 재시도.
+//       시총 300위 밖 코인(WAXP, CARV, LSK 등) 컷오프 해소.
 // #104 Opus: paprika 는 보강 데이터라 실패해도 snapshot 저장에 영향 없음.
 // Edge 10s 예산을 지키기 위해 타임아웃 10s → 4s 로 축소. 실패는 allSettled 가 흡수.
-async function fetchCoinPaprika() {
-  const res = await fetch('https://api.coinpaprika.com/v1/tickers?limit=300&quotes=KRW,USD', {
+async function fetchCoinPaprikaOnce() {
+  const res = await fetch('https://api.coinpaprika.com/v1/tickers?limit=500&quotes=KRW,USD', {
     headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout(4000),
   });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error(`CoinPaprika HTTP ${res.status}`);
   return res.json();
+}
+
+async function fetchCoinPaprika() {
+  try {
+    return await fetchCoinPaprikaOnce();
+  } catch (e) {
+    // #117: 1회 재시도 (네트워크 일시 실패 대응)
+    console.warn('[update-coins] CoinPaprika 1차 실패 재시도:', e.message);
+    try {
+      return await fetchCoinPaprikaOnce();
+    } catch (e2) {
+      console.warn('[update-coins] CoinPaprika 재시도 실패:', e2.message);
+      return [];
+    }
+  }
+}
+
+// #117: CoinGecko 2차 fallback — paprika 누락 심볼만 보강
+// 무료 tier 30 req/min. page=1,2 두 번만 호출 → 500개 커버 (안전 마진 충분).
+// Promise.allSettled 로 단일 페이지 실패는 흡수. 완전 실패 시 빈 배열.
+async function fetchCoinGeckoPage(page, timeoutMs = 4000) {
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`CoinGecko page=${page} HTTP ${res.status}`);
+  return res.json();
+}
+
+async function fetchCoinGecko() {
+  const settled = await Promise.allSettled([
+    fetchCoinGeckoPage(1),
+    fetchCoinGeckoPage(2),
+  ]);
+  const merged = [];
+  for (const r of settled) {
+    if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+      merged.push(...r.value);
+    } else if (r.status === 'rejected') {
+      console.warn('[update-coins] CoinGecko 페이지 실패:', r.reason?.message);
+    }
+  }
+  return merged;
 }
 
 export async function updateCoins(env) {
@@ -206,6 +252,34 @@ export async function updateCoins(env) {
       paprikaMap.set(key, { priceUsd, marketCap, volume24h });
     }
 
+    // #117: CoinGecko 2차 fallback — paprika 누락(=priceUsd<=0) 심볼만 보강.
+    // paprika 에 이미 있는 심볼은 덮어쓰지 않음 (시총 큰 쪽 유지 정책 보존).
+    // Upbit KRW 마켓 심볼 집합을 먼저 만들어 "결손 여부" 를 계산.
+    const needGecko = new Set();
+    for (const t of tickers) {
+      const sym = t.market.replace('KRW-', '').toUpperCase();
+      if (!paprikaMap.has(sym)) needGecko.add(sym);
+    }
+    let geckoFillCount = 0;
+    if (needGecko.size > 0) {
+      const geckoData = await fetchCoinGecko();
+      // CoinGecko 도 market_cap_desc 정렬 → first-wins 로 시총 큰 쪽 유지.
+      const geckoSeen = new Set();
+      for (const coin of geckoData) {
+        if (!coin?.symbol) continue;
+        const key = coin.symbol.toUpperCase();
+        if (geckoSeen.has(key)) continue;
+        geckoSeen.add(key);
+        if (!needGecko.has(key)) continue; // paprika 커버 심볼은 건너뜀
+        const priceUsd  = Number(coin.current_price) || 0;
+        const marketCap = Number(coin.market_cap) || 0;
+        const volume24h = Number(coin.total_volume) || 0;
+        if (priceUsd <= 0) continue;
+        paprikaMap.set(key, { priceUsd, marketCap, volume24h });
+        geckoFillCount += 1;
+      }
+    }
+
     // Upbit/Bithumb 티커 → 통합 형태 변환
     const items = tickers.map((t) => {
       const symbol = t.market.replace('KRW-', '');
@@ -231,7 +305,13 @@ export async function updateCoins(env) {
         lowPrice: t.low_price ?? 0,
       };
     });
-    console.log(`[update-coins] 저장: ${items.length}개 (source=${tickerSource}, paprika=${paprikaMap.size})`);
+    // #117: 커버리지 관측 로그 — paprika 와 CoinGecko fallback 기여분 분리 표기.
+    const paprikaBase = paprikaMap.size - geckoFillCount;
+    const missingMeta = items.filter((it) => (it.priceUsd ?? 0) <= 0).length;
+    console.log(
+      `[update-coins] 저장: ${items.length}개 ` +
+      `(source=${tickerSource}, paprika=${paprikaBase} coingecko_fallback=${geckoFillCount} missing_meta=${missingMeta})`,
+    );
 
     // Redis 저장
     if (items.length > 0) {
