@@ -237,7 +237,7 @@ export async function fetchExchangeRate() {
     if (btcKrw && btcUsd) {
       const rate = Math.round(btcKrw / btcUsd);
       saveRateCache(rate);
-      return rate;
+      return { rate, isFallback: false };
     }
   } catch {}
 
@@ -252,13 +252,15 @@ export async function fetchExchangeRate() {
     if (btcKrw && btcUsd) {
       const rate = Math.round(btcKrw / btcUsd);
       saveRateCache(rate);
-      return rate;
+      return { rate, isFallback: false };
     }
   } catch {}
 
+  // 캐시(24h)는 실제값 기반이므로 isFallback:false
   const cachedRate = loadRateCache();
-  if (cachedRate) return cachedRate;
-  return RATE_FALLBACK;
+  if (cachedRate) return { rate: cachedRate, isFallback: false };
+  // 모든 실시간/캐시 실패 → 하드코딩 폴백 (#113 Codex P2: loaded 플래그용)
+  return { rate: RATE_FALLBACK, isFallback: true };
 }
 
 // ─── Upbit만으로 빠른 가격 갱신 (10초 폴링용) ─────────────────

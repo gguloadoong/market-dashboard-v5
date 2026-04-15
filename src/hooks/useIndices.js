@@ -33,10 +33,12 @@ export function useIndices() {
 
   const refreshExchangeRate = useCallback(async () => {
     try {
-      const rate = await fetchExchangeRate();
+      const { rate, isFallback } = await fetchExchangeRate();
       if (rate) {
         setKrwRate(rate);
-        setKrwRateLoaded(true);
+        // 실제 fetch 또는 24h 캐시 성공 시에만 loaded=true (Codex #113 P2)
+        // isFallback=true는 모든 실시간/캐시 실패 후 하드코딩 값 → fx_impact 시그널 발화 금지
+        if (!isFallback) setKrwRateLoaded(true);
         setWhaleKrwRate(rate);
       }
     } catch (e) { console.warn('[환율] 갱신 실패:', e.message); }
