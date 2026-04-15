@@ -39,3 +39,12 @@ dist-ssr
 e2e-report/
 test-results/
 .last-deployed-commit
+.playwright-mcp/
+
+# QA / 목업 / 임시 스크린샷 (사고 #113-followup)
+qa-*.png
+mockup-*.png
+mockup-*.html
+local-check-*.png
+.project/*.png
+*.bak.*
