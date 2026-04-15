@@ -9,6 +9,7 @@ import { DEFAULT_KRW_RATE } from '../constants/market';
 export function useIndices() {
   const [indices, setIndices]   = useState([]);
   const [krwRate, setKrwRate]   = useState(DEFAULT_KRW_RATE);
+  const [krwRateLoaded, setKrwRateLoaded] = useState(false);
 
   const refreshIndices = useCallback(async () => {
     try {
@@ -32,9 +33,12 @@ export function useIndices() {
 
   const refreshExchangeRate = useCallback(async () => {
     try {
-      const rate = await fetchExchangeRate();
+      const { rate, isFallback } = await fetchExchangeRate();
       if (rate) {
         setKrwRate(rate);
+        // 실제 fetch 또는 24h 캐시 성공 시에만 loaded=true (Codex #113 P2)
+        // isFallback=true는 모든 실시간/캐시 실패 후 하드코딩 값 → fx_impact 시그널 발화 금지
+        if (!isFallback) setKrwRateLoaded(true);
         setWhaleKrwRate(rate);
       }
     } catch (e) { console.warn('[환율] 갱신 실패:', e.message); }
@@ -55,5 +59,5 @@ export function useIndices() {
     };
   }, [refreshIndices, refreshExchangeRate]);
 
-  return { indices, krwRate, refreshIndices };
+  return { indices, krwRate, krwRateLoaded, refreshIndices };
 }
