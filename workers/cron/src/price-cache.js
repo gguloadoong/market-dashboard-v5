@@ -52,10 +52,9 @@ export async function getSnapWithFallback(key) {
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    try {
-      const existing = await _redis.get(key);
-      if (existing !== null) await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
-    } catch (_) {}
+    // #125: :prev 백업 쓰기 제거 — subrequest 한계(50/invocation) 회피
+    // get+set 2회 → set 1회로 감소. 원본 snap:<key> TTL이 크론 주기의 2배이므로
+    // 크론 1회 실패는 다음 주기에 자연 복구. 장시간 다운 대비는 Worker 전체 장애 상황.
     await _redis.set(key, data, { ex });
     return true;
   } catch (e) { console.error(`[price-cache] setSnap 실패 (${key}):`, e); return false; }
