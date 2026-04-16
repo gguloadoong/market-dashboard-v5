@@ -13,6 +13,9 @@
 
 import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../price-cache.js';
 
+// 외부 API 호출 시 CF Worker IP 차단 방지용 User-Agent
+const UA_HEADER = { 'User-Agent': 'MarketRadar/5.0' };
+
 // #104 Opus: Upbit markets 전량 실패 + Bithumb fallback 경로에서도 최소한의 한글명 보장.
 // 라이브 Upbit 한글명 매핑을 1-off 로 추출 (Top 40 KRW 마켓).
 // ※ 리브랜드 반영: MATIC → POL, RNDR → RENDER (2024 마이그레이션).
@@ -29,7 +32,7 @@ const COIN_KR_NAMES_FALLBACK = {
   SAND: '샌드박스', MANA: '디센트럴랜드', AXS: '엑시인피니티', APE: '에이프코인', GMT: '스테픈',
 };
 
-// Upbit 전종목 KRW 마켓 목록 조회
+// Upbit 전종목 KRW 마켓 목록 조회 (한국어명 매핑용)
 async function fetchUpbitMarkets(timeoutMs = 5000) {
   const res = await fetch('https://api.upbit.com/v1/market/all?isDetails=false', {
     headers: { Accept: 'application/json' },
@@ -37,8 +40,19 @@ async function fetchUpbitMarkets(timeoutMs = 5000) {
   });
   if (!res.ok) throw new Error(`Upbit markets HTTP ${res.status}`);
   const data = await res.json();
-  // KRW 마켓만 필터
   return data.filter((m) => m.market.startsWith('KRW-'));
+}
+
+// #133: Upbit ticker/all — 전종목 1회 요청 (기존 100개 청크 분할 대체)
+async function fetchUpbitTickerAll(timeoutMs = 6000) {
+  const res = await fetch('https://api.upbit.com/v1/ticker/all?quote_currencies=KRW', {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`Upbit ticker/all HTTP ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) throw new Error('Upbit ticker/all: 빈 응답');
+  return data;
 }
 
 // Upbit 티커 배치 조회 — 100개씩 청크 분할 (URL 길이 제한 대비)
@@ -126,9 +140,10 @@ async function fetchBithumbTickers() {
 //       시총 300위 밖 코인(WAXP, CARV, LSK 등) 컷오프 해소.
 // #104 Opus: paprika 는 보강 데이터라 실패해도 snapshot 저장에 영향 없음.
 // Edge 10s 예산을 지키기 위해 타임아웃 10s → 4s 로 축소. 실패는 allSettled 가 흡수.
+// #132: CoinPaprika 상업 라이선스 필요 (402). 보조 데이터 소스로 유지하되 실패 허용.
 async function fetchCoinPaprikaOnce() {
   const res = await fetch('https://api.coinpaprika.com/v1/tickers?limit=500&quotes=KRW,USD', {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...UA_HEADER },
     signal: AbortSignal.timeout(4000),
   });
   if (!res.ok) throw new Error(`CoinPaprika HTTP ${res.status}`);
@@ -149,10 +164,11 @@ async function fetchCoinPaprika() {
 // #117: CoinGecko 2차 fallback — paprika 누락 심볼만 보강
 // 무료 tier 30 req/min. page=1,2 두 번만 호출 → 500개 커버 (안전 마진 충분).
 // Promise.allSettled 로 단일 페이지 실패는 흡수. 완전 실패 시 빈 배열.
+// #132: User-Agent 추가 — CF Worker IP에서 CoinGecko 403 방지
 async function fetchCoinGeckoPage(page, timeoutMs = 4000) {
   const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=${page}`;
   const res = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...UA_HEADER },
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`CoinGecko page=${page} HTTP ${res.status}`);
@@ -192,18 +208,21 @@ export async function updateCoins(env) {
       console.warn('[update-coins] CoinPaprika 실패 (보강 데이터 생략):', paprikaRes.reason?.message);
     }
 
-    // 2단계: Upbit 티커 조회 — 실패 시 Bithumb fallback (#104 B4)
+    // 2단계: Upbit 티커 — ticker/all 우선(1회 요청), 청크 fallback, Bithumb 최종
+    // #133: ticker/all API로 전종목 단일 요청 (기존 100개 청크 분할 N회 → 1회)
     let tickers = null;
     let tickerSource = 'upbit';
-    if (markets && markets.length > 0) {
-      try {
-        tickers = await fetchUpbitTickers(markets);
-      } catch (e) {
-        console.warn('[update-coins] Upbit ticker 전종목 실패, Bithumb fallback 시도:', e.message);
-        tickers = null;
+    try {
+      tickers = await fetchUpbitTickerAll();
+    } catch (e) {
+      console.warn('[update-coins] ticker/all 실패, 청크 fallback:', e.message);
+      if (markets && markets.length > 0) {
+        try {
+          tickers = await fetchUpbitTickers(markets);
+        } catch (e2) {
+          console.warn('[update-coins] Upbit 청크도 실패:', e2.message);
+        }
       }
-    } else {
-      console.warn('[update-coins] Upbit markets 없음 — Bithumb fallback 으로 진행');
     }
     if (!tickers || tickers.length === 0) {
       try {
