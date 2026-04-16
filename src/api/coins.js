@@ -1,7 +1,8 @@
 import { DEFAULT_KRW_RATE } from '../constants/market';
 // 코인 실시간 데이터 — 다중 소스 최적화
 // 가격: Upbit(KRW, ticker/all 단일 요청) + Binance(USD) — 키 불필요
-// 메타/이미지/스파크라인: CoinGecko 1순위 → CoinPaprika fallback
+// 메타/이미지: CoinPaprika 1순위 → CoinGecko fallback (클라이언트 rate limit 보호)
+// 스파크라인: CoinGecko — 유일한 소스, 5분 간격
 // 커버리지: 시총 상위 250개 + 업비트 상장 전체
 import { getCoinSector } from '../data/coinSectors';
 
@@ -297,32 +298,33 @@ export async function fetchCoinsUpbitOnly(prevCoins = [], krwRate = DEFAULT_KRW_
 }
 
 // ─── 통합 코인 데이터 (다중 소스 병합) ─────────────────────────
-// #132: CoinGecko 1순위 승격 (CoinPaprika 402 상업 라이선스 이슈)
-// 1순위: CoinGecko (코인 목록 + USD 가격 + 시총 + 스파크라인 + 이미지)
-// 2순위: CoinPaprika (fallback)
+// #132: 클라이언트는 CoinPaprika 우선 유지 (CoinGecko rate limit 보호)
+// 서버(Worker)에서 CoinGecko 우선 → Redis snapshot에 메타 반영
+// 1순위: CoinPaprika (코인 목록 + USD 가격 + 시총)
+// 2순위: CoinGecko (fallback + 스파크라인)
 // + Upbit (KRW 가격 덮어쓰기 — 업비트 상장 코인은 항상 우선)
 // + Binance (USD 가격 보강)
 export async function fetchCoins(krwRate = DEFAULT_KRW_RATE) {
-  // 4개 소스 병렬 호출
-  const [upbitMap, cgData, paprikaRaw, binanceMap] = await Promise.all([
+  // 3개 소스 병렬 호출 (CoinGecko는 스파크라인 전용, 별도 경로)
+  const [upbitMap, paprikaRaw, binanceMap] = await Promise.all([
     fetchUpbit().catch(() => ({})),
-    fetchCoinGecko().catch(() => null),
     fetchCoinPaprika().catch(() => null),
     fetchBinancePrices().catch(() => ({})),
   ]);
 
-  // 1순위: CoinGecko (이미지·스파크라인·시총 통합 제공)
-  if (cgData?.length) {
-    const coins = buildFromCoinGecko(cgData, upbitMap, krwRate);
+  // 1순위: CoinPaprika
+  if (paprikaRaw?.length) {
+    const coins = buildFromPaprika(paprikaRaw, upbitMap, binanceMap, krwRate);
     if (coins.length) {
       saveMetaCache(coins);
       return coins;
     }
   }
 
-  // 2순위: CoinPaprika fallback (메모리 캐시 또는 새 요청)
-  if (paprikaRaw?.length) {
-    const coins = buildFromPaprika(paprikaRaw, upbitMap, binanceMap, krwRate);
+  // 2순위: CoinGecko fallback (CoinPaprika 402 시 여기로)
+  const cgList = cgFullCache?.length ? cgFullCache : await fetchCoinGecko().catch(() => null);
+  if (cgList?.length) {
+    const coins = buildFromCoinGecko(cgList, upbitMap, krwRate);
     if (coins.length) {
       saveMetaCache(coins);
       return coins;
