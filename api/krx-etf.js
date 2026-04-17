@@ -42,20 +42,20 @@ export default async function handler(_req) {
     return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
   }
 
-  // 최근 5 거래일 병렬 요청 — Promise.any로 첫 성공 응답 사용
-  // 최악 6s 내 완료 (게이트웨이 12s 여유), 순차 7일 × 8s = 최악 56s 문제(#115) 해소
+  // 최근 7 거래일 병렬 요청 — Promise.allSettled 인덱스 순(최신 우선) 픽
+  // 최악 6s (게이트웨이 12s 여유). 추석·설 연휴 커버 위해 7일 유지. #115 해소.
+  // allSettled(Any 아님) → 최신 날짜 데이터 우선 보장, 품질 래칫 유지.
   let list = [];
-  try {
-    const attempts = Array.from({ length: 5 }, (_, i) => dateStr(i + 1));
-    list = await Promise.any(
-      attempts.map(basDd =>
-        fetchEtfForDate(basDd).then(rows => {
-          if (!rows || rows.length === 0) throw new Error('empty');
-          return rows;
-        }),
-      ),
-    );
-  } catch { /* 모든 시도 실패/빈 응답 — list 빈 상태 유지 */ }
+  const attempts = Array.from({ length: 7 }, (_, i) => dateStr(i + 1));
+  const results = await Promise.allSettled(
+    attempts.map(basDd => fetchEtfForDate(basDd)),
+  );
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value.length > 0) {
+      list = r.value;
+      break;
+    }
+  }
 
   if (!list.length) {
     return Response.json({ etfs: [] }, {
