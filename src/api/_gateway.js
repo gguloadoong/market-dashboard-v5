@@ -158,6 +158,17 @@ export function fetchNewsSummary(url, title, fallback, timeoutMs = 15000) {
 }
 
 // ─── 업비트 공지 ─────────────────────────────────────────────
+// ─── Upbit 프록시 (#136: 클라이언트 CORS 우회) ────────────────
+export function fetchUpbitMarket(timeoutMs = 5000) {
+  return gwJson({ t: 'um' }, timeoutMs);
+}
+export function fetchUpbitTicker(markets, timeoutMs = 8000) {
+  return gwJson({ t: 'ut', markets }, timeoutMs);
+}
+export function fetchUpbitTickerAll(timeoutMs = 8000) {
+  return gwJson({ t: 'uta' }, timeoutMs);
+}
+
 export function fetchUpbitNotices(timeoutMs = 5000) {
   return gwJson({ t: 'ub' }, timeoutMs);
 }
