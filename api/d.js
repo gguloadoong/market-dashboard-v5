@@ -205,16 +205,19 @@ export default async function handler(request) {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, s-maxage=1800',
+            // 업스트림 에러는 no-store — 장애 응답의 장시간 CDN 캐시 방지 (Opus HIGH)
+            'Cache-Control': r.ok ? 'public, s-maxage=1800' : 'no-store',
           },
         });
       }
       case 'ut': {
         // Upbit 티커 (markets 지정) — 클라이언트 CORS 우회 (#136)
         const markets = body.markets || '';
-        if (!markets) {
-          return new Response(JSON.stringify({ error: 'missing markets' }), {
-            status: 400, headers: { 'Content-Type': 'application/json' },
+        // markets 검증: 길이 2000 이하 + 허용 문자만 (SEC: 대역폭/RL 소진 방지)
+        if (!markets || typeof markets !== 'string' || markets.length > 2000 || !/^[A-Za-z0-9\-,]+$/.test(markets)) {
+          return new Response(JSON.stringify({ error: 'invalid markets' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
           });
         }
         const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${encodeURIComponent(markets)}`, {
@@ -223,7 +226,11 @@ export default async function handler(request) {
         const txt = await r.text();
         return new Response(txt, {
           status: r.status,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': r.ok ? 'public, s-maxage=2' : 'no-store',
+          },
         });
       }
       case 'uta': {
@@ -237,7 +244,7 @@ export default async function handler(request) {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, s-maxage=5',
+            'Cache-Control': r.ok ? 'public, s-maxage=5' : 'no-store',
           },
         });
       }

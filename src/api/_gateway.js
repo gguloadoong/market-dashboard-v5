@@ -162,8 +162,10 @@ export function fetchNewsSummary(url, title, fallback, timeoutMs = 15000) {
 export function fetchUpbitMarket(timeoutMs = 5000) {
   return gwJson({ t: 'um' }, timeoutMs);
 }
+// markets: "KRW-BTC,KRW-ETH" 형식 문자열. 배열 허용 (자동 join).
 export function fetchUpbitTicker(markets, timeoutMs = 8000) {
-  return gwJson({ t: 'ut', markets }, timeoutMs);
+  const ms = Array.isArray(markets) ? markets.join(',') : markets;
+  return gwJson({ t: 'ut', markets: ms }, timeoutMs);
 }
 export function fetchUpbitTickerAll(timeoutMs = 8000) {
   return gwJson({ t: 'uta' }, timeoutMs);
