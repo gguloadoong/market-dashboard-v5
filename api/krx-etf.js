@@ -47,11 +47,9 @@ export default async function handler(_req) {
   // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 3중복 발생.
   // offset을 최대 2주(14)까지 확장하고 dedup으로 **5 영업일 보장** (Codex P2).
   let list = [];
-  const uniqueDates = [];
-  for (let offset = 1; uniqueDates.length < 5 && offset <= 14; offset++) {
-    const d = dateStr(offset);
-    if (!uniqueDates.includes(d)) uniqueDates.push(d);
-  }
+  const uniqueDates = [...new Set(
+    Array.from({ length: 14 }, (_, i) => dateStr(i + 1)),
+  )].slice(0, 5);
   for (const basDd of uniqueDates) {
     try {
       const rows = await fetchEtfForDate(basDd);
