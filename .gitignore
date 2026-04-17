@@ -38,4 +38,17 @@ dist-ssr
 # e2e / playwright
 e2e-report/
 test-results/
+.playwright-mcp/
 .last-deployed-commit
+
+# QA 스크린샷 / 임시 목업 / 로컬 백업
+qa-*.png
+qa-*.jpg
+mockup-*.png
+mockup-*.html
+local-check-*.png
+CLAUDE.md.bak.*
+.mcp.json
+
+# 서브모듈 .claude 디렉토리
+workers/cron/.claude/
