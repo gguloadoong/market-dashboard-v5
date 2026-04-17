@@ -30,7 +30,7 @@ async function fetchMarketFromHantoo(token, iscd, today) {
       tr_id:         'FHKST01010900',
       custtype:      'P',
     },
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(4000),
   });
 
   if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
@@ -57,7 +57,7 @@ async function fetchMarketFromNaver(marketCode) {
   const naverUrl = `https://m.stock.naver.com/api/index/${marketCode}/investor`;
   const res = await fetch(
     `${PROXY}${encodeURIComponent(naverUrl)}`,
-    { signal: AbortSignal.timeout(7000) },
+    { signal: AbortSignal.timeout(5000) },
   );
   if (!res.ok) throw new Error(`Naver proxy ${res.status}`);
   const wrapper = await res.json();
