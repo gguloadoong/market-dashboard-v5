@@ -46,9 +46,11 @@ export default async function handler(_req) {
   // 최악 6s (게이트웨이 12s 여유). 추석·설 연휴 커버 위해 7일 유지. #115 해소.
   // allSettled(Any 아님) → 최신 날짜 데이터 우선 보장, 품질 래칫 유지.
   let list = [];
-  const attempts = Array.from({ length: 7 }, (_, i) => dateStr(i + 1));
+  // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 중복 3회 발생.
+  // Set으로 중복 제거 후 고유 영업일만 요청 — KRX 쿼터 낭비 방지 (Codex P2).
+  const uniqueDates = [...new Set(Array.from({ length: 7 }, (_, i) => dateStr(i + 1)))];
   const results = await Promise.allSettled(
-    attempts.map(basDd => fetchEtfForDate(basDd)),
+    uniqueDates.map(basDd => fetchEtfForDate(basDd)),
   );
   for (const r of results) {
     if (r.status === 'fulfilled' && r.value.length > 0) {
