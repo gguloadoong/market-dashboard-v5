@@ -58,10 +58,11 @@ const BACKUP_INTERVAL = 5; // 크론 5분 × 5회 = 25분 주기 (BACKUP_TTL 360
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    // 메인 키만 백업 대상 — SNAP_KEYS.KR/US/COINS 만 getSnapWithFallback 사용.
-    const isMainKey = key === SNAP_KEYS.KR || key === SNAP_KEYS.US || key === SNAP_KEYS.COINS;
+    // snap:* 전체 백업 — 메인 키(getSnapWithFallback) + 미국 샤드 키(api/_price-cache.js:getUsSnap)
+    // 둘 다 :prev fallback을 실제 읽음. cron:fail:* 등 기타 키는 스킵.
+    const isBackupKey = typeof key === 'string' && key.startsWith('snap:');
 
-    if (isMainKey) {
+    if (isBackupKey) {
       try {
         // 총 subrequest: incr(1) + set 메인(1) + 20%[get+set:prev = 2] = 평균 2.4/호출
         const counterKey = `setSnap:counter:${key}`;
