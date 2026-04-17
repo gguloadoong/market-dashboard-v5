@@ -23,7 +23,7 @@ async function fetchEtfForDate(basDd) {
       'Content-Type': 'application/json',
     },
     body:   JSON.stringify({ basDd }),
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(2000),
   });
   if (!res.ok) throw new Error(`KRX ${res.status}`);
   const data = await res.json();
@@ -42,21 +42,16 @@ export default async function handler(_req) {
     return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
   }
 
-  // 최근 7 거래일 병렬 요청 — Promise.allSettled 인덱스 순(최신 우선) 픽
-  // 최악 6s (게이트웨이 12s 여유). 추석·설 연휴 커버 위해 7일 유지. #115 해소.
-  // allSettled(Any 아님) → 최신 날짜 데이터 우선 보장, 품질 래칫 유지.
+  // 순차 5 거래일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
+  // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소)
+  // Set으로 주말 collapse 중복(월요일 Fri 3회) 제거.
   let list = [];
-  // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 중복 3회 발생.
-  // Set으로 중복 제거 후 고유 영업일만 요청 — KRX 쿼터 낭비 방지 (Codex P2).
-  const uniqueDates = [...new Set(Array.from({ length: 7 }, (_, i) => dateStr(i + 1)))];
-  const results = await Promise.allSettled(
-    uniqueDates.map(basDd => fetchEtfForDate(basDd)),
-  );
-  for (const r of results) {
-    if (r.status === 'fulfilled' && r.value.length > 0) {
-      list = r.value;
-      break;
-    }
+  const uniqueDates = [...new Set(Array.from({ length: 5 }, (_, i) => dateStr(i + 1)))];
+  for (const basDd of uniqueDates) {
+    try {
+      const rows = await fetchEtfForDate(basDd);
+      if (rows.length > 0) { list = rows; break; }
+    } catch { /* 다음 날짜 시도 */ }
   }
 
   if (!list.length) {
