@@ -49,12 +49,25 @@ export async function getSnapWithFallback(key) {
   } catch (e) { console.error(`[price-cache] 백업 조회 실패:`, e); return null; }
 }
 
+// #128: :prev 백업 경량 재도입 — counter 기반 N회 중 1회만 백업.
+// #125에서 subrequest 한계(50/invocation) 때문에 모든 setSnap 백업을 제거했으나,
+// getSnapWithFallback이 :prev를 참조하므로 fallback이 무력화 → 주기적 백업으로 복원.
+const BACKUP_INTERVAL = 10; // setSnap 10회당 1회 :prev 백업 (BACKUP_TTL은 line 33 재사용)
+
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    // #125: :prev 백업 쓰기 제거 — subrequest 한계(50/invocation) 회피
-    // get+set 2회 → set 1회로 감소. 원본 snap:<key> TTL이 크론 주기의 2배이므로
-    // 크론 1회 실패는 다음 주기에 자연 복구. 장시간 다운 대비는 Worker 전체 장애 상황.
+    // 평균 subrequest: (9*1 + 1*3)/10 = 1.2회 (set 1 + 10% 확률 get+set 추가)
+    try {
+      const counter = await _redis.incr('setSnap:counter');
+      if (counter % BACKUP_INTERVAL === 0) {
+        const existing = await _redis.get(key);
+        if (existing !== null) {
+          await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+        }
+      }
+    } catch { /* 백업 실패는 메인 쓰기를 막지 않음 */ }
+
     await _redis.set(key, data, { ex });
     return true;
   } catch (e) { console.error(`[price-cache] setSnap 실패 (${key}):`, e); return false; }
