@@ -48,7 +48,7 @@ const KR_TOP_SYMBOLS = [
   { symbol: '003550', name: 'LG' },
   { symbol: '051910', name: 'LG화학' },
   { symbol: '006400', name: '삼성SDI' },
-  { symbol: '005935', name: '삼성전자우' },
+  { symbol: '247540', name: '에코프로비엠' },
   { symbol: '011200', name: 'HMM' },
 ];
 
@@ -235,12 +235,17 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   }, []);
 }
 
-/** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출
+/** 외국인/기관 연속 매수매도 스캔 — 청크 병렬 호출 (#111 20종목)
+ * 브라우저 도메인당 동시 연결 6개 제한 대응 — 5개씩 청크로 순차 실행 (Gemini HIGH).
+ * 청크 내부는 Promise.allSettled 병렬.
  * @param {Array} allItems - 전체 종목 배열 (현재가 조회용)
  */
+const INVESTOR_CHUNK_SIZE = 5;
+
 async function scanInvestorTrends(allItems = []) {
-  // Promise.allSettled로 병렬화 (기존 순차 for loop → 로딩 최적화)
-  await Promise.allSettled(KR_TOP_SYMBOLS.map(async ({ symbol, name }) => {
+  for (let i = 0; i < KR_TOP_SYMBOLS.length; i += INVESTOR_CHUNK_SIZE) {
+    const chunk = KR_TOP_SYMBOLS.slice(i, i + INVESTOR_CHUNK_SIZE);
+    await Promise.allSettled(chunk.map(async ({ symbol, name }) => {
     try {
       const result = await fetchInvestorTrendGateway(symbol, 10);
       const data = result?.data;
@@ -294,7 +299,8 @@ async function scanInvestorTrends(allItems = []) {
     } catch {
       // 개별 종목 실패 시 무시 — 다른 종목은 계속 진행
     }
-  }));
+    }));
+  }
 }
 
 /** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널
