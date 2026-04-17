@@ -42,11 +42,16 @@ export default async function handler(_req) {
     return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
   }
 
-  // 순차 5 거래일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
-  // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소)
-  // Set으로 주말 collapse 중복(월요일 Fri 3회) 제거.
+  // 순차 5 영업일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
+  // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소).
+  // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 3중복 발생.
+  // offset을 최대 2주(14)까지 확장하고 dedup으로 **5 영업일 보장** (Codex P2).
   let list = [];
-  const uniqueDates = [...new Set(Array.from({ length: 5 }, (_, i) => dateStr(i + 1)))];
+  const uniqueDates = [];
+  for (let offset = 1; uniqueDates.length < 5 && offset <= 14; offset++) {
+    const d = dateStr(offset);
+    if (!uniqueDates.includes(d)) uniqueDates.push(d);
+  }
   for (const basDd of uniqueDates) {
     try {
       const rows = await fetchEtfForDate(basDd);
