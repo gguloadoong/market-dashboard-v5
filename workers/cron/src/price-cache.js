@@ -49,24 +49,35 @@ export async function getSnapWithFallback(key) {
   } catch (e) { console.error(`[price-cache] 백업 조회 실패:`, e); return null; }
 }
 
-// #128: :prev 백업 경량 재도입 — counter 기반 N회 중 1회만 백업.
-// #125에서 subrequest 한계(50/invocation) 때문에 모든 setSnap 백업을 제거했으나,
-// getSnapWithFallback이 :prev를 참조하므로 fallback이 무력화 → 주기적 백업으로 복원.
-const BACKUP_INTERVAL = 10; // setSnap 10회당 1회 :prev 백업 (BACKUP_TTL은 line 33 재사용)
+// #128: :prev 백업 경량 재도입 — counter 기반 N회 중 1회, 메인 키만 백업.
+// #125에서 subrequest 한계(50/invocation) 때문에 모든 백업을 제거했으나,
+// getSnapWithFallback이 :prev를 참조하므로 fallback 무력화 → 주기적 백업 복원.
+// 샤드 키는 getSnapWithFallback 대상이 아니므로 백업 스킵(죽은 subrequest 방지).
+const BACKUP_INTERVAL = 5; // 크론 5분 × 5회 = 25분 주기 (BACKUP_TTL 3600s 대비 ~35분 마진)
 
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    // 평균 subrequest: (9*1 + 1*3)/10 = 1.2회 (set 1 + 10% 확률 get+set 추가)
-    try {
-      const counter = await _redis.incr(`setSnap:counter:${key}`);
-      if (counter % BACKUP_INTERVAL === 0) {
-        const existing = await _redis.get(key);
-        if (existing !== null) {
-          await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+    // 메인 키만 백업 대상 — SNAP_KEYS.KR/US/COINS 만 getSnapWithFallback 사용.
+    const isMainKey = key === SNAP_KEYS.KR || key === SNAP_KEYS.US || key === SNAP_KEYS.COINS;
+
+    if (isMainKey) {
+      try {
+        // 총 subrequest: incr(1) + set 메인(1) + 20%[get+set:prev = 2] = 평균 2.4/호출
+        const counterKey = `setSnap:counter:${key}`;
+        const counter = await _redis.incr(counterKey);
+        if (counter === 1) {
+          // 최초 생성 시 TTL 부여 → 좀비 counter 키 누적 방지 (3시간)
+          await _redis.expire(counterKey, BACKUP_TTL * 3);
         }
-      }
-    } catch { /* 백업 실패는 메인 쓰기를 막지 않음 */ }
+        if (counter % BACKUP_INTERVAL === 0) {
+          const existing = await _redis.get(key);
+          if (existing !== null) {
+            await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+          }
+        }
+      } catch (e) { console.warn('[price-cache] :prev 백업 실패', key, e?.message); }
+    }
 
     await _redis.set(key, data, { ex });
     return true;
