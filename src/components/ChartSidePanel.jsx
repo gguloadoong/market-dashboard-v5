@@ -823,6 +823,9 @@ export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClo
 
       {/* 패널 — full-height 슬라이드 */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="종목 상세"
         className="fixed top-0 right-0 bg-white shadow-2xl flex flex-col w-full sm:w-[min(620px,48vw)]"
         style={{
           zIndex: 151,

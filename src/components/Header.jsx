@@ -116,6 +116,7 @@ export default function Header({
           {onDarkToggle && (
             <button
               onClick={onDarkToggle}
+              aria-label={dark ? '라이트 모드로 전환' : '다크 모드로 전환'}
               title={dark ? '라이트 모드로 전환' : '다크 모드로 전환'}
               className="flex items-center justify-center w-8 h-8 rounded-lg text-[#6B7684] hover:bg-[#F2F4F6] hover:text-[#191F28] transition-colors"
             >
