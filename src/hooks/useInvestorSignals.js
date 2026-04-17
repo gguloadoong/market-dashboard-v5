@@ -26,13 +26,30 @@ const CROSS_MARKET_PAIRS = [
   { leader: 'TSLA', lagger: '373220', leaderMarket: 'US', laggerMarket: 'KR' },
 ];
 
-// 시총 상위 KR 종목 (최소 5개)
+// 시총 상위 KR 종목 — #111 커버리지 확장 (5 → 20).
+// Promise.allSettled 병렬 호출이지만 한투 API 쿼터 + 게이트웨이 12s 제약 고려해 20개 선에서 타협.
+// 미장 투자자 flow는 한투 미지원(외부 13F/Form4 필요) → 별도 이슈로 분리.
 const KR_TOP_SYMBOLS = [
   { symbol: '005930', name: '삼성전자' },
   { symbol: '000660', name: 'SK하이닉스' },
   { symbol: '373220', name: 'LG에너지솔루션' },
   { symbol: '207940', name: '삼성바이오로직스' },
   { symbol: '005380', name: '현대차' },
+  { symbol: '005490', name: 'POSCO홀딩스' },
+  { symbol: '035420', name: 'NAVER' },
+  { symbol: '000270', name: '기아' },
+  { symbol: '068270', name: '셀트리온' },
+  { symbol: '035720', name: '카카오' },
+  { symbol: '105560', name: 'KB금융' },
+  { symbol: '055550', name: '신한지주' },
+  { symbol: '012330', name: '현대모비스' },
+  { symbol: '028260', name: '삼성물산' },
+  { symbol: '086790', name: '하나금융지주' },
+  { symbol: '003550', name: 'LG' },
+  { symbol: '051910', name: 'LG화학' },
+  { symbol: '006400', name: '삼성SDI' },
+  { symbol: '005935', name: '삼성전자우' },
+  { symbol: '011200', name: 'HMM' },
 ];
 
 // 현재가 조회 헬퍼 — symbol 매칭 후 가격 필드 우선순위대로 반환
