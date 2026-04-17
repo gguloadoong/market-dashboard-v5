@@ -82,16 +82,18 @@ export default async function handler(req, res) {
   try {
     let kospi, kosdaq;
 
-    // 한투 API 키가 설정된 경우 — 정확한 실시간 데이터
-    if (process.env.HANTOO_APP_KEY && process.env.HANTOO_APP_SECRET) {
+    // 한투 우선 시도 → 에러 시 Naver 자동 fallback (#135: FID_COND_MRKT_DIV_CODE 거부 대응)
+    try {
+      if (!process.env.HANTOO_APP_KEY || !process.env.HANTOO_APP_SECRET) {
+        throw new Error('HANTOO_APP_KEY 미설정');
+      }
       const token = await getHantooToken();
       [kospi, kosdaq] = await Promise.all([
         fetchMarketFromHantoo(token, '0001', today),
         fetchMarketFromHantoo(token, '1001', today),
       ]);
-    } else {
-      // Naver fallback — 한투 키 미설정 시
-      console.warn('[market-investor] HANTOO_APP_KEY 미설정 → Naver fallback');
+    } catch (hantooErr) {
+      console.warn('[market-investor] 한투 실패 → Naver fallback:', hantooErr.message);
       [kospi, kosdaq] = await Promise.all([
         fetchMarketFromNaver('KOSPI'),
         fetchMarketFromNaver('KOSDAQ'),
