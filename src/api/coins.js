@@ -1,7 +1,7 @@
 import { DEFAULT_KRW_RATE } from '../constants/market';
 // 코인 실시간 데이터 — 다중 소스 최적화
-// 가격: Upbit(KRW) + Binance(USD) — 키 불필요, 빠르고 안정
-// 메타데이터/이미지: CoinPaprika — 키 불필요, rate limit 관대
+// 가격: Upbit(KRW, ticker/all 단일 요청) + Binance(USD) — 키 불필요
+// 메타/이미지: CoinPaprika 1순위 → CoinGecko fallback (클라이언트 rate limit 보호)
 // 스파크라인: CoinGecko — 유일한 소스, 5분 간격
 // 커버리지: 시총 상위 250개 + 업비트 상장 전체
 import { getCoinSector } from '../data/coinSectors';
@@ -80,21 +80,51 @@ export async function fetchUpbitAllSymbols() {
   return symbols;
 }
 
-// ─── Upbit 실시간 호가 (동적 마켓 목록, 100개씩 청크) ──────────
+// ─── Upbit 실시간 호가 — ticker/all 단일 요청 (#133) ──────────
+// 기존: fetchUpbitAllSymbols() + 100개 청크 N회 → 신규: ticker/all 1회
 export async function fetchUpbit() {
+  const toMap = (data) => {
+    const map = {};
+    for (const d of data) {
+      if (!d.market?.startsWith('KRW-')) continue;
+      const sym = d.market.replace('KRW-', '');
+      map[sym] = {
+        priceKrw:     d.trade_price,
+        change24h:    d.signed_change_rate * 100,
+        volume24hKrw: d.acc_trade_price_24h,
+        high24hKrw:   d.high_price,
+        low24hKrw:    d.low_price,
+        high52wKrw:   d.highest_52_week_price,
+        low52wKrw:    d.lowest_52_week_price,
+      };
+    }
+    return map;
+  };
+
+  // 1순위: ticker/all (전종목 1회)
+  try {
+    const res = await fetch(
+      'https://api.upbit.com/v1/ticker/all?quote_currencies=KRW',
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return toMap(data);
+    }
+  } catch { /* fallback */ }
+
+  // 2순위: 기존 청크 방식 (ticker/all 실패 시)
   const symbols = await fetchUpbitAllSymbols().catch(() => [
     'BTC','ETH','SOL','XRP','ADA','DOGE','AVAX','SHIB','DOT','LINK',
     'UNI','NEAR','APT','ARB','SUI','OP','PEPE','XLM','TON','ATOM',
     'FIL','ICP','HBAR','ETC','SAND','MANA','INJ','SEI','LTC','BNB',
   ]);
-
   const markets = symbols.map(s => `KRW-${s}`);
   const CHUNK = 100;
   const chunks = [];
   for (let i = 0; i < markets.length; i += CHUNK) {
     chunks.push(markets.slice(i, i + CHUNK));
   }
-
   const results = await Promise.all(
     chunks.map(chunk =>
       fetch(
@@ -105,22 +135,7 @@ export async function fetchUpbit() {
         .catch(() => [])
     )
   );
-  const data = results.flat();
-
-  const map = {};
-  for (const d of data) {
-    const sym = d.market.replace('KRW-', '');
-    map[sym] = {
-      priceKrw:     d.trade_price,
-      change24h:    d.signed_change_rate * 100,
-      volume24hKrw: d.acc_trade_price_24h,
-      high24hKrw:   d.high_price,
-      low24hKrw:    d.low_price,
-      high52wKrw:   d.highest_52_week_price,
-      low52wKrw:    d.lowest_52_week_price,
-    };
-  }
-  return map;
+  return toMap(results.flat());
 }
 
 // ─── CoinPaprika — 코인 목록 + USD 가격 + 시총 (키 불필요) ──────
@@ -283,19 +298,21 @@ export async function fetchCoinsUpbitOnly(prevCoins = [], krwRate = DEFAULT_KRW_
 }
 
 // ─── 통합 코인 데이터 (다중 소스 병합) ─────────────────────────
+// #132: 클라이언트는 CoinPaprika 우선 유지 (CoinGecko rate limit 보호)
+// 서버(Worker)에서 CoinGecko 우선 → Redis snapshot에 메타 반영
 // 1순위: CoinPaprika (코인 목록 + USD 가격 + 시총)
 // 2순위: CoinGecko (fallback + 스파크라인)
-// + Upbit (KRW 가격 덮어쓰기)
+// + Upbit (KRW 가격 덮어쓰기 — 업비트 상장 코인은 항상 우선)
 // + Binance (USD 가격 보강)
 export async function fetchCoins(krwRate = DEFAULT_KRW_RATE) {
-  // 3개 소스 병렬 호출
+  // 3개 소스 병렬 호출 (CoinGecko는 스파크라인 전용, 별도 경로)
   const [upbitMap, paprikaRaw, binanceMap] = await Promise.all([
     fetchUpbit().catch(() => ({})),
     fetchCoinPaprika().catch(() => null),
     fetchBinancePrices().catch(() => ({})),
   ]);
 
-  // CoinPaprika 성공 시 → 1순위 사용
+  // 1순위: CoinPaprika
   if (paprikaRaw?.length) {
     const coins = buildFromPaprika(paprikaRaw, upbitMap, binanceMap, krwRate);
     if (coins.length) {
@@ -304,7 +321,7 @@ export async function fetchCoins(krwRate = DEFAULT_KRW_RATE) {
     }
   }
 
-  // CoinPaprika 실패 → CoinGecko fallback (이미 캐시가 있으면 사용)
+  // 2순위: CoinGecko fallback (CoinPaprika 402 시 여기로)
   const cgList = cgFullCache?.length ? cgFullCache : await fetchCoinGecko().catch(() => null);
   if (cgList?.length) {
     const coins = buildFromCoinGecko(cgList, upbitMap, krwRate);
