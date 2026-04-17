@@ -59,7 +59,7 @@ export async function setSnap(key, data, ex) {
   try {
     // 평균 subrequest: (9*1 + 1*3)/10 = 1.2회 (set 1 + 10% 확률 get+set 추가)
     try {
-      const counter = await _redis.incr('setSnap:counter');
+      const counter = await _redis.incr(`setSnap:counter:${key}`);
       if (counter % BACKUP_INTERVAL === 0) {
         const existing = await _redis.get(key);
         if (existing !== null) {
