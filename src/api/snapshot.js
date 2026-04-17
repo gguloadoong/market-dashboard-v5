@@ -2,7 +2,7 @@
 // /api/snapshot (Edge → Redis) 캐시된 전체 시세를 한 번에 가져옴
 // [최적화] ETag/304 지원 — 데이터 미변경 시 빈 응답으로 전송량 절감
 
-const SNAPSHOT_TTL = 25 * 1000; // 25초 (서버 s-maxage=30보다 짧게)
+const SNAPSHOT_TTL = 60 * 1000; // 60초 (서버 s-maxage=60과 동기화 — 중복 호출 방지)
 let _cache = null;
 let _cacheTs = 0;
 let _inflight = null;
