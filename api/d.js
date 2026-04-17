@@ -194,60 +194,6 @@ export default async function handler(request) {
         const req = makeEdgeRequest(baseUrl, `/api/upbit-notices`);
         return upbitNoticesHandler(req);
       }
-      case 'um': {
-        // Upbit 전종목 마켓 리스트 — 클라이언트 CORS 우회 (#136)
-        const r = await fetch('https://api.upbit.com/v1/market/all?isDetails=false', {
-          signal: AbortSignal.timeout(5000),
-        });
-        const txt = await r.text();
-        return new Response(txt, {
-          status: r.status,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            // 업스트림 에러는 no-store — 장애 응답의 장시간 CDN 캐시 방지 (Opus HIGH)
-            'Cache-Control': r.ok ? 'public, s-maxage=1800' : 'no-store',
-          },
-        });
-      }
-      case 'ut': {
-        // Upbit 티커 (markets 지정) — 클라이언트 CORS 우회 (#136)
-        const markets = body.markets || '';
-        // markets 검증: 길이 2000 이하 + 허용 문자만 (SEC: 대역폭/RL 소진 방지)
-        if (!markets || typeof markets !== 'string' || markets.length > 2000 || !/^[A-Za-z0-9\-,]+$/.test(markets)) {
-          return new Response(JSON.stringify({ error: 'invalid markets' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-          });
-        }
-        const r = await fetch(`https://api.upbit.com/v1/ticker?markets=${encodeURIComponent(markets)}`, {
-          signal: AbortSignal.timeout(8000),
-        });
-        const txt = await r.text();
-        return new Response(txt, {
-          status: r.status,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': r.ok ? 'public, s-maxage=2' : 'no-store',
-          },
-        });
-      }
-      case 'uta': {
-        // Upbit 전종목 KRW 티커 — 클라이언트 CORS 우회 (#136)
-        const r = await fetch('https://api.upbit.com/v1/ticker/all?quote_currencies=KRW', {
-          signal: AbortSignal.timeout(8000),
-        });
-        const txt = await r.text();
-        return new Response(txt, {
-          status: r.status,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': r.ok ? 'public, s-maxage=5' : 'no-store',
-          },
-        });
-      }
       case 'sm': {
         // 뉴스 요약: u = 기사URL, ti = 제목, fb = fallback
         const params = new URLSearchParams();
