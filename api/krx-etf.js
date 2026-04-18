@@ -23,7 +23,7 @@ async function fetchEtfForDate(basDd) {
       'Content-Type': 'application/json',
     },
     body:   JSON.stringify({ basDd }),
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(2000),
   });
   if (!res.ok) throw new Error(`KRX ${res.status}`);
   const data = await res.json();
@@ -42,11 +42,16 @@ export default async function handler(_req) {
     return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
   }
 
-  // 최근 5 거래일 중 데이터 있는 날 사용
+  // 순차 5 영업일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
+  // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소).
+  // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 3중복 발생.
+  // offset을 최대 2주(14)까지 확장하고 dedup으로 **5 영업일 보장** (Codex P2).
   let list = [];
-  for (let i = 1; i <= 7; i++) {
+  const uniqueDates = [...new Set(
+    Array.from({ length: 14 }, (_, i) => dateStr(i + 1)),
+  )].slice(0, 5);
+  for (const basDd of uniqueDates) {
     try {
-      const basDd = dateStr(i);
       const rows = await fetchEtfForDate(basDd);
       if (rows.length > 0) { list = rows; break; }
     } catch { /* 다음 날짜 시도 */ }
