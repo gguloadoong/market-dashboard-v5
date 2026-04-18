@@ -158,6 +158,26 @@ export function fetchNewsSummary(url, title, fallback, timeoutMs = 15000) {
 }
 
 // ─── 업비트 공지 ─────────────────────────────────────────────
+// ─── Upbit 프록시 (#136: CORS 우회 + CDN 캐시 활성) ────────────
+// POST /api/d 경유 시 CDN 캐시 불가 → GET /api/upbit-proxy 사용 (Codex P1).
+async function upbitProxyGet(path, params = {}, timeoutMs = 8000) {
+  const qs = new URLSearchParams({ p: path, ...params }).toString();
+  const res = await fetch(`/api/upbit-proxy?${qs}`, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`upbit-proxy ${path}: ${res.status}`);
+  return res.json();
+}
+export function fetchUpbitMarket(timeoutMs = 5000) {
+  return upbitProxyGet('market/all', {}, timeoutMs);
+}
+// markets: "KRW-BTC,KRW-ETH" 형식 문자열. 배열 허용 (자동 join).
+export function fetchUpbitTicker(markets, timeoutMs = 8000) {
+  const ms = Array.isArray(markets) ? markets.join(',') : markets;
+  return upbitProxyGet('ticker', { m: ms }, timeoutMs);
+}
+export function fetchUpbitTickerAll(timeoutMs = 8000) {
+  return upbitProxyGet('ticker/all', {}, timeoutMs);
+}
+
 export function fetchUpbitNotices(timeoutMs = 5000) {
   return gwJson({ t: 'ub' }, timeoutMs);
 }

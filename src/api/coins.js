@@ -1,4 +1,5 @@
 import { DEFAULT_KRW_RATE } from '../constants/market';
+import { fetchUpbitMarket, fetchUpbitTicker, fetchUpbitTickerAll } from './_gateway';
 // 코인 실시간 데이터 — 다중 소스 최적화
 // 가격: Upbit(KRW, ticker/all 단일 요청) + Binance(USD) — 키 불필요
 // 메타/이미지: CoinPaprika 1순위 → CoinGecko fallback (클라이언트 rate limit 보호)
@@ -66,12 +67,9 @@ export async function fetchUpbitAllSymbols() {
   if (upbitMarketCache && now - upbitMarketCacheAt < 30 * 60 * 1000) {
     return upbitMarketCache;
   }
-  const res = await fetch(
-    'https://api.upbit.com/v1/market/all?isDetails=false',
-    { signal: AbortSignal.timeout(5000) }
-  );
-  if (!res.ok) throw new Error('Upbit market list error');
-  const data = await res.json();
+  // #136: Upbit 직접 호출 → /api/d 게이트웨이 경유 (CORS 우회)
+  const data = await fetchUpbitMarket(5000);
+  if (!Array.isArray(data)) throw new Error('Upbit market list error');
   const symbols = data
     .filter(m => m.market.startsWith('KRW-'))
     .map(m => m.market.replace('KRW-', ''));
@@ -101,16 +99,10 @@ export async function fetchUpbit() {
     return map;
   };
 
-  // 1순위: ticker/all (전종목 1회)
+  // 1순위: ticker/all (전종목 1회) — #136 게이트웨이 경유
   try {
-    const res = await fetch(
-      'https://api.upbit.com/v1/ticker/all?quote_currencies=KRW',
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return toMap(data);
-    }
+    const data = await fetchUpbitTickerAll(8000);
+    if (Array.isArray(data) && data.length > 0) return toMap(data);
   } catch { /* fallback */ }
 
   // 2순위: 기존 청크 방식 (ticker/all 실패 시)
@@ -125,15 +117,11 @@ export async function fetchUpbit() {
   for (let i = 0; i < markets.length; i += CHUNK) {
     chunks.push(markets.slice(i, i + CHUNK));
   }
+  // #136: 게이트웨이 경유
   const results = await Promise.all(
     chunks.map(chunk =>
-      fetch(
-        `https://api.upbit.com/v1/ticker?markets=${chunk.join(',')}`,
-        { signal: AbortSignal.timeout(8000) }
-      )
-        .then(r => (r.ok ? r.json() : []))
-        .catch(() => [])
-    )
+      fetchUpbitTicker(chunk.join(','), 8000).catch(() => []),
+    ),
   );
   return toMap(results.flat());
 }
@@ -242,11 +230,12 @@ function loadRateCache() {
 export async function fetchExchangeRate() {
   // 1순위: Binance BTCUSDT + Upbit BTCKRW
   try {
-    const [upbitRes, binanceRes] = await Promise.all([
-      fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC', { signal: AbortSignal.timeout(4000) }),
+    // #136: Upbit은 게이트웨이 경유, Binance는 CORS OK 유지
+    const [upbitData, binanceRes] = await Promise.all([
+      fetchUpbitTicker('KRW-BTC', 4000),
       fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', { signal: AbortSignal.timeout(4000) }),
     ]);
-    const [upbitData, binanceData] = await Promise.all([upbitRes.json(), binanceRes.json()]);
+    const binanceData = await binanceRes.json();
     const btcKrw = upbitData[0]?.trade_price;
     const btcUsd = parseFloat(binanceData?.price);
     if (btcKrw && btcUsd) {
@@ -258,8 +247,8 @@ export async function fetchExchangeRate() {
 
   // 2순위: Upbit + CoinGecko
   try {
-    const res = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC', { signal: AbortSignal.timeout(4000) });
-    const data = await res.json();
+    // #136: 게이트웨이 경유
+    const data = await fetchUpbitTicker('KRW-BTC', 4000);
     const btcKrw = data[0]?.trade_price;
     const cgRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', { headers: CG_HEADERS, signal: AbortSignal.timeout(5000) });
     const cgData = await cgRes.json();
