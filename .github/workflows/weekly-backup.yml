@@ -89,13 +89,9 @@ jobs:
           # gzip 무결성 검증 — 끊긴 아카이브 조기 탐지
           gunzip -t "$GZ" || { echo "::error::gzip 무결성 실패"; exit 1; }
 
+          # 고정 size floor는 제거 — 스키마만 있는 신규 프로젝트에서 false alarm 유발 (Codex P2).
+          # 이미 앞단에 set -e로 pg_dump exit 체크, trailing marker, gunzip -t 검증이 있음.
           SIZE=$(stat -c%s "$GZ")
-          # 스키마만 있어도 수십 KB 이상이 정상 — 10KB 미만은 near-empty 의심
-          if [ "$SIZE" -lt 10240 ]; then
-            echo "::error::덤프 파일 크기 비정상 (${SIZE}B < 10KB) — 스키마 누락 의심"
-            exit 1
-          fi
-
           echo "file=$GZ" >> "$GITHUB_OUTPUT"
           echo "size=$SIZE" >> "$GITHUB_OUTPUT"
           echo "✅ 덤프 완료: $GZ ($(ls -lh "$GZ" | awk '{print $5}'))"
@@ -127,8 +123,18 @@ jobs:
           retention-days: 28
           if-no-files-found: error
 
+  # backup job이 timeout-minutes 초과로 종료되면 job-level 'if: failure()'만 이
+  # 실패를 감지 — 같은 job의 step은 실행되지 않음. 분리 job + needs로 해소 (Codex P2).
+  notify-on-failure:
+    name: notify failure
+    needs: backup
+    if: ${{ always() && needs.backup.result != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
       - name: Create issue on failure
-        if: failure()
         uses: actions/github-script@v7
         with:
           script: |
