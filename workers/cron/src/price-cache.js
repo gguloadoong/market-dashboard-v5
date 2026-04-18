@@ -49,12 +49,37 @@ export async function getSnapWithFallback(key) {
   } catch (e) { console.error(`[price-cache] 백업 조회 실패:`, e); return null; }
 }
 
+// #128: :prev 백업 경량 재도입 — counter 기반 N회 중 1회, 메인 키만 백업.
+// #125에서 subrequest 한계(50/invocation) 때문에 모든 백업을 제거했으나,
+// getSnapWithFallback이 :prev를 참조하므로 fallback 무력화 → 주기적 백업 복원.
+// 샤드 키는 getSnapWithFallback 대상이 아니므로 백업 스킵(죽은 subrequest 방지).
+const BACKUP_INTERVAL = 5; // 크론 5분 × 5회 = 25분 주기 (BACKUP_TTL 3600s 대비 ~35분 마진)
+
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    // #125: :prev 백업 쓰기 제거 — subrequest 한계(50/invocation) 회피
-    // get+set 2회 → set 1회로 감소. 원본 snap:<key> TTL이 크론 주기의 2배이므로
-    // 크론 1회 실패는 다음 주기에 자연 복구. 장시간 다운 대비는 Worker 전체 장애 상황.
+    // snap:* 전체 백업 — 메인 키(getSnapWithFallback) + 미국 샤드 키(api/_price-cache.js:getUsSnap)
+    // 둘 다 :prev fallback을 실제 읽음. cron:fail:* 등 기타 키는 스킵.
+    const isBackupKey = typeof key === 'string' && key.startsWith('snap:');
+
+    if (isBackupKey) {
+      try {
+        // 총 subrequest: incr(1) + set 메인(1) + 20%[get+set:prev = 2] = 평균 2.4/호출
+        const counterKey = `setSnap:counter:${key}`;
+        const counter = await _redis.incr(counterKey);
+        if (counter === 1) {
+          // 최초 생성 시 TTL 부여 → 좀비 counter 키 누적 방지 (3시간)
+          await _redis.expire(counterKey, BACKUP_TTL * 3);
+        }
+        if (counter % BACKUP_INTERVAL === 0) {
+          const existing = await _redis.get(key);
+          if (existing !== null) {
+            await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+          }
+        }
+      } catch (e) { console.warn('[price-cache] :prev 백업 실패', key, e?.message); }
+    }
+
     await _redis.set(key, data, { ex });
     return true;
   } catch (e) { console.error(`[price-cache] setSnap 실패 (${key}):`, e); return false; }
