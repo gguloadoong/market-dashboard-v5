@@ -13,10 +13,10 @@ export function useSignals() {
   const [signals, setSignals] = useState(getActiveSignals);
 
   useEffect(() => {
-    const handler = (active) => setSignals(active);
+    const handler = () => setSignals(getActiveSignals());
     subscribe(handler);
     // 마운트 시점 최신 상태 반영
-    setSignals(getActiveSignals());
+    handler();
     return () => unsubscribe(handler);
   }, []);
 
