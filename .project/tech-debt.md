@@ -1,6 +1,6 @@
 ---
 담당: 박서연 (Staff FE)
-마지막 업데이트: 2026-04-08
+마지막 업데이트: 2026-04-18
 ---
 
 # 기술 부채 목록
@@ -19,6 +19,7 @@
 | `scripts/pre-deploy-consensus.sh` | Reviewer Loop Deadlock — Opus PASS + Codex BLOCK 충돌 시 중재 규칙 없음 (Issue #38) | 2026-04-04 |
 | `scripts/review-summary.sh` | Codex gate 재실행 시 스테일 artifact 잔존 가능 (Issue #39) | 2026-04-04 |
 | `.git/hooks/pre-push` | v5에 pre-push hook 없음 — `npm run pr` 우회 시 Codex gate/code-review 검증 전부 스킵 가능. v2에는 있었으나 v5 마이그레이션 시 누락. PR #42가 Codex gate 없이 머지된 원인 | 2026-04-06 |
+| `api/krx-etf.js` | 2s 타임아웃 공격성 모니터링 — Codex P2 재지적 (Issue #143 기각). 설계 근거: 5영업일 × 2s = 10s ≤ gateway 12s (#115 15s hang 방지). 실패 시 Edge cache(s-maxage=3600) + 빈 ETF graceful fallback. 프로덕션 KRX p95 응답시간 확인 후 3s 상향 여부 재판단 | 2026-04-18 |
 
 ---
 
