@@ -71,9 +71,11 @@ jobs:
           GZ="${RAW}.gz"
 
           # set -e가 pg_dump 비정상 종료 시 즉시 실패 처리
+          # --no-owner: Supabase service_role 소유권 복구 충돌 방지
+          # ACL(GRANT/REVOKE)은 유지 — supabase/migrations가 anon/authenticated 권한 명시 부여
+          # → --no-privileges 제거 시 disaster recovery에서 권한 재현 필수 (Codex P1)
           PGCONNECT_TIMEOUT=30 pg_dump "$DATABASE_URL" \
             --no-owner \
-            --no-privileges \
             --format=plain \
             > "$RAW"
 
