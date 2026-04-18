@@ -26,13 +26,30 @@ const CROSS_MARKET_PAIRS = [
   { leader: 'TSLA', lagger: '373220', leaderMarket: 'US', laggerMarket: 'KR' },
 ];
 
-// 시총 상위 KR 종목 (최소 5개)
+// 시총 상위 KR 종목 — #111 커버리지 확장 (5 → 20).
+// Promise.allSettled 병렬 호출이지만 한투 API 쿼터 + 게이트웨이 12s 제약 고려해 20개 선에서 타협.
+// 미장 투자자 flow는 한투 미지원(외부 13F/Form4 필요) → 별도 이슈로 분리.
 const KR_TOP_SYMBOLS = [
   { symbol: '005930', name: '삼성전자' },
   { symbol: '000660', name: 'SK하이닉스' },
   { symbol: '373220', name: 'LG에너지솔루션' },
   { symbol: '207940', name: '삼성바이오로직스' },
   { symbol: '005380', name: '현대차' },
+  { symbol: '005490', name: 'POSCO홀딩스' },
+  { symbol: '035420', name: 'NAVER' },
+  { symbol: '000270', name: '기아' },
+  { symbol: '068270', name: '셀트리온' },
+  { symbol: '035720', name: '카카오' },
+  { symbol: '105560', name: 'KB금융' },
+  { symbol: '055550', name: '신한지주' },
+  { symbol: '012330', name: '현대모비스' },
+  { symbol: '028260', name: '삼성물산' },
+  { symbol: '086790', name: '하나금융지주' },
+  { symbol: '003550', name: 'LG' },
+  { symbol: '051910', name: 'LG화학' },
+  { symbol: '006400', name: '삼성SDI' },
+  { symbol: '247540', name: '에코프로비엠' },
+  { symbol: '011200', name: 'HMM' },
 ];
 
 // 현재가 조회 헬퍼 — symbol 매칭 후 가격 필드 우선순위대로 반환
@@ -218,12 +235,17 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   }, []);
 }
 
-/** 외국인/기관 연속 매수매도 스캔 — 5종목 병렬 호출
+/** 외국인/기관 연속 매수매도 스캔 — 청크 병렬 호출 (#111 20종목)
+ * 브라우저 도메인당 동시 연결 6개 제한 대응 — 5개씩 청크로 순차 실행 (Gemini HIGH).
+ * 청크 내부는 Promise.allSettled 병렬.
  * @param {Array} allItems - 전체 종목 배열 (현재가 조회용)
  */
+const INVESTOR_CHUNK_SIZE = 5;
+
 async function scanInvestorTrends(allItems = []) {
-  // Promise.allSettled로 병렬화 (기존 순차 for loop → 로딩 최적화)
-  await Promise.allSettled(KR_TOP_SYMBOLS.map(async ({ symbol, name }) => {
+  for (let i = 0; i < KR_TOP_SYMBOLS.length; i += INVESTOR_CHUNK_SIZE) {
+    const chunk = KR_TOP_SYMBOLS.slice(i, i + INVESTOR_CHUNK_SIZE);
+    await Promise.allSettled(chunk.map(async ({ symbol, name }) => {
     try {
       const result = await fetchInvestorTrendGateway(symbol, 10);
       const data = result?.data;
@@ -277,7 +299,8 @@ async function scanInvestorTrends(allItems = []) {
     } catch {
       // 개별 종목 실패 시 무시 — 다른 종목은 계속 진행
     }
-  }));
+    }));
+  }
 }
 
 /** 섹터 로테이션 감지 — 전일 대비 섹터 순위 3단계+ 변동 시 시그널
