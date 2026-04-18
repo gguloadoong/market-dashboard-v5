@@ -1,7 +1,13 @@
 # Supabase 주간 자동 백업
 # 매주 일요일 UTC 18:00 (월요일 KST 03:00)
-# pg_dump → gzip → GitHub artifact (4주 보관)
+# pg_dump(PGDG 17) → gunzip-t 검증 → GPG AES256(선택) → GitHub artifact (4주)
 # 실패 시 Issue 자동 생성 (중복 방지)
+#
+# 필수 secret:
+#   - SUPABASE_DB_URL: **Direct Connection** URI (db.{ref}.supabase.co:5432)
+#     ※ Pooler(6543/pgbouncer) URL은 pg_dump와 호환 안 됨
+# 선택 secret:
+#   - BACKUP_PASSPHRASE: 있으면 GPG 대칭 암호화(AES256), 없으면 평문 gzip
 
 name: Supabase Weekly Backup
 
@@ -10,18 +16,34 @@ on:
     - cron: '0 18 * * 0'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: supabase-weekly-backup
+  cancel-in-progress: false
+
 jobs:
   backup:
-    name: dump / upload / notify
+    name: dump / verify / upload
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Supabase 현재 PG 메이저 — 업그레이드 시 이 값만 조정
+      PG_MAJOR: '17'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL ${{ env.PG_MAJOR }} client (PGDG)
         run: |
+          set -euo pipefail
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
+          pg_dump --version
 
       - name: Dump Supabase database
         id: dump
@@ -30,37 +52,75 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${DATABASE_URL:-}" ]; then
-            echo "::error::SUPABASE_DB_URL secret 미등록 — Settings → Secrets → Actions에서 등록 필요"
+            echo "::error::SUPABASE_DB_URL secret 미등록 — Settings → Secrets → Actions에서 등록 필요 (Direct Connection URI)"
             exit 1
           fi
 
-          TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
-          FILE="supabase-backup-${TIMESTAMP}.sql.gz"
+          # Pooler URL 조기 차단 — pg_dump는 pgBouncer transaction mode와 호환 안 됨
+          case "$DATABASE_URL" in
+            *pooler*|*:6543*)
+              echo "::error::SUPABASE_DB_URL이 Pooler(6543/pooler)로 감지 — Direct Connection(5432)으로 교체 필요"
+              exit 1
+              ;;
+          esac
 
-          # --no-owner/--no-privileges: 복구 시 권한 충돌 방지
-          # --format=plain + gzip: 범용 복구 편의
+          TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
+          RAW="supabase-backup-${TIMESTAMP}.sql"
+          GZ="${RAW}.gz"
+
+          # set -o pipefail 전역 적용 — pg_dump 실패 시 pipeline exit code 전파
           pg_dump "$DATABASE_URL" \
             --no-owner \
             --no-privileges \
             --format=plain \
-            | gzip --best > "$FILE"
+            > "$RAW"
 
-          SIZE=$(stat -c%s "$FILE" 2>/dev/null || stat -f%z "$FILE")
-          if [ "$SIZE" -lt 1024 ]; then
-            echo "::error::덤프 파일 크기 비정상 (${SIZE}B < 1KB) — pg_dump 실패 의심"
+          # trailing marker 검증 — pg_dump가 silent truncate 되면 마커 없음
+          if ! tail -n 20 "$RAW" | grep -q 'PostgreSQL database dump complete'; then
+            echo "::error::pg_dump 완료 마커 누락 — 덤프 불완전 의심"
             exit 1
           fi
 
-          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          gzip -6 "$RAW"
+          # gzip 무결성 검증 — 끊긴 아카이브 조기 탐지
+          gunzip -t "$GZ" || { echo "::error::gzip 무결성 실패"; exit 1; }
+
+          SIZE=$(stat -c%s "$GZ")
+          if [ "$SIZE" -lt 1024 ]; then
+            echo "::error::덤프 파일 크기 비정상 (${SIZE}B < 1KB)"
+            exit 1
+          fi
+
+          echo "file=$GZ" >> "$GITHUB_OUTPUT"
           echo "size=$SIZE" >> "$GITHUB_OUTPUT"
-          echo "✅ 덤프 완료: $FILE ($(ls -lh "$FILE" | awk '{print $5}'))"
+          echo "✅ 덤프 완료: $GZ ($(ls -lh "$GZ" | awk '{print $5}'))"
+
+      - name: Encrypt backup (optional, if BACKUP_PASSPHRASE set)
+        id: encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          SRC="${{ steps.dump.outputs.file }}"
+          if [ -z "${BACKUP_PASSPHRASE:-}" ]; then
+            echo "::warning::BACKUP_PASSPHRASE 미등록 — 평문 gzip 상태로 artifact 업로드 (민감 데이터 있으면 secret 등록 권장)"
+            echo "artifact=$SRC" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          OUT="${SRC}.gpg"
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$OUT" "$SRC"
+          shred -u "$SRC" 2>/dev/null || rm -f "$SRC"
+          echo "artifact=$OUT" >> "$GITHUB_OUTPUT"
+          echo "✅ AES256 암호화 완료: $OUT"
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: supabase-backup-${{ github.run_number }}
-          path: ${{ steps.dump.outputs.file }}
+          path: ${{ steps.encrypt.outputs.artifact }}
           retention-days: 28
+          if-no-files-found: error
 
       - name: Create issue on failure
         if: failure()
@@ -72,28 +132,33 @@ jobs:
               repo: context.repo.repo,
               state: 'open',
               labels: 'supabase-backup-failed',
+              per_page: 100,
             });
             if (issues.data.length > 0) {
               console.log('이미 열린 백업 실패 이슈 존재, 중복 생성 생략');
               return;
             }
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // KST 기준 날짜 (UTC + 9h)
+            const kstDate = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🗄 Supabase 주간 백업 실패 — ${new Date().toISOString().slice(0,10)}`,
+              title: `🗄 Supabase 주간 백업 실패 — ${kstDate}`,
               body: [
                 '## 문제',
                 `주간 백업 워크플로우가 실패했습니다.`,
                 `실행 로그: ${runUrl}`,
                 '',
-                '## 원인 후보',
-                '- `SUPABASE_DB_URL` secret 미등록/만료',
-                '- pg_dump 네트워크/TLS 오류',
-                '- Supabase 측 연결 제한 (동시 접속/대역폭)',
+                '## 원인 후보 (빈도순)',
+                '1. **Pooler URL 등록** — Supabase Dashboard의 기본 connection string은 pooler(6543). pg_dump는 Direct(5432) 필요',
+                '2. `SUPABASE_DB_URL` secret 미등록 또는 만료',
+                '3. `BACKUP_PASSPHRASE` secret 형식/인코딩 이슈',
+                '4. pg_dump 버전 불일치 — Supabase PG 메이저 업그레이드 시 워크플로우 PG_MAJOR 갱신 필요',
+                '5. Supabase 측 연결 제한 (동시 접속/대역폭)',
                 '',
                 '## 조치',
-                '1. Supabase Dashboard → Settings → Database → Connection string (URI 형식)',
+                '1. Supabase Dashboard → Settings → Database → **Direct connection** URI 확인',
                 '2. GitHub Settings → Secrets → Actions → `SUPABASE_DB_URL` 갱신',
                 '3. 워크플로우 수동 재실행 (`workflow_dispatch`)',
                 '',
