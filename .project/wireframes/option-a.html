@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>A안 · 보수 — 순서 재배치</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100">
+
+<div class="max-w-6xl mx-auto px-6 py-6">
+  <a href="./index.html" class="text-xs text-slate-500 hover:underline">← 비교 허브로</a>
+  <h1 class="text-xl font-bold mt-2 text-green-700">A안 · 보수 (리스크 낮음 · 2~3일 · 기존 95% 재사용)</h1>
+  <p class="text-xs text-slate-600 mt-1">CommandCenter 내부 재구성 + 섹션 순서 미세 조정. 영구 삭제 목록 100% 준수.</p>
+</div>
+
+<div class="mx-auto bg-white" style="width:375px;">
+  <!-- 상단 앱바 -->
+  <div class="sticky top-0 z-10 bg-white border-b px-4 py-3 flex items-center justify-between">
+    <div class="text-base font-bold">마켓레이더</div>
+    <div class="flex gap-3 text-slate-500 text-xs">🔍 🌙 🔔</div>
+  </div>
+
+  <!-- CommandCenter 재구성: 온도 축소 + 히어로 확대 + 관심종목/이벤트 압축 -->
+  <div class="border-b-8 border-slate-100">
+    <div class="px-4 pt-3 pb-2 text-[10px] text-green-600 font-mono">CommandCenterWidget · 재구성</div>
+
+    <!-- 온도바 한 줄 -->
+    <div class="px-4 pb-2">
+      <div class="flex items-center gap-2 text-xs">
+        <span class="font-bold">🔥 72 탐욕</span>
+        <div class="flex-1 h-1.5 bg-slate-200 rounded-full">
+          <div class="h-1.5 bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 rounded-full" style="width:72%"></div>
+        </div>
+      </div>
+      <div class="mt-1 flex gap-2 text-[10px] text-slate-600">
+        <span>KOSPI <b class="text-red-500">+0.8%</b></span>
+        <span>S&amp;P <b class="text-red-500">+1.2%</b></span>
+        <span>BTC <b class="text-blue-500">-0.3%</b></span>
+        <span>$1,410</span>
+      </div>
+    </div>
+
+    <!-- 히어로 시그널 확대 (1번이 큰 단독 카드) -->
+    <div class="px-4 pb-3">
+      <div class="text-[10px] text-green-600 mb-1">히어로 시그널 · 가장 강한 것 1개 크게</div>
+      <div class="bg-gradient-to-br from-red-50 to-amber-50 border-2 border-red-200 rounded-lg p-3">
+        <div class="flex items-center gap-2">
+          <span class="text-red-700 font-bold text-xs">🔥 거래량 3배 폭증</span>
+          <span class="text-[10px] bg-red-100 text-red-700 px-1.5 rounded">STRONG</span>
+        </div>
+        <div class="mt-2 flex justify-between items-end">
+          <div>
+            <div class="text-base font-bold">삼성전자</div>
+            <div class="text-[11px] text-slate-500">반도체 · KR</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xl font-bold text-red-600">+2.1%</div>
+            <div class="text-[10px] text-slate-500">₩72,100</div>
+          </div>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-700 border-t border-red-100 pt-2">
+          <b>왜?</b> HBM3E 엔비디아 공급 뉴스 + 외국인 1,200억 순매수
+        </div>
+      </div>
+      <!-- 추가 시그널 2개 작게 -->
+      <div class="mt-2 grid grid-cols-2 gap-1">
+        <div class="bg-red-50 rounded p-1.5 text-[10px]">
+          <div class="font-bold text-red-700">💪 세력포착</div>
+          <div class="flex justify-between"><span>SK하이닉스</span><span class="text-red-500 font-bold">+3.4%</span></div>
+        </div>
+        <div class="bg-blue-50 rounded p-1.5 text-[10px]">
+          <div class="font-bold text-blue-700">📉 급락</div>
+          <div class="flex justify-between"><span>LG화학</span><span class="text-blue-500 font-bold">-2.8%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 관심종목: 있을 때만 표시 (예시는 빈 상태 → 완전 숨김) -->
+    <!-- 빈 섹션 제거: 첫방문자 배려 -->
+
+    <!-- 이벤트 한 줄 축소 -->
+    <div class="px-4 pb-3">
+      <div class="bg-amber-50 rounded px-2 py-1.5 text-[11px]">
+        <span class="text-amber-700 font-bold">📅 D-2</span>
+        <span class="ml-1 text-slate-700">미국 CPI (4/21 21:30)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 순서: NotableMovers 유지 -->
+  <div class="px-4 py-4 border-b-8 border-slate-100">
+    <div class="text-[10px] text-slate-400 font-mono mb-2">NotableMoversSection · 유지</div>
+    <div class="text-sm font-bold mb-2">주목할 종목</div>
+    <div class="space-y-2">
+      <div class="bg-slate-50 rounded p-2 text-xs">
+        <div class="flex justify-between"><span class="font-bold">현대차 +4.2%</span><span>🔥</span></div>
+        <div class="text-slate-500 mt-1">미국 관세 우려 완화 + 거래량 2.3배</div>
+      </div>
+      <div class="bg-slate-50 rounded p-2 text-xs">
+        <div class="flex justify-between"><span class="font-bold">에코프로비엠 -3.1%</span><span>📉</span></div>
+        <div class="text-slate-500 mt-1">배터리 수주 취소 보도</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 순서: SignalBoard 유지 -->
+  <div class="px-4 py-4 border-b-8 border-slate-100">
+    <div class="text-[10px] text-slate-400 font-mono mb-2">SignalBoardWidget · 유지</div>
+    <div class="text-sm font-bold mb-2">시그널 보드</div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-slate-50 rounded p-3"><div class="text-lg font-bold">24</div><div class="text-[10px] text-slate-500">활성</div></div>
+      <div class="bg-slate-50 rounded p-3"><div class="text-lg font-bold text-red-500">12</div><div class="text-[10px] text-slate-500">매수</div></div>
+      <div class="bg-slate-50 rounded p-3"><div class="text-lg font-bold text-blue-500">8</div><div class="text-[10px] text-slate-500">매도</div></div>
+    </div>
+  </div>
+
+  <!-- 순서: ExploreTabs 유지 (AI토론보다 위로) -->
+  <div class="px-4 py-4 border-b-8 border-slate-100">
+    <div class="text-[10px] text-green-600 font-mono mb-2">ExploreTabsWidget · AI토론보다 위로 이동</div>
+    <div class="flex gap-2 mb-2 text-xs">
+      <span class="px-2 py-1 bg-slate-900 text-white rounded">급등/급락</span>
+      <span class="px-2 py-1 text-slate-500">섹터</span>
+    </div>
+    <div class="space-y-1 text-xs">
+      <div class="flex justify-between py-1"><span>현대차</span><span class="text-red-500">+4.2%</span></div>
+      <div class="flex justify-between py-1"><span>삼성전자</span><span class="text-red-500">+2.1%</span></div>
+      <div class="flex justify-between py-1"><span>LG화학</span><span class="text-blue-500">-2.8%</span></div>
+    </div>
+  </div>
+
+  <!-- 순서: AiDebate 하단 이동 (심층 분석은 후순위) -->
+  <div class="px-4 py-4 border-b-8 border-slate-100">
+    <div class="text-[10px] text-green-600 font-mono mb-2">AiDebateSection · 하단 이동</div>
+    <div class="text-sm font-bold mb-2">AI 종목 토론</div>
+    <div class="flex gap-1 mb-2 overflow-x-auto text-xs">
+      <span class="px-2 py-1 bg-slate-100 rounded-full whitespace-nowrap">삼성전자</span>
+      <span class="px-2 py-1 bg-slate-100 rounded-full whitespace-nowrap">애플</span>
+      <span class="px-2 py-1 bg-slate-100 rounded-full whitespace-nowrap">BTC</span>
+      <span class="px-2 py-1 bg-slate-100 rounded-full whitespace-nowrap">NVDA</span>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <div class="bg-red-50 border border-red-200 rounded p-2"><div class="text-[10px] font-bold text-red-700">살 이유</div><div class="text-xs mt-1 text-slate-700">HBM 수주...</div></div>
+      <div class="bg-blue-50 border border-blue-200 rounded p-2"><div class="text-[10px] font-bold text-blue-700">조심할 이유</div><div class="text-xs mt-1 text-slate-700">중국 수요...</div></div>
+    </div>
+  </div>
+
+  <!-- NewsFeed 유지 -->
+  <div class="px-4 py-4 pb-20">
+    <div class="text-[10px] text-slate-400 font-mono mb-2">NewsFeedWidget · 유지</div>
+    <div class="text-sm font-bold mb-2">투자 뉴스</div>
+    <div class="space-y-2 text-xs">
+      <div class="border-b pb-2"><div class="font-medium">삼성전자, HBM3E 엔비디아 공급 본격화</div><div class="text-slate-500 mt-1">매경 · 5분</div></div>
+      <div class="border-b pb-2"><div class="font-medium">미국 국채금리 상승에 증시 긴장</div><div class="text-slate-500 mt-1">연합 · 12분</div></div>
+    </div>
+  </div>
+
+  <div class="sticky bottom-0 bg-white border-t flex justify-around py-2 text-[10px] text-slate-600">
+    <div class="flex flex-col items-center"><span>🏠</span><span>홈</span></div>
+    <div class="flex flex-col items-center"><span>📊</span><span>차트</span></div>
+    <div class="flex flex-col items-center"><span>📰</span><span>뉴스</span></div>
+    <div class="flex flex-col items-center"><span>🔥</span><span>섹터</span></div>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-6 py-6">
+  <h2 class="font-bold">🔧 변경점 (파일 수정 범위)</h2>
+  <ul class="mt-2 text-sm list-disc pl-5 space-y-1 text-slate-700">
+    <li><code>CommandCenterWidget.jsx</code> — 히어로 카드 1개를 큰 카드로 렌더 + 2/3등 작게</li>
+    <li><code>CommandCenterWidget.jsx</code> — 관심종목 미등록 시 렌더 스킵 (첫방문자 배려)</li>
+    <li><code>home/index.jsx</code> — ExploreTabs ↔ AiDebate 순서 swap</li>
+    <li>삭제/추가 없음, HOME_CONTRACT 원자적 유지 가능</li>
+  </ul>
+  <p class="mt-3 text-xs text-slate-500">예상 공수: 2~3일 (리뷰·QA 포함). 롤백 매우 쉬움 (flag off만).</p>
+</div>
+
+</body>
+</html>
