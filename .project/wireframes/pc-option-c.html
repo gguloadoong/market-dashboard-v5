@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PC C안 · 과감 — 타임라인 피드</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100">
+
+<div class="max-w-7xl mx-auto px-6 py-6">
+  <a href="./index.html" class="text-xs text-slate-500 hover:underline">← 비교 허브로</a>
+  <h1 class="text-xl font-bold mt-2 text-purple-700">PC C안 · 과감 (6~8일 · 기존 40% 재사용)</h1>
+  <p class="text-xs text-slate-600 mt-1">2-column 그리드 → 3-column 분할. 히어로+타임라인+집계를 동시에 보여주는 Bloomberg 스타일.</p>
+</div>
+
+<div class="mx-auto bg-white shadow-xl" style="width:1280px;">
+  <!-- 상단 헤더 + 얇은 온도 게이지 -->
+  <div class="sticky top-0 z-20 bg-white border-b">
+    <div class="px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <div class="text-lg font-bold">마켓레이더</div>
+        <nav class="flex gap-6 text-sm text-slate-600">
+          <span class="font-semibold text-slate-900">홈</span>
+          <span>차트</span><span>뉴스</span><span>섹터</span><span>스크리너</span>
+        </nav>
+      </div>
+      <div class="flex gap-4 text-slate-500 text-sm">🔍 🌙 🔔</div>
+    </div>
+    <div class="px-6 pb-2">
+      <div class="flex items-center gap-3 text-[11px]">
+        <span class="font-bold text-red-600">🔥 72 탐욕</span>
+        <div class="flex-1 h-1 bg-slate-200 rounded-full"><div class="h-1 bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 rounded-full" style="width:72%"></div></div>
+        <span>KOSPI <b class="text-red-500">+0.8%</b></span>
+        <span>S&amp;P <b class="text-red-500">+1.2%</b></span>
+        <span>NDX <b class="text-red-500">+1.4%</b></span>
+        <span>BTC <b class="text-blue-500">-0.3%</b></span>
+        <span>$ <b>1,410</b></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3-column grid: 히어로(좌 560px) | 타임라인 피드(중앙 1fr) | 사이드 진입점(우 260px) -->
+  <div class="grid" style="grid-template-columns: 560px 1fr 260px;">
+
+    <!-- ═══ 좌측: 히어로 시그널 (스와이프 가능) ═══ -->
+    <div class="bg-slate-900 text-white min-h-[600px] relative">
+      <div class="absolute top-4 left-6 text-[10px] font-bold tracking-wider opacity-70">🔥 가장 강한 시그널</div>
+      <div class="absolute top-4 right-6 text-[10px] bg-white/20 backdrop-blur px-2 py-1 rounded-full">1 / 3 ▸</div>
+
+      <div class="px-6 pt-16 pb-8">
+        <div class="text-xs opacity-70">반도체 · 코스피</div>
+        <div class="text-5xl font-black mt-2">삼성전자</div>
+        <div class="mt-4 flex items-baseline gap-3">
+          <span class="text-7xl font-black text-red-400">+2.1%</span>
+          <span class="text-xl opacity-80">₩72,100</span>
+        </div>
+
+        <div class="mt-6 bg-white/10 backdrop-blur rounded-xl p-4">
+          <div class="text-[11px] font-bold opacity-70 tracking-wider mb-2">왜 지금?</div>
+          <div class="text-sm leading-relaxed">
+            HBM3E 엔비디아 공급 본격화 뉴스 + <b class="text-red-300">거래량 3배 폭증</b> + 외국인 1,200억 순매수 (오전 10시 이후)
+          </div>
+        </div>
+
+        <!-- 추가 맥락 -->
+        <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+          <div class="bg-white/5 rounded p-2">
+            <div class="opacity-60 text-[10px]">거래량</div>
+            <div class="font-bold text-red-300 mt-0.5">3.2× 평균</div>
+          </div>
+          <div class="bg-white/5 rounded p-2">
+            <div class="opacity-60 text-[10px]">외인</div>
+            <div class="font-bold text-red-300 mt-0.5">+1,200억</div>
+          </div>
+          <div class="bg-white/5 rounded p-2">
+            <div class="opacity-60 text-[10px]">관련 뉴스</div>
+            <div class="font-bold mt-0.5">12건</div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex gap-2">
+          <button class="flex-1 bg-white text-slate-900 text-sm font-bold py-3 rounded-lg">차트 보기</button>
+          <button class="flex-1 bg-white/10 border border-white/30 text-sm py-3 rounded-lg">뉴스 전체</button>
+          <button class="px-4 bg-white/10 border border-white/30 text-sm py-3 rounded-lg">⭐</button>
+        </div>
+
+        <!-- 스와이프 인디케이터 -->
+        <div class="mt-8 flex items-center gap-2 text-[10px] opacity-60">
+          <span class="w-8 h-1 bg-white rounded-full"></span>
+          <span class="w-2 h-1 bg-white/30 rounded-full"></span>
+          <span class="w-2 h-1 bg-white/30 rounded-full"></span>
+          <span class="ml-2">다음: SK하이닉스 +3.4% · 세력 포착</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 중앙: 통합 타임라인 피드 ═══ -->
+    <div class="bg-slate-50/50">
+      <div class="sticky top-[88px] bg-white/90 backdrop-blur border-b px-5 py-3 flex items-center justify-between z-10">
+        <div class="text-sm font-bold">지금 일어나는 일</div>
+        <div class="flex gap-1 text-[10px]">
+          <span class="px-2 py-1 bg-slate-900 text-white rounded-full">전체</span>
+          <span class="px-2 py-1 text-slate-500">시그널</span>
+          <span class="px-2 py-1 text-slate-500">뉴스</span>
+          <span class="px-2 py-1 text-slate-500">급등/급락</span>
+          <span class="px-2 py-1 text-slate-500">섹터</span>
+        </div>
+      </div>
+
+      <div>
+        <!-- 피드 아이템들 (시간순) -->
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">💪</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-red-700 font-bold">세력 포착</span>
+              <span class="text-slate-400">· 5분 전</span>
+            </div>
+            <div class="mt-0.5 flex items-center justify-between">
+              <div class="font-bold text-sm">SK하이닉스</div>
+              <div class="text-red-600 font-bold">+3.4%</div>
+            </div>
+            <div class="text-xs text-slate-600 mt-1">기관 3일 연속 순매수 — 누적 850억. HBM 수혜 본격화 국면.</div>
+          </div>
+        </div>
+
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">📰</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-blue-700 font-bold">속보 · 호재</span>
+              <span class="text-slate-400">· 8분 전</span>
+            </div>
+            <div class="mt-0.5 font-medium text-sm">삼성전자 HBM3E 엔비디아 공급 본격화</div>
+            <div class="text-xs text-slate-600 mt-1">매일경제 · 관련 종목 <span class="text-blue-600">#삼성전자</span> <span class="text-blue-600">#SK하이닉스</span></div>
+          </div>
+        </div>
+
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">🔥</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-red-700 font-bold">급등</span>
+              <span class="text-slate-400">· 12분 전</span>
+            </div>
+            <div class="mt-0.5 flex items-center justify-between">
+              <div class="font-bold text-sm">현대차</div>
+              <div class="text-red-600 font-bold">+4.2%</div>
+            </div>
+            <div class="text-xs text-slate-600 mt-1">관세 완화 뉴스 + 거래량 2.3배. 자동차 섹터 동반 상승.</div>
+          </div>
+        </div>
+
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">🔥</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-amber-700 font-bold">섹터 HOT</span>
+              <span class="text-slate-400">· 15분 전</span>
+            </div>
+            <div class="mt-0.5 flex items-center justify-between">
+              <div class="font-bold text-sm">반도체</div>
+              <div class="text-red-600 font-bold">+2.1%</div>
+            </div>
+            <div class="text-xs text-slate-600 mt-1">상승 종목 83% · HBM 수혜 전반 확산. 하이닉스·삼성 쌍두 견인.</div>
+          </div>
+        </div>
+
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">📅</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-slate-700 font-bold">예정 이벤트</span>
+              <span class="text-slate-400">· D-2</span>
+            </div>
+            <div class="mt-0.5 font-medium text-sm">미국 CPI 발표</div>
+            <div class="text-xs text-slate-600 mt-1">4/21 21:30 KST · 예상 3.2% · 과열 시 시장 조정 가능</div>
+          </div>
+        </div>
+
+        <div class="px-5 py-3 border-b flex gap-3 hover:bg-white cursor-pointer">
+          <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">📉</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-blue-700 font-bold">급락 · 악재</span>
+              <span class="text-slate-400">· 18분 전</span>
+            </div>
+            <div class="mt-0.5 flex items-center justify-between">
+              <div class="font-bold text-sm">LG화학</div>
+              <div class="text-blue-600 font-bold">-2.8%</div>
+            </div>
+            <div class="text-xs text-slate-600 mt-1">배터리 수요 둔화 보도. 2차전지 섹터 동반 조정.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 우측: 탐색 진입점 + 집계 ═══ -->
+    <div class="bg-white border-l p-4 space-y-4">
+      <div>
+        <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-2">시그널 집계</div>
+        <div class="bg-slate-50 rounded-lg p-3 grid grid-cols-2 gap-2 text-center">
+          <div><div class="text-lg font-bold">24</div><div class="text-[10px] text-slate-500">활성</div></div>
+          <div><div class="text-lg font-bold text-red-500">12</div><div class="text-[10px] text-slate-500">매수</div></div>
+          <div><div class="text-lg font-bold text-blue-500">8</div><div class="text-[10px] text-slate-500">매도</div></div>
+          <div><div class="text-lg font-bold text-amber-500">3</div><div class="text-[10px] text-slate-500">세력</div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-2">더 깊게 탐색</div>
+        <div class="space-y-1.5">
+          <button class="w-full flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm">
+            <span>🔥</span><span class="font-medium flex-1 text-left">섹터 분석</span><span class="text-slate-400 text-xs">▸</span>
+          </button>
+          <button class="w-full flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm">
+            <span>🤖</span><span class="font-medium flex-1 text-left">AI 종목 토론</span><span class="text-slate-400 text-xs">▸</span>
+          </button>
+          <button class="w-full flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm">
+            <span>⚙️</span><span class="font-medium flex-1 text-left">스크리너</span><span class="text-slate-400 text-xs">▸</span>
+          </button>
+          <button class="w-full flex items-center gap-2 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg text-sm">
+            <span>⭐</span><span class="font-medium flex-1 text-left">관심종목</span><span class="text-slate-400 text-[10px]">등록 후</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="text-[10px] font-bold text-slate-500 tracking-wider mb-2">오늘의 숫자</div>
+        <div class="space-y-1.5 text-xs">
+          <div class="flex justify-between py-1 border-b"><span class="text-slate-500">상승/하락</span><span><b class="text-red-500">1,247</b> / <b class="text-blue-500">823</b></span></div>
+          <div class="flex justify-between py-1 border-b"><span class="text-slate-500">상한가</span><span class="text-red-500 font-bold">8</span></div>
+          <div class="flex justify-between py-1 border-b"><span class="text-slate-500">거래대금</span><span class="font-bold">14.2조</span></div>
+          <div class="flex justify-between py-1"><span class="text-slate-500">외인 순매수</span><span class="text-red-500 font-bold">+3,200억</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-6 py-6 space-y-4">
+  <div>
+    <h2 class="font-bold">🎯 설계 철학 (PC 버전)</h2>
+    <p class="mt-2 text-sm text-slate-700 leading-relaxed">
+      Bloomberg LAUNCHPAD 스타일의 <b>멀티 패널 구성</b>을 응용. 좌측은 <b>"가장 중요한 하나"</b>(히어로 단독),
+      중앙은 <b>"시간의 흐름"</b>(통합 타임라인), 우측은 <b>"집계·진입점"</b>(요약 숫자 + 탐색 링크).
+      각 패널이 독립 역할을 가져 <b>동시 인지</b> 가능 — 스크롤 없이 홈 한 화면에서 의사결정 완결.
+    </p>
+  </div>
+
+  <div>
+    <h2 class="font-bold">🔧 변경 범위 (크다)</h2>
+    <ul class="mt-2 text-sm list-disc pl-5 space-y-1 text-slate-700">
+      <li><code>home/index.jsx</code> 전면 재작성 — <code>grid-template-columns: 560px 1fr 260px</code>로 3열</li>
+      <li>신규 <code>HeroSignalPager.jsx</code> — 좌측 스와이프 가능한 TOP3 히어로</li>
+      <li>신규 <code>TimelineFeed.jsx</code> — 중앙 시그널/뉴스/급등/섹터/이벤트 통합 스트림</li>
+      <li>신규 <code>SidebarSummary.jsx</code> — 우측 집계 + 탐색 진입점 + 오늘의 숫자</li>
+      <li>기존 섹션 컴포넌트(NotableMovers/AiDebate/ExploreTabs)는 <b>삭제가 아니라 "하위 페이지로 이관"</b> — 우측 진입점에서 접근</li>
+      <li>UnifiedFeedPanel은 TimelineFeed로 통합 (사이드 패널 개념 제거)</li>
+      <li>HOME_CONTRACT 대폭 개정 + ADR 작성 필수</li>
+    </ul>
+  </div>
+
+  <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+    <h3 class="font-bold text-red-900">⚠️ PC C안 리스크</h3>
+    <ul class="mt-2 text-sm list-disc pl-5 space-y-1 text-red-900">
+      <li>데스크톱 1280px 미만(노트북 1024px 등) 해상도에서 3열 레이아웃 깨짐 → 반응형 분기 설계 필요</li>
+      <li>타임라인 정렬 알고리즘 품질이 전체 UX 결정 — 시그널 강도×시간 가중치 튜닝 공수 큼</li>
+      <li>기존 섹션 이관으로 "어디 갔지?" 탐색 혼란 발생 가능</li>
+      <li>feature flag 롤백 후에도 IA 경로 변경 부담</li>
+      <li>architect/code-review 반복 3회+ 예상 (구조 크고 새 컴포넌트 3개)</li>
+    </ul>
+  </div>
+
+  <div>
+    <h2 class="font-bold">💡 이 안을 고르려면</h2>
+    <p class="mt-2 text-sm text-slate-700 leading-relaxed">
+      PC 사용자(데스크톱 데이트레이더)가 타깃이고, 마켓레이더를 <b>"전문가용 단일 화면 터미널"</b>로 포지셔닝하고 싶을 때.
+      단기 공수가 크고 리스크 높지만 <b>경쟁사에 없는 차별화</b> (토스 없음, 업비트 없음, TradingView 유료 영역)를 확보.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

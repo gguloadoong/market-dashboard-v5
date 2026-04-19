@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PC A안 · 보수 — 재배치</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100">
+
+<div class="max-w-7xl mx-auto px-6 py-6">
+  <a href="./index.html" class="text-xs text-slate-500 hover:underline">← 비교 허브로</a>
+  <h1 class="text-xl font-bold mt-2 text-green-700">PC A안 · 보수 (2~3일 · 기존 95% 재사용)</h1>
+  <p class="text-xs text-slate-600 mt-1">CommandCenter 내부 재구성 + 섹션 순서 재배치. 좌우 그리드 유지.</p>
+</div>
+
+<div class="mx-auto bg-white shadow-xl" style="width:1280px;">
+  <!-- 상단 헤더 -->
+  <div class="border-b px-6 py-3 flex items-center justify-between bg-white">
+    <div class="flex items-center gap-8">
+      <div class="text-lg font-bold">마켓레이더</div>
+      <nav class="flex gap-6 text-sm text-slate-600">
+        <span class="font-semibold text-slate-900">홈</span>
+        <span>차트</span><span>뉴스</span><span>섹터</span><span>스크리너</span>
+      </nav>
+    </div>
+    <div class="flex gap-4 text-slate-500 text-sm">🔍 🌙 🔔</div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: 1fr 360px;">
+
+    <!-- 좌측 콘텐츠 -->
+    <div class="p-6 space-y-5 bg-slate-50/50">
+
+      <!-- CommandCenter 재구성 -->
+      <div class="bg-white rounded-lg border p-4">
+        <div class="text-[10px] text-green-600 font-mono mb-2">CommandCenterWidget · 히어로 확대 + 관심종목 조건부</div>
+
+        <!-- 온도바 한 줄 축소 -->
+        <div class="flex items-center gap-3 mb-3 pb-3 border-b">
+          <span class="font-bold text-red-600 text-sm">🔥 72 탐욕</span>
+          <div class="flex-1 h-1.5 bg-slate-200 rounded-full"><div class="h-1.5 bg-gradient-to-r from-blue-400 via-yellow-400 to-red-500 rounded-full" style="width:72%"></div></div>
+          <div class="flex gap-3 text-xs">
+            <span>KOSPI <b class="text-red-500">+0.8%</b></span>
+            <span>S&amp;P <b class="text-red-500">+1.2%</b></span>
+            <span>BTC <b class="text-blue-500">-0.3%</b></span>
+            <span>$1,410</span>
+          </div>
+        </div>
+
+        <!-- 히어로: 큰 카드 1개 + 작은 2개 (grid-cols-[1fr_280px]) -->
+        <div class="grid gap-3" style="grid-template-columns: 1fr 280px;">
+          <div class="bg-gradient-to-br from-red-50 to-amber-50 border-2 border-red-200 rounded-lg p-4">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-full">🔥 가장 강한 시그널</span>
+              <span class="text-[10px] text-slate-500">거래량 3배 폭증 · 2분 전</span>
+            </div>
+            <div class="mt-3 flex items-end justify-between">
+              <div>
+                <div class="text-xs text-slate-500">반도체 · KR</div>
+                <div class="text-2xl font-bold mt-0.5">삼성전자</div>
+              </div>
+              <div class="text-right">
+                <div class="text-3xl font-bold text-red-600">+2.1%</div>
+                <div class="text-xs text-slate-500">₩72,100</div>
+              </div>
+            </div>
+            <div class="mt-3 bg-white/60 rounded p-2 text-xs text-slate-700">
+              <b>왜?</b> HBM3E 엔비디아 공급 뉴스 + 외국인 1,200억 순매수
+            </div>
+            <div class="mt-3 flex gap-2">
+              <button class="px-4 py-2 bg-slate-900 text-white text-sm rounded font-medium">차트 보기</button>
+              <button class="px-4 py-2 bg-white border text-sm rounded">⭐ 관심종목 추가</button>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <div class="bg-red-50 border border-red-200 rounded p-3 text-xs">
+              <div class="font-bold text-red-700">💪 세력 포착</div>
+              <div class="mt-1.5 flex justify-between items-center">
+                <span>SK하이닉스</span>
+                <span class="text-red-500 font-bold">+3.4%</span>
+              </div>
+              <div class="mt-1 text-[11px] text-slate-500">기관 3일 연속 순매수</div>
+            </div>
+            <div class="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
+              <div class="font-bold text-blue-700">📉 급락</div>
+              <div class="mt-1.5 flex justify-between items-center">
+                <span>LG화학</span>
+                <span class="text-blue-500 font-bold">-2.8%</span>
+              </div>
+              <div class="mt-1 text-[11px] text-slate-500">배터리 수요 둔화 보도</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 관심종목: 첫방문자엔 숨김 (빈 섹션 제거) -->
+        <!-- 등록자에게만 여기에 미니 리스트 렌더 -->
+
+        <!-- 이벤트 한 줄 -->
+        <div class="mt-3 bg-amber-50 rounded px-3 py-2 text-xs">
+          <span class="text-amber-700 font-bold">📅 D-2</span>
+          <span class="ml-2 text-slate-700">미국 CPI 발표 (4/21 21:30 KST)</span>
+        </div>
+      </div>
+
+      <!-- NotableMovers 유지 -->
+      <div class="bg-white rounded-lg border p-4">
+        <div class="text-[10px] text-slate-400 font-mono mb-2">NotableMoversSection · 유지</div>
+        <div class="text-base font-bold mb-2">주목할 종목</div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="bg-slate-50 rounded p-3 text-xs">
+            <div class="flex justify-between"><span class="font-bold">현대차 +4.2%</span><span>🔥</span></div>
+            <div class="text-slate-500 mt-1">미국 관세 우려 완화 + 거래량 2.3배</div>
+          </div>
+          <div class="bg-slate-50 rounded p-3 text-xs">
+            <div class="flex justify-between"><span class="font-bold">에코프로비엠 -3.1%</span><span>📉</span></div>
+            <div class="text-slate-500 mt-1">배터리 수주 취소 보도</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SignalBoard 유지 -->
+      <div class="bg-white rounded-lg border p-4">
+        <div class="text-[10px] text-slate-400 font-mono mb-2">SignalBoardWidget · 유지</div>
+        <div class="text-base font-bold mb-3">시그널 보드</div>
+        <div class="grid grid-cols-5 gap-2 text-center">
+          <div class="bg-slate-50 rounded p-3"><div class="text-xl font-bold">24</div><div class="text-[10px] text-slate-500">활성</div></div>
+          <div class="bg-slate-50 rounded p-3"><div class="text-xl font-bold text-red-500">12</div><div class="text-[10px] text-slate-500">매수</div></div>
+          <div class="bg-slate-50 rounded p-3"><div class="text-xl font-bold text-blue-500">8</div><div class="text-[10px] text-slate-500">매도</div></div>
+          <div class="bg-slate-50 rounded p-3"><div class="text-xl font-bold">4</div><div class="text-[10px] text-slate-500">중립</div></div>
+          <div class="bg-slate-50 rounded p-3"><div class="text-xl font-bold text-amber-500">3</div><div class="text-[10px] text-slate-500">세력</div></div>
+        </div>
+      </div>
+
+      <!-- ExploreTabs · AiDebate보다 위로 이동 -->
+      <div class="bg-white rounded-lg border p-4">
+        <div class="text-[10px] text-green-600 font-mono mb-2">ExploreTabsWidget · AI토론 위로 이동</div>
+        <div class="flex gap-2 mb-3 text-sm">
+          <span class="px-3 py-1 bg-slate-900 text-white rounded">급등/급락</span>
+          <span class="px-3 py-1 text-slate-500">섹터</span>
+        </div>
+        <div class="flex gap-2 mb-2 text-xs">
+          <span class="px-2 py-0.5 bg-slate-100 rounded">KR</span>
+          <span class="px-2 py-0.5 text-slate-500">US</span>
+          <span class="px-2 py-0.5 text-slate-500">COIN</span>
+        </div>
+        <table class="w-full text-sm">
+          <tbody>
+            <tr class="border-t"><td class="py-1.5">현대차</td><td class="text-right text-red-500 font-bold">+4.2%</td></tr>
+            <tr class="border-t"><td class="py-1.5">SK하이닉스</td><td class="text-right text-red-500 font-bold">+3.4%</td></tr>
+            <tr class="border-t"><td class="py-1.5">삼성전자</td><td class="text-right text-red-500 font-bold">+2.1%</td></tr>
+            <tr class="border-t"><td class="py-1.5">LG화학</td><td class="text-right text-blue-500 font-bold">-2.8%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- AiDebate 하단 이동 -->
+      <div class="bg-white rounded-lg border p-4">
+        <div class="text-[10px] text-green-600 font-mono mb-2">AiDebateSection · 하단 이동</div>
+        <div class="text-base font-bold mb-2">AI 종목 토론</div>
+        <div class="flex gap-2 mb-3 text-xs">
+          <span class="px-3 py-1 bg-slate-900 text-white rounded-full">삼성전자</span>
+          <span class="px-3 py-1 bg-slate-100 rounded-full">애플</span>
+          <span class="px-3 py-1 bg-slate-100 rounded-full">BTC</span>
+          <span class="px-3 py-1 bg-slate-100 rounded-full">NVDA</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-red-50 border border-red-200 rounded p-3">
+            <div class="text-xs font-bold text-red-700">살 이유</div>
+            <ul class="mt-2 text-xs text-slate-700 space-y-1 list-disc pl-4">
+              <li>HBM3E 엔비디아 공급 본격화</li>
+              <li>외국인 1,200억 순매수</li>
+            </ul>
+          </div>
+          <div class="bg-blue-50 border border-blue-200 rounded p-3">
+            <div class="text-xs font-bold text-blue-700">조심할 이유</div>
+            <ul class="mt-2 text-xs text-slate-700 space-y-1 list-disc pl-4">
+              <li>중국 반도체 수요 둔화 리스크</li>
+              <li>미 CPI 발표 앞둔 관망세</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측 UnifiedFeedPanel · 유지 -->
+    <div class="bg-white border-l min-h-screen">
+      <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+        <span class="text-sm font-bold">실시간</span>
+        <span class="text-[10px] text-slate-400 ml-auto">UnifiedFeedPanel · 유지</span>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <div class="text-[10px] font-bold text-red-600 tracking-wider">시그널 (5)</div>
+        <div class="border-l-2 border-red-400 pl-3">
+          <div class="font-bold">💪 세력 포착 · SK하이닉스</div>
+          <div class="text-slate-500 mt-0.5">기관 3일 연속 매수 · <span class="text-red-500">+3.4%</span></div>
+          <div class="text-[10px] text-slate-400 mt-1">5분 전</div>
+        </div>
+        <div class="border-l-2 border-red-400 pl-3">
+          <div class="font-bold">🔥 거래량 폭증 · 삼성전자</div>
+          <div class="text-slate-500 mt-0.5">평균 3배 · <span class="text-red-500">+2.1%</span></div>
+          <div class="text-[10px] text-slate-400 mt-1">2분 전</div>
+        </div>
+        <div class="flex gap-2 pt-2 border-t text-[10px]">
+          <span class="px-2 py-1 bg-slate-900 text-white rounded">속보</span>
+          <span class="px-2 py-1 text-slate-500">국내</span>
+          <span class="px-2 py-1 text-slate-500">해외</span>
+          <span class="px-2 py-1 text-slate-500">코인</span>
+        </div>
+        <div class="space-y-2 pt-2">
+          <div class="border-b pb-2">
+            <div class="font-medium">삼성전자, HBM3E 엔비디아 공급 본격화</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">매일경제 · 5분 전</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-6 py-6">
+  <h2 class="font-bold">🔧 변경 파일</h2>
+  <ul class="mt-2 text-sm list-disc pl-5 space-y-1 text-slate-700">
+    <li><code>CommandCenterWidget.jsx</code> — 히어로 [1fr_280px] 큰 단독 + 사이드 2개 리스트</li>
+    <li><code>CommandCenterWidget.jsx</code> — 관심종목 <code>watchedItems.length===0</code>이면 렌더 스킵</li>
+    <li><code>home/index.jsx</code> — ExploreTabs ↔ AiDebate 순서 swap</li>
+    <li>우측 패널·삭제 컴포넌트 없음 · HOME_CONTRACT 원자적 유지</li>
+  </ul>
+</div>
+
+</body>
+</html>
