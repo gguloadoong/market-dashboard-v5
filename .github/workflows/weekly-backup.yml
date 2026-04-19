@@ -1,5 +1,8 @@
-# Supabase 주간 자동 백업
-# 매주 일요일 UTC 18:00 (월요일 KST 03:00)
+# Supabase 수동 백업 (옵션 B, 2026-04-19)
+# 자동 스케줄 비활성화 — Supabase 자체 일일 백업(7일) 커버로 충분하다 판단.
+# 실제 필요(사고/이전) 시 Actions 탭에서 "Run workflow" 수동 실행.
+# 자동 주간 백업 복원 시 아래 `schedule:` 주석 해제.
+#
 # pg_dump(PGDG 17) → gunzip-t 검증 → GPG AES256(선택) → GitHub artifact (4주)
 # 실패 시 Issue 자동 생성 (중복 방지)
 #
@@ -9,11 +12,11 @@
 # 선택 secret:
 #   - BACKUP_PASSPHRASE: 있으면 GPG 대칭 암호화(AES256), 없으면 평문 gzip
 
-name: Supabase Weekly Backup
+name: Supabase Manual Backup
 
 on:
-  schedule:
-    - cron: '0 18 * * 0'
+  # schedule:
+  #   - cron: '0 18 * * 0'  # 매주 일요일 UTC 18:00 (월요일 KST 03:00) — 필요 시 활성화
   workflow_dispatch:
 
 permissions:
