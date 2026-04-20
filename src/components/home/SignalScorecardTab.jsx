@@ -69,6 +69,14 @@ const CATEGORY_CHIPS = [
   { key: 'pattern', label: '패턴', count: BOT_CATEGORIES.pattern.length },
 ];
 
+// 제거된 레거시 시그널 타입 — Supabase 과거 레코드 필터링 (#162 whale 제거 후속)
+const LEGACY_SIGNAL_TYPES = new Set([
+  'whale_exchange_inflow',
+  'whale_exchange_outflow',
+  'whale_stablecoin_inflow',
+  'whale_large_single',
+]);
+
 // 적중률 → 색상
 function accuracyColor(pct) {
   if (pct >= 70) return '#2AC769';
@@ -227,11 +235,12 @@ export default function SignalScorecardTab() {
   const { bots, overallAccuracy, isLoading } = useSignalAccuracy();
   const [category, setCategory] = useState('all');
 
-  // 카테고리 필터 + 적중률 내림차순 정렬
+  // 레거시 제거 + 카테고리 필터 + 적중률 내림차순 정렬
   const filteredBots = useMemo(() => {
+    const active = bots.filter((b) => !LEGACY_SIGNAL_TYPES.has(b.type));
     const filtered = category === 'all'
-      ? bots
-      : bots.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
+      ? active
+      : active.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
     return [...filtered].sort((a, b) => b.accuracy - a.accuracy);
   }, [bots, category]);
 
