@@ -23,12 +23,12 @@ export const SNAP_KEYS = {
   ETF: 'snap:etf',
 };
 
-// TTL (초) — 크론 주기의 2배 (크론 지연/실패 시 데이터 유지 보장)
+// TTL (초) — 크론 5분 주기 × 2 로 통일. jitter/지연 흡수 (#165, #169 Codex P1)
 export const SNAP_TTL = {
-  KR: 600,    // 10분 (크론 5분 × 2)
-  US: 300,    // 5분 (크론 2분 × 2.5)
-  COINS: 180, // 3분 (크론 1분 × 3)
-  ETF: 600,   // 10분
+  KR: 600,
+  US: 600,
+  COINS: 600,
+  ETF: 600,
 };
 
 // 백업 키 TTL (초) — 1시간
@@ -85,44 +85,9 @@ export async function setSnap(key, data, ex) {
   }
 }
 
-// US 샤드 병합 조회 — snap:us:0~N 샤드 + snap:us 레거시 fallback
+// US 스냅샷 조회 — #169 이후 샤딩 제거. 단일 snap:us 키 + :prev 백업 fallback.
 export async function getUsSnap() {
-  if (!redis) return null;
-  try {
-    // 샤드 수 동적 조회 (크론이 저장)
-    const shardCount = parseInt(await redis.get('us:cron:shardCount') || '0', 10);
-    if (shardCount > 0) {
-      // mget으로 한 번에 조회
-      const shardKeys = Array.from({ length: shardCount }, (_, i) => `snap:us:${i}`);
-      const shards = await redis.mget(...shardKeys);
-      const merged = new Map();
-      // 만료된 샤드 인덱스를 모아서 backup 일괄 조회 (N+1 방지)
-      const missIdx = [];
-      for (let i = 0; i < shards.length; i++) {
-        if (Array.isArray(shards[i])) {
-          for (const item of shards[i]) merged.set(item.symbol, item);
-        } else {
-          missIdx.push(i);
-        }
-      }
-      if (missIdx.length > 0) {
-        try {
-          const prevKeys = missIdx.map(i => `${shardKeys[i]}:prev`);
-          const backups = await redis.mget(...prevKeys);
-          for (const backup of backups) {
-            if (!Array.isArray(backup)) continue;
-            for (const item of backup) merged.set(item.symbol, item);
-          }
-        } catch { /* 백업 일괄 조회 실패 무시 */ }
-      }
-      if (merged.size > 0) return [...merged.values()];
-    }
-    // 샤드 없으면 레거시 fallback
-    return getSnapWithFallback(SNAP_KEYS.US);
-  } catch (e) {
-    console.error('[price-cache] getUsSnap 실패:', e);
-    return getSnapWithFallback(SNAP_KEYS.US);
-  }
+  return getSnapWithFallback(SNAP_KEYS.US);
 }
 
 // 전체 마켓 스냅샷 일괄 조회 (백업 fallback 포함)

@@ -23,10 +23,11 @@ export const SNAP_KEYS = {
   ETF: 'snap:etf',
 };
 
+// TTL — 크론 주기(5분)의 2배로 통일. jitter/지연 흡수 버퍼 확보 (#165, #169 Codex P1)
 export const SNAP_TTL = {
   KR: 600,
-  US: 300,
-  COINS: 180,
+  US: 600,
+  COINS: 600,
   ETF: 600,
 };
 
