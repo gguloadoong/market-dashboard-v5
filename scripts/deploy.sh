@@ -117,6 +117,10 @@ if [ -f "$LAST_DEPLOYED_FILE" ]; then
   LAST_COMMIT=$(cat "$LAST_DEPLOYED_FILE")
   if [ "$LAST_COMMIT" = "$CURRENT_COMMIT" ]; then
     echo "ℹ️  Vercel 은 이미 ${CURRENT_COMMIT:0:7} 에 배포됨. CF Workers 동기화 상태 확인..."
+    # 워커스-온리 경로에서도 origin 동기화 검증 (#160 Codex 5차 P1)
+    # 이유: 로컬 main 이 origin 보다 앞서있으면 Vercel(origin/main) ≠ Workers(로컬) 불일치 발생.
+    # 네트워크 실패로 이 경로가 막히는 건 안전 쪽 trade-off (Codex 4차 P2 역행이지만 리비전 일관성 우선).
+    check_origin_sync_or_abort
     if deploy_workers_if_changed; then
       echo "✅ 전체 배포 완료 상태. 생략."
       exit 0
