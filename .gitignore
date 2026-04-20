@@ -40,6 +40,7 @@ e2e-report/
 test-results/
 .playwright-mcp/
 .last-deployed-commit
+.last-deployed-workers-commit
 
 # QA 스크린샷 / 임시 목업 / 로컬 백업
 qa-*.png
