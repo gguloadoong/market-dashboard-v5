@@ -167,16 +167,19 @@ async function fetchYahooV7Batch(symbols, timeoutMs = 10000, mcMap = null) {
   if (!Array.isArray(quotes)) throw new Error('Yahoo v7: result 배열 누락');
 
   // 응답된 심볼 set — 요청 ↔ 응답 매칭으로 missing 추출
-  const returned = new Set();
+  const requestedSet = new Set(symbols);
+  const validOriginals = new Set();  // 원본 요청 심볼 (suffix 포함) 중 응답 유효한 것
   const items = [];
   for (const q of quotes) {
     const rawSymbol = q.symbol || '';
-    if (rawSymbol) returned.add(rawSymbol);
-    const resolvedSymbol = rawSymbol.split('.')[0] || rawSymbol;
+    if (!rawSymbol) continue;
+    // BRK.A / BRK.B 계열 보존: dot 제거 금지. Naver/Toss 관행대로 dash 로 치환만 (#169 Codex HIGH #1).
+    const resolvedSymbol = rawSymbol.replace('.', '-');
     const price = Number(q.regularMarketPrice);
-    if (!Number.isFinite(price) || price <= 0) continue; // 가격 무효도 skip (missing 에 집계)
+    if (!Number.isFinite(price) || price <= 0) continue; // 가격 무효는 missingSymbols 에 집계됨
     const prev = Number(q.regularMarketPreviousClose) || price || 0;
-    const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] || mcMap[rawSymbol]) : 0;
+    // mcMap lookup 은 원본(raw) 또는 resolved(dash) 양쪽 키로 시도 — NASDAQ 포맷이 환경별로 다름
+    const mcFromNasdaq = mcMap ? (mcMap[rawSymbol] || mcMap[resolvedSymbol]) : 0;
     const marketCap = mcFromNasdaq || Number(q.marketCap) || 0;
     items.push({
       symbol: resolvedSymbol,
@@ -188,23 +191,12 @@ async function fetchYahooV7Batch(symbols, timeoutMs = 10000, mcMap = null) {
       name: q.shortName || q.longName || resolvedSymbol,
       market: 'us',
     });
+    // 원본 요청 심볼 포맷이 Yahoo rawSymbol 과 일치하는 것만 기록 (Set 조회 O(1))
+    if (requestedSet.has(rawSymbol)) validOriginals.add(rawSymbol);
   }
 
-  // 요청은 했지만 응답 result 에 없는 심볼 — 지원 미지원/일시장애 등 (Yahoo 가 조용히 드롭)
-  const missingSymbols = symbols.filter((s) => !returned.has(s));
-  // 응답은 있지만 price 무효인 케이스도 가격 없음으로 간주 → 배치 items 갯수와 대조
-  const validReturned = items.length;
-  const returnedButInvalid = returned.size - validReturned;
-  if (returnedButInvalid > 0) {
-    // 구체적 심볼 추출: returned 순회 중 items 에 없는 심볼
-    const validSymbolsSet = new Set(items.map((it) => {
-      // symbols 원본에 .XX suffix 가 있을 수 있어 매칭 안전하게
-      return symbols.find((s) => (s.split('.')[0] || s) === it.symbol) || it.symbol;
-    }));
-    for (const s of returned) {
-      if (!validSymbolsSet.has(s)) missingSymbols.push(s);
-    }
-  }
+  // 요청 원본 기준으로 valid 이지 않은 심볼 전부 missing 처리 — O(n) 한 번 순회
+  const missingSymbols = symbols.filter((s) => !validOriginals.has(s));
   return { items, missingSymbols };
 }
 
@@ -240,6 +232,7 @@ async function fetchAllV7Batches(symbols, mcMap = null, timeoutMs = 10000) {
 // ── 메인 함수 ──
 // #169: 샤딩 제거. 단일 invocation 에서 전 종목 v7 batch 로 갱신 → snap:us 에 직접 저장.
 export async function updateUs(env) {
+  const redis = getRedis();
   try {
     // 1. 종목 리스트 + marketCap 맵 (24h 캐시)
     const { symbols: allSymbols, mcMap } = await getSymbolList();
@@ -257,22 +250,39 @@ export async function updateUs(env) {
       retryResults = retried;
     }
 
-    const items = [...firstResults, ...retryResults];
+    let items = [...firstResults, ...retryResults];
 
-    // 4. snap:us 에 단일 저장 (샤드 머지 로직 불필요)
+    // 4. 부분 실패 시 기존 snap 보존 머지 (#169 Codex HIGH #2)
+    //    30% 이상 실패면 신규 items 로 통째 덮으면 coverage 축소 regression.
+    //    기존 snap:us 를 읽어 symbol 기준 Map 머지 → 이번 배치 성공분으로 상위 덮어쓰기.
+    const finalFailed = failed.length - retryResults.length;
+    if (finalFailed > allSymbols.length * 0.3 && redis && items.length > 0) {
+      try {
+        const existing = await redis.get(SNAP_KEYS.US);
+        if (Array.isArray(existing) && existing.length > 0) {
+          const merged = new Map();
+          for (const it of existing) merged.set(it.symbol, it);
+          for (const it of items) merged.set(it.symbol, it); // 신규가 기존을 덮어씀
+          items = [...merged.values()];
+          console.log(`[update-us] 부분실패 머지: 신규 ${firstResults.length + retryResults.length} + 기존 보존 → ${items.length}`);
+        }
+      } catch (_) { /* 머지 실패해도 items 로 진행 */ }
+    }
+
+    // 5. snap:us 에 단일 저장
     if (items.length > 0) {
       await setSnap(SNAP_KEYS.US, items, SNAP_TTL.US);
     } else {
       try { await recordCronFailure('us', '전량 실패 — v7 batch 응답 없음'); } catch (_) {}
     }
 
-    console.log(`[update-us] 저장: ${items.length}개 (재시도 ${retryResults.length}, 최종실패 ${failed.length - retryResults.length})`);
+    console.log(`[update-us] 저장: ${items.length}개 (재시도 ${retryResults.length}, 최종실패 ${finalFailed})`);
     return {
       ok: items.length > 0,
       totalSymbols: allSymbols.length,
       count: items.length,
       retried: retryResults.length,
-      failed: failed.length - retryResults.length,
+      failed: finalFailed,
     };
   } catch (err) {
     try { await recordCronFailure('us', String(err?.message || err)); } catch (_) {}
