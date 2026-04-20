@@ -549,20 +549,21 @@ export function createOrderFlowSignal(symbol, bidVolume, askVolume) {
   }));
 }
 
-/** VWAP 편차 평균회귀 시그널 */
-export function createVWAPSignal(symbol, name, market, currentPrice, vwap) {
-  if (!vwap || !currentPrice) return null;
-  const deviation = ((currentPrice - vwap) / vwap) * 100;
-  if (Math.abs(deviation) < 3) return null;
-  // 평균회귀: VWAP 위로 이탈 → 하방, 아래로 이탈 → 상방
-  const direction = deviation > 0 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
-  const strength = Math.abs(deviation) > 5 ? 4 : 3;
-  const title = `${name} VWAP 대비 ${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}% — 평균회귀 가능`;
-  return addSignal(createSignal({
-    type: SIGNAL_TYPES.VWAP_DEVIATION,
-    symbol, name, market, direction, strength,
-    title, meta: { currentPrice, vwap, deviation },
-  }));
+/** VWAP 편차 평균회귀 시그널 — [비활성] 적중률 0% (#155, 2026-04-20)
+ *
+ * 실사용 데이터 453건 판정 결과 1h/4h/24h 적중률 모두 0.0%.
+ * 원인: 평균회귀 가정(VWAP 위 이탈 → 하방, 아래 이탈 → 상방)이 현재 시장 regime에서 실패.
+ *   - 391 bearish (deviation > 0) → 1h 평균 +0.01% 상승 (복귀 없음)
+ *   - 62  bullish (deviation < 0) → 1h 평균 +0.01% (반등 없음)
+ *
+ * 복원 조건 (둘 중 하나 충족 시):
+ *   1) 장기 타임프레임(24h+) 전용 판정 로직 도입
+ *   2) 방향 반전(추세 추종) 버전 A/B 테스트로 유의미한 적중률 확보
+ *
+ * 기존 호출부는 유지 — 본 함수가 null을 반환해 신규 시그널 발화만 중단.
+ */
+export function createVWAPSignal(_symbol, _name, _market, _currentPrice, _vwap) {
+  return null;
 }
 
 /** 소셜 감성 시그널 — 최소 표본 5건 (완화), 상수 기반 임계값 */
