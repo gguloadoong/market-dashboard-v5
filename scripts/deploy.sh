@@ -19,12 +19,33 @@ LAST_DEPLOYED_FILE=".last-deployed-commit"
 WORKERS_LAST_DEPLOYED_FILE=".last-deployed-workers-commit"
 WORKERS_DIR="workers/cron"
 CURRENT_COMMIT=$(git rev-parse HEAD)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
+# Vercel GA는 --ref main 고정. 로컬이 main 이 아니면 Vercel(main)과 Workers(local)가
+# 서로 다른 리비전을 배포해 프론트↔크론 불일치 발생. 사전 차단. (#160 Codex P1)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+  echo "❌ 배포는 main 브랜치에서만 실행하세요 (현재: ${CURRENT_BRANCH})"
+  echo "   이유: Vercel GA 는 --ref main 고정이므로 다른 브랜치에서 실행 시"
+  echo "   Vercel(main) ≠ CF Workers(로컬) 리비전 불일치 발생."
+  echo "   조치: git checkout main && git pull && npm run deploy"
+  exit 1
+fi
+# origin/main 과 최신 동기화 확인 — fetch 후 비교 (네트워크 오류는 경고만)
+git fetch origin main --quiet 2>/dev/null || echo "⚠️  origin fetch 실패 — 로컬 HEAD 기준으로 진행"
+ORIGIN_MAIN=$(git rev-parse origin/main 2>/dev/null || echo "")
+if [ -n "$ORIGIN_MAIN" ] && [ "$ORIGIN_MAIN" != "$CURRENT_COMMIT" ]; then
+  echo "⚠️  로컬 main(${CURRENT_COMMIT:0:7}) ≠ origin/main(${ORIGIN_MAIN:0:7})"
+  echo "   GA 는 origin/main 을 배포합니다. git pull 후 재시도하세요."
+  exit 1
+fi
 
 # CF Workers 변경 시 wrangler deploy — Vercel 배포 성공 후 호출
 # (#160) 자동화로 "배포는 했는데 Workers는 까먹음" 방지
+# Return: 0 = 실제 동기화 상태 (변경 없음 OR 배포 성공)
+#         1 = 배포 필요한데 실패 (wrangler 미설치 포함)
 deploy_workers_if_changed() {
   if [ ! -d "$WORKERS_DIR" ]; then
-    return 0  # workers 디렉토리 없는 체크아웃 — skip
+    return 0  # workers 디렉토리 없는 체크아웃 — skip (정상)
   fi
 
   local workers_last=""
@@ -38,9 +59,11 @@ deploy_workers_if_changed() {
     return 0
   fi
 
+  # 여기부터는 "배포 필요" 확정. wrangler 없거나 실패 시 1 반환 — 동기화 거짓 보고 금지 (#160 Codex P2)
   if ! command -v wrangler &>/dev/null; then
-    echo "⚠️  wrangler CLI 미설치 — CF Workers 배포 자동화 비활성. 수동 배포 필요 시: npm i -g wrangler && cd $WORKERS_DIR && wrangler deploy"
-    return 0  # 미설치는 사용자 환경 이슈 — 기존 exit 0 동작 유지 (#160 재리뷰)
+    echo "❌ wrangler CLI 미설치 + CF Workers 변경 존재 → 크론 뒤처짐 상태"
+    echo "   조치: npm i -g wrangler && cd $WORKERS_DIR && wrangler deploy"
+    return 1
   fi
 
   echo "🔧 CF Workers 변경 감지 — wrangler deploy 실행"
