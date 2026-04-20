@@ -14,29 +14,12 @@
 | 미장 | Yahoo Finance + Stooq 폴백 | ⚠️ 15분 지연 | 전일종가 부정확 |
 | ETF | mock 데이터 | ❌ 가짜 | 실제 데이터 없음 |
 | 뉴스 | Google 뉴스 RSS (한국어) | ⚠️ 준실시간 | 종목 매칭 약함 |
-| 고래알림 | Whale Alert REST + 업비트 WebSocket | ✅ 실시간 | API 키 필요 |
 
 ---
 
 ## 필요한 API 키 목록
 
-### 1. 🔑 Whale Alert API (즉시 적용 가능)
-> **현재**: 이미 코드에 연동됨 (`VITE_WHALE_ALERT_KEY`)
-> **문제**: 무료 플랜은 분당 1회 요청, $1M 이상 트랜잭션만 표시
-
-| 항목 | 내용 |
-|------|------|
-| 발급처 | https://whale-alert.io/api |
-| 무료 플랜 | 분당 1req, $1M+ 거래만 |
-| Pro 플랜 | 월 $99~, $100K+ 거래, 실시간 WebSocket |
-| 환경변수 | `VITE_WHALE_ALERT_KEY=wa_xxxxxxxxxxxx` |
-| 우선순위 | ⭐⭐⭐ 높음 (이미 연동, 키만 있으면 됨) |
-
-**발급 방법**: whale-alert.io 가입 → API → Create Key
-
----
-
-### 2. 🔑 한국투자증권 (KIS) OpenAPI — 국장 실시간 시세
+### 1. 🔑 한국투자증권 (KIS) OpenAPI — 국장 실시간 시세
 > **대체 대상**: Naver Finance 스크래핑 (allorigins) 완전 교체
 > **효과**: 국내 주식 실시간 시세, 등락률 정확, 거래량 정확, 투자자 수급 실데이터
 
@@ -136,7 +119,6 @@
 
 ```
 Phase 1 (즉시, 무료/저비용):
-✅ Whale Alert Key 발급 → 고래알림 실제 작동
 ✅ CoinGecko Demo Key → 코인 메타 안정화
 ✅ Finnhub Key → 종목별 관련 뉴스
 
@@ -156,9 +138,6 @@ Phase 3 (유료 서비스):
 
 # === 코인 ===
 VITE_COINGECKO_API_KEY=CG-xxxxxxxxxxxxxxxxx
-
-# === 고래알림 ===
-VITE_WHALE_ALERT_KEY=wa_xxxxxxxxxxxxxxxxxxxx
 
 # === 국내주식 (KIS OpenAPI) ===
 VITE_KIS_APP_KEY=PSxxxxxxxxxxxxxxxxxxxxxxx
