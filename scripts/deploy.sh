@@ -39,8 +39,8 @@ deploy_workers_if_changed() {
   fi
 
   if ! command -v wrangler &>/dev/null; then
-    echo "⚠️  wrangler CLI 미설치 — CF Workers 배포 수동 필요 (npm i -g wrangler 또는 brew install cloudflare-wrangler)"
-    return 1
+    echo "⚠️  wrangler CLI 미설치 — CF Workers 배포 자동화 비활성. 수동 배포 필요 시: npm i -g wrangler && cd $WORKERS_DIR && wrangler deploy"
+    return 0  # 미설치는 사용자 환경 이슈 — 기존 exit 0 동작 유지 (#160 재리뷰)
   fi
 
   echo "🔧 CF Workers 변경 감지 — wrangler deploy 실행"
