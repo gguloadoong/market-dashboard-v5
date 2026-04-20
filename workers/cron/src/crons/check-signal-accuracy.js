@@ -94,23 +94,37 @@ function isHit(direction, changePct) {
   return false;
 }
 
+// 비현실적 changePct 상한 — 단위 불일치(USD/KRW 혼합) 방어 (#158)
+// 예: 코인 시그널이 USD로 기록된 후 KRW 스냅샷과 비교돼 149,188% 같은 가짜 변동 산출.
+// 500% 초과는 실거래에서 발생 극히 드물며, 이 경계를 넘으면 데이터 품질 문제로 간주하고
+// 판정 보류 (hit_Xh NULL 유지) → signal_accuracy 뷰가 NULL을 집계 제외 (#152)해 보호됨.
+const CHANGE_PCT_SANITY_LIMIT = 500;
+
 async function evaluateHorizon(supabaseUrl, supabaseKey, signalRpcSecret, horizon, prices) {
   const pending = await listPending(supabaseUrl, supabaseKey, signalRpcSecret, horizon, 100);
   if (!pending.length) return 0;
 
   const items = [];
+  let rejected = 0;
   for (const sig of pending) {
     const curPrice = prices[sig.symbol];
     if (!curPrice || !sig.price_at_fire) continue;
     const base = Number(sig.price_at_fire);
     if (!base) continue;
     const changePct = ((curPrice - base) / base) * 100;
+    if (Math.abs(changePct) > CHANGE_PCT_SANITY_LIMIT) {
+      rejected += 1;
+      continue;
+    }
     items.push({
       id: sig.id,
       price: curPrice,
       change: +changePct.toFixed(2),
       hit: isHit(sig.direction, changePct),
     });
+  }
+  if (rejected > 0) {
+    console.warn(`[signal-accuracy] ${horizon} rejected ${rejected} signals (|change| > ${CHANGE_PCT_SANITY_LIMIT}%)`);
   }
   return updateEvaluationBatch(supabaseUrl, supabaseKey, signalRpcSecret, horizon, items);
 }
