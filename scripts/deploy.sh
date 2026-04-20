@@ -55,11 +55,17 @@ deploy_workers_if_changed() {
 }
 
 # ── 1. 이중 배포 방지 ─────────────────────────────────────────────
+# Vercel 이 같은 커밋에 이미 배포됐으면 skip. 단 Workers 가 뒤처져있으면 Workers만 재동기화.
 if [ -f "$LAST_DEPLOYED_FILE" ]; then
   LAST_COMMIT=$(cat "$LAST_DEPLOYED_FILE")
   if [ "$LAST_COMMIT" = "$CURRENT_COMMIT" ]; then
-    echo "✅ 이미 배포된 커밋입니다 (${CURRENT_COMMIT:0:7}). 배포 생략."
-    exit 0
+    echo "ℹ️  Vercel 은 이미 ${CURRENT_COMMIT:0:7} 에 배포됨. CF Workers 동기화 상태 확인..."
+    if deploy_workers_if_changed; then
+      echo "✅ 전체 배포 완료 상태. 생략."
+      exit 0
+    fi
+    echo "❌ Workers 배포 실패. 수동 확인 후 재시도."
+    exit 1
   fi
 fi
 
