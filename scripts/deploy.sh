@@ -30,12 +30,31 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   echo "   조치: git checkout main && git pull && npm run deploy"
   exit 1
 fi
-# origin/main 과 최신 동기화 확인 — fetch 후 비교 (네트워크 오류는 경고만)
-git fetch origin main --quiet 2>/dev/null || echo "⚠️  origin fetch 실패 — 로컬 HEAD 기준으로 진행"
+# origin/main 과 최신 동기화 확인 — fetch 성공 필수 (#160 Codex P2)
+# fetch 실패 시 무조건 abort. 이유: 로컬이 stale 일 수 있는데 "배포됨" 기록 시
+# .last-deployed-commit 에 실제 미배포 커밋이 쓰여 다음 실행이 잘못 skip 됨.
+if ! git fetch origin main --quiet 2>/dev/null; then
+  echo "❌ git fetch origin main 실패 — 네트워크/인증 확인 후 재시도"
+  echo "   이유: GA 는 origin/main 배포 → 로컬이 stale 이면 잘못된 커밋을 배포됨으로 기록"
+  exit 1
+fi
 ORIGIN_MAIN=$(git rev-parse origin/main 2>/dev/null || echo "")
-if [ -n "$ORIGIN_MAIN" ] && [ "$ORIGIN_MAIN" != "$CURRENT_COMMIT" ]; then
-  echo "⚠️  로컬 main(${CURRENT_COMMIT:0:7}) ≠ origin/main(${ORIGIN_MAIN:0:7})"
-  echo "   GA 는 origin/main 을 배포합니다. git pull 후 재시도하세요."
+if [ -z "$ORIGIN_MAIN" ]; then
+  echo "❌ origin/main ref 조회 실패 — git 원격 설정 확인"
+  exit 1
+fi
+if [ "$ORIGIN_MAIN" != "$CURRENT_COMMIT" ]; then
+  # ahead/behind 구분해서 명확히 안내 (#160 재리뷰 HIGH)
+  if git merge-base --is-ancestor "$CURRENT_COMMIT" "$ORIGIN_MAIN" 2>/dev/null; then
+    echo "⚠️  로컬이 origin/main 보다 뒤처짐 (${CURRENT_COMMIT:0:7} → ${ORIGIN_MAIN:0:7})"
+    echo "   조치: git pull --ff-only && npm run deploy"
+  elif git merge-base --is-ancestor "$ORIGIN_MAIN" "$CURRENT_COMMIT" 2>/dev/null; then
+    echo "⚠️  로컬이 origin/main 보다 앞섬 (${ORIGIN_MAIN:0:7} → ${CURRENT_COMMIT:0:7})"
+    echo "   조치: git push origin main 후 npm run deploy"
+  else
+    echo "⚠️  로컬과 origin/main 이 분기됨 (로컬 ${CURRENT_COMMIT:0:7} ↔ 원격 ${ORIGIN_MAIN:0:7})"
+    echo "   조치: git log로 분기 지점 확인 후 rebase/merge"
+  fi
   exit 1
 fi
 
@@ -63,6 +82,16 @@ deploy_workers_if_changed() {
   if ! command -v wrangler &>/dev/null; then
     echo "❌ wrangler CLI 미설치 + CF Workers 변경 존재 → 크론 뒤처짐 상태"
     echo "   조치: npm i -g wrangler && cd $WORKERS_DIR && wrangler deploy"
+    return 1
+  fi
+
+  # workers/cron 에 미커밋 변경이 있으면 거부 (#160 Codex P1)
+  # 이유: wrangler deploy 는 파일시스템을 배포하므로 미커밋 에디트가 prod 에 올라가고
+  # .last-deployed-workers-commit 에는 HEAD 만 기록돼 다음 run 이 "in sync" 로 오인.
+  if ! git diff --quiet HEAD -- "$WORKERS_DIR" 2>/dev/null; then
+    echo "❌ $WORKERS_DIR 에 미커밋 변경 감지 — wrangler deploy 거부"
+    echo "   이유: 미커밋 코드가 prod 에 배포되면 추적 불가 + 복구 어려움"
+    echo "   조치: git status로 확인 → stash 또는 commit 후 재실행"
     return 1
   fi
 
