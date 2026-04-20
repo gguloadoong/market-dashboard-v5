@@ -30,33 +30,36 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
   echo "   조치: git checkout main && git pull && npm run deploy"
   exit 1
 fi
-# origin/main 과 최신 동기화 확인 — fetch 성공 필수 (#160 Codex P2)
-# fetch 실패 시 무조건 abort. 이유: 로컬이 stale 일 수 있는데 "배포됨" 기록 시
-# .last-deployed-commit 에 실제 미배포 커밋이 쓰여 다음 실행이 잘못 skip 됨.
-if ! git fetch origin main --quiet 2>/dev/null; then
-  echo "❌ git fetch origin main 실패 — 네트워크/인증 확인 후 재시도"
-  echo "   이유: GA 는 origin/main 배포 → 로컬이 stale 이면 잘못된 커밋을 배포됨으로 기록"
-  exit 1
-fi
-ORIGIN_MAIN=$(git rev-parse origin/main 2>/dev/null || echo "")
-if [ -z "$ORIGIN_MAIN" ]; then
-  echo "❌ origin/main ref 조회 실패 — git 원격 설정 확인"
-  exit 1
-fi
-if [ "$ORIGIN_MAIN" != "$CURRENT_COMMIT" ]; then
-  # ahead/behind 구분해서 명확히 안내 (#160 재리뷰 HIGH)
-  if git merge-base --is-ancestor "$CURRENT_COMMIT" "$ORIGIN_MAIN" 2>/dev/null; then
-    echo "⚠️  로컬이 origin/main 보다 뒤처짐 (${CURRENT_COMMIT:0:7} → ${ORIGIN_MAIN:0:7})"
-    echo "   조치: git pull --ff-only && npm run deploy"
-  elif git merge-base --is-ancestor "$ORIGIN_MAIN" "$CURRENT_COMMIT" 2>/dev/null; then
-    echo "⚠️  로컬이 origin/main 보다 앞섬 (${ORIGIN_MAIN:0:7} → ${CURRENT_COMMIT:0:7})"
-    echo "   조치: git push origin main 후 npm run deploy"
-  else
-    echo "⚠️  로컬과 origin/main 이 분기됨 (로컬 ${CURRENT_COMMIT:0:7} ↔ 원격 ${ORIGIN_MAIN:0:7})"
-    echo "   조치: git log로 분기 지점 확인 후 rebase/merge"
+# origin/main 동기화 검증은 Vercel 배포 직전에 수행 (#160 Codex 4차 P2)
+# 이유: duplicate-deploy 경로(workers-only)는 Vercel 재배포 없으므로 네트워크 불필요 —
+# 일시적 fetch 실패로 workers 재동기화 차단되면 부분 배포 복구 불가.
+# 함수화해서 Vercel 실제 배포 직전에만 호출.
+check_origin_sync_or_abort() {
+  if ! git fetch origin main --quiet 2>/dev/null; then
+    echo "❌ git fetch origin main 실패 — 네트워크/인증 확인 후 재시도"
+    echo "   이유: GA 는 origin/main 배포 → 로컬이 stale 이면 잘못된 커밋을 배포됨으로 기록"
+    exit 1
   fi
-  exit 1
-fi
+  local origin_main
+  origin_main=$(git rev-parse origin/main 2>/dev/null || echo "")
+  if [ -z "$origin_main" ]; then
+    echo "❌ origin/main ref 조회 실패 — git 원격 설정 확인"
+    exit 1
+  fi
+  if [ "$origin_main" != "$CURRENT_COMMIT" ]; then
+    if git merge-base --is-ancestor "$CURRENT_COMMIT" "$origin_main" 2>/dev/null; then
+      echo "⚠️  로컬이 origin/main 보다 뒤처짐 (${CURRENT_COMMIT:0:7} → ${origin_main:0:7})"
+      echo "   조치: git pull --ff-only && npm run deploy"
+    elif git merge-base --is-ancestor "$origin_main" "$CURRENT_COMMIT" 2>/dev/null; then
+      echo "⚠️  로컬이 origin/main 보다 앞섬 (${origin_main:0:7} → ${CURRENT_COMMIT:0:7})"
+      echo "   조치: git push origin main 후 npm run deploy"
+    else
+      echo "⚠️  로컬과 origin/main 이 분기됨 (로컬 ${CURRENT_COMMIT:0:7} ↔ 원격 ${origin_main:0:7})"
+      echo "   조치: git log로 분기 지점 확인 후 rebase/merge"
+    fi
+    exit 1
+  fi
+}
 
 # CF Workers 변경 시 wrangler deploy — Vercel 배포 성공 후 호출
 # (#160) 자동화로 "배포는 했는데 Workers는 까먹음" 방지
@@ -85,13 +88,13 @@ deploy_workers_if_changed() {
     return 1
   fi
 
-  # workers/cron 에 미커밋 변경이 있으면 거부 (#160 Codex P1)
-  # 이유: wrangler deploy 는 파일시스템을 배포하므로 미커밋 에디트가 prod 에 올라가고
-  # .last-deployed-workers-commit 에는 HEAD 만 기록돼 다음 run 이 "in sync" 로 오인.
-  if ! git diff --quiet HEAD -- "$WORKERS_DIR" 2>/dev/null; then
-    echo "❌ $WORKERS_DIR 에 미커밋 변경 감지 — wrangler deploy 거부"
-    echo "   이유: 미커밋 코드가 prod 에 배포되면 추적 불가 + 복구 어려움"
-    echo "   조치: git status로 확인 → stash 또는 commit 후 재실행"
+  # workers/cron 에 미커밋 변경(수정 또는 untracked) 감지 시 거부 (#160 Codex P1 4차)
+  # git diff 는 untracked 파일 누락 — porcelain 으로 modified + untracked 모두 커버
+  if [ -n "$(git status --porcelain -- "$WORKERS_DIR" 2>/dev/null)" ]; then
+    echo "❌ $WORKERS_DIR 에 미커밋 변경(untracked 포함) 감지 — wrangler deploy 거부"
+    echo "   이유: wrangler 는 파일시스템을 배포하므로 미커밋/untracked 파일이 prod 에 올라감"
+    echo "   → .last-deployed-workers-commit 은 HEAD 만 기록 → 다음 run 이 \"in sync\" 로 오판"
+    echo "   조치: git status로 확인 → commit/stash 후 재실행"
     return 1
   fi
 
@@ -122,6 +125,10 @@ if [ -f "$LAST_DEPLOYED_FILE" ]; then
     exit 1
   fi
 fi
+
+# Vercel 실제 배포 들어가기 전 origin/main 동기화 검증 (#160 Codex 4차 P2)
+# workers-only 경로(early-return)는 이미 위에서 처리됐으므로 여기선 무조건 수행.
+check_origin_sync_or_abort
 
 echo "🚀 배포 시작 — HEAD: ${CURRENT_COMMIT:0:7}"
 echo ""
