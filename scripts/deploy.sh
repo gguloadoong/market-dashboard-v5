@@ -20,6 +20,8 @@ WORKERS_LAST_DEPLOYED_FILE=".last-deployed-workers-commit"
 WORKERS_DIR="workers/cron"
 CURRENT_COMMIT=$(git rev-parse HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+# Workers 배포 상태 추적 — 실패 시 smoke test 후 exit 1 전파 (#160 봇 리뷰 MEDIUM)
+WORKERS_DEPLOY_STATUS=0
 
 # Vercel GA는 --ref main 고정. 로컬이 main 이 아니면 Vercel(main)과 Workers(local)가
 # 서로 다른 리비전을 배포해 프론트↔크론 불일치 발생. 사전 차단. (#160 Codex P1)
@@ -111,8 +113,7 @@ deploy_workers_if_changed() {
 
 # ── 1. 이중 배포 방지 ─────────────────────────────────────────────
 # Vercel 이 같은 커밋에 이미 배포됐으면 skip. 단 Workers 가 뒤처져있으면 Workers만 재동기화.
-# 이 경로의 Workers 실패는 exit 1 (의도적) — main 경로(|| true)와 비대칭이지만,
-# 여기선 Workers 가 배포 액션 전부이므로 실패 = 작업 실패. main 은 Vercel 성공 후 부가 단계라 smoke test 진행 목적.
+# Workers 실패 시 즉시 exit 1. main 경로도 smoke test 후 최종 exit 1 로 부분 배포 명시 (#160 봇 리뷰).
 if [ -f "$LAST_DEPLOYED_FILE" ]; then
   LAST_COMMIT=$(cat "$LAST_DEPLOYED_FILE")
   if [ "$LAST_COMMIT" = "$CURRENT_COMMIT" ]; then
@@ -174,8 +175,8 @@ if [ "$CONCLUSION" = "success" ]; then
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
   echo ""
 
-  # ── CF Workers 배포 ─────────────────────────────────────────────
-  deploy_workers_if_changed || true
+  # ── CF Workers 배포 — 실패는 smoke test 후 exit 1 전파 ──────────
+  deploy_workers_if_changed || WORKERS_DEPLOY_STATUS=1
   echo ""
 
   # ── Smoke Test ──────────────────────────────────────────────────
@@ -206,6 +207,14 @@ if [ "$CONCLUSION" = "success" ]; then
 
   echo ""
   echo "🌐 https://market-dashboard-v5.vercel.app"
+  # Workers 실패 시 부분 배포 상태 명시 + exit 1 (#160 봇 리뷰 MEDIUM 채택)
+  if [ "$WORKERS_DEPLOY_STATUS" -ne 0 ]; then
+    echo ""
+    echo "⚠️  부분 배포 상태: Vercel 성공 + CF Workers 실패"
+    echo "   수동 복구: cd $WORKERS_DIR && wrangler deploy"
+    echo "   또는: npm run deploy 재실행 (workers-only 경로가 자동 재시도)"
+    exit 1
+  fi
   exit 0
 fi
 
@@ -225,8 +234,8 @@ if echo "$FAIL_LOG" | grep -q "token provided via.*argument is not valid\|The to
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
   echo ""
 
-  # ── CF Workers 배포 (fallback 경로에서도 동일) ──────────────────
-  deploy_workers_if_changed || true
+  # ── CF Workers 배포 (fallback 경로) — 실패는 smoke test 후 exit 1 전파 ──
+  deploy_workers_if_changed || WORKERS_DEPLOY_STATUS=1
   echo ""
 
   # ── Smoke Test (fallback 배포) ─────────────────────────────────
@@ -257,6 +266,14 @@ if echo "$FAIL_LOG" | grep -q "token provided via.*argument is not valid\|The to
   echo "   2. GitHub Settings → Secrets → VERCEL_TOKEN 업데이트"
   echo ""
   echo "🌐 https://market-dashboard-v5.vercel.app"
+  # fallback 경로에서도 Workers 실패 시 exit 1 (#160 봇 리뷰 MEDIUM 채택)
+  if [ "$WORKERS_DEPLOY_STATUS" -ne 0 ]; then
+    echo ""
+    echo "⚠️  부분 배포 상태: Vercel(CLI fallback) 성공 + CF Workers 실패"
+    echo "   수동 복구: cd $WORKERS_DIR && wrangler deploy"
+    echo "   또는: npm run deploy 재실행 (workers-only 경로가 자동 재시도)"
+    exit 1
+  fi
 else
   echo "⚠️  원인: 토큰 외 다른 문제. 로그 확인 필요:"
   echo "   gh run view $RUN_ID --log-failed"
