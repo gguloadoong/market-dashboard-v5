@@ -252,11 +252,12 @@ export async function updateUs(env) {
 
     let items = [...firstResults, ...retryResults];
 
-    // 4. 부분 실패 시 기존 snap 보존 머지 (#169 Codex HIGH #2)
-    //    30% 이상 실패면 신규 items 로 통째 덮으면 coverage 축소 regression.
-    //    기존 snap:us 를 읽어 symbol 기준 Map 머지 → 이번 배치 성공분으로 상위 덮어쓰기.
+    // 4. 기존 snap 과 항상 머지 — 임계치 없이 (#169 Codex HIGH #1 재지적)
+    //    어떤 실패율이든 신규 items 가 기존을 부분적으로 덮는 상태. 10개만 실패해도
+    //    coverage 가 10개 축소되는 regression 방지. 기존 snap 이 없으면 신규만 사용.
     const finalFailed = failed.length - retryResults.length;
-    if (finalFailed > allSymbols.length * 0.3 && redis && items.length > 0) {
+    const newItemCount = items.length;
+    if (redis && items.length > 0) {
       try {
         const existing = await redis.get(SNAP_KEYS.US);
         if (Array.isArray(existing) && existing.length > 0) {
@@ -264,9 +265,11 @@ export async function updateUs(env) {
           for (const it of existing) merged.set(it.symbol, it);
           for (const it of items) merged.set(it.symbol, it); // 신규가 기존을 덮어씀
           items = [...merged.values()];
-          console.log(`[update-us] 부분실패 머지: 신규 ${firstResults.length + retryResults.length} + 기존 보존 → ${items.length}`);
+          if (items.length > newItemCount) {
+            console.log(`[update-us] snap 머지: 신규 ${newItemCount} + 기존 보존 ${items.length - newItemCount} = ${items.length}`);
+          }
         }
-      } catch (_) { /* 머지 실패해도 items 로 진행 */ }
+      } catch (_) { /* 머지 실패해도 신규 items 로 진행 */ }
     }
 
     // 5. snap:us 에 단일 저장
