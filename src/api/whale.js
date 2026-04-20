@@ -610,7 +610,7 @@ export function unsubscribeBinanceWhaleTrades() {
 
 // ─── Layer 5: 텔레그램 고래 알림 채널 폴링 ──────────────────────────────────
 // Redis 캐시된 텔레그램 Whale Alert 메시지 → 프론트엔드 이벤트 변환
-// Cron(api/cron/whale-telegram.js)이 2분 간격 수집 → 여기서 2분 간격 읽기
+// api/whale-telegram.js(루트)가 /api/d?t=wt 경유 수집 → 여기서 2분 간격 읽기
 
 let telegramTimer    = null;
 let telegramDestroyed = false;
