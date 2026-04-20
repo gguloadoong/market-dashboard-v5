@@ -16,7 +16,43 @@ echo ""
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 WORKFLOW="Deploy to Vercel"
 LAST_DEPLOYED_FILE=".last-deployed-commit"
+WORKERS_LAST_DEPLOYED_FILE=".last-deployed-workers-commit"
+WORKERS_DIR="workers/cron"
 CURRENT_COMMIT=$(git rev-parse HEAD)
+
+# CF Workers 변경 시 wrangler deploy — Vercel 배포 성공 후 호출
+# (#160) 자동화로 "배포는 했는데 Workers는 까먹음" 방지
+deploy_workers_if_changed() {
+  if [ ! -d "$WORKERS_DIR" ]; then
+    return 0  # workers 디렉토리 없는 체크아웃 — skip
+  fi
+
+  local workers_last=""
+  if [ -f "$WORKERS_LAST_DEPLOYED_FILE" ]; then
+    workers_last=$(cat "$WORKERS_LAST_DEPLOYED_FILE")
+  fi
+
+  if [ -n "$workers_last" ] && git cat-file -e "$workers_last^{commit}" 2>/dev/null \
+     && git diff --quiet "$workers_last" HEAD -- "$WORKERS_DIR" 2>/dev/null; then
+    echo "✅ CF Workers 변경 없음 — wrangler deploy 생략"
+    return 0
+  fi
+
+  if ! command -v wrangler &>/dev/null; then
+    echo "⚠️  wrangler CLI 미설치 — CF Workers 배포 수동 필요 (npm i -g wrangler 또는 brew install cloudflare-wrangler)"
+    return 1
+  fi
+
+  echo "🔧 CF Workers 변경 감지 — wrangler deploy 실행"
+  if (cd "$WORKERS_DIR" && wrangler deploy); then
+    echo "$CURRENT_COMMIT" > "$WORKERS_LAST_DEPLOYED_FILE"
+    echo "✅ CF Workers 배포 성공 — 크론 최신 커밋으로 동기화"
+    return 0
+  else
+    echo "❌ CF Workers 배포 실패 — Vercel 프론트는 배포됨. 수동 확인 필요 (cd $WORKERS_DIR && wrangler deploy)"
+    return 1
+  fi
+}
 
 # ── 1. 이중 배포 방지 ─────────────────────────────────────────────
 if [ -f "$LAST_DEPLOYED_FILE" ]; then
@@ -67,6 +103,10 @@ if [ "$CONCLUSION" = "success" ]; then
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
   echo ""
 
+  # ── CF Workers 배포 ─────────────────────────────────────────────
+  deploy_workers_if_changed || true
+  echo ""
+
   # ── Smoke Test ──────────────────────────────────────────────────
   echo "🔍 배포 후 Smoke Test 시작 (30초 대기)..."
   sleep 30
@@ -112,6 +152,10 @@ if echo "$FAIL_LOG" | grep -q "token provided via.*argument is not valid\|The to
   echo ""
   echo "✅ vercel --prod 배포 완료"
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
+  echo ""
+
+  # ── CF Workers 배포 (fallback 경로에서도 동일) ──────────────────
+  deploy_workers_if_changed || true
   echo ""
 
   # ── Smoke Test (fallback 배포) ─────────────────────────────────
