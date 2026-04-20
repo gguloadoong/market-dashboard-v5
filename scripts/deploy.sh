@@ -66,10 +66,22 @@ check_origin_sync_or_abort() {
 # CF Workers 변경 시 wrangler deploy — Vercel 배포 성공 후 호출
 # (#160) 자동화로 "배포는 했는데 Workers는 까먹음" 방지
 # Return: 0 = 실제 동기화 상태 (변경 없음 OR 배포 성공)
-#         1 = 배포 필요한데 실패 (wrangler 미설치 포함)
+#         1 = 배포 필요한데 실패 (wrangler 미설치/dirty/deploy 실패 포함)
 deploy_workers_if_changed() {
   if [ ! -d "$WORKERS_DIR" ]; then
     return 0  # workers 디렉토리 없는 체크아웃 — skip (정상)
+  fi
+
+  # dirty 체크는 skip 판정보다 먼저 수행 (#160 Codex 7차 P1)
+  # 이유: LAST_DEPLOYED == HEAD 인데 로컬에 미커밋 변경 있으면 기존 로직은
+  # "변경 없음" 으로 skip → untracked/수정이 prod 에 올라갈 위험 놓침.
+  # 반드시 순수 clean 상태에서만 sync 판정.
+  if [ -n "$(git status --porcelain -- "$WORKERS_DIR" 2>/dev/null)" ]; then
+    echo "❌ $WORKERS_DIR 에 미커밋 변경(untracked 포함) 감지 — wrangler deploy 거부"
+    echo "   이유: wrangler 는 파일시스템을 배포하므로 미커밋/untracked 파일이 prod 에 올라감"
+    echo "   → .last-deployed-workers-commit 은 HEAD 만 기록 → 다음 run 이 \"in sync\" 로 오판"
+    echo "   조치: git status로 확인 → commit/stash 후 재실행"
+    return 1
   fi
 
   local workers_last=""
@@ -83,20 +95,10 @@ deploy_workers_if_changed() {
     return 0
   fi
 
-  # 여기부터는 "배포 필요" 확정. wrangler 없거나 실패 시 1 반환 — 동기화 거짓 보고 금지 (#160 Codex P2)
+  # 여기부터는 "배포 필요" 확정. wrangler 없으면 1 반환 — 동기화 거짓 보고 금지 (#160 Codex P2)
   if ! command -v wrangler &>/dev/null; then
     echo "❌ wrangler CLI 미설치 + CF Workers 변경 존재 → 크론 뒤처짐 상태"
     echo "   조치: npm i -g wrangler && cd $WORKERS_DIR && wrangler deploy"
-    return 1
-  fi
-
-  # workers/cron 에 미커밋 변경(수정 또는 untracked) 감지 시 거부 (#160 Codex P1 4차)
-  # git diff 는 untracked 파일 누락 — porcelain 으로 modified + untracked 모두 커버
-  if [ -n "$(git status --porcelain -- "$WORKERS_DIR" 2>/dev/null)" ]; then
-    echo "❌ $WORKERS_DIR 에 미커밋 변경(untracked 포함) 감지 — wrangler deploy 거부"
-    echo "   이유: wrangler 는 파일시스템을 배포하므로 미커밋/untracked 파일이 prod 에 올라감"
-    echo "   → .last-deployed-workers-commit 은 HEAD 만 기록 → 다음 run 이 \"in sync\" 로 오판"
-    echo "   조치: git status로 확인 → commit/stash 후 재실행"
     return 1
   fi
 
