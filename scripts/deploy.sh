@@ -56,6 +56,8 @@ deploy_workers_if_changed() {
 
 # ── 1. 이중 배포 방지 ─────────────────────────────────────────────
 # Vercel 이 같은 커밋에 이미 배포됐으면 skip. 단 Workers 가 뒤처져있으면 Workers만 재동기화.
+# 이 경로의 Workers 실패는 exit 1 (의도적) — main 경로(|| true)와 비대칭이지만,
+# 여기선 Workers 가 배포 액션 전부이므로 실패 = 작업 실패. main 은 Vercel 성공 후 부가 단계라 smoke test 진행 목적.
 if [ -f "$LAST_DEPLOYED_FILE" ]; then
   LAST_COMMIT=$(cat "$LAST_DEPLOYED_FILE")
   if [ "$LAST_COMMIT" = "$CURRENT_COMMIT" ]; then
