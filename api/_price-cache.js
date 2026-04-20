@@ -23,12 +23,12 @@ export const SNAP_KEYS = {
   ETF: 'snap:etf',
 };
 
-// TTL (초) — 크론 주기의 2배 (크론 지연/실패 시 데이터 유지 보장)
+// TTL (초) — 크론 5분 주기 × 2 로 통일. jitter/지연 흡수 (#165, #169 Codex P1)
 export const SNAP_TTL = {
-  KR: 600,    // 10분 (크론 5분 × 2)
-  US: 300,    // 5분 (크론 2분 × 2.5)
-  COINS: 180, // 3분 (크론 1분 × 3)
-  ETF: 600,   // 10분
+  KR: 600,
+  US: 600,
+  COINS: 600,
+  ETF: 600,
 };
 
 // 백업 키 TTL (초) — 1시간

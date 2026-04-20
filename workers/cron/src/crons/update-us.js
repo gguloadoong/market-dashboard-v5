@@ -152,6 +152,8 @@ let _hostIdx = 0;
 function nextHost() { return YAHOO_HOSTS[(_hostIdx++) % YAHOO_HOSTS.length]; }
 
 // v7 quote 단일 배치 (최대 BATCH_SIZE 심볼)
+// 반환: { items, missingSymbols } — Yahoo 가 응답에서 누락한 심볼은 missingSymbols 로
+//      명시 (#169 Codex P2: 요청은 있었는데 result 에 없으면 실패로 간주, silent 누락 금지)
 async function fetchYahooV7Batch(symbols, timeoutMs = 10000, mcMap = null) {
   const host = nextHost();
   const url = `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}`;
@@ -164,32 +166,50 @@ async function fetchYahooV7Batch(symbols, timeoutMs = 10000, mcMap = null) {
   const quotes = data?.quoteResponse?.result;
   if (!Array.isArray(quotes)) throw new Error('Yahoo v7: result 배열 누락');
 
-  return quotes
-    .map((q) => {
-      const rawSymbol = q.symbol || '';
-      const resolvedSymbol = rawSymbol.split('.')[0] || rawSymbol;
-      const price = Number(q.regularMarketPrice);
-      // v8 의 closes 배열 fallback 필요 없음 — v7 은 previousClose 직접 제공.
-      const prev = Number(q.regularMarketPreviousClose) || price || 0;
-      if (!Number.isFinite(price) || price <= 0) return null;
-      const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] || mcMap[rawSymbol]) : 0;
-      const marketCap = mcFromNasdaq || Number(q.marketCap) || 0;
-      return {
-        symbol: resolvedSymbol,
-        price: parseFloat(price.toFixed(2)),
-        change: parseFloat((price - prev).toFixed(2)),
-        changePct: prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0,
-        volume: Number(q.regularMarketVolume) || 0,
-        marketCap,
-        name: q.shortName || q.longName || resolvedSymbol,
-        market: 'us',
-      };
-    })
-    .filter(Boolean);
+  // 응답된 심볼 set — 요청 ↔ 응답 매칭으로 missing 추출
+  const returned = new Set();
+  const items = [];
+  for (const q of quotes) {
+    const rawSymbol = q.symbol || '';
+    if (rawSymbol) returned.add(rawSymbol);
+    const resolvedSymbol = rawSymbol.split('.')[0] || rawSymbol;
+    const price = Number(q.regularMarketPrice);
+    if (!Number.isFinite(price) || price <= 0) continue; // 가격 무효도 skip (missing 에 집계)
+    const prev = Number(q.regularMarketPreviousClose) || price || 0;
+    const mcFromNasdaq = mcMap ? (mcMap[resolvedSymbol] || mcMap[rawSymbol]) : 0;
+    const marketCap = mcFromNasdaq || Number(q.marketCap) || 0;
+    items.push({
+      symbol: resolvedSymbol,
+      price: parseFloat(price.toFixed(2)),
+      change: parseFloat((price - prev).toFixed(2)),
+      changePct: prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0,
+      volume: Number(q.regularMarketVolume) || 0,
+      marketCap,
+      name: q.shortName || q.longName || resolvedSymbol,
+      market: 'us',
+    });
+  }
+
+  // 요청은 했지만 응답 result 에 없는 심볼 — 지원 미지원/일시장애 등 (Yahoo 가 조용히 드롭)
+  const missingSymbols = symbols.filter((s) => !returned.has(s));
+  // 응답은 있지만 price 무효인 케이스도 가격 없음으로 간주 → 배치 items 갯수와 대조
+  const validReturned = items.length;
+  const returnedButInvalid = returned.size - validReturned;
+  if (returnedButInvalid > 0) {
+    // 구체적 심볼 추출: returned 순회 중 items 에 없는 심볼
+    const validSymbolsSet = new Set(items.map((it) => {
+      // symbols 원본에 .XX suffix 가 있을 수 있어 매칭 안전하게
+      return symbols.find((s) => (s.split('.')[0] || s) === it.symbol) || it.symbol;
+    }));
+    for (const s of returned) {
+      if (!validSymbolsSet.has(s)) missingSymbols.push(s);
+    }
+  }
+  return { items, missingSymbols };
 }
 
 // 전 심볼을 BATCH_SIZE 로 잘라 BATCH_CONCURRENCY 병렬로 실행.
-// 실패한 배치의 심볼은 failed 로 반환해 다음 크론 주기에 자연 재시도.
+// 배치 자체 실패(HTTP/parse 에러) + Yahoo 가 응답에서 드롭한 심볼 모두 failed 에 집계.
 async function fetchAllV7Batches(symbols, mcMap = null, timeoutMs = 10000) {
   const batches = [];
   for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
@@ -205,9 +225,11 @@ async function fetchAllV7Batches(symbols, mcMap = null, timeoutMs = 10000) {
     );
     for (let j = 0; j < settled.length; j++) {
       if (settled[j].status === 'fulfilled') {
-        results.push(...settled[j].value);
+        const { items, missingSymbols } = settled[j].value;
+        results.push(...items);
+        if (missingSymbols && missingSymbols.length > 0) failed.push(...missingSymbols);
       } else {
-        failed.push(...group[j]);
+        failed.push(...group[j]); // 전체 배치 실패 — 200 심볼 통째로 실패 처리
         console.warn('[update-us] v7 batch 실패:', settled[j].reason?.message);
       }
     }
