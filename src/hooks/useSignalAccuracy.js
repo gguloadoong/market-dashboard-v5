@@ -1,6 +1,15 @@
 // 시그널 적중률 조회 훅 — GET /api/signal-accuracy
 import { useQuery } from '@tanstack/react-query';
 
+// 제거된 레거시 시그널 타입 — Supabase 과거 레코드 차단 (#162 whale 제거 후속)
+// 향후 Supabase 뷰 마이그레이션으로 whale_* 레코드 정리 완료 시 이 Set 제거
+const LEGACY_SIGNAL_TYPES = new Set([
+  'whale_exchange_inflow',
+  'whale_exchange_outflow',
+  'whale_stablecoin_inflow',
+  'whale_large_single',
+]);
+
 async function fetchSignalAccuracy() {
   const res = await fetch('/api/signal-accuracy');
   if (!res.ok) throw new Error('signal-accuracy fetch failed');
@@ -22,19 +31,21 @@ export function useSignalAccuracy() {
     placeholderData: [],
   });
 
-  // 봇별 데이터 가공
-  const bots = raw.map((row) => ({
-    type: row.signal_type,
-    totalFired: row.total_fired ?? 0,
-    hitCount: row.hit_count ?? 0,
-    accuracy: row.accuracy ?? 0,
-    accuracy1h: row.accuracy_1h ?? null,
-    accuracy4h: row.accuracy_4h ?? null,
-    accuracy24h: row.accuracy_24h ?? null,
-    trend: row.trend ?? 0,
-    recentResults: row.recent_results ?? [],    // boolean[] — 최근 적중 여부
-    recentSignals: row.recent_signals ?? [],    // 최근 시그널 상세
-  }));
+  // 봇별 데이터 가공 — 레거시 타입(whale_*) 선차단
+  const bots = raw
+    .filter((row) => !LEGACY_SIGNAL_TYPES.has(row.signal_type))
+    .map((row) => ({
+      type: row.signal_type,
+      totalFired: row.total_fired ?? 0,
+      hitCount: row.hit_count ?? 0,
+      accuracy: row.accuracy ?? 0,
+      accuracy1h: row.accuracy_1h ?? null,
+      accuracy4h: row.accuracy_4h ?? null,
+      accuracy24h: row.accuracy_24h ?? null,
+      trend: row.trend ?? 0,
+      recentResults: row.recent_results ?? [],    // boolean[] — 최근 적중 여부
+      recentSignals: row.recent_signals ?? [],    // 최근 시그널 상세
+    }));
 
   // 전체 평균 적중률
   const totalFiredSum = bots.reduce((s, b) => s + b.totalFired, 0);

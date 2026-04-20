@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchIndices } from '../api/stocks';
 import { fetchExchangeRate } from '../api/coins';
-import { setWhaleKrwRate } from '../api/whale';
 import { POLLING } from '../constants/polling';
 import { DEFAULT_KRW_RATE } from '../constants/market';
 
@@ -39,7 +38,6 @@ export function useIndices() {
         // 실제 fetch 또는 24h 캐시 성공 시에만 loaded=true (Codex #113 P2)
         // isFallback=true는 모든 실시간/캐시 실패 후 하드코딩 값 → fx_impact 시그널 발화 금지
         if (!isFallback) setKrwRateLoaded(true);
-        setWhaleKrwRate(rate);
       }
     } catch (e) { console.warn('[환율] 갱신 실패:', e.message); }
   }, []);

@@ -14,8 +14,6 @@
 //   h  = hantoo-indices  (한투 지수)
 //   r  = rss             (뉴스 RSS 프록시)
 //   c  = chart-proxy     (차트)
-//   w  = whale-proxy     (고래 알림)
-//   wt = whale-telegram  (텔레그램 고래 알림)
 //   v  = hantoo-investor (투자자 동향)
 //   m  = hantoo-market-investor (시장 투자자)
 //   f  = fear-greed      (공포탐욕 — 미장/코인)
@@ -56,7 +54,7 @@ import aiDebateHandler from './ai-debate.js';
 // ─── Serverless Function 은 Edge에서 직접 import 불가 ─────────
 // hantoo-price, naver-price, hantoo-indices, hantoo-investor,
 // hantoo-market-investor, hantoo-chart, hantoo-ws-approval,
-// naver-search, whale-proxy, krx-etf 는 serverless (req, res) 시그니처.
+// naver-search, krx-etf 는 serverless (req, res) 시그니처.
 // Edge Function에서 이들을 직접 호출하면 런타임 불일치.
 // → 내부 fetch로 원본 엔드포인트를 호출하여 중계한다.
 
@@ -233,15 +231,6 @@ export default async function handler(request) {
       case 'a': {
         // WebSocket 인증키
         return proxyPostToServerless(baseUrl, `/api/hantoo-ws-approval`, {});
-      }
-      case 'w': {
-        // 고래 알림: cr = cursor
-        const qs = body.cr ? `?cursor=${body.cr}` : '';
-        return proxyToServerless(baseUrl, `/api/whale-proxy${qs}`);
-      }
-      case 'wt': {
-        // 텔레그램 고래 알림
-        return proxyToServerless(baseUrl, `/api/whale-telegram`);
       }
       case 'ns': {
         // 네이버 검색: q = 검색어

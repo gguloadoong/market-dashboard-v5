@@ -1,5 +1,5 @@
 // 시그널 엔진 — 시그널 생성/관리/만료/구독
-import { SIGNAL_TYPES, DIRECTIONS, getTTL, STABLECOIN_SYMBOLS } from './signalTypes';
+import { SIGNAL_TYPES, DIRECTIONS, getTTL } from './signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 
 // ─── 내부 저장소 ────────────────────────────────────────────
@@ -314,78 +314,6 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     strength,
     title,
     meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
-  });
-  return addSignal(signal);
-}
-
-/**
- * 고래 이벤트 → 시그널 변환
- * @param {{ symbol: string, name?: string, movementType: string, amount: number, from?: string, to?: string }} event
- */
-export function createWhaleSignal(event) {
-  const { symbol, name, movementType, amount, from, to, tradeAmt, tradeUsd } = event;
-  const isStablecoin = STABLECOIN_SYMBOLS.has(symbol?.toUpperCase());
-
-  // 방향 결정: 거래소 입금 = 매도 압력 (스테이블코인은 반대)
-  let direction = DIRECTIONS.NEUTRAL;
-  let type = SIGNAL_TYPES.WHALE_LARGE_SINGLE;
-  let actionDesc = '대량 이동';
-
-  if (movementType === 'exchange_deposit') {
-    direction = isStablecoin ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
-    type = isStablecoin ? SIGNAL_TYPES.WHALE_STABLECOIN_INFLOW : SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW;
-    actionDesc = isStablecoin
-      ? `${to ?? '거래소'} 스테이블코인 입금 — 매수 대기`
-      : `${to ?? '거래소'} 입금 — 매도 압력`;
-  } else if (movementType === 'exchange_withdrawal') {
-    direction = isStablecoin ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
-    type = SIGNAL_TYPES.WHALE_EXCHANGE_OUTFLOW;
-    actionDesc = isStablecoin
-      ? `${from ?? '거래소'} 스테이블코인 출금 — 매수 약화`
-      : `${from ?? '거래소'}→콜드월렛 — HODLing 시그널`;
-  }
-
-  // 금액 결정: tradeAmt(원화) 또는 tradeUsd(달러) 또는 amount(기존 호환)
-  const krwAmt = tradeAmt ?? amount ?? 0;
-  const usdAmt = tradeUsd ?? 0;
-
-  // 금액 기반 strength — USD 우선, 없으면 KRW (억 단위)
-  let strength = 1;
-  if (usdAmt > 0) {
-    const usdM = usdAmt / 1_000_000;
-    if (usdM >= 10) strength = 5;
-    else if (usdM >= 5) strength = 4;
-    else if (usdM >= 1) strength = 3;
-    else if (usdM >= 0.5) strength = 2;
-  } else {
-    const amountInBillion = krwAmt / 1_000_000_000;
-    if (amountInBillion >= 5) strength = 5;
-    else if (amountInBillion >= 3) strength = 4;
-    else if (amountInBillion >= 1) strength = 3;
-    else if (amountInBillion >= 0.5) strength = 2;
-  }
-
-  // 금액 표시: USD + KRW 병기 또는 단독
-  let amountStr;
-  if (usdAmt > 0 && krwAmt > 0) {
-    amountStr = `${_formatUsd(usdAmt)} (${_formatAmount(krwAmt)})`;
-  } else if (usdAmt > 0) {
-    amountStr = _formatUsd(usdAmt);
-  } else {
-    amountStr = _formatAmount(krwAmt);
-  }
-
-  const title = `${symbol} ${amountStr} ${actionDesc}`;
-
-  const signal = createSignal({
-    type,
-    symbol,
-    name: name ?? symbol,
-    market: 'crypto',
-    direction,
-    strength,
-    title,
-    meta: { movementType, amount: krwAmt, tradeUsd: usdAmt, from, to },
   });
   return addSignal(signal);
 }

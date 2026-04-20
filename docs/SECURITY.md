@@ -46,7 +46,6 @@ Git에 한 번 올라간 키는 삭제해도 히스토리에 남는다.
 | `HANTOO_APP_KEY` | O | 한국투자증권 앱 키 | [apiportal.koreainvestment.com](https://apiportal.koreainvestment.com) |
 | `HANTOO_APP_SECRET` | O | 한국투자증권 앱 시크릿 | 동일 |
 | `GEMINI_API_KEY` | - | Google Gemini (뉴스 AI 요약) | [aistudio.google.com](https://aistudio.google.com) |
-| `WHALE_ALERT_KEY` | - | Whale Alert (고래 추적) | [whale-alert.io](https://whale-alert.io) |
 | `KRX_API_KEY` | - | KRX ETF 데이터 | [data.krx.co.kr](https://data.krx.co.kr) |
 
 > **필수 키 없이도 작동**: 코인(Upbit/CoinPaprika/Binance)과 미장(Yahoo/Stooq)은 공개 API 사용. 국내 주식만 한투 키 필요.
@@ -56,7 +55,6 @@ Git에 한 번 올라간 키는 삭제해도 히스토리에 남는다.
 HANTOO_APP_KEY=your_hantoo_app_key
 HANTOO_APP_SECRET=your_hantoo_app_secret
 GEMINI_API_KEY=your_gemini_api_key
-WHALE_ALERT_KEY=your_whale_alert_key
 KRX_API_KEY=your_krx_api_key
 ```
 
