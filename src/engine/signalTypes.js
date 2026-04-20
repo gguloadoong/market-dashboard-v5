@@ -1,6 +1,6 @@
 // 시그널 타입 상수 — 시그널 엔진 전체에서 공유
 
-// 스테이블코인 심볼 집합 — WhalePanel·signalEngine 공유
+// 스테이블코인 심볼 집합 — 투자자 시그널 스테이블코인 필터링
 export const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'BUSD', 'TUSD']);
 
 export const SIGNAL_TYPES = {
@@ -9,10 +9,6 @@ export const SIGNAL_TYPES = {
   INSTITUTIONAL_CONSECUTIVE_BUY: 'institutional_consecutive_buy',
   INSTITUTIONAL_CONSECUTIVE_SELL: 'institutional_consecutive_sell',
   VOLUME_ANOMALY: 'volume_anomaly',
-  WHALE_EXCHANGE_INFLOW: 'whale_exchange_inflow',
-  WHALE_EXCHANGE_OUTFLOW: 'whale_exchange_outflow',
-  WHALE_STABLECOIN_INFLOW: 'whale_stablecoin_inflow',
-  WHALE_LARGE_SINGLE: 'whale_large_single',
   FEAR_GREED_SHIFT: 'fear_greed_shift',
   NEWS_SENTIMENT_CLUSTER: 'news_sentiment_cluster',
   SECTOR_ROTATION: 'sector_rotation',
@@ -56,10 +52,6 @@ export const SIGNAL_TTL = {
   [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY]: 24 * 3600000,
   [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL]: 24 * 3600000,
   [SIGNAL_TYPES.VOLUME_ANOMALY]: 2 * 3600000,
-  [SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW]: 30 * 60000,
-  [SIGNAL_TYPES.WHALE_EXCHANGE_OUTFLOW]: 30 * 60000,
-  [SIGNAL_TYPES.WHALE_STABLECOIN_INFLOW]: 30 * 60000,
-  [SIGNAL_TYPES.WHALE_LARGE_SINGLE]: 30 * 60000,
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: 12 * 3600000,
   [SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER]: 2 * 3600000,
   [SIGNAL_TYPES.SECTOR_ROTATION]: 6 * 3600000,
@@ -133,22 +125,6 @@ export const TYPE_META = {
       if (pct >= 1) return `${name} 상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
       return `${name} 거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
     },
-  },
-  [SIGNAL_TYPES.WHALE_EXCHANGE_INFLOW]: {
-    easyLabel: '큰손이 거래소에 입금 📥',
-    easyDesc: () => '대규모 자금이 거래소로 이동 — 매도 준비 가능성',
-  },
-  [SIGNAL_TYPES.WHALE_EXCHANGE_OUTFLOW]: {
-    easyLabel: '큰손이 거래소에서 출금 📤',
-    easyDesc: () => '대규모 자금이 거래소 밖으로 — 장기 보유 신호',
-  },
-  [SIGNAL_TYPES.WHALE_STABLECOIN_INFLOW]: {
-    easyLabel: '현금이 거래소로 들어오는 중 💰',
-    easyDesc: () => '스테이블코인 대량 입금 — 매수 대기 자금',
-  },
-  [SIGNAL_TYPES.WHALE_LARGE_SINGLE]: {
-    easyLabel: '초대형 자금 이동 감지 🐋',
-    easyDesc: (m) => `${m.amount || '대규모'} 규모 자금이 한 번에 이동했어요`,
   },
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: {
     easyLabel: '시장 심리가 바뀌고 있어요 🔄',

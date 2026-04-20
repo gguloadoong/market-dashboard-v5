@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchSnapshot } from '../api/snapshot';
 import { fetchCoins, fetchCoinsUpbitOnly, fetchUpbitAllSymbols, fetchCoinGecko, getSparklineCache } from '../api/coins';
 import { subscribeCoinPrices, unsubscribeCoinPrices } from '../api/coinWs';
-import { setWhaleBtcKrwPrice } from '../api/whale';
 import { POLLING } from '../constants/polling';
 import { checkAndAlertBatch } from '../utils/priceAlert';
 
@@ -118,12 +117,6 @@ export function useCoins(krwRateRef) {
       // CoinGecko 실패해도 가격에는 영향 없음
     }
   }, []);
-
-  // BTC KRW 가격 → whale 모듈
-  useEffect(() => {
-    const btc = coins.find(c => c.symbol === 'BTC');
-    if (btc?.priceKrw) setWhaleBtcKrwPrice(btc.priceKrw);
-  }, [coins]);
 
   // 폴링 인터벌 — WebSocket 연결 시 REST 빠른 갱신 생략
   useEffect(() => {

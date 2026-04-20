@@ -3,7 +3,7 @@
 //
 // 타입 코드 (1~2자):
 //   u=미국주식, k=한투가격, n=네이버가격, e=ETF, i=지수, h=한투지수,
-//   r=RSS, c=차트, w=고래, v=투자자, m=시장투자자, f=공포탐욕, fk=국장공포탐욕,
+//   r=RSS, c=차트, v=투자자, m=시장투자자, f=공포탐욕, fk=국장공포탐욕,
 //   g=한투차트, a=WS인증, ns=네이버검색, us=미국검색, sm=뉴스요약,
 //   ub=업비트공지, ke=KRX-ETF
 
@@ -74,16 +74,6 @@ export function fetchChartProxy(symbol, range, interval, timeoutMs = 6000) {
   return gwJson({ t: 'c', s: symbol, rg: range, iv: interval }, timeoutMs);
 }
 
-// ─── 고래 알림 ───────────────────────────────────────────────
-export function fetchWhaleProxy(cursor, timeoutMs = 8000) {
-  return gwJson({ t: 'w', ...(cursor ? { cr: cursor } : {}) }, timeoutMs);
-}
-
-// ─── 텔레그램 고래 알림 ──────────────────────────────────────
-export function fetchWhaleTelegram(timeoutMs = 8000) {
-  return gwJson({ t: 'wt' }, timeoutMs);
-}
-
 // ─── BTC · ETH ETF 순유입/유출 ───────────────────────────────
 export async function fetchBtcEtfFlow() {
   try {
@@ -91,25 +81,6 @@ export async function fetchBtcEtfFlow() {
     if (!res.ok) return null;
     return await res.json();
   } catch { return null; }
-}
-
-// ─── 온체인 고래 (Blockchair, 키 불필요) ─────────────────────
-// whale-chain.js Edge Function 직접 호출 (d.js 우회 — 응답 크기 때문에 별도)
-export async function fetchWhaleChain(chain = 'all', minUsd = 1_000_000, timeoutMs = 10000) {
-  const res = await fetch(`/api/whale-chain?chain=${chain}&min_usd=${minUsd}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!res.ok) throw new Error(`whale-chain ${res.status}`);
-  return res.json();
-}
-
-// ─── 바이낸스 고래 (Edge Function, IP 차단 우회) ─────────────
-export async function fetchBinanceWhale(timeoutMs = 8000) {
-  const res = await fetch('/api/binance-whale', {
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!res.ok) throw new Error(`binance-whale ${res.status}`);
-  return res.json();
 }
 
 // ─── 투자자 동향 ─────────────────────────────────────────────
