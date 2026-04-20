@@ -85,9 +85,46 @@ export async function setSnap(key, data, ex) {
   }
 }
 
-// US 스냅샷 조회 — #169 이후 샤딩 제거. 단일 snap:us 키 + :prev 백업 fallback.
+// US 스냅샷 조회 — #171 이후 샤딩 복원 (sharded-read 패턴).
+// worker 가 snap:us:0, snap:us:1, snap:us:2 에 각 샤드를 독립적으로 씀 (race 방지).
+// reader 는 mget 으로 3개 키 한 번에 가져와 Map 으로 symbol-merge.
+// 샤드 하나 expire/실패 시 :prev 백업 fallback, 그마저 없으면 나머지 샤드만 반환.
+// 과거 단일 snap:us 도 backward-compat 용으로 마지막 fallback 유지.
+const US_SHARD_COUNT = 3;
 export async function getUsSnap() {
-  return getSnapWithFallback(SNAP_KEYS.US);
+  if (!redis) return getSnapWithFallback(SNAP_KEYS.US);
+  try {
+    const shardKeys = Array.from({ length: US_SHARD_COUNT }, (_, i) => `${SNAP_KEYS.US}:${i}`);
+    const shards = await redis.mget(...shardKeys);
+    const merged = new Map();
+    const missIdx = [];
+    for (let i = 0; i < shards.length; i++) {
+      if (Array.isArray(shards[i])) {
+        for (const item of shards[i]) merged.set(item.symbol, item);
+      } else {
+        missIdx.push(i);
+      }
+    }
+    // 누락 샤드 :prev 백업 mget — N+1 쿼리 방지
+    if (missIdx.length > 0) {
+      try {
+        const prevKeys = missIdx.map((i) => `${shardKeys[i]}:prev`);
+        const backups = await redis.mget(...prevKeys);
+        for (const backup of backups) {
+          if (!Array.isArray(backup)) continue;
+          for (const item of backup) {
+            if (!merged.has(item.symbol)) merged.set(item.symbol, item);
+          }
+        }
+      } catch { /* 백업 조회 실패 무시 */ }
+    }
+    if (merged.size > 0) return [...merged.values()];
+    // 샤드 + 백업 전부 비어있음 → 레거시 단일 snap:us fallback (쓰기 없음, 읽기만)
+    return getSnapWithFallback(SNAP_KEYS.US);
+  } catch (e) {
+    console.error('[price-cache] getUsSnap 샤드 읽기 실패:', e);
+    return getSnapWithFallback(SNAP_KEYS.US);
+  }
 }
 
 // 전체 마켓 스냅샷 일괄 조회 (백업 fallback 포함)
