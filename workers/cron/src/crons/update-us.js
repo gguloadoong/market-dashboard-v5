@@ -215,9 +215,13 @@ async function fetchBatch(symbols, timeoutMs = 10000, mcMap = null) {
 }
 
 // ── 메인 함수 ──
-// #171: 샤딩 복원. shardId ∈ [0, TOTAL_SHARDS) 로 SHARD_SIZE 단위 슬라이스 처리.
-//       3개 샤드가 각각 snap:us 에 자기 구간을 머지 저장 → 다른 샤드/이전 주기 보존.
-export async function updateUs(env, shardId = 0) {
+// #171: 샤딩 복원. shardId ∈ [0, TOTAL_SHARDS) 필수 (기본값 없음 — 호출자 명시 강제).
+//   각 샤드는 자기 전용 키(snap:us:N)에만 쓰기 → 샤드 간 race condition 원천 차단.
+//   reader(api/_price-cache.js) 가 snap:us:0..N 을 mget 후 merge 하는 "sharded-read" 패턴.
+export async function updateUs(env, shardId) {
+  if (!Number.isInteger(shardId) || shardId < 0 || shardId >= TOTAL_SHARDS) {
+    throw new Error(`updateUs: shardId 필수(0~${TOTAL_SHARDS - 1}) — 받은 값: ${shardId}`);
+  }
   const redis = getRedis();
   try {
     const { symbols: allSymbols, mcMap } = await getSymbolList();
@@ -225,7 +229,8 @@ export async function updateUs(env, shardId = 0) {
     const start = shardId * SHARD_SIZE;
     const end = Math.min(start + SHARD_SIZE, totalSymbols);
     const shardSymbols = allSymbols.slice(start, end);
-    console.log(`[update-us] 샤드 ${shardId}/${TOTAL_SHARDS - 1}: ${shardSymbols.length}개 (${start}~${end - 1})`);
+    const shardKey = `${SNAP_KEYS.US}:${shardId}`;
+    console.log(`[update-us] 샤드 ${shardId}/${TOTAL_SHARDS - 1}: ${shardSymbols.length}개 (${start}~${end - 1}) → ${shardKey}`);
 
     if (shardSymbols.length === 0) {
       return { ok: true, shardId, count: 0 };
@@ -233,34 +238,34 @@ export async function updateUs(env, shardId = 0) {
 
     const { results, failed } = await fetchBatch(shardSymbols, 10000, mcMap);
 
-    // 실패 재시도 (50% 미만)
+    // 실패 재시도 (50% 미만 + 재시도 추가 subrequest 가 1000 한도 넘지 않을 때만)
     let retryResults = [];
     const failRatio = failed.length / shardSymbols.length;
-    if (failed.length > 0 && failRatio < 0.5) {
+    const wouldExceedBudget = (shardSymbols.length + failed.length) > 980;  // 샤드 Yahoo + 재시도 합산
+    if (failed.length > 0 && failRatio < 0.5 && !wouldExceedBudget) {
       console.log(`[update-us] 샤드 ${shardId} 재시도: ${failed.length}개`);
       const { results: retried } = await fetchBatch(failed, 12000, mcMap);
       retryResults = retried;
+    } else if (wouldExceedBudget) {
+      console.log(`[update-us] 샤드 ${shardId} 재시도 skip — subrequest 예산 초과 우려 (${shardSymbols.length + failed.length})`);
     }
 
     const shardItems = [...results, ...retryResults];
 
-    // snap:us 머지 저장 — 이번 샤드 성공분 + 기존 (다른 샤드/이전 주기) 병합.
-    // 3 샤드가 각각 snap:us 에 자기 구간만 덮어쓰고 나머지는 기존 보존.
-    if (redis && shardItems.length > 0) {
+    // 샤드 전용 키에만 쓰기 — snap:us 공유 키는 절대 건드리지 않음 (race 방지)
+    // 빈 배열이면 쓰기 skip (직전 성공분 TTL 내 보존)
+    if (shardItems.length > 0) {
       try {
-        const existing = await redis.get(SNAP_KEYS.US);
-        const merged = new Map();
-        if (Array.isArray(existing)) {
-          for (const it of existing) merged.set(it.symbol, it);
-        }
-        for (const it of shardItems) merged.set(it.symbol, it);
-        await setSnap(SNAP_KEYS.US, [...merged.values()], SNAP_TTL.US);
-        console.log(`[update-us] 샤드 ${shardId} 머지 저장: 신규 ${shardItems.length} → snap:us ${merged.size}`);
+        await setSnap(shardKey, shardItems, SNAP_TTL.US);
+        console.log(`[update-us] 샤드 ${shardId} 저장: ${shardItems.length}개 → ${shardKey}`);
       } catch (e) {
-        // 머지 실패 시 이번 샤드만으로 저장 (coverage 축소 리스크)
-        await setSnap(SNAP_KEYS.US, shardItems, SNAP_TTL.US);
+        // 샤드 전용 키 쓰기 실패 시: 에러 기록만 하고 진행. 공유 snap:us 로 fallback 쓰기 금지
+        // (다른 샤드 데이터 덮어쓰면 전체 coverage 전멸 — Codex CRITICAL #1 반영).
+        console.warn(`[update-us] 샤드 ${shardId} setSnap 실패: ${e?.message || e}`);
+        try { await recordCronFailure('us', `샤드 ${shardId} setSnap: ${String(e?.message || e)}`); } catch (_) {}
       }
-    } else if (shardItems.length === 0) {
+    } else {
+      // 전량 실패: 기존 snap:us:N 은 건드리지 않음 (TTL 내 직전 성공분 보존)
       try { await recordCronFailure('us', `샤드 ${shardId} 전량 실패`); } catch (_) {}
     }
 
