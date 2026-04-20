@@ -39,6 +39,15 @@
             "timeout": 10000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/check-context-pct.sh",
+            "timeout": 3000
+          }
+        ]
       }
     ],
     "Stop": [
@@ -48,6 +57,11 @@
             "type": "command",
             "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/stop-cost-summary.sh",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/bong/market-dashboard-v5/.claude/hooks/auto-checkpoint.sh",
+            "timeout": 10000
           }
         ]
       }
