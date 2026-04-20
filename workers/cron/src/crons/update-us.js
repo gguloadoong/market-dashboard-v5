@@ -1,14 +1,17 @@
-// crons/update-us.js — 미장 가격 갱신 (Yahoo v7 batch, 단일 invocation 전량)
-// #169: 샤딩 제거. 5분 주기로 NASDAQ 시총 상위 3000종목(토스/네이버 수준) 전량 갱신.
-//       Yahoo v7 multi-quote 로 200개/call → 3000 종목 15 batch × 5 병렬 → ~3~5 라운드.
+// crons/update-us.js — 미장 가격 갱신 (Yahoo v8 chart, 샤드 기반)
+// #171: v7 batch 의 401 인증 회귀로 v8 개별 호출 복원.
+//   멀티 오프셋 병렬 크론 (cron 2,3,4) 각각 900 종목 샤드 처리 → 풀 리프레시 5분.
+//   3 shards × 900 = 2700 종목 (NASDAQ 시총 상위).
+//   샤드당 900 subrequest (CF Workers Paid Standard 1000 한도 내 안전 마진).
 
 import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure, getRedis } from '../price-cache.js';
 
-// ── 커버리지 / 배치 설정 ──
-const SYMBOL_LIMIT = 3000;         // 토스/네이버 해외주식 수준 커버
-const BATCH_SIZE = 200;            // Yahoo v7 multi-quote 안전 상한 (500 이상 시 HTTP 414)
-const BATCH_CONCURRENCY = 5;       // 동시 배치 수 (IP rate limit 완화)
-const SYMBOL_LIST_TTL = 86400;     // NASDAQ 종목 리스트 24시간 캐시
+// ── 샤딩 / 배치 설정 ──
+const SYMBOL_LIMIT = 2700;        // 3 shards × 900
+const SHARD_SIZE = 900;           // 샤드당 종목 수 (~900 subrequest/invocation)
+const TOTAL_SHARDS = 3;
+const CONCURRENCY = 30;           // v8 개별 호출 병렬도
+const SYMBOL_LIST_TTL = 86400;    // NASDAQ 종목 리스트 24시간 캐시
 const SYMBOL_LIST_KEY = 'us:symbols';
 
 // NASDAQ API에서 시가총액 상위 종목 수집
@@ -144,85 +147,67 @@ const FALLBACK_SYMBOLS = [
   'ACN','IBM','CSCO','TXN','NEE','PG','KO','PEP','PM','MO',
 ];
 
-// ── Yahoo v7 multi-quote 배치 조회 ──
-// 개별 /v8/finance/chart 호출 대신 /v7/finance/quote?symbols=... 로 200개 1 call.
-// 3000 종목 → 15 batch × 5 병렬 → subrequest 15개만 소모 (기존 3000개 → 200배 감소).
+// ── Yahoo v8 chart 개별 호출 ──
+// v7 quote 배치는 CF Worker IP 에서 401(crumb/cookie) 요구로 차단.
+// v8 chart 는 인증 없이 개별 심볼 조회 가능. 개당 subrequest 1개 소모.
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 let _hostIdx = 0;
 function nextHost() { return YAHOO_HOSTS[(_hostIdx++) % YAHOO_HOSTS.length]; }
 
-// v7 quote 단일 배치 (최대 BATCH_SIZE 심볼)
-// 반환: { items, missingSymbols } — Yahoo 가 응답에서 누락한 심볼은 missingSymbols 로
-//      명시 (#169 Codex P2: 요청은 있었는데 result 에 없으면 실패로 간주, silent 누락 금지)
-async function fetchYahooV7Batch(symbols, timeoutMs = 10000, mcMap = null) {
+// v8 chart API 개별 심볼 조회.
+// BRK.A 등 dot 심볼은 Yahoo 포맷(BRK-A)으로 dash 치환 후 요청 (#169 Codex HIGH #1 관행 유지).
+// mcMap 에서 marketCap 을 머지 (v8 응답엔 marketCap 없음).
+async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
+  // Yahoo v8 은 dot 심볼을 dash 로 요청 (BRK.A → BRK-A)
+  const yahooSymbol = symbol.includes('.') ? symbol.replace('.', '-') : symbol;
   const host = nextHost();
-  const url = `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}`;
+  const url = `https://${host}/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=2d`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json' },
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`Yahoo v7 batch HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Yahoo v8 HTTP ${res.status}`);
   const data = await res.json();
-  const quotes = data?.quoteResponse?.result;
-  if (!Array.isArray(quotes)) throw new Error('Yahoo v7: result 배열 누락');
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error('Yahoo v8: result 없음');
 
-  // 응답된 심볼 set — 요청 ↔ 응답 매칭으로 missing 추출
-  const requestedSet = new Set(symbols);
-  const validOriginals = new Set();  // 원본 요청 심볼 (suffix 포함) 중 응답 유효한 것
-  const items = [];
-  for (const q of quotes) {
-    const rawSymbol = q.symbol || '';
-    if (!rawSymbol) continue;
-    // BRK.A / BRK.B 계열 보존: dot 제거 금지. Naver/Toss 관행대로 dash 로 치환만 (#169 Codex HIGH #1).
-    const resolvedSymbol = rawSymbol.replace('.', '-');
-    const price = Number(q.regularMarketPrice);
-    if (!Number.isFinite(price) || price <= 0) continue; // 가격 무효는 missingSymbols 에 집계됨
-    const prev = Number(q.regularMarketPreviousClose) || price || 0;
-    // mcMap lookup 은 원본(raw) 또는 resolved(dash) 양쪽 키로 시도 — NASDAQ 포맷이 환경별로 다름
-    const mcFromNasdaq = mcMap ? (mcMap[rawSymbol] || mcMap[resolvedSymbol]) : 0;
-    const marketCap = mcFromNasdaq || Number(q.marketCap) || 0;
-    items.push({
-      symbol: resolvedSymbol,
-      price: parseFloat(price.toFixed(2)),
-      change: parseFloat((price - prev).toFixed(2)),
-      changePct: prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0,
-      volume: Number(q.regularMarketVolume) || 0,
-      marketCap,
-      name: q.shortName || q.longName || resolvedSymbol,
-      market: 'us',
-    });
-    // 원본 요청 심볼 포맷이 Yahoo rawSymbol 과 일치하는 것만 기록 (Set 조회 O(1))
-    if (requestedSet.has(rawSymbol)) validOriginals.add(rawSymbol);
-  }
+  const meta = result.meta || {};
+  const price = Number(meta.regularMarketPrice);
+  if (!Number.isFinite(price) || price <= 0) throw new Error('Yahoo v8: 가격 무효');
+  const prev = Number(meta.chartPreviousClose) || Number(meta.previousClose) || price || 0;
+  const volume = Number(meta.regularMarketVolume) || 0;
 
-  // 요청 원본 기준으로 valid 이지 않은 심볼 전부 missing 처리 — O(n) 한 번 순회
-  const missingSymbols = symbols.filter((s) => !validOriginals.has(s));
-  return { items, missingSymbols };
+  // mcMap lookup 은 원본(raw) 또는 dash 치환 심볼 양쪽 키로 시도 — NASDAQ 포맷이 환경별로 다름
+  const mcFromNasdaq = mcMap ? (mcMap[symbol] || mcMap[yahooSymbol]) : 0;
+  const marketCap = mcFromNasdaq || 0;
+
+  return {
+    symbol: yahooSymbol,
+    price: parseFloat(price.toFixed(2)),
+    change: parseFloat((price - prev).toFixed(2)),
+    changePct: prev > 0 ? parseFloat(((price - prev) / prev * 100).toFixed(2)) : 0,
+    volume,
+    marketCap,
+    name: meta.shortName || meta.longName || yahooSymbol,
+    market: 'us',
+  };
 }
 
-// 전 심볼을 BATCH_SIZE 로 잘라 BATCH_CONCURRENCY 병렬로 실행.
-// 배치 자체 실패(HTTP/parse 에러) + Yahoo 가 응답에서 드롭한 심볼 모두 failed 에 집계.
-async function fetchAllV7Batches(symbols, mcMap = null, timeoutMs = 10000) {
-  const batches = [];
-  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-    batches.push(symbols.slice(i, i + BATCH_SIZE));
-  }
-
+// 전 심볼을 CONCURRENCY 병렬 청크로 v8 개별 호출.
+// 성공: results, 실패(HTTP/parse/가격 무효): failed 에 원본 심볼 집계.
+async function fetchBatch(symbols, timeoutMs = 10000, mcMap = null) {
   const results = [];
   const failed = [];
-  for (let i = 0; i < batches.length; i += BATCH_CONCURRENCY) {
-    const group = batches.slice(i, i + BATCH_CONCURRENCY);
+  for (let i = 0; i < symbols.length; i += CONCURRENCY) {
+    const chunk = symbols.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(
-      group.map((b) => fetchYahooV7Batch(b, timeoutMs, mcMap))
+      chunk.map((s) => fetchYahooV8Single(s, timeoutMs, mcMap))
     );
     for (let j = 0; j < settled.length; j++) {
       if (settled[j].status === 'fulfilled') {
-        const { items, missingSymbols } = settled[j].value;
-        results.push(...items);
-        if (missingSymbols && missingSymbols.length > 0) failed.push(...missingSymbols);
+        results.push(settled[j].value);
       } else {
-        failed.push(...group[j]); // 전체 배치 실패 — 200 심볼 통째로 실패 처리
-        console.warn('[update-us] v7 batch 실패:', settled[j].reason?.message);
+        failed.push(chunk[j]);
       }
     }
   }
@@ -230,65 +215,65 @@ async function fetchAllV7Batches(symbols, mcMap = null, timeoutMs = 10000) {
 }
 
 // ── 메인 함수 ──
-// #169: 샤딩 제거. 단일 invocation 에서 전 종목 v7 batch 로 갱신 → snap:us 에 직접 저장.
-export async function updateUs(env) {
+// #171: 샤딩 복원. shardId ∈ [0, TOTAL_SHARDS) 로 SHARD_SIZE 단위 슬라이스 처리.
+//       3개 샤드가 각각 snap:us 에 자기 구간을 머지 저장 → 다른 샤드/이전 주기 보존.
+export async function updateUs(env, shardId = 0) {
   const redis = getRedis();
   try {
-    // 1. 종목 리스트 + marketCap 맵 (24h 캐시)
     const { symbols: allSymbols, mcMap } = await getSymbolList();
-    console.log(`[update-us] v7 batch 시작: ${allSymbols.length}개 (BATCH=${BATCH_SIZE} 병렬=${BATCH_CONCURRENCY})`);
+    const totalSymbols = Math.min(allSymbols.length, SYMBOL_LIMIT);
+    const start = shardId * SHARD_SIZE;
+    const end = Math.min(start + SHARD_SIZE, totalSymbols);
+    const shardSymbols = allSymbols.slice(start, end);
+    console.log(`[update-us] 샤드 ${shardId}/${TOTAL_SHARDS - 1}: ${shardSymbols.length}개 (${start}~${end - 1})`);
 
-    // 2. 전 종목 v7 batch 조회
-    const { results: firstResults, failed } = await fetchAllV7Batches(allSymbols, mcMap, 10000);
+    if (shardSymbols.length === 0) {
+      return { ok: true, shardId, count: 0 };
+    }
 
-    // 3. 실패 심볼 재시도 (50% 미만일 때만 — 대규모 장애 시 재시도 비용 방지)
+    const { results, failed } = await fetchBatch(shardSymbols, 10000, mcMap);
+
+    // 실패 재시도 (50% 미만)
     let retryResults = [];
-    const failRatio = allSymbols.length > 0 ? failed.length / allSymbols.length : 0;
+    const failRatio = failed.length / shardSymbols.length;
     if (failed.length > 0 && failRatio < 0.5) {
-      console.log(`[update-us] 재시도: ${failed.length}개`);
-      const { results: retried } = await fetchAllV7Batches(failed, mcMap, 12000);
+      console.log(`[update-us] 샤드 ${shardId} 재시도: ${failed.length}개`);
+      const { results: retried } = await fetchBatch(failed, 12000, mcMap);
       retryResults = retried;
     }
 
-    let items = [...firstResults, ...retryResults];
+    const shardItems = [...results, ...retryResults];
 
-    // 4. 기존 snap 과 항상 머지 — 임계치 없이 (#169 Codex HIGH #1 재지적)
-    //    어떤 실패율이든 신규 items 가 기존을 부분적으로 덮는 상태. 10개만 실패해도
-    //    coverage 가 10개 축소되는 regression 방지. 기존 snap 이 없으면 신규만 사용.
-    const finalFailed = failed.length - retryResults.length;
-    const newItemCount = items.length;
-    if (redis && items.length > 0) {
+    // snap:us 머지 저장 — 이번 샤드 성공분 + 기존 (다른 샤드/이전 주기) 병합.
+    // 3 샤드가 각각 snap:us 에 자기 구간만 덮어쓰고 나머지는 기존 보존.
+    if (redis && shardItems.length > 0) {
       try {
         const existing = await redis.get(SNAP_KEYS.US);
-        if (Array.isArray(existing) && existing.length > 0) {
-          const merged = new Map();
+        const merged = new Map();
+        if (Array.isArray(existing)) {
           for (const it of existing) merged.set(it.symbol, it);
-          for (const it of items) merged.set(it.symbol, it); // 신규가 기존을 덮어씀
-          items = [...merged.values()];
-          if (items.length > newItemCount) {
-            console.log(`[update-us] snap 머지: 신규 ${newItemCount} + 기존 보존 ${items.length - newItemCount} = ${items.length}`);
-          }
         }
-      } catch (_) { /* 머지 실패해도 신규 items 로 진행 */ }
+        for (const it of shardItems) merged.set(it.symbol, it);
+        await setSnap(SNAP_KEYS.US, [...merged.values()], SNAP_TTL.US);
+        console.log(`[update-us] 샤드 ${shardId} 머지 저장: 신규 ${shardItems.length} → snap:us ${merged.size}`);
+      } catch (e) {
+        // 머지 실패 시 이번 샤드만으로 저장 (coverage 축소 리스크)
+        await setSnap(SNAP_KEYS.US, shardItems, SNAP_TTL.US);
+      }
+    } else if (shardItems.length === 0) {
+      try { await recordCronFailure('us', `샤드 ${shardId} 전량 실패`); } catch (_) {}
     }
 
-    // 5. snap:us 에 단일 저장
-    if (items.length > 0) {
-      await setSnap(SNAP_KEYS.US, items, SNAP_TTL.US);
-    } else {
-      try { await recordCronFailure('us', '전량 실패 — v7 batch 응답 없음'); } catch (_) {}
-    }
-
-    console.log(`[update-us] 저장: ${items.length}개 (재시도 ${retryResults.length}, 최종실패 ${finalFailed})`);
     return {
-      ok: items.length > 0,
-      totalSymbols: allSymbols.length,
-      count: items.length,
+      ok: shardItems.length > 0,
+      shardId,
+      count: shardItems.length,
       retried: retryResults.length,
-      failed: finalFailed,
+      failed: failed.length - retryResults.length,
+      totalSymbols: shardSymbols.length,
     };
   } catch (err) {
-    try { await recordCronFailure('us', String(err?.message || err)); } catch (_) {}
+    try { await recordCronFailure('us', `샤드 ${shardId}: ${String(err?.message || err)}`); } catch (_) {}
     throw err;
   }
 }
