@@ -6,18 +6,6 @@ import {
   fetchEtfPrices, fetchMarketIndices, fetchHantooIndices as gwHantooIndices,
 } from './_gateway.js';
 
-const PROXY_BASE = 'https://api.allorigins.win/get?url=';
-
-async function proxyFetch(targetUrl) {
-  const res = await fetch(`${PROXY_BASE}${encodeURIComponent(targetUrl)}`, {
-    signal: AbortSignal.timeout(7000),
-  });
-  if (!res.ok) throw new Error(`proxy ${res.status}`);
-  const json = await res.json();
-  const text = json.contents ?? JSON.stringify(json);
-  return JSON.parse(text);
-}
-
 // ─── Stooq.com (미국 주식, CORS 허용) ────────────────────────
 // Stooq JSON 배치 API는 최신 1 row만 반환한다.
 // 전일 종가를 얻으려면 각 심볼에 대해 CSV 2일치를 별도 요청해야 하나,
@@ -51,45 +39,9 @@ async function fetchStooq(symbols) {
     });
 }
 
-// ─── Yahoo Finance v7 (배치) via allorigins ───────────────────
-async function fetchYahooQuoteBatch(symbols) {
-  const url  = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-  const data = await proxyFetch(url);
-  return data?.quoteResponse?.result ?? [];
-}
-
-// ─── Yahoo Finance v8 chart (단일, fallback) ─────────────────
-async function fetchYahooChart(symbol) {
-  const url    = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=5d`;
-  const data   = await proxyFetch(url);
-  const result = data?.chart?.result?.[0];
-  if (!result) throw new Error(`No chart: ${symbol}`);
-  const meta   = result.meta;
-  const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-  // chartPreviousClose는 차트 시작 기준점으로 전일 종가가 아님 — 사용 금지
-  // previousClose가 현재가와 같거나 없으면 closes에서 현재가와 다른 가장 최근 값 사용
-  // 부동소수점 비교: 상대 0.01% 이내 차이는 동일 가격으로 간주
-  const curPrice = meta.regularMarketPrice;
-  const almostEq = (a, b) => Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1) < 0.0001;
-  let prev = meta.previousClose;
-  if (!prev || almostEq(prev, curPrice)) {
-    for (let i = closes.length - 2; i >= 0; i--) {
-      if (closes[i] && !almostEq(closes[i], curPrice)) { prev = closes[i]; break; }
-    }
-  }
-  if (!prev) prev = curPrice;
-  return {
-    symbol:    meta.symbol?.split('.')[0],
-    price:     meta.regularMarketPrice,
-    change:    parseFloat((meta.regularMarketPrice - prev).toFixed(2)),
-    changePct: parseFloat(((meta.regularMarketPrice - prev) / prev * 100).toFixed(2)),
-    volume:    meta.regularMarketVolume,
-    high52w:   meta.fiftyTwoWeekHigh,
-    low52w:    meta.fiftyTwoWeekLow,
-    sparkline: closes.slice(-20),
-    _source:   'yahoo', // 데이터 소스 태그
-  };
-}
+// #173: fetchYahooQuoteBatch / fetchYahooChart 제거 — allorigins 경유는
+//       CORS 차단으로 실질 작동 안 하던 dead fallback. 주 소스(통합 게이트웨이,
+//       Stooq, Naver) 로 충분 커버.
 
 // ─── 미국 주식 ─────────────────────────────────────────────────
 export async function fetchUsStocksBatch(symbols) {
@@ -126,36 +78,10 @@ export async function fetchUsStocksBatch(symbols) {
     } catch (e) { console.warn('[미장] Stooq 실패:', e.message); }
   }
 
-  // 3) Yahoo v7 batch via allorigins proxy — missing symbol만 조회
-  const miss3 = missing();
-  if (miss3.length > 0) {
-    try {
-      const results = await fetchYahooQuoteBatch(miss3);
-      addResults(results.map(r => ({
-        symbol:    r.symbol,
-        price:     r.regularMarketPrice,
-        change:    r.regularMarketChange,
-        changePct: r.regularMarketChangePercent,
-        volume:    r.regularMarketVolume,
-        marketCap: r.marketCap,
-        high52w:   r.fiftyTwoWeekHigh,
-        low52w:    r.fiftyTwoWeekLow,
-        _source:   'yahoo',
-      })));
-      if (missing().length === 0) return [...collected.values()];
-      if (results.length > 0) console.warn(`[미장] Yahoo v7 부분 결과: ${results.length}/${miss3.length}`);
-    } catch (e) { console.warn('[미장] Yahoo v7 실패:', e.message); }
-  }
+  // #173: 구 fallback 3(Yahoo v7 proxy), 4(Yahoo v8 chart proxy) 제거 —
+  //       allorigins CORS 차단으로 실질 작동 안 함. Naver 서버 fallback 이 최종 안전망.
 
-  // 4) Yahoo v8 개별 chart — 마지막 missing symbol 처리
-  const miss4 = missing();
-  if (miss4.length > 0) {
-    const settled = await Promise.allSettled(miss4.map(fetchYahooChart));
-    const v8Results = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
-    addResults(v8Results);
-  }
-
-  // 5) 네이버 해외시세 fallback — Yahoo/Stooq 모두 실패한 심볼 처리
+  // 5) 네이버 해외시세 fallback — 통합 게이트웨이/Stooq 모두 실패한 심볼 처리
   const miss5 = missing();
   if (miss5.length > 0) {
     try {
@@ -266,22 +192,8 @@ export async function fetchKoreanStocksBatch(stocks) {
     if (valid.length >= stocks.length * 0.1) return valid;
   } catch (e) { console.warn('[국장] Naver 실패:', e.message); }
 
-  // 3) Yahoo Finance .KS via proxy
-  try {
-    const symbols = stocks.map(s => `${s.symbol}.KS`);
-    const results = await fetchYahooQuoteBatch(symbols);
-    if (results.length > 0) return results.map(r => ({
-      symbol:    r.symbol.replace('.KS', ''),
-      price:     r.regularMarketPrice,
-      change:    r.regularMarketChange,
-      changePct: r.regularMarketChangePercent,
-      volume:    r.regularMarketVolume,
-      marketCap: r.marketCap,
-      high52w:   r.fiftyTwoWeekHigh,
-      low52w:    r.fiftyTwoWeekLow,
-    }));
-  } catch (e) { console.warn('[국장] Yahoo .KS 실패:', e.message); }
-
+  // #173: Yahoo .KS via allorigins fallback 제거 — CORS 차단 dead path.
+  //       한투 + Naver 실패 시 빈 배열 반환.
   return [];
 }
 
@@ -293,22 +205,9 @@ export async function fetchEtfPricesBatch(symbols) {
     const data = await fetchEtfPrices(symbols, 10000);
     if (data.results?.length > 0) return data.results;
   } catch {}
-  // 2) 직접 Yahoo v7 fallback (프록시 실패 시)
-  try {
-    const results = await fetchYahooQuoteBatch(symbols);
-    if (results.length > 0) return results.map(r => {
-      const price     = r.regularMarketPrice;
-      const change    = r.regularMarketChange ?? 0;
-      const prevClose = price - change;
-      const changePct = r.regularMarketChangePercent != null
-        ? r.regularMarketChangePercent
-        : (change !== 0 && prevClose > 0 ? parseFloat((change / prevClose * 100).toFixed(2)) : 0);
-      return { symbol: r.symbol, price, change: parseFloat(change.toFixed(2)), changePct: parseFloat(changePct.toFixed(2)), volume: r.regularMarketVolume ?? 0 };
-    }).filter(r => r.price > 0);
-  } catch {}
-  // 3) Yahoo v8 개별 chart fallback
-  const settled = await Promise.allSettled(symbols.map(fetchYahooChart));
-  return settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+  // #173: Yahoo v7/v8 allorigins fallback 제거 — CORS 차단 dead path.
+  //       통합 게이트웨이 실패 시 빈 배열 반환.
+  return [];
 }
 
 // ─── 지수 ────────────────────────────────────────────────────
@@ -316,76 +215,8 @@ export async function fetchEtfPricesBatch(symbols) {
 // KOSPI: ^KS11, KOSDAQ: ^KQ11 (Yahoo Finance 공식 티커)
 const _toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
 
-// allorigins 두 엔드포인트로 레이스 (corsproxy.io 서비스 종료로 제거)
-async function fetchYahooRace(symbol, id) {
-  const encoded = encodeURIComponent(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`
-  );
-  const encoded2 = encodeURIComponent(
-    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`
-  );
-
-  // allorigins /get — contents 필드에 JSON 문자열
-  const tryAlloriginsGet = async () => {
-    const res  = await fetch(`https://api.allorigins.win/get?url=${encoded}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`allorigins ${res.status}`);
-    const json = await res.json();
-    if (!json.contents) throw new Error('allorigins empty');
-    const raw    = JSON.parse(json.contents);
-    const result = raw?.chart?.result?.[0];
-    if (!result?.meta?.regularMarketPrice) throw new Error('no price');
-    return result;
-  };
-
-  // allorigins /raw — 직접 JSON 반환 (같은 서비스, 다른 엔드포인트)
-  const tryAlloriginsRaw = async () => {
-    const res  = await fetch(`https://api.allorigins.win/raw?url=${encoded2}`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`allorigins-raw ${res.status}`);
-    const raw    = await res.json();
-    const result = raw?.chart?.result?.[0];
-    if (!result?.meta?.regularMarketPrice) throw new Error('no price');
-    return result;
-  };
-
-  // 두 엔드포인트 동시 실행 — 먼저 성공한 것 사용
-  return new Promise((resolve, reject) => {
-    let done = false;
-    let failed = 0;
-
-    [tryAlloriginsGet, tryAlloriginsRaw].forEach(fn => {
-      fn().then(result => {
-        if (done) return;
-        done = true;
-        const meta   = result.meta;
-        const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
-        const price  = meta.regularMarketPrice;
-        // chartPreviousClose는 차트 시작 기준점 — 전일 종가 아님, 사용 금지
-        // previousClose가 null이거나 현재가와 동일하면 closes에서 이전 종가 탐색
-        // 부동소수점 비교: 상대 0.01% 이내 차이는 동일 가격으로 간주
-        const almostEq = (a, b) => Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1) < 0.0001;
-        let prev = meta.previousClose;
-        if (!prev || almostEq(prev, price)) {
-          for (let i = closes.length - 2; i >= 0; i--) {
-            if (closes[i] && !almostEq(closes[i], price)) { prev = closes[i]; break; }
-          }
-        }
-        if (!prev) prev = price;
-        resolve({
-          id,
-          value:     parseFloat(price.toFixed(2)),
-          change:    parseFloat((price - prev).toFixed(2)),
-          changePct: parseFloat(((price - prev) / prev * 100).toFixed(2)),
-        });
-      }).catch(() => {
-        failed++;
-        if (failed === 2 && !done) {
-          done = true;
-          reject(new Error(`${symbol} 모든 프록시 실패`));
-        }
-      });
-    });
-  });
-}
+// #173: fetchYahooRace 제거 — allorigins 경유 지수 프록시는 CORS 차단 dead path.
+//       KOSPI 는 Stooq + 한투 지수 fallback, 나머지는 통합 게이트웨이만 사용.
 
 // ─── Stooq 한국 지수 (CORS 허용, 실시간에 가까운 데이터) ──────
 // 검증 결과: ^kospi 동작 확인, ^kosdaq N/D
@@ -459,21 +290,13 @@ export async function fetchIndices() {
     } catch (e) { console.warn('[지수] 한투 지수 fallback 실패:', e.message); }
   }
 
-  // 3) 여전히 누락된 지수: Stooq(KOSPI) + Yahoo allorigins(나머지) fallback
+  // 3) 여전히 누락된 지수: Stooq(KOSPI) fallback. #173: Yahoo allorigins race 제거 (CORS dead).
   const stillMissing = ALL_INDEX_IDS.filter(id => !have.has(id));
   if (stillMissing.length > 0) {
     const fallbackPromises = stillMissing.map(async (id) => {
       if (id === 'KOSPI') {
         try { return await fetchStooqKospi(); } catch {}
-        try {
-          const r = await fetchYahooRace('^KS11', 'KOSPI');
-          return { ...r, isDelayed: true, dataDelay: '~10분 지연' };
-        } catch {}
-        return null;
       }
-      const entry = ALL_INDICES.find(x => x.id === id);
-      if (!entry) return null;
-      try { return await fetchYahooRace(entry.symbol, id); } catch {}
       return null;
     });
 
