@@ -31,8 +31,8 @@ export const SNAP_TTL = {
   ETF: 600,
 };
 
-// 백업 키 TTL (초) — 1시간
-const BACKUP_TTL = 3600;
+// 백업 키 TTL (초) — #176: 1h → 24h. 미장/국장 장 마감 quiet window 커버.
+const BACKUP_TTL = 86400;
 
 // 단일 키 조회
 export async function getSnap(key) {
