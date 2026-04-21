@@ -31,7 +31,10 @@ export const SNAP_TTL = {
   ETF: 600,
 };
 
-const BACKUP_TTL = 3600;
+// #176: 1h → 24h. 미장 quiet window(ET post 20 UTC ~ pre 08 UTC = 11h) 를 커버해
+//       사용자가 자정~새벽에 앱 열 때 \"--\" 표시되는 치명적 UX 회피.
+//       KR 주말은 24h 로 부분 커버 (토요일까지). 월요일 오전 누출은 별도 이슈.
+const BACKUP_TTL = 86400;
 
 export async function getSnap(key) {
   if (!_redis) return null;
