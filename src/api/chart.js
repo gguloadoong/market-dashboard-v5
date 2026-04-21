@@ -73,30 +73,14 @@ async function fetchHantooCandles(symbol, periodCode = 'D') {
 export async function fetchStockCandles(symbol, range = '1mo', interval = '1d') {
   const isIntraday = ['5m','15m','30m','60m','90m','1h'].includes(interval);
 
-  // 1순위: 통합 게이트웨이 프록시 (production)
-  try {
-    const data = await fetchChartProxy(symbol, range, interval, 6000);
-    if (data?.chart?.result?.[0]) {
-      return parseYahooChart(data, isIntraday);
-    }
-  } catch {}
-
-  // 2순위: allorigins fallback (일봉 이상만)
-  if (!isIntraday) {
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
-      const encoded = encodeURIComponent(url);
-      const res = await fetch(`https://api.allorigins.win/get?url=${encoded}`, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.contents) {
-          const data = JSON.parse(json.contents);
-          if (data?.chart?.result?.[0]) return parseYahooChart(data, false);
-        }
-      }
-    } catch {}
+  // 통합 게이트웨이 프록시만 사용 — allorigins fallback 제거 (#173)
+  // 이유: allorigins 가 Yahoo 요청 전파 시 Access-Control-Allow-Origin 헤더 안 붙여
+  //       브라우저에서 CORS 차단 → 콘솔 에러 스팸 (182건/로드) + 데이터도 못 받음.
+  //       fetchChartProxy 실패 시 별도 복구 수단 없음 (의미 없는 fallback 제거).
+  const data = await fetchChartProxy(symbol, range, interval, 6000);
+  if (data?.chart?.result?.[0]) {
+    return parseYahooChart(data, isIntraday);
   }
-
   throw new Error('차트 데이터 취득 실패');
 }
 
