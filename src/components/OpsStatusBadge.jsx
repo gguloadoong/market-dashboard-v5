@@ -14,7 +14,8 @@ export default function OpsStatusBadge() {
     } catch { /* 무시 */ }
   }, []);
 
-  const { status, unhealthyCount, unhealthyNames } = useCronStatus();
+  // visible 일 때만 폴링 — 일반 사용자는 네트워크 요청 0 (비용/부하 방지)
+  const { status, unhealthyCount, unhealthyNames } = useCronStatus(visible);
 
   if (!visible) return null;
 

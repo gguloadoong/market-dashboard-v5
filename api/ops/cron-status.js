@@ -67,8 +67,11 @@ export default async function handler(request) {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
-      // 공개 응답 30초 CDN 캐시 — 같은 상태 브라우저 탭 다수 호출 부하 감소
-      'Cache-Control': 'public, max-age=0, s-maxage=30',
+      // 토큰 요청(lastError 포함)은 CDN 캐시 금지 — 공개 응답에 토큰 응답 캐시되어
+      // lastError 유출되는 critical 회피. 공개 모드만 30s s-maxage.
+      'Cache-Control': hasDetailAccess
+        ? 'private, no-store'
+        : 'public, max-age=0, s-maxage=30',
     },
   });
 }

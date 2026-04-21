@@ -13,6 +13,7 @@ async function fetchCronStatus() {
 }
 
 /**
+ * @param {boolean} enabled — false 면 요청 중단 (일반 사용자 폴링 방지)
  * @returns {{
  *   status: 'ok' | 'warn' | 'unknown',
  *   unhealthyCount: number,
@@ -20,15 +21,16 @@ async function fetchCronStatus() {
  *   isLoading: boolean,
  * }}
  */
-export function useCronStatus() {
+export function useCronStatus(enabled = true) {
   const { data, isLoading } = useQuery({
     queryKey: ['ops-cron-status'],
     queryFn: fetchCronStatus,
     staleTime: 30_000,
-    refetchInterval: 30_000,
+    refetchInterval: enabled ? 30_000 : false,
     refetchIntervalInBackground: false,
     retry: 1,
     placeholderData: null,
+    enabled,
   });
 
   if (!data?.crons) {
