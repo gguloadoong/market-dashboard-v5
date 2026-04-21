@@ -140,24 +140,28 @@ function BuyPriceCell({ item, buyPrice, onBuyPriceChange, krwRate }) {
     );
   }
 
+  // #137: 셀 자체는 row 핸들러로 bubble (padding 클릭 시 차트 열림).
+  //       편집 진입은 내부 button 으로 격리 (stopPropagation 은 startEdit 이 수행).
   if (pnlPct != null) {
     return (
-      <TableCell className="px-2 py-3 text-right" onClick={startEdit}>
-        <div className={`text-[12px] font-bold tabular-nums font-mono ${isProfit ? 'text-[#F04452]' : isLoss ? 'text-[#1764ED]' : 'text-[#8B95A1]'}`}>
-          {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
-        </div>
-        <div className={`text-[10px] tabular-nums font-mono mt-0.5 ${isProfit ? 'text-[#F04452]' : isLoss ? 'text-[#1764ED]' : 'text-[#8B95A1]'}`}>
-          {pnlAmt >= 0 ? '+' : ''}₩{Math.abs(Math.round(pnlAmt)).toLocaleString('ko-KR')}
-        </div>
+      <TableCell className="px-2 py-3 text-right">
+        <button type="button" onClick={startEdit} className="block w-full text-right">
+          <div className={`text-[12px] font-bold tabular-nums font-mono ${isProfit ? 'text-[#F04452]' : isLoss ? 'text-[#1764ED]' : 'text-[#8B95A1]'}`}>
+            {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
+          </div>
+          <div className={`text-[10px] tabular-nums font-mono mt-0.5 ${isProfit ? 'text-[#F04452]' : isLoss ? 'text-[#1764ED]' : 'text-[#8B95A1]'}`}>
+            {pnlAmt >= 0 ? '+' : ''}₩{Math.abs(Math.round(pnlAmt)).toLocaleString('ko-KR')}
+          </div>
+        </button>
       </TableCell>
     );
   }
 
   return (
-    <TableCell className="px-2 py-3 text-right" onClick={startEdit}>
-      <span className="text-[10px] text-[#C9CDD2] hover:text-[#8B95A1] transition-colors cursor-pointer select-none">
+    <TableCell className="px-2 py-3 text-right">
+      <button type="button" onClick={startEdit} className="text-[10px] text-[#C9CDD2] hover:text-[#8B95A1] transition-colors cursor-pointer select-none">
         ✎ 매수가
-      </span>
+      </button>
     </TableCell>
   );
 }
@@ -242,22 +246,25 @@ function TargetPriceCell({ item, targetPrice, targetDir, onTargetChange, krwRate
     );
   }
 
+  // #137: 셀은 row 핸들러로 bubble, 편집 진입은 내부 button 으로 격리.
   if (hasTarget) {
     return (
-      <TableCell className="px-2 py-3 text-right" onClick={startEdit}>
-        <div className={`text-[11px] font-bold ${reached ? 'text-[#059669]' : targetDir === 'above' ? 'text-[#F04452]' : 'text-[#1764ED]'}`}>
-          {reached ? '🎯' : (targetDir === 'above' ? '↑' : '↓')}
-        </div>
-        <div className="text-[10px] text-[#8B95A1] font-mono tabular-nums mt-0.5">
-          ₩{Math.round(targetPrice).toLocaleString('ko-KR')}
-        </div>
+      <TableCell className="px-2 py-3 text-right">
+        <button type="button" onClick={startEdit} className="block w-full text-right">
+          <div className={`text-[11px] font-bold ${reached ? 'text-[#059669]' : targetDir === 'above' ? 'text-[#F04452]' : 'text-[#1764ED]'}`}>
+            {reached ? '🎯' : (targetDir === 'above' ? '↑' : '↓')}
+          </div>
+          <div className="text-[10px] text-[#8B95A1] font-mono tabular-nums mt-0.5">
+            ₩{Math.round(targetPrice).toLocaleString('ko-KR')}
+          </div>
+        </button>
       </TableCell>
     );
   }
 
   return (
-    <TableCell className="px-2 py-3 text-right" onClick={startEdit}>
-      <span className="text-[13px] text-[#D9DDE3] hover:text-[#8B95A1] transition-colors cursor-pointer select-none">🔔</span>
+    <TableCell className="px-2 py-3 text-right">
+      <button type="button" onClick={startEdit} className="text-[13px] text-[#D9DDE3] hover:text-[#8B95A1] transition-colors cursor-pointer select-none">🔔</button>
     </TableCell>
   );
 }
