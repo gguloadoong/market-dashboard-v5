@@ -53,3 +53,5 @@ CLAUDE.md.bak.*
 
 # 서브모듈 .claude 디렉토리
 workers/cron/.claude/
+workers/cron/.secrets.json
+workers/cron/.dev.vars
