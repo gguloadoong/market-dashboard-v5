@@ -307,13 +307,13 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
 
                   {/* 관심종목 ★ */}
                   <button
-                    onClick={(e) => { e.stopPropagation(); toggle(item.id || item.symbol); }}
+                    onClick={(e) => { e.stopPropagation(); toggle(item.id || item.symbol, item._market || item.market); }}
                     className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-[16px] mr-2 ${
-                      isWatched(item.id || item.symbol) ? 'text-[#FF9500] hover:bg-[#FFF4E6]' : 'text-[#D5D8DC] hover:bg-[#F2F4F6]'
+                      isWatched(item.id || item.symbol, item._market || item.market) ? 'text-[#FF9500] hover:bg-[#FFF4E6]' : 'text-[#D5D8DC] hover:bg-[#F2F4F6]'
                     }`}
-                    title={isWatched(item.id || item.symbol) ? '관심종목 해제' : '관심종목 추가'}
+                    title={isWatched(item.id || item.symbol, item._market || item.market) ? '관심종목 해제' : '관심종목 추가'}
                   >
-                    {isWatched(item.id || item.symbol) ? '★' : '☆'}
+                    {isWatched(item.id || item.symbol, item._market || item.market) ? '★' : '☆'}
                   </button>
                 </button>
               );

@@ -75,7 +75,7 @@ export default function HomeDashboard({
 
   // 관심종목
   const watchedItems = useMemo(
-    () => allItems.filter(i => isWatched(i.id || i.symbol)),
+    () => allItems.filter(i => isWatched(i.id || i.symbol, i._market || i.market)),
     [allItems, watchlist] // eslint-disable-line react-hooks/exhaustive-deps
   );
 

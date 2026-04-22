@@ -555,7 +555,7 @@ export default function HomeDashboard({
 
   // ─── 관심종목 필터링 ────────────────────────────────────────
   const watchedItems = useMemo(
-    () => allItems.filter(i => isWatched(i.id || i.symbol)),
+    () => allItems.filter(i => isWatched(i.id || i.symbol, i._market || i.market)),
     [allItems, watchlist] // watchlist dep: Set 변경 시 재계산
   );
 
@@ -673,7 +673,7 @@ export default function HomeDashboard({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <button
-                      onClick={e => { e.stopPropagation(); toggle(item.id || item.symbol); }}
+                      onClick={e => { e.stopPropagation(); toggle(item.id || item.symbol, item._market || item.market); }}
                       className="text-[14px] text-yellow-400 flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >★</button>
                     <div className="min-w-0">

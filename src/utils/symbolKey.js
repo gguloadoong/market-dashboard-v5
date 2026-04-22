@@ -11,23 +11,19 @@ export const itemKey = (i) => {
   return `${mkt}:${sym}`;
 };
 
-// 워런트/특수단위 — 하이픈/점 접미사 + WS/WT 꼬리
-// 예: DAL.W, XYZ-WS, FUND.UN (접미사 W, L, P, U, T 단일자)
-const WARRANT_RE = /[-.][WLPUT]$|W[ST]$/;
-// 시리즈/우선주 표기 — 캐럿(^), `.PR.`, `-PR.`, `PRA~PRZ` 명시 접미사
+// 워런트/권리 — `WS`/`WT` 꼬리만 확정 매치 (e.g., XYZWS, ABCWT)
+const WARRANT_RE = /W[ST]$/;
+// 시리즈/우선주 — 캐럿(`^`) 또는 `.PR.`/`-PR.` 명시 토큰
 const SERIES_RE = /\^|[-.]PR\./;
-// 명시적 우선주 클래스 — `-A~-Z`, `.A~.Z` 구분자 포함된 단일 알파벳 접미사
-// (듀얼클래스 보통주 BRK-B, BRK.B, FOXA 등은 화이트리스트로 예외 처리)
-const CLASS_SUFFIX_RE = /[-.][A-Z]$/;
 
-// 우선주/특수클래스 식별 — 보통주 복귀 위해 화이트리스트 선행
-// 정책: 구분자(`-`/`.`) 없는 3~6글자 티커(AAPL/ORCL/META 등)는 절대 필터 안 함
+// 우선주/워런트 식별 — 클라이언트는 명시 토큰만 잡음.
+// 정책: 듀얼클래스 `-A`/`-B`/`.A`/`.B` 패턴은 서버 `update-us` 크론이 1차 책임.
+// 클라이언트가 일반 구분자 접미사를 필터하면 CWEN-A, MOG-A, LGF-B 등 보통주 오탐 발생.
 export function isPreferredOrSpecial(sym) {
   if (!sym || typeof sym !== 'string') return false;
   const up = sym.toUpperCase();
   if (US_DUAL_CLASS_WHITELIST.has(up)) return false;
   if (WARRANT_RE.test(up)) return true;
   if (SERIES_RE.test(up)) return true;
-  if (CLASS_SUFFIX_RE.test(up)) return true;
   return false;
 }
