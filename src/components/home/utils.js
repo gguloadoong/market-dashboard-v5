@@ -1,4 +1,5 @@
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
+import { US_LOGO_DOMAIN } from '../../data/usLogoOverrides';
 
 // 종목 → 검색 키워드 배열 반환
 export function buildKeywords(item) {
@@ -127,10 +128,17 @@ export function getLogoUrls(item) {
     return urls;
   }
   if (market === 'US') {
-    return [
-      `https://assets.parqet.com/logos/symbol/${sym}?format=png`,
-      `https://logo.clearbit.com/${sym.toLowerCase()}.com`,
-    ];
+    // parqet 단일 소스 + 화이트리스트 기반 수동 도메인 매핑 보조
+    // clearbit `${sym}.com` 추측 fallback은 오매칭(F.com≠Ford 등)을 일으키므로 제거 (#182)
+    // 빈 심볼 가드 — 무효 URL 호출 방지 (Gemini 리뷰)
+    if (!sym) return [];
+    // 예비 공백·특수문자 방어 — encodeURIComponent는 공백/&/? 등에 효과
+    const urls = [`https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png`];
+    const domain = US_LOGO_DOMAIN[sym.toUpperCase()];
+    if (typeof domain === 'string' && domain) {
+      urls.push(`https://logo.clearbit.com/${domain}`);
+    }
+    return urls;
   }
   if (market === 'KR') {
     return [
