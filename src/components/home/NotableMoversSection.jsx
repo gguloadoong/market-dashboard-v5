@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews, DERIVATIVE_RE } from './utils';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
+import { itemKey } from '../../utils/symbolKey';
 
 const MKT_BADGE = {
   KR:         { label: '국내',      bg: '#FFF0F0', color: '#F04452' },
@@ -316,7 +317,7 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
           <div className="flex gap-3 pb-2" style={{ minWidth: 'max-content' }}>
             {displayed.map(item => (
               <NotableCard
-                key={item.id || item.symbol}
+                key={itemKey(item)}
                 item={item}
                 newsCount={item._newsCount}
                 volumeRank={item._volRank}

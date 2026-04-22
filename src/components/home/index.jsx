@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
+import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import NotableMoversSection from './NotableMoversSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
@@ -29,12 +30,27 @@ export default function HomeDashboard({
     ...krStocks.map(s => ({ ...s, _market: 'KR' })),
     ...etfs.filter(e => e.market === 'kr').map(e => ({ ...e, _market: 'KR', _isEtf: true })),
   ], [krStocks, etfs]);
+  // US 우선주/워런트/시리즈 주 2차 방어 — 서버 필터 실패 대비 (#183)
   const usItems   = useMemo(() => [
-    ...usStocks.map(s => ({ ...s, _market: 'US' })),
+    ...usStocks.filter(s => !isPreferredOrSpecial(s.symbol)).map(s => ({ ...s, _market: 'US' })),
     ...etfs.filter(e => e.market === 'us').map(e => ({ ...e, _market: 'US', _isEtf: true })),
   ], [usStocks, etfs]);
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
-  const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
+
+  // 크로스마켓 심볼 충돌(META=Meta/메타디움 등) 해소 — 복합키 기반 dedup (#183)
+  // 동일 키에 중복 발생 시 거래량이 큰 쪽을 유지
+  const allItems  = useMemo(() => {
+    const seen = new Map();
+    const source = [...krItems, ...usItems, ...coinItems];
+    for (const it of source) {
+      const k = itemKey(it);
+      const prev = seen.get(k);
+      const curVol = it._market === 'COIN' ? (it.volume24h ?? 0) : (it.volume ?? 0);
+      const prevVol = prev ? (prev._market === 'COIN' ? (prev.volume24h ?? 0) : (prev.volume ?? 0)) : -1;
+      if (!prev || curVol > prevVol) seen.set(k, it);
+    }
+    return [...seen.values()];
+  }, [krItems, usItems, coinItems]);
 
   // 레버리지·인버스·미분류 ETF 제외 — 시그널 엔진 오발화 방지
   // _isEtf 플래그는 krItems/usItems spread 시 항상 true로 세팅됨 (보장)
