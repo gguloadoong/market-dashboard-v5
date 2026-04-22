@@ -21,6 +21,11 @@ export const SNAP_KEYS = {
   US: 'snap:us',
   COINS: 'snap:coins',
   ETF: 'snap:etf',
+  // #185: hot tier 키 — marketCap/volume 상위 200개만 담은 작은 스냅샷.
+  //       Edge `/api/snapshot?tier=hot` 이 mget 으로 한 번에 읽음.
+  KR_HOT: 'snap:kr:hot',
+  US_HOT: 'snap:us:hot',
+  COINS_HOT: 'snap:coins:hot',
 };
 
 // TTL — 크론 주기(5분)의 2배로 통일. jitter/지연 흡수 버퍼 확보 (#165, #169 Codex P1)
@@ -29,6 +34,8 @@ export const SNAP_TTL = {
   US: 600,
   COINS: 600,
   ETF: 600,
+  // #185: hot 키는 본 키와 동일 주기로 갱신 → 동일 TTL.
+  HOT: 600,
 };
 
 // #176: 1h → 24h. 미장 quiet window(ET post 20 UTC ~ pre 08 UTC = 11h) 를 커버해

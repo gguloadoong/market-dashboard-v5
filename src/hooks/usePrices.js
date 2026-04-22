@@ -149,11 +149,14 @@ export function usePrices() {
     } catch { setDataErrors(prev => ({ ...prev, kr: true })); }
   }, []); // ref 패턴 — stocks 의존성 없음
 
-  // 마운트 시 snapshot 초기 로드
+  // #185: snapshot 초기 로드 = hot tier(Top 200) 즉시 → full tier lazy merge.
+  //        applySnapshot 로 merge 경로 단일화 → hot/full 동일 로직 공유.
   useEffect(() => {
-    (async () => {
-      const snap = await fetchSnapshot();
-      if (snap?.kr?.length > 0) {
+    let cancelled = false;
+
+    const applySnapshot = (snap) => {
+      if (cancelled || !snap) return;
+      if (snap.kr?.length > 0) {
         setKrStocks(prev => {
           if (prev.length === 0) {
             return snap.kr.map(u => ({ ...u, sector: KR_SECTOR_MAP.get(u.symbol) ?? u.sector }));
@@ -170,14 +173,11 @@ export function usePrices() {
           return [...map.values()];
         });
       }
-      // prev가 비어있으면 snapshot 유무와 무관하게 US_STOCK_LIST 메타(sector, nameEn)로 시드
-      // Redis 미연결(snapshot 비어있음)이어도 섹터자금흐름이 정상 동작하도록 보장
       setUsStocks(prev => {
-        if (prev.length > 0 && !snap?.us?.length) return prev; // 이미 데이터 있고 snapshot도 없으면 스킵
-        // US_STOCK_LIST 메타(sector, nameEn) 보존 — cold load 시 전체 목록 베이스로 시작
+        if (prev.length > 0 && !snap.us?.length) return prev;
         const base = prev.length === 0 ? [...US_STOCK_LIST] : [...prev];
         const map = new Map(base.map(s => [s.symbol, s]));
-        for (const u of (snap?.us ?? [])) {
+        for (const u of (snap.us ?? [])) {
           if (u?.price > 0) {
             const existing = map.get(u.symbol) ?? US_META_MAP.get(u.symbol) ?? {};
             map.set(u.symbol, { ...existing, ...u });
@@ -185,8 +185,28 @@ export function usePrices() {
         }
         return [...map.values()];
       });
-      setPricesReady(true);
+    };
+
+    (async () => {
+      // 1단계: hot — 작고 빠르게 (~30KB) 홈 즉시 렌더
+      const hot = await fetchSnapshot({ tier: 'hot' });
+      applySnapshot(hot);
+      if (!cancelled) setPricesReady(true);
+
+      // 2단계: full lazy — idle 시점에 전종목 보강. ric 없으면 1s setTimeout fallback.
+      const loadFull = async () => {
+        if (cancelled) return;
+        const full = await fetchSnapshot({ tier: 'full' });
+        applySnapshot(full);
+      };
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(loadFull, { timeout: 2000 });
+      } else {
+        setTimeout(loadFull, 1000);
+      }
     })();
+
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

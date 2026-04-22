@@ -258,6 +258,33 @@ export async function updateUs(env, shardId) {
       try {
         await setSnap(shardKey, shardItems, SNAP_TTL.US);
         console.log(`[update-us] 샤드 ${shardId} 저장: ${shardItems.length}개 → ${shardKey}`);
+        // #185: 샤드 0 에서만 hot 계산. 자기 샤드 쓰기 완료 → snap:us:0..2 mget → merge → Top 200.
+        //        다른 샤드는 자기 쓰기 직후 이미 redis 에 있으므로 race 없음.
+        //        샤드 1/2 아직 안 썼다면 mget 이 일부 null 이지만, 다음 샤드 0 실행(5분 뒤)에 복원됨.
+        if (shardId === 0) {
+          try {
+            const shardKeys = [`${SNAP_KEYS.US}:0`, `${SNAP_KEYS.US}:1`, `${SNAP_KEYS.US}:2`];
+            const shards = await redis.mget(...shardKeys);
+            const merged = new Map();
+            for (const arr of shards) {
+              if (!Array.isArray(arr)) continue;
+              for (const it of arr) merged.set(it.symbol, it);
+            }
+            if (merged.size > 0) {
+              const hot = [...merged.values()]
+                .sort((a, b) => {
+                  const mc = (b.marketCap || 0) - (a.marketCap || 0);
+                  if (mc !== 0) return mc;
+                  return String(a.symbol).localeCompare(String(b.symbol));
+                })
+                .slice(0, 200);
+              await setSnap(SNAP_KEYS.US_HOT, hot, SNAP_TTL.HOT);
+              console.log(`[update-us] hot 저장: ${hot.length}개 (merged ${merged.size})`);
+            }
+          } catch (e) {
+            console.warn('[update-us] hot 계산/저장 실패:', e?.message || e);
+          }
+        }
       } catch (e) {
         // 샤드 전용 키 쓰기 실패 시: 에러 기록만 하고 진행. 공유 snap:us 로 fallback 쓰기 금지
         // (다른 샤드 데이터 덮어쓰면 전체 coverage 전멸 — Codex CRITICAL #1 반영).
