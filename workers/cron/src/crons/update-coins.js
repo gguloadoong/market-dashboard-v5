@@ -143,8 +143,10 @@ export async function updateCoins(env) {
     console.log(`[update-coins] 저장: ${items.length}개 (source=upbit)`);
 
     if (items.length > 0) {
-      // #185: hot tier 우선 계산 — accTradePrice24h 가 stripping 전에 살아 있어야 정렬 가능.
-      //        items 는 전체 저장 시 기존과 동일하게 그대로 저장 (stripping 은 snapshot API 에서 수행).
+      // #185: full 먼저 저장 → hot 후 저장 (kr/us와 순서 통일).
+      //        클라이언트가 hot → full lazy 순으로 읽으므로
+      //        full이 hot보다 오래된 적이 없어야 hot 데이터를 덮어쓰지 않음.
+      await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
       try {
         const hot = [...items]
           .sort((a, b) => {
@@ -157,7 +159,6 @@ export async function updateCoins(env) {
       } catch (e) {
         console.warn('[update-coins] hot 저장 실패:', e?.message || e);
       }
-      await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
     }
 
     return { ok: true, count: items.length };

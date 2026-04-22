@@ -270,7 +270,11 @@ export async function updateUs(env, shardId) {
               if (!Array.isArray(arr)) continue;
               for (const it of arr) merged.set(it.symbol, it);
             }
-            if (merged.size > 0) {
+            // #185 cold start sanity: 최소 2 샤드(2×SHARD_SIZE=1800) 이상 병합돼야 hot 저장.
+            // 신규 배포/Redis flush 직후 샤드 0만 있는 상태에서 편향된 Top 200 서빙 방지.
+            // 다음 샤드 0 실행(5분 뒤)에 정상 복원 — skip 이 편향 서빙보다 안전.
+            const MIN_SYMBOLS_FOR_HOT = SHARD_SIZE * 2;
+            if (merged.size >= MIN_SYMBOLS_FOR_HOT) {
               const hot = [...merged.values()]
                 .sort((a, b) => {
                   const mc = (b.marketCap || 0) - (a.marketCap || 0);
@@ -280,6 +284,8 @@ export async function updateUs(env, shardId) {
                 .slice(0, 200);
               await setSnap(SNAP_KEYS.US_HOT, hot, SNAP_TTL.HOT);
               console.log(`[update-us] hot 저장: ${hot.length}개 (merged ${merged.size})`);
+            } else {
+              console.warn(`[update-us] hot skip — 병합(${merged.size}) < ${MIN_SYMBOLS_FOR_HOT} (cold start 편향 방지)`);
             }
           } catch (e) {
             console.warn('[update-us] hot 계산/저장 실패:', e?.message || e);
