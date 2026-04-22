@@ -130,10 +130,14 @@ export function getLogoUrls(item) {
   if (market === 'US') {
     // parqet 단일 소스 + 화이트리스트 기반 수동 도메인 매핑 보조
     // clearbit `${sym}.com` 추측 fallback은 오매칭(F.com≠Ford 등)을 일으키므로 제거 (#182)
-    // BRK.B 등 점(.) 포함 심볼은 encodeURIComponent로 안전 처리
+    // 빈 심볼 가드 — 무효 URL 호출 방지 (Gemini 리뷰)
+    if (!sym) return [];
+    // 예비 공백·특수문자 방어 — encodeURIComponent는 공백/&/? 등에 효과
     const urls = [`https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png`];
     const domain = US_LOGO_DOMAIN[sym.toUpperCase()];
-    if (domain) urls.push(`https://logo.clearbit.com/${domain}`);
+    if (typeof domain === 'string' && domain) {
+      urls.push(`https://logo.clearbit.com/${domain}`);
+    }
     return urls;
   }
   if (market === 'KR') {
