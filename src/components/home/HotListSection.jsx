@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls } from './utils';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
+import { itemKey } from '../../utils/symbolKey';
 
 // ─── SECTION 3: HOT 리스트 행 (3열 공통) ─────────────────────
 const HotRow = memo(function HotRow({ item, rank, krwRate, onClick }) {
@@ -116,7 +117,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               : krHot.length > 0
                 ? krHot.map((item, i) => (
                     <HotRow
-                      key={`kr-hot-${item.symbol}`}
+                      key={`hot-${itemKey(item)}`}
                       item={item}
                       rank={i + 1}
                       krwRate={krwRate}
@@ -145,7 +146,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               : usHot.length > 0
                 ? usHot.map((item, i) => (
                     <HotRow
-                      key={`us-hot-${item.symbol}`}
+                      key={`hot-${itemKey(item)}`}
                       item={item}
                       rank={i + 1}
                       krwRate={krwRate}
@@ -172,7 +173,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               : coinHot.length > 0
                 ? coinHot.map((item, i) => (
                     <HotRow
-                      key={`coin-hot-${item.symbol}`}
+                      key={`hot-${itemKey(item)}`}
                       item={item}
                       rank={i + 1}
                       krwRate={krwRate}
@@ -203,7 +204,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               ? <SkeletonHotRow count={5} />
               : krDrop.map((item, i) => (
                   <HotRow
-                    key={`kr-drop-${item.symbol}`}
+                    key={`drop-${itemKey(item)}`}
                     item={item}
                     rank={i + 1}
                     krwRate={krwRate}
@@ -230,7 +231,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               ? <SkeletonHotRow count={5} />
               : usDrop.map((item, i) => (
                   <HotRow
-                    key={`us-drop-${item.symbol}`}
+                    key={`drop-${itemKey(item)}`}
                     item={item}
                     rank={i + 1}
                     krwRate={krwRate}
@@ -255,7 +256,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
               ? <SkeletonHotRow count={5} />
               : coinDrop.map((item, i) => (
                   <HotRow
-                    key={`coin-drop-${item.symbol}`}
+                    key={`drop-${itemKey(item)}`}
                     item={item}
                     rank={i + 1}
                     krwRate={krwRate}

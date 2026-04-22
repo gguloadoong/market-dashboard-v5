@@ -9,6 +9,7 @@ function fmt(n, d = 0) {
 }
 
 import { isCoinItem } from './home/utils';
+import { itemKey, isPreferredOrSpecial } from '../utils/symbolKey';
 
 function getPct(item) {
   return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
@@ -118,12 +119,13 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // 전체 종목 합치기 (market 태그 포함)
+  // 전체 종목 합치기 (market 태그 포함) — US 우선주 2차 방어 (#183)
   const allItems = useMemo(() => [
     ...krStocks.map(s => ({ ...s, _market: 'kr' })),
-    ...usStocks.map(s => ({ ...s, _market: 'us' })),
+    ...usStocks.filter(s => !isPreferredOrSpecial(s.symbol)).map(s => ({ ...s, _market: 'us' })),
     ...coins.map(c    => ({ ...c, _market: 'coin' })),
-    ...etfs.map(e     => ({ ...e, _market: 'etf' })),
+    // ETF는 실제 거래 시장(kr/us)에 태그 — HomeDashboard와 동일 규약으로 관심종목 키 일치
+    ...etfs.map(e     => ({ ...e, _market: (e.market || 'us').toLowerCase() })),
   ], [krStocks, usStocks, coins, etfs]);
 
   const results = useMemo(() => {
@@ -149,12 +151,12 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         return 0;
       });
 
-    // 로컬 결과의 code/symbol 집합 (중복 제거용)
-    const localCodes = new Set(local.map(i => (i.symbol || i.id || '').toUpperCase()));
+    // 로컬 결과의 복합키 집합 (크로스마켓 충돌 방지 — META 등)
+    const localKeys = new Set(local.map(itemKey));
 
-    // 네이버 검색 결과 정규화 — 중복 제거 후 추가
+    // 네이버 검색 결과 정규화 — KR 전용이므로 KR 키로 중복 체크
     const naverNormalized = naverItems
-      .filter(item => !localCodes.has((item.code || '').toUpperCase()))
+      .filter(item => !localKeys.has(`KR:${(item.code || '').toUpperCase()}`))
       .map(item => ({
         id:       item.code,
         code:     item.code,
@@ -168,10 +170,11 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
         _naverOnly: true,
       }));
 
-    // 미장 검색 결과 정규화 — 로컬에 없는 종목만 추가
-    const allCodes = new Set([...localCodes, ...naverNormalized.map(i => i.symbol.toUpperCase())]);
+    // 미장 검색 결과 정규화 — US 키로만 중복 체크 (우선주도 필터)
+    const allKeys = new Set([...localKeys, ...naverNormalized.map(itemKey)]);
     const usNormalized = usSearchItems
-      .filter(item => !allCodes.has((item.symbol || '').toUpperCase()))
+      .filter(item => !isPreferredOrSpecial(item.symbol))
+      .filter(item => !allKeys.has(`US:${(item.symbol || '').toUpperCase()}`))
       .map(item => ({
         symbol:   item.symbol,
         name:     item.name,
@@ -305,13 +308,13 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
 
                   {/* 관심종목 ★ */}
                   <button
-                    onClick={(e) => { e.stopPropagation(); toggle(item.id || item.symbol); }}
+                    onClick={(e) => { e.stopPropagation(); toggle(item.id || item.symbol, item._market || item.market); }}
                     className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-[16px] mr-2 ${
-                      isWatched(item.id || item.symbol) ? 'text-[#FF9500] hover:bg-[#FFF4E6]' : 'text-[#D5D8DC] hover:bg-[#F2F4F6]'
+                      isWatched(item.id || item.symbol, item._market || item.market) ? 'text-[#FF9500] hover:bg-[#FFF4E6]' : 'text-[#D5D8DC] hover:bg-[#F2F4F6]'
                     }`}
-                    title={isWatched(item.id || item.symbol) ? '관심종목 해제' : '관심종목 추가'}
+                    title={isWatched(item.id || item.symbol, item._market || item.market) ? '관심종목 해제' : '관심종목 추가'}
                   >
-                    {isWatched(item.id || item.symbol) ? '★' : '☆'}
+                    {isWatched(item.id || item.symbol, item._market || item.market) ? '★' : '☆'}
                   </button>
                 </button>
               );

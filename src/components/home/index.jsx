@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
+import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import NotableMoversSection from './NotableMoversSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
@@ -29,12 +30,29 @@ export default function HomeDashboard({
     ...krStocks.map(s => ({ ...s, _market: 'KR' })),
     ...etfs.filter(e => e.market === 'kr').map(e => ({ ...e, _market: 'KR', _isEtf: true })),
   ], [krStocks, etfs]);
+  // US 우선주/워런트/시리즈 주 2차 방어 — 서버 필터 실패 대비 (#183)
   const usItems   = useMemo(() => [
-    ...usStocks.map(s => ({ ...s, _market: 'US' })),
+    ...usStocks.filter(s => !isPreferredOrSpecial(s.symbol)).map(s => ({ ...s, _market: 'US' })),
     ...etfs.filter(e => e.market === 'us').map(e => ({ ...e, _market: 'US', _isEtf: true })),
   ], [usStocks, etfs]);
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
-  const allItems  = useMemo(() => [...krItems, ...usItems, ...coinItems], [krItems, usItems, coinItems]);
+
+  // 복합키 `${_market}:${symbol}` 기반 dedup — 서버 중복 공급(동일 market 내 중복 행) 방어 (#183)
+  // 크로스마켓 충돌(US:META vs COIN:META)은 키가 달라 자연히 분리됨
+  // 동일 market 내 중복 시에만 거래량 큰 쪽 유지 (단위가 같아 비교 유효)
+  const allItems  = useMemo(() => {
+    const seen = new Map();
+    const source = [...krItems, ...usItems, ...coinItems];
+    for (const it of source) {
+      const k = itemKey(it);
+      const prev = seen.get(k);
+      if (!prev) { seen.set(k, it); continue; }
+      const curVol = it._market === 'COIN' ? (it.volume24h ?? 0) : (it.volume ?? 0);
+      const prevVol = prev._market === 'COIN' ? (prev.volume24h ?? 0) : (prev.volume ?? 0);
+      if (curVol > prevVol) seen.set(k, it);
+    }
+    return [...seen.values()];
+  }, [krItems, usItems, coinItems]);
 
   // 레버리지·인버스·미분류 ETF 제외 — 시그널 엔진 오발화 방지
   // _isEtf 플래그는 krItems/usItems spread 시 항상 true로 세팅됨 (보장)
@@ -57,7 +75,7 @@ export default function HomeDashboard({
 
   // 관심종목
   const watchedItems = useMemo(
-    () => allItems.filter(i => isWatched(i.id || i.symbol)),
+    () => allItems.filter(i => isWatched(i.id || i.symbol, i._market || i.market)),
     [allItems, watchlist] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
