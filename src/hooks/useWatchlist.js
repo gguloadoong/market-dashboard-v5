@@ -30,17 +30,19 @@ function toCompositeKey(id, market) {
 }
 
 // v1 → v2 1회성 마이그레이션 — raw 심볼 → 복합키
+// 실패 시에도 v1 제거: 손상된 JSON이 로드마다 재시도되는 것 방지
 function migrate() {
+  const rawV1 = localStorage.getItem(KEY_V1);
+  if (!rawV1) return null;
   try {
-    const rawV1 = localStorage.getItem(KEY_V1);
-    if (!rawV1) return null;
     const arr = JSON.parse(rawV1) ?? [];
-    const migrated = new Set(arr.map(toCompositeKey).filter(Boolean));
+    const migrated = new Set(arr.map(id => toCompositeKey(id)).filter(Boolean));
     localStorage.setItem(KEY_V2, JSON.stringify([...migrated]));
-    localStorage.removeItem(KEY_V1);
     return migrated;
   } catch {
     return null;
+  } finally {
+    try { localStorage.removeItem(KEY_V1); } catch {}
   }
 }
 

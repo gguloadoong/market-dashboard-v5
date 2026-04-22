@@ -3,16 +3,19 @@
 // - 우선주/워런트 필터는 서버 `update-us` 크론이 1차 책임. 클라이언트는 명시적 패턴만 방어.
 import { US_DUAL_CLASS_WHITELIST } from '../data/usDualClass';
 
-// 마켓:심볼 복합키 — allItems dedup/React key 공통
-// `_market`은 대문자로 정규화 (home/index.jsx 'US' vs GlobalSearch.jsx 'us' 불일치 흡수)
+// 마켓:심볼 복합키 — allItems dedup/React key + useWatchlist 조회 공통
+// `_market`은 대문자 정규화. COIN body는 원본 유지(외부 API 소문자 id 요구) → toCompositeKey와 규약 일치.
 export const itemKey = (i) => {
   const mkt = (i._market || 'US').toString().toUpperCase();
-  const sym = (i.symbol || i.id || '').toString().toUpperCase();
+  const raw = (i.symbol || i.id || '').toString();
+  if (!raw) return '';
+  const sym = mkt === 'COIN' ? raw : raw.toUpperCase();
   return `${mkt}:${sym}`;
 };
 
-// 워런트/권리 — `WS`/`WT` 꼬리만 확정 매치 (e.g., XYZWS, ABCWT)
-const WARRANT_RE = /W[ST]$/;
+// 워런트/권리 — 하이픈/점 구분자 + `WS`/`WT` 꼬리만 매치 (e.g., XYZ-WS, ABC.WT)
+// 구분자 없이 WS/WT 끝나는 보통주(NEWS, JEWELS)는 제외.
+const WARRANT_RE = /[-.]W[ST]$/;
 // 시리즈/우선주 — 캐럿(`^`) 또는 `.PR.`/`-PR.` 명시 토큰
 const SERIES_RE = /\^|[-.]PR\./;
 

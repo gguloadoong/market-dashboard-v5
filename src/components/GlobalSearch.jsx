@@ -124,7 +124,8 @@ export default function GlobalSearch({ krStocks = [], usStocks = [], coins = [],
     ...krStocks.map(s => ({ ...s, _market: 'kr' })),
     ...usStocks.filter(s => !isPreferredOrSpecial(s.symbol)).map(s => ({ ...s, _market: 'us' })),
     ...coins.map(c    => ({ ...c, _market: 'coin' })),
-    ...etfs.map(e     => ({ ...e, _market: 'etf' })),
+    // ETF는 실제 거래 시장(kr/us)에 태그 — HomeDashboard와 동일 규약으로 관심종목 키 일치
+    ...etfs.map(e     => ({ ...e, _market: (e.market || 'us').toLowerCase() })),
   ], [krStocks, usStocks, coins, etfs]);
 
   const results = useMemo(() => {
