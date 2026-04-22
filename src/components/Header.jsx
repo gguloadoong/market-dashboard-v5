@@ -1,6 +1,7 @@
 // 데스크탑 헤더 — CDS 스타일 탭 + 장 상태 + 환율 + 다크모드
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
+import OpsStatusBadge from './OpsStatusBadge';
 
 function DarkToggleIcon({ dark }) {
   return dark ? (
@@ -111,6 +112,9 @@ export default function Header({
               <span className="text-[12px] text-[#B0B8C1] font-mono">{timeStr}</span>
             </div>
           )}
+
+          {/* #164 Phase B: 크론 상태 뱃지 (localStorage opsMode=true 일 때만 표시) */}
+          <OpsStatusBadge />
 
           {/* 다크모드 토글 */}
           {onDarkToggle && (

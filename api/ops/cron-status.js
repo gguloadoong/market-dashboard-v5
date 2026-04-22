@@ -1,28 +1,21 @@
-// api/ops/cron-status.js — 크론 실패 카운트 + 마지막 에러 조회 (#164 Phase A)
-// 인증: x-ops-token 헤더 = OPS_SECRET (fallback: CRON_SECRET). 내부 관측 전용.
-// 응답: { ts, crons: { coins: { failCount, lastError }, kr: {...}, ... } }
+// api/ops/cron-status.js — 크론 실패 카운트 조회 (#164 Phase A + B)
+// 두 가지 모드:
+//   (1) 공개 모드 (토큰 없음): 각 크론의 failCount + healthy 불린만 반환. UI 뱃지용.
+//   (2) 토큰 모드 (x-ops-token=OPS_SECRET/CRON_SECRET): lastError 상세 포함. CLI 디버깅용.
+//
+// 공개 모드는 에러 메시지 등 내부 구조 노출 가능한 정보 미포함 —
+// 클라이언트 번들에 토큰 심지 않아도 안전.
 export const config = { runtime: 'edge' };
 
 import { Redis } from '@upstash/redis';
 
 const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing'];
+const HEALTHY_THRESHOLD = 3; // failCount >= 3 이면 unhealthy
 
 export default async function handler(request) {
   const auth = (process.env.OPS_SECRET || process.env.CRON_SECRET || '').trim();
   const token = (request.headers.get('x-ops-token') || '').trim();
-
-  if (!auth) {
-    return new Response(JSON.stringify({ error: 'server misconfigured: OPS_SECRET/CRON_SECRET 미설정' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-  if (token !== auth) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const hasDetailAccess = !!auth && token === auth;
 
   const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
   const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -35,7 +28,6 @@ export default async function handler(request) {
 
   const redis = new Redis({ url, token: kvToken });
 
-  // 5개 크론 × 2 키(failCount + lastError) = 10 키 한 번에 조회
   const keys = CRON_NAMES.flatMap((c) => [`cron:fail:${c}`, `cron:lastError:${c}`]);
   let vals;
   try {
@@ -49,21 +41,37 @@ export default async function handler(request) {
 
   const result = {};
   for (let i = 0; i < CRON_NAMES.length; i++) {
-    const raw = vals[i * 2 + 1];
-    let lastError = null;
-    if (raw) {
-      try {
-        lastError = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      } catch { lastError = { parseError: true, raw: String(raw).slice(0, 200) }; }
-    }
-    result[CRON_NAMES[i]] = {
-      failCount: parseInt(vals[i * 2] || '0', 10),
-      lastError,
+    const failCount = parseInt(vals[i * 2] || '0', 10);
+    const entry = {
+      failCount,
+      healthy: failCount < HEALTHY_THRESHOLD,
     };
+    if (hasDetailAccess) {
+      const raw = vals[i * 2 + 1];
+      let lastError = null;
+      if (raw) {
+        try {
+          lastError = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch { lastError = { parseError: true, raw: String(raw).slice(0, 200) }; }
+      }
+      entry.lastError = lastError;
+    }
+    result[CRON_NAMES[i]] = entry;
   }
 
-  return new Response(JSON.stringify({ ts: new Date().toISOString(), crons: result }), {
+  return new Response(JSON.stringify({
+    ts: new Date().toISOString(),
+    mode: hasDetailAccess ? 'detail' : 'public',
+    crons: result,
+  }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      // 토큰 요청(lastError 포함)은 CDN 캐시 금지 — 공개 응답에 토큰 응답 캐시되어
+      // lastError 유출되는 critical 회피. 공개 모드만 30s s-maxage.
+      'Cache-Control': hasDetailAccess
+        ? 'private, no-store'
+        : 'public, max-age=0, s-maxage=30',
+    },
   });
 }
