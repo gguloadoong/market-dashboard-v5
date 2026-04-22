@@ -22,7 +22,10 @@ function inferMarket(id) {
 function toCompositeKey(id) {
   if (typeof id !== 'string' || !id) return '';
   if (id.includes(':')) return id;
-  return `${inferMarket(id)}:${id.toUpperCase()}`;
+  const market = inferMarket(id);
+  // 코인 id는 CoinGecko/Paprika API 소문자 요구 — 원본 유지
+  const body = market === 'COIN' ? id : id.toUpperCase();
+  return `${market}:${body}`;
 }
 
 // v1 → v2 1회성 마이그레이션 — raw 심볼 → 복합키

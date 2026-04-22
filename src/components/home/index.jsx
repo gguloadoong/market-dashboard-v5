@@ -37,17 +37,19 @@ export default function HomeDashboard({
   ], [usStocks, etfs]);
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);
 
-  // 크로스마켓 심볼 충돌(META=Meta/메타디움 등) 해소 — 복합키 기반 dedup (#183)
-  // 동일 키에 중복 발생 시 거래량이 큰 쪽을 유지
+  // 복합키 `${_market}:${symbol}` 기반 dedup — 서버 중복 공급(동일 market 내 중복 행) 방어 (#183)
+  // 크로스마켓 충돌(US:META vs COIN:META)은 키가 달라 자연히 분리됨
+  // 동일 market 내 중복 시에만 거래량 큰 쪽 유지 (단위가 같아 비교 유효)
   const allItems  = useMemo(() => {
     const seen = new Map();
     const source = [...krItems, ...usItems, ...coinItems];
     for (const it of source) {
       const k = itemKey(it);
       const prev = seen.get(k);
+      if (!prev) { seen.set(k, it); continue; }
       const curVol = it._market === 'COIN' ? (it.volume24h ?? 0) : (it.volume ?? 0);
-      const prevVol = prev ? (prev._market === 'COIN' ? (prev.volume24h ?? 0) : (prev.volume ?? 0)) : -1;
-      if (!prev || curVol > prevVol) seen.set(k, it);
+      const prevVol = prev._market === 'COIN' ? (prev.volume24h ?? 0) : (prev.volume ?? 0);
+      if (curVol > prevVol) seen.set(k, it);
     }
     return [...seen.values()];
   }, [krItems, usItems, coinItems]);
