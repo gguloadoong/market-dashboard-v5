@@ -407,6 +407,20 @@ export async function updateKr(env) {
   // Redis 저장
   if (items.length > 0) {
     await setSnap(SNAP_KEYS.KR, items, SNAP_TTL.KR);
+    // #185: hot tier — marketCap 내림차순 Top 200 (동률 시 symbol asc 로 2차 정렬
+    //        → ETag flapping 방지). 홈 /api/snapshot?tier=hot 이 mget 으로 즉시 반환.
+    try {
+      const hot = [...items]
+        .sort((a, b) => {
+          const mc = (b.marketCap || 0) - (a.marketCap || 0);
+          if (mc !== 0) return mc;
+          return String(a.symbol).localeCompare(String(b.symbol));
+        })
+        .slice(0, 200);
+      await setSnap(SNAP_KEYS.KR_HOT, hot, SNAP_TTL.HOT);
+    } catch (e) {
+      console.warn('[update-kr] hot 저장 실패:', e?.message || e);
+    }
   }
 
   // 모든 소스 실패 시 Cron 실패 기록

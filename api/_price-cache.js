@@ -21,6 +21,10 @@ export const SNAP_KEYS = {
   US: 'snap:us',
   COINS: 'snap:coins',
   ETF: 'snap:etf',
+  // #185: hot tier — CF Workers 크론이 Top 200 을 별도 키로 사전 계산.
+  KR_HOT: 'snap:kr:hot',
+  US_HOT: 'snap:us:hot',
+  COINS_HOT: 'snap:coins:hot',
 };
 
 // TTL (초) — 크론 5분 주기 × 2 로 통일. jitter/지연 흡수 (#165, #169 Codex P1)
@@ -124,6 +128,27 @@ export async function getUsSnap() {
   } catch (e) {
     console.error('[price-cache] getUsSnap 샤드 읽기 실패:', e);
     return getSnapWithFallback(SNAP_KEYS.US);
+  }
+}
+
+// #185: hot tier 스냅샷 조회 — 3개 hot 키 mget 병렬 (캐시 미스 시 빈 배열).
+//       `/api/snapshot?tier=hot` 의 읽기 경로. 각 키가 null 이어도 503 아닌 `[]` 로 정상 반환.
+export async function getHotSnaps() {
+  if (!redis) return null;
+  try {
+    const [kr, us, coins] = await redis.mget(
+      SNAP_KEYS.KR_HOT,
+      SNAP_KEYS.US_HOT,
+      SNAP_KEYS.COINS_HOT,
+    );
+    return {
+      kr: Array.isArray(kr) ? kr : [],
+      us: Array.isArray(us) ? us : [],
+      coins: Array.isArray(coins) ? coins : [],
+    };
+  } catch (e) {
+    console.error('[price-cache] getHotSnaps 실패:', e);
+    return null;
   }
 }
 

@@ -47,22 +47,49 @@ export function useCoins(krwRateRef) {
   const coinsRef      = useRef(coins);
   coinsRef.current    = coins;
 
-  // 마운트 시 snapshot 초기 로드
+  // #185: snapshot 초기 로드 = hot tier(Top 200) 즉시 → full tier lazy merge.
   useEffect(() => {
+    let cancelled = false;
+
+    const mergeCoins = (snap) => {
+      if (cancelled || !snap?.coins?.length) return;
+      setCoins(prev => {
+        if (prev.length === 0) return snap.coins;
+        const map = new Map(prev.map(c => [c.symbol, c]));
+        for (const coin of snap.coins) {
+          map.set(coin.symbol, { ...map.get(coin.symbol), ...coin });
+        }
+        return [...map.values()];
+      });
+    };
+
+    let idleId = null;
+    let timerId = null;
+
     (async () => {
-      const snap = await fetchSnapshot();
-      if (snap?.coins?.length > 0) {
-        setCoins(prev => {
-          if (prev.length === 0) return snap.coins;
-          const map = new Map(prev.map(c => [c.symbol, c]));
-          for (const coin of snap.coins) {
-            map.set(coin.symbol, { ...map.get(coin.symbol), ...coin });
-          }
-          return [...map.values()];
-        });
+      const hot = await fetchSnapshot({ tier: 'hot' });
+      mergeCoins(hot);
+      if (!cancelled) setCoinsReady(true);
+
+      const loadFull = async () => {
+        if (cancelled) return;
+        const full = await fetchSnapshot({ tier: 'full' });
+        mergeCoins(full);
+      };
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(loadFull, { timeout: 2000 });
+      } else {
+        timerId = setTimeout(loadFull, 1000);
       }
-      setCoinsReady(true);
     })();
+
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timerId != null) clearTimeout(timerId);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 빠른 갱신 (10초, Upbit만)

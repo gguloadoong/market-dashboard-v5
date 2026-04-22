@@ -3,7 +3,7 @@
 // [최적화] ETag/304 + 필드 스트리핑
 export const config = { runtime: 'edge' };
 
-import { getAllSnaps, getCronHealth } from './_price-cache.js';
+import { getAllSnaps, getHotSnaps, getCronHealth } from './_price-cache.js';
 
 // CORS 공통 헤더
 const CORS_HEADERS = {
@@ -12,11 +12,12 @@ const CORS_HEADERS = {
 };
 
 // ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
-// 제거: KR→exchange, Coins→accTradePrice24h/highPrice/lowPrice
+// 제거: Coins→accTradePrice24h/highPrice/lowPrice
+// #185: KR exchange(kospi/kosdaq) 보존 — 뱃지 렌더링 회귀 방지.
 function stripStocks(items) {
   if (!Array.isArray(items)) return items;
-  return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market }) =>
-    ({ symbol, name, price, change, changePct, volume, marketCap, market }));
+  return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market, exchange }) =>
+    ({ symbol, name, price, change, changePct, volume, marketCap, market, exchange }));
 }
 
 function stripCoins(items) {
@@ -73,6 +74,45 @@ export default async function handler(request) {
       });
     }
 
+    // #185: tier 분기 — `?tier=hot` 은 Top 200 사전 계산 키, `?tier=full`(기본) 은 전종목.
+    //       ETag 네임스페이스 분리(hot-* / full-*) → tier 간 교차 오염 방지.
+    const tier = url.searchParams.get('tier') === 'hot' ? 'hot' : 'full';
+
+    if (tier === 'hot') {
+      const snaps = await getHotSnaps();
+      // Redis 연결 실패 → 503 (hot 도 Redis 의존)
+      if (!snaps) {
+        return new Response(JSON.stringify({
+          error: 'Service Unavailable — Redis 연결 실패',
+          kr: [], us: [], coins: [],
+          ts: Date.now(), _fromCache: false,
+        }), { status: 503, headers: CORS_HEADERS });
+      }
+      // hot 키 미존재(크론 첫 실행 전 등) → 빈 배열 + _fromCache:false 로 graceful degrade.
+      const kr = stripStocks(snaps.kr ?? []);
+      const us = stripStocks(snaps.us ?? []);
+      const coins = stripCoins(snaps.coins ?? []);
+      const hasAny = kr.length + us.length + coins.length > 0;
+      const etag = `"hot-${simpleHash(JSON.stringify([kr, us, coins]))}"`;
+      const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: hasAny, tier: 'hot' });
+      const clientETag = request.headers.get('if-none-match');
+      if (clientETag === etag) {
+        return new Response(null, {
+          status: 304,
+          headers: { 'Access-Control-Allow-Origin': '*', 'ETag': etag },
+        });
+      }
+      // hot 은 s-maxage=30 — 본 키와 동기화 지연 최소화 (갱신 주기 5분 대비 여유).
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...CORS_HEADERS,
+          'Cache-Control': 'public, max-age=0, s-maxage=30',
+          'ETag': etag,
+        },
+      });
+    }
+
     const snaps = await getAllSnaps();
     const fromCache = snaps !== null;
 
@@ -93,8 +133,9 @@ export default async function handler(request) {
     const coins = stripCoins(snaps?.coins ?? []);
 
     // ── ETag: 데이터 내용 해시 (ts/_fromCache 제외 — 매번 바뀌므로) ──
-    const etag = `"${simpleHash(JSON.stringify([kr, us, coins]))}"`;
-    const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: fromCache });
+    // #185: "full-" 프리픽스 — hot 과 ETag 네임스페이스 분리.
+    const etag = `"full-${simpleHash(JSON.stringify([kr, us, coins]))}"`;
+    const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: fromCache, tier: 'full' });
     const clientETag = request.headers.get('if-none-match');
     if (clientETag === etag) {
       return new Response(null, {
