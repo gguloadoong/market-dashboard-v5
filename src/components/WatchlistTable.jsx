@@ -351,10 +351,10 @@ const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, se
       {/* 관심종목 별 버튼 */}
       <TableCell className="pl-2 pr-0 py-3 w-7">
         <button
-          onClick={e => { e.stopPropagation(); toggle(item.id || item.symbol, item._market || item.market); }}
+          onClick={e => { e.stopPropagation(); toggle(item.id || item.symbol, item._market || item.market || type); }}
           className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-[14px] hover:scale-110 transition-transform"
         >
-          {isWatched(item.id || item.symbol, item._market || item.market) ? '★' : '☆'}
+          {isWatched(item.id || item.symbol, item._market || item.market || type) ? '★' : '☆'}
         </button>
       </TableCell>
 
@@ -613,9 +613,9 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFA
       const avg = items.length ? items.reduce((s, i) => s + getVol(i), 0) / items.length : 0;
       if (avg > 0) list = list.filter(i => getVol(i) >= avg * 2);
     }
-    if (filter === 'watchlist') list = list.filter(i => isWatched(i.id || i.symbol, i._market || i.market));
+    if (filter === 'watchlist') list = list.filter(i => isWatched(i.id || i.symbol, i._market || i.market || type));
     // ★ 관심종목만 보기 토글
-    if (showWatchlistOnly)      list = list.filter(i => isWatched(i.id || i.symbol, i._market || i.market));
+    if (showWatchlistOnly)      list = list.filter(i => isWatched(i.id || i.symbol, i._market || i.market || type));
     return list;
   }, [items, debouncedSearch, filter, sector, showWatchlistOnly, isWatched]);
 
