@@ -1,5 +1,7 @@
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { US_LOGO_DOMAIN } from '../../data/usLogoOverrides';
+// CoinPaprika id 맵 — scripts/fetch-coinpaprika-ids.js로 자동 생성된 정적 파일 참조 (#184)
+import { COIN_PAPRIKA_IDS } from '../../data/coinPaprikaIds';
 
 // 종목 → 검색 키워드 배열 반환
 export function buildKeywords(item) {
@@ -83,29 +85,6 @@ export const PALETTE = ['#3182F6','#F04452','#FF9500','#2AC769','#8B5CF6','#EC48
 export function getAvatarBg(symbol) {
   return PALETTE[Math.abs((symbol || '').split('').reduce((h, c) => c.charCodeAt(0) + ((h << 5) - h), 0)) % PALETTE.length] || '#8B95A1';
 }
-
-const COIN_PAPRIKA_IDS = {
-  BTC: 'btc-bitcoin',
-  ETH: 'eth-ethereum',
-  XRP: 'xrp-xrp',
-  SOL: 'sol-solana',
-  DOGE: 'doge-dogecoin',
-  ADA: 'ada-cardano',
-  BNB: 'bnb-binance-coin',
-  AVAX: 'avax-avalanche',
-  DOT: 'dot-polkadot',
-  LINK: 'link-chainlink',
-  TON: 'ton-toncoin',
-  TRX: 'trx-tron',
-  BCH: 'bch-bitcoin-cash',
-  LTC: 'ltc-litecoin',
-  SHIB: 'shib-shiba-inu',
-  UNI: 'uni-uniswap',
-  ATOM: 'atom-cosmos',
-  ETC: 'etc-ethereum-classic',
-  XLM: 'xlm-stellar',
-  HBAR: 'hbar-hedera-hashgraph',
-};
 
 // ─── 종목/코인 로고 URL fallback 체인 ─────────────────────────
 // 반환: [url1, url2, ...] — 순서대로 시도, 모두 실패 시 이니셜 아바타
