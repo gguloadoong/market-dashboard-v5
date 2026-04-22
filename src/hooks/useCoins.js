@@ -63,6 +63,9 @@ export function useCoins(krwRateRef) {
       });
     };
 
+    let idleId = null;
+    let timerId = null;
+
     (async () => {
       const hot = await fetchSnapshot({ tier: 'hot' });
       mergeCoins(hot);
@@ -74,13 +77,19 @@ export function useCoins(krwRateRef) {
         mergeCoins(full);
       };
       if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-        window.requestIdleCallback(loadFull, { timeout: 2000 });
+        idleId = window.requestIdleCallback(loadFull, { timeout: 2000 });
       } else {
-        setTimeout(loadFull, 1000);
+        timerId = setTimeout(loadFull, 1000);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timerId != null) clearTimeout(timerId);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 빠른 갱신 (10초, Upbit만)

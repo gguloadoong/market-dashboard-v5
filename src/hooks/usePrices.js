@@ -187,6 +187,9 @@ export function usePrices() {
       });
     };
 
+    let idleId = null;
+    let timerId = null;
+
     (async () => {
       // 1단계: hot — 작고 빠르게 (~30KB) 홈 즉시 렌더
       const hot = await fetchSnapshot({ tier: 'hot' });
@@ -200,13 +203,19 @@ export function usePrices() {
         applySnapshot(full);
       };
       if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-        window.requestIdleCallback(loadFull, { timeout: 2000 });
+        idleId = window.requestIdleCallback(loadFull, { timeout: 2000 });
       } else {
-        setTimeout(loadFull, 1000);
+        timerId = setTimeout(loadFull, 1000);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timerId != null) clearTimeout(timerId);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

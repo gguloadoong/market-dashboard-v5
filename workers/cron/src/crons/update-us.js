@@ -263,7 +263,7 @@ export async function updateUs(env, shardId) {
         //        샤드 1/2 아직 안 썼다면 mget 이 일부 null 이지만, 다음 샤드 0 실행(5분 뒤)에 복원됨.
         if (shardId === 0) {
           try {
-            const shardKeys = [`${SNAP_KEYS.US}:0`, `${SNAP_KEYS.US}:1`, `${SNAP_KEYS.US}:2`];
+            const shardKeys = Array.from({ length: TOTAL_SHARDS }, (_, i) => `${SNAP_KEYS.US}:${i}`);
             const shards = await redis.mget(...shardKeys);
             const merged = new Map();
             for (const arr of shards) {
