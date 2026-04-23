@@ -11,7 +11,7 @@ export default async function handler(_request) {
     if (!res.ok) {
       return new Response(JSON.stringify({ pcr: null, error: 'deribit_fetch_failed' }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=60', 'Access-Control-Allow-Origin': '*' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
