@@ -44,6 +44,7 @@ export default function MorningBriefing() {
       .then(d => {
         if (d && !d.error) setData(d);
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
