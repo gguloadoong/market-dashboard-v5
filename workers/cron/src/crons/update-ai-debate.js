@@ -7,8 +7,10 @@ import { getRedis, recordCronFailure } from '../price-cache.js';
 
 const DEBATE_TTL = 90000; // 25시간
 
+// 25종목 — CF Workers subrequest 50/invocation 한계 고려 (종목당 Gemini+Redis = 2req)
+// 25 × 2 = 50 → 한계 내. 롱테일은 유저 first-click 시 실시간 생성 (fallback 유지)
 const TOP_SYMBOLS = [
-  // 국장 상위 20
+  // 국장 상위 10
   { symbol: '005930', name: '삼성전자', market: 'kr' },
   { symbol: '000660', name: 'SK하이닉스', market: 'kr' },
   { symbol: '005380', name: '현대차', market: 'kr' },
@@ -19,17 +21,7 @@ const TOP_SYMBOLS = [
   { symbol: '035720', name: '카카오', market: 'kr' },
   { symbol: '035420', name: 'NAVER', market: 'kr' },
   { symbol: '006400', name: '삼성SDI', market: 'kr' },
-  { symbol: '051910', name: 'LG화학', market: 'kr' },
-  { symbol: '105560', name: 'KB금융', market: 'kr' },
-  { symbol: '055550', name: '신한지주', market: 'kr' },
-  { symbol: '066570', name: 'LG전자', market: 'kr' },
-  { symbol: '003550', name: 'LG', market: 'kr' },
-  { symbol: '028260', name: '삼성물산', market: 'kr' },
-  { symbol: '012330', name: '현대모비스', market: 'kr' },
-  { symbol: '000810', name: '삼성화재', market: 'kr' },
-  { symbol: '032830', name: '삼성생명', market: 'kr' },
-  { symbol: '096770', name: 'SK이노베이션', market: 'kr' },
-  // 미장 상위 20
+  // 미장 상위 10
   { symbol: 'AAPL', name: 'Apple', market: 'us' },
   { symbol: 'MSFT', name: 'Microsoft', market: 'us' },
   { symbol: 'NVDA', name: 'NVIDIA', market: 'us' },
@@ -40,27 +32,12 @@ const TOP_SYMBOLS = [
   { symbol: 'JPM', name: 'JPMorgan', market: 'us' },
   { symbol: 'AVGO', name: 'Broadcom', market: 'us' },
   { symbol: 'TSM', name: 'TSMC', market: 'us' },
-  { symbol: 'AMD', name: 'AMD', market: 'us' },
-  { symbol: 'NFLX', name: 'Netflix', market: 'us' },
-  { symbol: 'V', name: 'Visa', market: 'us' },
-  { symbol: 'UNH', name: 'UnitedHealth', market: 'us' },
-  { symbol: 'XOM', name: 'ExxonMobil', market: 'us' },
-  { symbol: 'ORCL', name: 'Oracle', market: 'us' },
-  { symbol: 'WMT', name: 'Walmart', market: 'us' },
-  { symbol: 'PLTR', name: 'Palantir', market: 'us' },
-  { symbol: 'ARM', name: 'ARM Holdings', market: 'us' },
-  { symbol: 'CRM', name: 'Salesforce', market: 'us' },
-  // 코인 상위 10
+  // 코인 상위 5
   { symbol: 'BTC', name: '비트코인', market: 'crypto' },
   { symbol: 'ETH', name: '이더리움', market: 'crypto' },
   { symbol: 'XRP', name: '리플', market: 'crypto' },
   { symbol: 'SOL', name: '솔라나', market: 'crypto' },
   { symbol: 'BNB', name: '바이낸스코인', market: 'crypto' },
-  { symbol: 'DOGE', name: '도지코인', market: 'crypto' },
-  { symbol: 'ADA', name: '에이다', market: 'crypto' },
-  { symbol: 'AVAX', name: '아발란체', market: 'crypto' },
-  { symbol: 'DOT', name: '폴카닷', market: 'crypto' },
-  { symbol: 'LINK', name: '체인링크', market: 'crypto' },
 ];
 
 const GEMINI_MODELS = [
@@ -151,7 +128,7 @@ export async function updateAiDebate(env) {
   }
 
   if (fail > ok) {
-    await recordCronFailure(env, 'update-ai-debate', `ok=${ok} fail=${fail}`);
+    await recordCronFailure(env, 'ai-debate', `ok=${ok} fail=${fail}`);
   }
 
   return { ok, fail, total: TOP_SYMBOLS.length };
