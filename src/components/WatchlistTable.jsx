@@ -303,7 +303,7 @@ const LogoAvatar = React.memo(function LogoAvatar({ item, size = 32 }) {
 });
 
 // ─── 행 플래시 애니메이션 ────────────────────────────────────
-const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange }) {
+const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange, type }) {
   const rowRef  = useRef(null);
   const prevPct = useRef(getPct(item));
   const pct     = getPct(item);
@@ -886,6 +886,7 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFA
                             searchTerm={debouncedSearch}
                             toggle={toggle}
                             isWatched={isWatched}
+                            type={type}
                             buyPrice={buyPrices[item.id || item.symbol] ?? null}
                             onBuyPriceChange={handleBuyPriceChange}
                             targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}

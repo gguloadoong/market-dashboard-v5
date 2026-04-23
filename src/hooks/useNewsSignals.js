@@ -43,8 +43,12 @@ export function useNewsSignals(allNews = [], allItems = []) {
   const itemsRef = useRef(allItems);
   // 이전 스캔에서 클러스터 시그널이 있던 심볼 추적
   const prevClusteredRef = useRef(new Set());
-  newsRef.current = allNews;
-  itemsRef.current = allItems;
+
+  // render-time ref 업데이트 금지 (react-hooks/refs) — 매 렌더 후 동기화
+  useEffect(() => {
+    newsRef.current = allNews;
+    itemsRef.current = allItems;
+  });
 
   const scan = useCallback(() => {
     const news = newsRef.current;
