@@ -86,7 +86,7 @@ export default function AiDebateSection({ watchedItems = [], usStocks = [], allI
       const ctx = { name: item.name, price: stock?.price, changePct: stock?.changePct, market: item.market };
       const data = await fetchAiDebate(item.symbol, ctx);
       if (data?.error) {
-        setError(data.error === 'GROQ_API_KEY not configured' ? 'AI 기능 미설정' : data.error);
+        setError(data.error === 'GEMINI_API_KEY not configured' ? 'AI 기능 미설정' : data.error);
       } else {
         setCached(item.symbol, data);
         setResult(data);

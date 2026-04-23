@@ -14,5 +14,6 @@ crons = [
   "4-59/5 * * * *",    # us shard 2  — 04, 09, 14, 19, ...
   "*/30 * * * *",
   "50 23 * * *",
+  "0 21 * * *",        # ai-debate pre-gen — UTC 21:00 = KST 06:00 (50종목 daily)
   "*/10 * * * *"       # #164 Phase C: watchdog — cron:fail:* >= 3 시 Discord 알림
 ]
