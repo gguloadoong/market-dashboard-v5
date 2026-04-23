@@ -1,7 +1,8 @@
 // crons/update-ai-debate.js — AI 종목토론 일일 pre-generation
-// 매일 KST 06:00 (UTC 21:00 전날) — 국장 20 + 미장 20 + 코인 10 = 50종목
+// 매일 KST 06:00 (UTC 21:00 전날) — 국장 10 + 미장 10 + 코인 5 = 25종목
 // Gemini 2.5 Flash Lite → Redis TTL 25h
-// 유저 수 무관 — 하루 50회 고정 (무료 티어 1,500회/일의 3.3%)
+// 25종목 × 2req = 50 subrequests — CF Workers 한계(50/invocation) 내 유지
+// 유저 수 무관 — 하루 25회 고정 (무료 티어 1,500회/일의 1.7%)
 
 import { getRedis, recordCronFailure } from '../price-cache.js';
 
@@ -64,9 +65,9 @@ async function generateOne(symbol, name, market, geminiKey) {
 
   for (const modelUrl of GEMINI_MODELS) {
     try {
-      const res = await fetch(`${modelUrl}?key=${geminiKey}`, {
+      const res = await fetch(modelUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 256, temperature: 0.7 },

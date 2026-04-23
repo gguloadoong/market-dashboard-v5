@@ -82,9 +82,9 @@ export default async function handler(request) {
 
   for (const modelUrl of GEMINI_MODELS) {
     try {
-      const res = await fetch(`${modelUrl}?key=${GEMINI_KEY}`, {
+      const res = await fetch(modelUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 256, temperature: 0.7 },
@@ -93,13 +93,14 @@ export default async function handler(request) {
       });
 
       if (res.status === 429 || res.status >= 500) continue;
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        return new Response(JSON.stringify({ error: `gemini_api: ${res.status}`, detail: errText }), {
+      // 401/403(인증 오류)만 즉시 실패 — 나머지 4xx(404 등 모델 미지원)는 다음 모델 시도
+      if (res.status === 401 || res.status === 403) {
+        return new Response(JSON.stringify({ error: `gemini_auth: ${res.status}` }), {
           status: 502,
           headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
         });
       }
+      if (!res.ok) continue;
 
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
