@@ -50,7 +50,7 @@ export default async function handler(request) {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300',
+          'Cache-Control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=60',
           'Access-Control-Allow-Origin': '*',
         },
       },
