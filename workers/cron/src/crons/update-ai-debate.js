@@ -1,17 +1,16 @@
 // crons/update-ai-debate.js — AI 종목토론 일일 pre-generation
-// 매일 KST 06:00 (UTC 21:00 전날) — 국장 10 + 미장 10 + 코인 5 = 25종목
-// Gemini 2.5 Flash Lite → Redis TTL 25h
-// 25종목 × 2req = 50 subrequests — CF Workers 한계(50/invocation) 내 유지
-// 유저 수 무관 — 하루 25회 고정 (무료 티어 1,500회/일의 1.7%)
+// 매일 KST 06:00 (UTC 21:00 전날) — 국장 8 + 미장 9 + 코인 5 = 22종목
+// Gemini 2.5 Flash Lite 단일 모델 (fallback 없음 — subrequest 예산 보존)
+// 22종목 × 2req(Gemini+Redis) = 44 subrequests — CF Workers 50/invocation 한계 내 여유 유지
+// 유저 수 무관 — 하루 22회 고정 (무료 티어 1,500회/일의 1.5%)
 
 import { getRedis, recordCronFailure } from '../price-cache.js';
 
 const DEBATE_TTL = 90000; // 25시간
 
-// 25종목 — CF Workers subrequest 50/invocation 한계 고려 (종목당 Gemini+Redis = 2req)
-// 25 × 2 = 50 → 한계 내. 롱테일은 유저 first-click 시 실시간 생성 (fallback 유지)
+// 22종목 — 국장 8 + 미장 9 + 코인 5. 롱테일은 유저 first-click 시 실시간 생성
 const TOP_SYMBOLS = [
-  // 국장 상위 10
+  // 국장 상위 8
   { symbol: '005930', name: '삼성전자', market: 'kr' },
   { symbol: '000660', name: 'SK하이닉스', market: 'kr' },
   { symbol: '005380', name: '현대차', market: 'kr' },
@@ -19,10 +18,8 @@ const TOP_SYMBOLS = [
   { symbol: '373220', name: 'LG에너지솔루션', market: 'kr' },
   { symbol: '207940', name: '삼성바이오로직스', market: 'kr' },
   { symbol: '068270', name: '셀트리온', market: 'kr' },
-  { symbol: '035720', name: '카카오', market: 'kr' },
   { symbol: '035420', name: 'NAVER', market: 'kr' },
-  { symbol: '006400', name: '삼성SDI', market: 'kr' },
-  // 미장 상위 10
+  // 미장 상위 9
   { symbol: 'AAPL', name: 'Apple', market: 'us' },
   { symbol: 'MSFT', name: 'Microsoft', market: 'us' },
   { symbol: 'NVDA', name: 'NVIDIA', market: 'us' },
@@ -32,7 +29,6 @@ const TOP_SYMBOLS = [
   { symbol: 'TSLA', name: 'Tesla', market: 'us' },
   { symbol: 'JPM', name: 'JPMorgan', market: 'us' },
   { symbol: 'AVGO', name: 'Broadcom', market: 'us' },
-  { symbol: 'TSM', name: 'TSMC', market: 'us' },
   // 코인 상위 5
   { symbol: 'BTC', name: '비트코인', market: 'crypto' },
   { symbol: 'ETH', name: '이더리움', market: 'crypto' },
@@ -41,10 +37,8 @@ const TOP_SYMBOLS = [
   { symbol: 'BNB', name: '바이낸스코인', market: 'crypto' },
 ];
 
-const GEMINI_MODELS = [
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-];
+// fallback 없음 — subrequest 예산 보존 (22×2=44, 한계 50 내 여유 6)
+const GEMINI_MODEL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 async function generateOne(symbol, name, market, geminiKey) {
   const marketLabel = market === 'kr' ? '한국 주식' : market === 'us' ? '미국 주식' : '암호화폐';
@@ -63,43 +57,36 @@ async function generateOne(symbol, name, market, geminiKey) {
   "confidence": 0.65
 }`;
 
-  for (const modelUrl of GEMINI_MODELS) {
-    try {
-      const res = await fetch(modelUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 256, temperature: 0.7 },
-        }),
-        signal: AbortSignal.timeout(20000),
-      });
+  try {
+    const res = await fetch(GEMINI_MODEL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 256, temperature: 0.7 },
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
 
-      if (res.status === 429) {
-        await new Promise(r => setTimeout(r, 5000));
-        continue;
-      }
-      if (!res.ok) continue;
+    if (!res.ok) return null;
 
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) continue;
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
 
-      const parsed = JSON.parse(match[0]);
-      if (!Array.isArray(parsed?.messages) || parsed.messages.length < 2) continue;
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed?.messages) || parsed.messages.length < 2) return null;
 
-      return {
-        symbol, name,
-        model: modelUrl.split('/models/')[1]?.split(':')[0] ?? 'gemini',
-        ...parsed,
-        _generatedAt: new Date().toISOString(),
-      };
-    } catch {
-      continue;
-    }
+    return {
+      symbol, name,
+      model: 'gemini-2.5-flash-lite',
+      ...parsed,
+      _generatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function updateAiDebate(env) {

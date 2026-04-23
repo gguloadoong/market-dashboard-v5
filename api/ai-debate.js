@@ -27,21 +27,16 @@ export default async function handler(request) {
 
   const url = new URL(request.url);
   const symbol = url.searchParams.get('s');
-  const name = url.searchParams.get('n') || symbol;
+  const rawName = url.searchParams.get('n') || symbol;
+  // 프롬프트 인젝션 방지 — 개행 제거 + 50자 제한
+  const name = (rawName || '').replace(/[\r\n]/g, ' ').slice(0, 50);
   const market = url.searchParams.get('m') || 'us';
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: 'symbol required' }), { status: 400 });
   }
 
-  if (!GEMINI_KEY) {
-    return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
-  // Redis 캐시 조회 — 크론 pre-gen 결과 또는 이전 실시간 생성 결과
+  // Redis 캐시 조회 먼저 — 키 없어도 캐시 hit 가능 (크론 pre-gen 결과)
   const cacheKey = `ai:debate:${symbol}`;
   if (redis) {
     try {
@@ -61,6 +56,14 @@ export default async function handler(request) {
     } catch (e) {
       console.warn('[ai-debate] Redis 조회 실패:', e.message);
     }
+  }
+
+  // 캐시 miss — 실시간 생성 전 키 확인
+  if (!GEMINI_KEY) {
+    return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+    });
   }
 
   // 롱테일 종목 실시간 생성 — 크론이 커버 안 한 종목의 첫 클릭
