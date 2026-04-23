@@ -18,7 +18,6 @@
 | `api/cron/update-kr.js` | 한투/Naver 개별 fallback 61종목 제한 — KRX+Naver 전종목 모두 실패 시 `HANTOO_NAME_MAP` 61종목(KOSPI 50+KOSDAQ 10+ETF 1)만 스냅샷 저장. 1~2순위 정상 시 ~4000종목 커버되므로 P1 유지 | 2026-04-04 |
 | `scripts/pre-deploy-consensus.sh` | Reviewer Loop Deadlock — Opus PASS + Codex BLOCK 충돌 시 중재 규칙 없음 (Issue #38) | 2026-04-04 |
 | `scripts/review-summary.sh` | Codex gate 재실행 시 스테일 artifact 잔존 가능 (Issue #39) | 2026-04-04 |
-| `.git/hooks/pre-push` | v5에 pre-push hook 없음 — `npm run pr` 우회 시 Codex gate/code-review 검증 전부 스킵 가능. v2에는 있었으나 v5 마이그레이션 시 누락. PR #42가 Codex gate 없이 머지된 원인 | 2026-04-06 |
 | `api/krx-etf.js` | 2s 타임아웃 공격성 모니터링 — Codex P2 재지적 (Issue #143 기각). 설계 근거: 5영업일 × 2s = 10s ≤ gateway 12s (#115 15s hang 방지). 실패 시 Edge cache(s-maxage=3600) + 빈 ETF graceful fallback. 프로덕션 KRX p95 응답시간 확인 후 3s 상향 여부 재판단 | 2026-04-18 |
 
 ---
@@ -49,6 +48,7 @@
 | 2026-03-28 | `api/_price-cache.js` | Upstash Redis 스냅샷 캐시 도입 — 첫 로딩 mock 0% → 실시간 <100ms |
 | 2026-03-28 | `src/data/mock.js` | 전체 [] 빈 배열 — mock 완전 제거, 실시간 데이터 전환 완료 |
 | 2026-03-28 | `vercel.json` | ignoreCommand "exit 0" 확정 — 수동 배포 게이트 운영 (ADR-013) |
+| 2026-04-23 | `.git/hooks/pre-push` | hook 실재 확인 (v2에서 2026-04-06 포팅 완료, 4/8 fix/* 브랜치 추가 수정) — 기록 스테일로 인한 P1 삭제 |
 | 2026-04-04 | `api/kr-fear-greed.js` | fetchForeignNetNaver dead code 제거, 14일 윈도우 확장, VKOSPI fallback 경고 로그 추가 (PR #37) |
 | 2026-04-04 | `scripts/pre-deploy-consensus.sh` | PM nonce 인젝션 차단, Gate5 ancestor 검색, gh set-e 방지 (PR #37) |
 | 2026-04-08 | `src/data/relatedAssets.js` + `NewsSidePanel.jsx` | Stage 3 섹터 확장 `Object.entries` 전수 순회 → `SECTOR_SYMBOL_INDEX` 역인덱스 Map O(1) 조회로 교체 |
