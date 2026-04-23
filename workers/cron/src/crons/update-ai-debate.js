@@ -116,7 +116,7 @@ export async function updateAiDebate(env) {
   }
 
   if (fail > ok) {
-    await recordCronFailure(env, 'ai-debate', `ok=${ok} fail=${fail}`);
+    await recordCronFailure('ai-debate', `ok=${ok} fail=${fail}`);
   }
 
   return { ok, fail, total: TOP_SYMBOLS.length };
