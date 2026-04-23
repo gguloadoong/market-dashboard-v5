@@ -21,6 +21,10 @@ export default async function handler(request) {
     });
   }
 
+  if (request.method !== 'GET') {
+    return new Response(JSON.stringify({ error: 'GET only' }), { status: 405 });
+  }
+
   const url = new URL(request.url);
   const symbol = url.searchParams.get('s');
   const name = url.searchParams.get('n') || symbol;
@@ -89,7 +93,13 @@ export default async function handler(request) {
       });
 
       if (res.status === 429 || res.status >= 500) continue;
-      if (!res.ok) continue;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        return new Response(JSON.stringify({ error: `gemini_api: ${res.status}`, detail: errText }), {
+          status: 502,
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
 
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
