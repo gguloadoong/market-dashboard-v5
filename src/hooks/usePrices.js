@@ -54,8 +54,10 @@ export function usePrices() {
   // ref로 최신 stocks 유지 — useCallback 의존성에서 제외하여 무한 루프 방지
   const krStocksRef = useRef(krStocks);
   const usStocksRef = useRef(usStocks);
-  krStocksRef.current = krStocks;
-  usStocksRef.current = usStocks;
+  useEffect(() => {
+    krStocksRef.current = krStocks;
+    usStocksRef.current = usStocks;
+  }, [krStocks, usStocks]);
 
   // 최신 watchlist 심볼 — 클로저 없이 참조 (App이 주입)
   const krSymbolsRef = useRef([]);

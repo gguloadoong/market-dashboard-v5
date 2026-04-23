@@ -21,9 +21,13 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
   const usStocksRef = useRef(usStocks);
   const krStocksRef = useRef(krStocks);
   const watchlistRef = useRef(watchlistSymbols);
-  usStocksRef.current = usStocks;
-  krStocksRef.current = krStocks;
-  watchlistRef.current = watchlistSymbols;
+
+  // render-time ref 업데이트 금지 (react-hooks/refs) — 매 렌더 후 동기화
+  useEffect(() => {
+    usStocksRef.current = usStocks;
+    krStocksRef.current = krStocks;
+    watchlistRef.current = watchlistSymbols;
+  });
 
   useEffect(() => {
     let pcrTimer, frTimer, ofTimer, socialTimer, vwapTimer;
