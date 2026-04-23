@@ -5,6 +5,7 @@ import { updateUs } from './crons/update-us.js';
 import { checkSignalAccuracy } from './crons/check-signal-accuracy.js';
 import { morningBriefing } from './crons/morning-briefing.js';
 import { watchdog } from './crons/watchdog.js';
+import { updateAiDebate } from './crons/update-ai-debate.js';
 
 export default {
   async scheduled(event, env, ctx) {
@@ -53,6 +54,9 @@ export default {
       ctx.waitUntil(checkSignalAccuracy(env));
     } else if (cron === '50 23 * * *') {
       ctx.waitUntil(morningBriefing(env));
+    } else if (cron === '0 21 * * *') {
+      // AI 종목토론 daily pre-gen — UTC 21:00 = KST 06:00
+      ctx.waitUntil(updateAiDebate(env));
     } else if (cron === '*/10 * * * *') {
       // #164 Phase C: 크론 실패 조기 경보. cron:fail:* >= 3 시 Discord 알림.
       ctx.waitUntil(watchdog(env));
@@ -75,6 +79,7 @@ export default {
       if (path === '/check-signal') return Response.json(await checkSignalAccuracy(env));
       if (path === '/briefing') return Response.json(await morningBriefing(env));
       if (path === '/watchdog') return Response.json(await watchdog(env));
+      if (path === '/ai-debate') return Response.json(await updateAiDebate(env));
       return new Response('mdv5-cron worker', { status: 200 });
     } catch (e) {
       return Response.json({ error: e.message }, { status: 500 });

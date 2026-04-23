@@ -183,7 +183,14 @@ export function fetchSocialSentiment(symbol, timeoutMs = 6000) {
   return gwJson({ t: 'sc', s: symbol }, timeoutMs);
 }
 
-// ─── AI 종목토론 ─────────────────────────────────────────────
-export function fetchAiDebate(symbol, ctx = {}, timeoutMs = 25000) {
-  return gwJson({ t: 'db', s: symbol, ctx }, timeoutMs);
+// ─── AI 종목토론 — GET (Edge CDN s-maxage=3600 캐시 가능) ────
+export async function fetchAiDebate(symbol, ctx = {}, timeoutMs = 25000) {
+  const params = new URLSearchParams({ s: symbol });
+  if (ctx.name) params.set('n', ctx.name);
+  if (ctx.market) params.set('m', ctx.market);
+  const res = await fetch(`/api/ai-debate?${params}`, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`ai-debate HTTP ${res.status}`);
+  return res.json();
 }
