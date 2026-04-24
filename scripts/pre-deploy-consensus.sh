@@ -87,7 +87,7 @@ if command -v claude &>/dev/null && [ -f ".project/backlog.md" ]; then
   # .last-deployed-commit 기준으로 배포 예정 커밋 산출 (없으면 최근 10개)
   LAST_DEPLOY=$(cat .last-deployed-commit 2>/dev/null | tr -d '[:space:]')
   if [ -n "$LAST_DEPLOY" ] && git cat-file -t "$LAST_DEPLOY" &>/dev/null; then
-    DEPLOY_COMMITS=$(git log "${LAST_DEPLOY}..HEAD" --oneline 2>/dev/null | head -20)
+    DEPLOY_COMMITS=$(git log "${LAST_DEPLOY}..HEAD" --oneline --max-count=20 2>/dev/null || true)
   else
     DEPLOY_COMMITS=$(git log --oneline -10 2>/dev/null)
   fi
