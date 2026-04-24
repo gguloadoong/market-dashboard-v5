@@ -141,14 +141,18 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
   const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
-  // fx_impact 기준값 — localStorage에서 당일(KST) 기준 환율 복원, 재접속 시 동일 기준 유지
-  const fxBaseRef = useRef((() => {
+  // fx_impact 기준값 — lazy useRef init (render 중 localStorage I/O 방지)
+  const fxBaseRef = useRef();
+  if (fxBaseRef.current === undefined) {
     try {
       const stored = JSON.parse(localStorage.getItem('fx_base_daily') || 'null');
       const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-      return stored?.dateKey === todayKey ? stored : { rate: null, dateKey: null };
-    } catch { return { rate: null, dateKey: null }; }
-  })());
+      fxBaseRef.current = (stored?.dateKey === todayKey && typeof stored?.rate === 'number' && stored.rate > 0)
+        ? stored : { rate: null, dateKey: null };
+    } catch { fxBaseRef.current = { rate: null, dateKey: null }; }
+  }
+  // fx_impact 마지막 발화 상태 추적 — 방향/임계값 미변경 시 매 폴링 재발화 방지
+  const fxSignaledRef = useRef({ direction: null, changePct: null });
 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
   // 시장별 개별 F&G 사용 — 평균 시 미장 공포(20)+코인 탐욕(75)=평균 47로 미발화되는 문제 해소
@@ -212,7 +216,7 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
         detectRebalancingSignal();
 
         // ── 신규: 환율 영향 (#113: useIndices().krwRate 주입) ──
-        detectFxImpactSignal(krwRateRef.current, fxBaseRef, krwRateLoadedRef.current);
+        detectFxImpactSignal(krwRateRef.current, fxBaseRef, krwRateLoadedRef.current, fxSignaledRef);
 
         // ── Tier2: 투매 감지 (캐피튤레이션) — 시장별 F&G 주입 (평균 사용 시 미발화 문제 해소) ──
         detectCapitulation(items, fgMapRef.current);
@@ -646,7 +650,7 @@ function detectRebalancingSignal() {
  * @param {{ current: { rate: number|null, dateKey: string|null } }} baseRef - 당일 기준값 ref
  * @param {boolean} loaded - 환율 fetch 완료 여부 (DEFAULT_KRW_RATE sentinel과 실제값 충돌 회피)
  */
-function detectFxImpactSignal(krwRate, baseRef, loaded) {
+function detectFxImpactSignal(krwRate, baseRef, loaded, signaledRef) {
   // 환율 fetch 미완료 또는 값 자체가 falsy면 skip — DEFAULT_KRW_RATE 값으로는 판정하지 않음 (Codex P2)
   if (!loaded || !krwRate) return;
 
@@ -669,15 +673,24 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
 
   const result = detectFxImpact(krwRate, baseRate);
   if (!result) return;
-  // threshold 미달 — 변동률 정상화 시 stale 경보 방지: 기존 시그널 제거 후 종료
+  // threshold 미달 — 정상화 시 기존 시그널 제거 (stale 경보 방지)
   if (Math.abs(result.changePct) < THRESHOLDS.FX.MIN_CHANGE_PCT) {
-    removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
+    if (signaledRef?.current?.direction !== null) {
+      removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
+      if (signaledRef) signaledRef.current = { direction: null, changePct: null };
+    }
     return;
   }
 
-  // threshold 충족 시에만 교체 — remove 후 create로 최신 시그널로 치환 (Codex P1)
+  // 방향·변동률 미변경(±0.1% 내) 시 매 폴링 재발화 방지
+  if (signaledRef?.current?.direction === result.direction &&
+      Math.abs((result.changePct - (signaledRef.current.changePct ?? 0))) < 0.1) {
+    return;
+  }
+
   removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
   createFxImpactSignal(krwRate, baseRate, result.changePct, result.impact);
+  if (signaledRef) signaledRef.current = { direction: result.direction, changePct: result.changePct };
 }
 
 /** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대
