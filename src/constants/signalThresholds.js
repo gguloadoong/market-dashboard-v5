@@ -4,23 +4,23 @@ export const THRESHOLDS = {
     BULLISH_STRONG: 1.5,  // PCR > 1.5: 극도공포 → 강한 역발상 매수
     BULLISH:        1.2,  // PCR > 1.2: 공포 → 역발상 매수
     CAUTION_HIGH:   1.0,  // PCR > 1.0: 경계 시작 (신규: 경고 시그널)
-    NEUTRAL_HIGH:   0.85, // PCR 0.85~1.0: 중립 상단
-    NEUTRAL_LOW:    0.85, // PCR 0.85 이하: 경계 시작
-    CAUTION_LOW:    0.7,  // PCR 0.7~0.85: 경계 (신규)
+    NEUTRAL_HIGH:   0.90, // PCR 0.90~1.0: 중립 상단 (compositeScorer 미사용 — createPCRSignal 로직 개선 시 활용)
+    NEUTRAL_LOW:    0.90, // PCR 0.90 이하: 경계 시작 (compositeScorer.js:78에서 참조)
+    CAUTION_LOW:    0.7,  // PCR 0.7~0.90: 경계 (신규)
     BEARISH:        0.7,  // PCR < 0.7: 탐욕 → 역발상 매도
     BEARISH_STRONG: 0.5,  // PCR < 0.5: 극도탐욕 → 강한 매도
   },
   FUNDING: {
     BEARISH_STRONG: 0.10, // > +0.10%: 강한 롱 과열
     BEARISH:        0.05, // > +0.05%: 롱 과열
-    CAUTION_BULL:   0.03, // > +0.03%: 롱 과열 징후 (신규)
-    CAUTION_BEAR:  -0.03, // < -0.03%: 숏 과열 징후 (신규)
+    CAUTION_BULL:   0.02, // > +0.02%: 롱 과열 징후 (완화: 0.03→0.02)
+    CAUTION_BEAR:  -0.02, // < -0.02%: 숏 과열 징후 (완화: -0.03→-0.02)
     BULLISH:       -0.05, // < -0.05%: 숏 과열
     BULLISH_STRONG:-0.10, // < -0.10%: 강한 숏 과열
   },
   ORDER_FLOW: {
     STRONG:  0.30, // |imbalance| > 30%: 강한 불균형 시그널
-    CAUTION: 0.15, // |imbalance| > 15%: 주의 시그널 (신규)
+    CAUTION: 0.10, // |imbalance| > 10%: 주의 시그널 (완화: 0.15→0.10)
   },
   SOCIAL: {
     BULLISH_STRONG: 0.85,
@@ -30,7 +30,7 @@ export const THRESHOLDS = {
     MIN_MESSAGES:    5,   // 5건 이상 (기존 10 → 5 완화)
   },
   CROSS_MARKET: {
-    DIVERGENCE: 5,        // 괴리율 5% 이상 시 시그널
+    DIVERGENCE: 3,        // 괴리율 3% 이상 시 시그널 (완화: 5→3)
     STRONG: 10,           // 10% 이상 강한 괴리
   },
   SENTIMENT_DIV: {
@@ -46,10 +46,10 @@ export const THRESHOLDS = {
     MIN_SPARKLINE: 10,    // 최소 스파크라인 데이터 10개
   },
   VOL_PRICE: {
-    HIGH_VOL_LOW_PRICE_RATIO: 2, // 거래량 2배 이상인데 가격 정체
-    HIGH_VOL_MAX_PRICE: 1,       // 가격 변동 1% 이하면 정체
-    BIG_PRICE_MIN: 5,            // 큰 가격 변동 최소 5%
-    STRONG_RATIO: 5,             // 거래량 5배 이상 — 강한 누적 시그널
+    HIGH_VOL_LOW_PRICE_RATIO: 1.5, // 거래량 1.5배 이상인데 가격 정체 (완화: 2→1.5)
+    HIGH_VOL_MAX_PRICE: 1.5,       // 가격 변동 1.5% 이하면 정체 (완화: 1→1.5, 2%는 국장 기준 정체 아님)
+    BIG_PRICE_MIN: 5,              // 큰 가격 변동 최소 5%
+    STRONG_RATIO: 5,               // 거래량 5배 이상 — 강한 누적 시그널
   },
   SMART_MONEY: {
     MIN_DAYS: 2,                 // 외국인+기관 동시 매수/매도 최소 일수
@@ -64,26 +64,26 @@ export const THRESHOLDS = {
     MONTH_STRENGTH: 2,       // 월말 strength
   },
   FX: {
-    MIN_CHANGE_PCT: 0.5,     // 환율 변동 최소 0.5% 이상 시 시그널
+    MIN_CHANGE_PCT: 0.3,     // 환율 변동 최소 0.3% 이상 시 시그널 (완화: 0.5→0.3)
     STRONG_CHANGE_PCT: 1.0,  // 강한 변동 1% 이상
   },
   MARKET_MOOD: {
-    DIRECTION_THRESHOLD: 1,      // 방향 판단 기준 1%
+    DIRECTION_THRESHOLD: 0.5,    // 방향 판단 기준 0.5% (완화: 1→0.5)
     MIN_FLIPS: 2,                // 최소 전환 시장 수
-    STALE_MS: 10 * 60 * 1000,   // 이전 상태 유효 시간 10분
+    STALE_MS: 20 * 60 * 1000,    // 이전 상태 유효 시간 20분 (완화: 10분→20분)
   },
   CAPITULATION: {
-    PRICE_DROP: -5,              // 가격 하락 -5% 이상
+    PRICE_DROP: -4,              // 가격 하락 -4% 이상 (중간값: -5→-4, -3은 정상 하락 포함 우려)
     VOLUME_RATIO: 3,             // 거래량 평소 3배 이상
-    FEAR_GREED_MAX: 25,          // 공포탐욕 25 이하 (극도공포~공포)
+    FEAR_GREED_MAX: 30,          // 공포탐욕 30 이하 (중간값: 25→30, 35는 투매 정의 희석 우려)
   },
   STEALTH: {
-    VOLUME_RATIO: 3,             // 거래량 평소 3배 이상
+    VOLUME_RATIO: 2,             // 거래량 평소 2배 이상 (완화: 3→2)
     NEWS_WINDOW_MS: 4 * 3600000, // 4시간 내 뉴스 클러스터 없어야 함
   },
   BTC_LEADING: {
-    BTC_MIN_CHANGE: 3,           // BTC 최소 1시간 변동률 3%
-    ALT_MAX_CHANGE: 1,           // 알트코인 최대 변동률 1% (아직 미반영)
+    BTC_MIN_CHANGE: 2,           // BTC 최소 1시간 변동률 2% (완화: 3→2)
+    ALT_MAX_CHANGE: 1.5,         // 알트코인 최대 변동률 1.5% (완화: 1→1.5)
     ALT_SYMBOLS: ['ETH', 'SOL', 'XRP', 'DOGE'], // 추적 대상 알트코인
   },
   SUPPORT_RESISTANCE: {
@@ -98,13 +98,17 @@ export const THRESHOLDS = {
     LOOKBACK_DAYS: 60,           // 60일 캔들 데이터
   },
   RECOVERY: {
-    DRAWDOWN_MIN: -10,           // 5일 최대 낙폭 -10% 이상
+    DRAWDOWN_MIN: -7,            // 5일 최대 낙폭 -7% 이상 (완화: -10→-7)
     DRAWDOWN_DAYS: 5,            // 낙폭 측정 기간 5일
     BB_BANDWIDTH_SHRINK: 0.7,    // BB 밴드폭 이전 대비 70% 이하로 축소
     VOLUME_NORMALIZE_RATIO: 1.5, // 거래량 정상화 (1.5배 이하)
   },
   SECTOR_OUTLIER: {
-    MIN_DEVIATION: 2,            // 섹터 평균 대비 최소 2σ 이탈
+    MIN_DEVIATION: 1.5,          // 섹터 평균 대비 최소 1.5σ 이탈 (완화: 2→1.5)
     MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
+  },
+  NEWS_CLUSTER: {
+    WINDOW_MS: 4 * 3600000,      // 4시간 (원본 유지 — 8h는 집중 아님)
+    MIN_CLUSTER: 2,              // 완화: 3→2 (건수만 완화)
   },
 };

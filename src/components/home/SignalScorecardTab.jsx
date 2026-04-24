@@ -2,38 +2,38 @@
 import { useState, useMemo } from 'react';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 
-// ── 봇 한국어 이름 매핑 ──
+// ── 봇 한국어 이름 매핑 (사용자 친화 명칭) ──
 const SIGNAL_BOT_NAMES = {
-  foreign_consecutive_buy: '외국인 연속매수',
-  foreign_consecutive_sell: '외국인 연속매도',
-  institutional_consecutive_buy: '기관 연속매수',
-  institutional_consecutive_sell: '기관 연속매도',
-  volume_anomaly: '거래량 이상감지',
-  fear_greed_shift: '공포탐욕 전환',
-  news_sentiment_cluster: '뉴스 클러스터',
-  sector_rotation: '섹터 로테이션',
-  put_call_ratio: '풋콜비율',
-  funding_rate_extreme: '펀딩비 과열',
-  order_flow_imbalance: '주문 불균형',
-  vwap_deviation: 'VWAP 이탈',
-  social_sentiment: '소셜 심리',
-  cross_market_correlation: '교차시장 상관',
-  sentiment_divergence: '심리 괴리',
-  smart_money_flow: '스마트머니',
-  momentum_divergence: '모멘텀 전환',
-  volume_price_divergence: '거래량-가격 괴리',
-  market_mood_shift: '시장분위기 전환',
-  composite_score: 'TA 복합분석',
-  gap_analysis: '갭 분석',
-  rebalancing_alert: '리밸런싱 경보',
-  fx_impact: '환율 영향',
-  capitulation: '투매 감지',
-  stealth_activity: '내부자 의심',
-  btc_leading: 'BTC 선행',
-  support_resistance_break: '지지/저항 돌파',
-  double_bottom: '이중바닥',
-  recovery_detection: '회복 감지',
-  sector_outlier: '섹터 이탈',
+  foreign_consecutive_buy:       '외국인 연속 매수',
+  foreign_consecutive_sell:      '외국인 연속 매도',
+  institutional_consecutive_buy: '기관 연속 매수',
+  institutional_consecutive_sell:'기관 연속 매도',
+  volume_anomaly:                '거래량 폭발',
+  fear_greed_shift:              '공포·탐욕 전환',
+  news_sentiment_cluster:        '뉴스 집중 포착',
+  sector_rotation:               '주도 섹터 교체',
+  put_call_ratio:                '옵션 경보',
+  funding_rate_extreme:          '코인 레버리지 과열',
+  order_flow_imbalance:          '매수·매도 불균형',
+  vwap_deviation:                'VWAP 이탈',
+  social_sentiment:              '소셜 반응',
+  cross_market_correlation:      '연동 자산 괴리',
+  sentiment_divergence:          '뉴스·가격 불일치',
+  smart_money_flow:              '스마트머니 감지',
+  momentum_divergence:           '추세 전환',
+  volume_price_divergence:       '거래량·가격 괴리',
+  market_mood_shift:             '시장 분위기 전환',
+  composite_score:               '종합 매수·매도 신호',
+  gap_analysis:                  '갭 출발',
+  rebalancing_alert:             '리밸런싱 경보',
+  fx_impact:                     '환율 충격',
+  capitulation:                  '투매 감지',
+  stealth_activity:              '세력 의심 매집',
+  btc_leading:                   'BTC 선행 신호',
+  support_resistance_break:      '지지·저항 돌파',
+  double_bottom:                 '이중바닥 패턴',
+  recovery_detection:            '반등 감지',
+  sector_outlier:                '섹터 이탈 종목',
 };
 
 // ── 카테고리 분류 ──
@@ -45,6 +45,7 @@ const BOT_CATEGORIES = {
     'news_sentiment_cluster', 'sector_rotation', 'put_call_ratio',
     'funding_rate_extreme', 'order_flow_imbalance', 'social_sentiment',
     'sentiment_divergence', 'market_mood_shift',
+    'smart_money_flow', // 신규 추가 — 외국인+기관 동시 흐름 이벤트
   ],
   quant: ['composite_score'],
   pattern: [
@@ -52,6 +53,8 @@ const BOT_CATEGORIES = {
     'stealth_activity', 'btc_leading', 'support_resistance_break',
     'double_bottom', 'recovery_detection', 'sector_outlier',
     'vwap_deviation', 'cross_market_correlation',
+    'momentum_divergence', // 신규 추가 — 추세 전환 패턴
+    'volume_price_divergence', // 신규 추가 — 거래량·가격 괴리 패턴
   ],
 };
 

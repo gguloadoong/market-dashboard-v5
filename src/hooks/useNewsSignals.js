@@ -9,8 +9,9 @@ import { getNewsSentimentScore } from '../utils/newsSignal';
 import { clampPct } from '../utils/clampPct';
 
 const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
-const NEWS_WINDOW = 4 * 3600000; // 4시간
-const MIN_CLUSTER = 3; // 최소 3건
+// NEWS_CLUSTER 임계값은 signalThresholds.js THRESHOLDS.NEWS_CLUSTER 단일 소스화
+const NEWS_WINDOW = THRESHOLDS.NEWS_CLUSTER.WINDOW_MS;
+const MIN_CLUSTER = THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER;
 
 // 호재/악재 키워드 (newsSignal.js 기반 단순화)
 const BULL_KW = [

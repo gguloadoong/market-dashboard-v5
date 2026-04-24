@@ -78,9 +78,9 @@ export function useCompositeSignals(allItems = []) {
           const composite = calculateCompositeScore(ta, flow, mergedSentiment);
           newScores[symbol] = { ...composite, ta, symbol, market: ta.market };
 
-          // 강한 시그널(±50 이상)만 시그널 엔진에 등록, 약화 시 제거
+          // 시그널(±40 이상)만 시그널 엔진에 등록, 약화 시 제거 (완화: 50→40)
           removeSignalByTypeAndSymbol('composite_score', symbol); // 항상 기존 시그널 제거 (stale 방지)
-          if (Math.abs(composite.score) >= 50) {
+          if (Math.abs(composite.score) >= 40) {
             const name = findName(symbol, items) || symbol;
             addSignal(createSignal({
               type: SIGNAL_TYPES.COMPOSITE_SCORE,

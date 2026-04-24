@@ -1,7 +1,7 @@
 // 커맨드 센터 위젯 — MarketPulse + Sentiment + HeroSignal + Watchlist + EventTicker 통합
 import { useMemo } from 'react';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
-import { useFearGreed } from '../../hooks/useFearGreed';
+import { useFearGreedScores } from '../../hooks/useFearGreed';
 import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { TYPE_META } from '../../engine/signalTypes';
@@ -26,7 +26,7 @@ function TemperatureBar({ indices, krwRate, allItems }) {
   const signals = useSignals();
   const temp = useMemo(() => calcTemperature(signals), [signals]);
   const fallback = useMemo(() => calcFallbackTemperature(allItems), [allItems]);
-  const { crypto, us, kr } = useFearGreed();
+  const { crypto, us, kr } = useFearGreedScores();
 
   const displayTemp = useMemo(() => mergeTemperature(temp, fallback), [temp, fallback]);
   const zone = ZONE[displayTemp.label] || ZONE['중립'];

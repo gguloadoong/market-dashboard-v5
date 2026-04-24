@@ -15,6 +15,7 @@ import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/ta
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
+import { useFearGreedScores } from './useFearGreed';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -140,7 +141,24 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
   const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
-  const fxPrevRef = useRef(null); // fx_impact 이전 환율 (첫 호출은 skip, #113)
+  // fx_impact 기준값 — lazy useRef init (render 중 localStorage I/O 방지)
+  const fxBaseRef = useRef();
+  if (fxBaseRef.current === undefined) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('fx_base_daily') || 'null');
+      const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+      fxBaseRef.current = (stored?.dateKey === todayKey && typeof stored?.rate === 'number' && stored.rate > 0)
+        ? stored : { rate: null, dateKey: null };
+    } catch { fxBaseRef.current = { rate: null, dateKey: null }; }
+  }
+  // fx_impact 마지막 발화 상태 추적 — 방향/임계값 미변경 시 매 폴링 재발화 방지
+  const fxSignaledRef = useRef({ direction: null, changePct: null });
+
+  // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
+  // 시장별 개별 F&G 사용 — 평균 시 미장 공포(20)+코인 탐욕(75)=평균 47로 미발화되는 문제 해소
+  const { crypto, us, kr } = useFearGreedScores();
+  // 시장별 F&G map ref — detectCapitulation 내부에서 item.market 기준 조회
+  const fgMapRef = useRef({ crypto: null, us: null, kr: null });
 
   // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
   useEffect(() => {
@@ -155,6 +173,14 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   useEffect(() => {
     krwRateLoadedRef.current = krwRateLoaded;
   }, [krwRateLoaded]);
+
+  useEffect(() => {
+    fgMapRef.current = {
+      crypto: crypto.data?.score ?? null,
+      us: us.data?.score ?? null,
+      kr: kr.data?.score ?? null,
+    };
+  }, [crypto.data?.score, us.data?.score, kr.data?.score]);
 
   useEffect(() => {
     let retryTimer = null; // 재시도 타이머 추적 (언마운트 시 정리)
@@ -190,10 +216,10 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
         detectRebalancingSignal();
 
         // ── 신규: 환율 영향 (#113: useIndices().krwRate 주입) ──
-        detectFxImpactSignal(krwRateRef.current, fxPrevRef, krwRateLoadedRef.current);
+        detectFxImpactSignal(krwRateRef.current, fxBaseRef, krwRateLoadedRef.current, fxSignaledRef);
 
-        // ── Tier2: 투매 감지 (캐피튤레이션) ──
-        detectCapitulation(items);
+        // ── Tier2: 투매 감지 (캐피튤레이션) — 시장별 F&G 주입 (평균 사용 시 미발화 문제 해소) ──
+        detectCapitulation(items, fgMapRef.current);
 
         // ── Tier2: 스텔스 활동 (뉴스 없는 거래 폭발) ──
         detectStealthActivity(items);
@@ -616,46 +642,83 @@ function detectRebalancingSignal() {
   createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
 }
 
-/** 환율 영향 — useIndices().krwRate를 직접 주입받아 이전 값과 비교 (#113)
- * 기존 구현은 allItems에서 USDKRW 심볼을 찾았으나 allItems에는 주식·코인만 포함되어 항상 skip되던 dead path.
+/** 환율 영향 — 사용자 첫 접속(당일 KST 기준) 시점 환율 대비 변동률 비교 (#113)
+ * 기존 구현은 이전 폴링(5분 전) 값과 비교 → 일중 누적 변동을 놓치고 자잘한 변동에 매번 발화.
+ * 변경: 매일 첫 환율을 fxBaseRef에 저장하고, 같은 날에는 그 기준값과 비교.
+ * 자정(KST) 경과 시 dateKey 변경 → 기준값 재설정.
  * @param {number|null} krwRate - 현재 원/달러 환율
- * @param {{ current: number|null }} prevRef - 이전 환율 ref (첫 호출은 skip)
+ * @param {{ current: { rate: number|null, dateKey: string|null } }} baseRef - 당일 기준값 ref
  * @param {boolean} loaded - 환율 fetch 완료 여부 (DEFAULT_KRW_RATE sentinel과 실제값 충돌 회피)
  */
-function detectFxImpactSignal(krwRate, prevRef, loaded) {
+function detectFxImpactSignal(krwRate, baseRef, loaded, signaledRef) {
   // 환율 fetch 미완료 또는 값 자체가 falsy면 skip — DEFAULT_KRW_RATE 값으로는 판정하지 않음 (Codex P2)
   if (!loaded || !krwRate) return;
 
-  const prevRate = prevRef.current;
-  // 첫 호출(prev=null) skip — 다음 주기부터 비교
-  if (prevRate == null) {
-    prevRef.current = krwRate;
+  // 당일 키 (KST 날짜)
+  // KST(UTC+9) 기준 날짜키 — toISOString()은 UTC라 09:00 KST에 날짜가 바뀌는 버그 방지
+  const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const base = baseRef.current;
+
+  // 첫 호출 또는 날짜 변경 → 기준값 재설정 후 localStorage 저장 (재접속 시 당일 기준 복원)
+  if (!base.rate || base.dateKey !== todayKey) {
+    const newBase = { rate: krwRate, dateKey: todayKey };
+    baseRef.current = newBase;
+    // 일자 경계: 어제 기준 FX 시그널 제거 (새 baseline과 스케일 불일치, 방향 역전 가능)
+    removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
+    signaledRef.current = { direction: null, changePct: null };
+    try { localStorage.setItem('fx_base_daily', JSON.stringify(newBase)); } catch {}
     return;
   }
-  // 값 변동 없으면 skip (prev 유지)
-  if (prevRate === krwRate) return;
 
-  const result = detectFxImpact(krwRate, prevRate);
-  prevRef.current = krwRate;
+  const baseRate = base.rate;
+  if (baseRate === krwRate) return;
+
+  const result = detectFxImpact(krwRate, baseRate);
   if (!result) return;
+  // threshold 미달 — 정상화 시 기존 시그널 제거 (stale 경보 방지)
+  if (Math.abs(result.changePct) < THRESHOLDS.FX.MIN_CHANGE_PCT) {
+    if (signaledRef.current.direction !== null) {
+      removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
+      signaledRef.current = { direction: null, changePct: null };
+    }
+    return;
+  }
 
-  // type+symbol dedupe 우회 — 환율은 자주 변하므로 매 변동마다 최신 시그널로 교체 (Codex P1)
+  // 방향·변동률 미변경(±0.1% 내) 시 매 폴링 재발화 방지
+  const FX_REFIRE_DELTA_PCT = 0.1;
+  if (signaledRef.current.direction === result.direction &&
+      Math.abs(result.changePct - (signaledRef.current.changePct ?? 0)) < FX_REFIRE_DELTA_PCT) {
+    return;
+  }
+
   removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
-  createFxImpactSignal(krwRate, prevRate, result.changePct, result.impact);
+  createFxImpactSignal(krwRate, baseRate, result.changePct, result.impact);
+  signaledRef.current = { direction: result.direction, changePct: result.changePct };
 }
 
-/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대 */
-function detectCapitulation(allItems) {
+/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대
+ * @param {Array} allItems - 전체 종목 배열
+ * @param {{ kr: number|null, us: number|null, crypto: number|null }} fgMap - 시장별 F&G map
+ *   (평균 사용 시 미장 공포(20)+코인 탐욕(75)=평균 47로 발화 안 되던 문제 해소)
+ */
+function detectCapitulation(allItems, fgMap) {
   if (!allItems?.length) return;
+  if (!fgMap || (fgMap.kr == null && fgMap.us == null && fgMap.crypto == null)) {
+    // 폴링 시마다 도배되지 않도록 개발 환경에서만 출력
+    if (import.meta.env.DEV) console.warn('[capitulation] F&G 데이터 미수신 — 투매 감지 비활성');
+    return;
+  }
 
   const T = THRESHOLDS.CAPITULATION;
-  // 공포탐욕 지수는 기존 시그널에서 추출 — 없으면 투매 감지 스킵
-  const fgSignal = getActiveSignals().find(s => s.type === SIGNAL_TYPES.FEAR_GREED_SHIFT);
-  const fearGreed = fgSignal?.meta?.current;
-  if (fearGreed == null) return; // F&G 데이터 없으면 투매 판단 불가
 
   const markets = ['KR', 'US', 'COIN'];
   for (const market of markets) {
+    // fgKey는 외부 market 루프 기준 — 내부 item 루프마다 재계산 불필요
+    const fgKey = market === 'COIN' ? 'crypto' : market.toLowerCase();
+    const fg = fgMap[fgKey];
+    if (fg == null) continue; // 해당 시장 F&G 미수신이면 시장 전체 스킵
+    if (fg > T.FEAR_GREED_MAX) continue; // 공포 구간 아님 — item 순회 비용 제거
+
     const threshold = calcPercentileVolume(allItems, market);
     if (threshold <= 0) continue;
 
@@ -666,11 +729,11 @@ function detectCapitulation(allItems) {
       const vol = item.volume ?? item.volume24h ?? 0;
       const volRatio = threshold > 0 ? vol / threshold : 0;
 
-      // 가격 급락 + 거래량 폭발 + 공포 지수 낮음
-      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fearGreed <= T.FEAR_GREED_MAX) {
+      // 가격 급락 + 거래량 폭발 + 해당 시장 공포 지수 낮음
+      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fg <= T.FEAR_GREED_MAX) {
         createCapitulationSignal(
           item.symbol, item.name ?? item.symbol,
-          market.toLowerCase(), pct, volRatio, fearGreed,
+          market.toLowerCase(), pct, volRatio, fg,
         );
       }
     }

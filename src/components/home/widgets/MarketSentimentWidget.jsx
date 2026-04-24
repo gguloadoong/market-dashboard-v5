@@ -2,7 +2,7 @@
 // MarketTemperatureWidget + FearGreedWidget 통합
 import { useState, useMemo } from 'react';
 import { useSignals } from '../../../hooks/useSignals';
-import { useFearGreed, getFgColor } from '../../../hooks/useFearGreed';
+import { useFearGreedScores, getFgColor } from '../../../hooks/useFearGreed';
 import { TYPE_META } from '../../../engine/signalTypes';
 import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../../utils/temperature';
 
@@ -73,7 +73,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
   const signals = useSignals();
   const temp = useMemo(() => calcTemperature(signals), [signals]);
   const fallback = useMemo(() => calcFallbackTemperature(allItems), [allItems]);
-  const { crypto, us, kr } = useFearGreed();
+  const { crypto, us, kr } = useFearGreedScores();
 
   const displayTemp = useMemo(() => mergeTemperature(temp, fallback), [temp, fallback]);
   const zone = ZONE[displayTemp.label] || ZONE['중립'];
