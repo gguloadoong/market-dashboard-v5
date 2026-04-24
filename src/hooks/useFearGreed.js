@@ -100,7 +100,8 @@ function useFearGreedSignal(score, market, storageKey) {
     // 이전 값 복원 (localStorage)
     if (prevRef.current === null) {
       const stored = localStorage.getItem(storageKey);
-      const parsed = Number(stored);
+      // stored=null(미저장) 시 Number(null)=0 → "극단적 공포"로 오판 방지
+      const parsed = stored != null ? Number(stored) : NaN;
       prevRef.current = Number.isFinite(parsed) ? parsed : score;
     }
 
