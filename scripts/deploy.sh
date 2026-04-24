@@ -8,6 +8,7 @@
 # 4. 배포 성공 시 .last-deployed-commit 갱신
 
 set -euo pipefail
+trap '' SIGPIPE  # 서브프로세스 SIGPIPE 전파 방지
 
 # ── 쿨다운 가드 — 연속 배포 방지 (consensus gate 이전) ────────────
 # 마지막 성공 배포(.last-deployed-commit mtime) 후 COOLDOWN_SEC 초 내 재실행 차단.
