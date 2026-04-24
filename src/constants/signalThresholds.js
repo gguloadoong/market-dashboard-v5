@@ -73,9 +73,9 @@ export const THRESHOLDS = {
     STALE_MS: 20 * 60 * 1000,    // 이전 상태 유효 시간 20분 (완화: 10분→20분)
   },
   CAPITULATION: {
-    PRICE_DROP: -3,              // 가격 하락 -3% 이상 (완화: -5→-3)
+    PRICE_DROP: -4,              // 가격 하락 -4% 이상 (중간값: -5→-4, -3은 정상 하락 포함 우려)
     VOLUME_RATIO: 3,             // 거래량 평소 3배 이상
-    FEAR_GREED_MAX: 35,          // 공포탐욕 35 이하 (완화: 25→35)
+    FEAR_GREED_MAX: 30,          // 공포탐욕 30 이하 (중간값: 25→30, 35는 투매 정의 희석 우려)
   },
   STEALTH: {
     VOLUME_RATIO: 2,             // 거래량 평소 2배 이상 (완화: 3→2)
@@ -106,5 +106,9 @@ export const THRESHOLDS = {
   SECTOR_OUTLIER: {
     MIN_DEVIATION: 1.5,          // 섹터 평균 대비 최소 1.5σ 이탈 (완화: 2→1.5)
     MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
+  },
+  NEWS_CLUSTER: {
+    WINDOW_MS: 8 * 3600000,      // 뉴스 집중 감지 윈도 8시간 (완화: 4h→8h)
+    MIN_CLUSTER: 2,              // 최소 뉴스 건수 (완화: 3→2)
   },
 };

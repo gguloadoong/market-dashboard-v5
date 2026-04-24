@@ -638,7 +638,7 @@ function detectRebalancingSignal() {
   createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
 }
 
-/** 환율 영향 — 당일 첫 환율(=시가/전일종가 대용) 대비 변동률 비교 (#113)
+/** 환율 영향 — 사용자 첫 접속(당일 KST 기준) 시점 환율 대비 변동률 비교 (#113)
  * 기존 구현은 이전 폴링(5분 전) 값과 비교 → 일중 누적 변동을 놓치고 자잘한 변동에 매번 발화.
  * 변경: 매일 첫 환율을 fxBaseRef에 저장하고, 같은 날에는 그 기준값과 비교.
  * 자정(KST) 경과 시 dateKey 변경 → 기준값 재설정.

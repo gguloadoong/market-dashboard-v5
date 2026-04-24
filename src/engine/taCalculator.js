@@ -334,7 +334,7 @@ export function detectFxImpact(krwRate, prevRate) {
   if (!krwRate || !prevRate || prevRate <= 0) return null;
 
   const changePct = ((krwRate - prevRate) / prevRate) * 100;
-  // 임계값 필터 제거 — signalEngine.createFxImpactSignal에서 THRESHOLDS.FX.MIN_CHANGE_PCT 기준으로 처리
+  // 임계값 필터 제거 — 호출처 useInvestorSignals.detectFxImpactSignal에서 THRESHOLDS.FX.MIN_CHANGE_PCT 체크
 
   // 환율 상승 = 원화 약세 → 수입주 약세, 수출주 수혜
   // 환율 하락 = 원화 강세 → 수입주 수혜

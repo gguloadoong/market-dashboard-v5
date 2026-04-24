@@ -71,8 +71,12 @@ function useFearGreedSignal(score, market, storageKey) {
   // 마지막 발화한 극단 zone 번호를 localStorage 영속 (0=극단적 공포, 4=극단적 탐욕)
   // boolean 대신 zone 번호 저장 — zone 0↔4 전환 시 재발화 허용
   const extremeKey = `fg_extreme_zone_${storageKey}`;
-  const storedZone = localStorage.getItem(extremeKey);
-  const extremeAlertedRef = useRef(storedZone != null ? Number(storedZone) : null);
+  // useRef lazy init — localStorage는 초기화 시 1회만 읽음 (매 렌더 I/O 방지)
+  const extremeAlertedRef = useRef();
+  if (extremeAlertedRef.current === undefined) {
+    const raw = localStorage.getItem(extremeKey);
+    extremeAlertedRef.current = raw != null ? Number(raw) : null;
+  }
 
   useEffect(() => {
     if (score == null) return;
