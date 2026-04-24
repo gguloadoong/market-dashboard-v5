@@ -124,7 +124,7 @@ ${PM_NONCE}: BLOCK — (이유 한 줄)"
   printf '%s' "$PM_PROMPT" > "$PM_TMP"
   PM_RESULT=$(claude --print < "$PM_TMP" 2>/dev/null || echo "${PM_NONCE}: SKIP")
   rm -f "$PM_TMP"
-  echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /'
+  echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /' || true
 
   # nonce 포함 줄에서만 verdict 추출 — 커밋 메시지 내 VERDICT 문자열 주입 완전 차단
   # nonce는 실행 시마다 랜덤 생성 → 커밋 메시지로 미리 알 수 없음
