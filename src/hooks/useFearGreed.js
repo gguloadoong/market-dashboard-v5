@@ -77,8 +77,7 @@ function useFearGreedSignal(score, market, storageKey) {
     try {
       const raw = localStorage.getItem(extremeKey);
       const stored = raw != null ? JSON.parse(raw) : null;
-      // TTL 4시간 — 시그널 만료 후 재접속 시 재발화 허용 (FEAR_GREED_SHIFT TTL과 동일)
-      // TTL 12h — FEAR_GREED_SHIFT 시그널 TTL(signalTypes.js:55)과 동일
+      // TTL 12h — FEAR_GREED_SHIFT 시그널 TTL(signalTypes.js:55)과 동일, 만료 후 재접속 시 재발화
       const valid = stored && (Date.now() - stored.ts) < 12 * 3600 * 1000
                     && (stored.zone === 0 || stored.zone === 4);
       const restoredZone = valid ? stored.zone : null;

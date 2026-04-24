@@ -1,5 +1,5 @@
-// 뉴스 클러스터 시그널 훅 — 특정 종목에 뉴스 3건+ 집중 시 시그널 발행
-// 4시간 이내 뉴스 대상, 5분 간격 재검사
+// 뉴스 클러스터 시그널 훅 — 특정 종목 뉴스 집중 시 시그널 발행 (THRESHOLDS.NEWS_CLUSTER 기준)
+// WINDOW_MS 4h 이내 MIN_CLUSTER 2건+ 대상, 5분 간격 재검사
 import { useEffect, useRef, useCallback } from 'react';
 import { createNewsClusterSignal, removeSignalByTypeAndSymbol, removeAllSignalsByType, createSentimentDivergenceSignal } from '../engine/signalEngine';
 import { SIGNAL_TYPES } from '../engine/signalTypes';
