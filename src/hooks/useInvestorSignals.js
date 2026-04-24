@@ -669,8 +669,11 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
 
   const result = detectFxImpact(krwRate, baseRate);
   if (!result) return;
-  // threshold 미달이면 기존 시그널 유지 (remove 없이 종료) — 정상화 시 이전 유효 시그널 소멸 방지
-  if (Math.abs(result.changePct) < THRESHOLDS.FX.MIN_CHANGE_PCT) return;
+  // threshold 미달 — 변동률 정상화 시 stale 경보 방지: 기존 시그널 제거 후 종료
+  if (Math.abs(result.changePct) < THRESHOLDS.FX.MIN_CHANGE_PCT) {
+    removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
+    return;
+  }
 
   // threshold 충족 시에만 교체 — remove 후 create로 최신 시그널로 치환 (Codex P1)
   removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');

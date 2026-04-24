@@ -138,7 +138,10 @@ function useFearGreedSignal(score, market, storageKey) {
         extremeFired = true;
       }
     } else {
-      // 극단 구간 탈출 → ref/storage 초기화, 재진입 시 재발화 가능
+      // 극단 구간 탈출 → strength:5 극단 시그널 제거 후 zone-shift로 교체 (stale 경보 방지)
+      if (extremeAlertedRef.current !== null) {
+        removeSignalByTypeAndSymbol(SIGNAL_TYPES.FEAR_GREED_SHIFT, market);
+      }
       extremeAlertedRef.current = null;
       try {
         localStorage.removeItem(extremeKey);
