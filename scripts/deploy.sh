@@ -9,6 +9,24 @@
 
 set -euo pipefail
 
+# ── 쿨다운 가드 — 연속 배포 방지 (consensus gate 이전) ────────────
+# 마지막 성공 배포(.last-deployed-commit mtime) 후 COOLDOWN_SEC 초 내 재실행 차단.
+# consensus gate / GA 호출 전에 수행 — 빌드 미닛·워크플로 분 낭비 방지.
+# 긴급 시 FORCE_DEPLOY=1 npm run deploy 로 우회.
+COOLDOWN_SEC=600
+if [ "${FORCE_DEPLOY:-0}" != "1" ] && [ -f ".last-deployed-commit" ]; then
+  LAST_MTIME=$(stat -f %m ".last-deployed-commit" 2>/dev/null || echo 0)
+  NOW_EPOCH=$(date "+%s")
+  DIFF=$((NOW_EPOCH - LAST_MTIME))
+  if [ "$LAST_MTIME" -gt 0 ] && [ "$DIFF" -lt "$COOLDOWN_SEC" ]; then
+    REMAIN=$((COOLDOWN_SEC - DIFF))
+    echo "❌ 마지막 배포 후 $((DIFF / 60))분 $((DIFF % 60))초 경과 — ${COOLDOWN_SEC}초 쿨다운 중"
+    echo "   ${REMAIN}초 ($((REMAIN / 60))분 $((REMAIN % 60))초) 후 재시도"
+    echo "   긴급 배포: FORCE_DEPLOY=1 npm run deploy"
+    exit 1
+  fi
+fi
+
 # ── 0. 배포 전 컨센서스 게이트 ────────────────────────────────────
 EXPLICIT_DEPLOY=1 bash "$(dirname "$0")/pre-deploy-consensus.sh"
 echo ""
