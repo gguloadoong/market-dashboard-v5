@@ -13,6 +13,7 @@
 #   6. 조직장 승인 — 이준혁 CPO (사업 방향 최종 확인)
 
 set -euo pipefail
+trap '' SIGPIPE  # claude --print 서브프로세스 SIGPIPE 전파 방지 (#202)
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
