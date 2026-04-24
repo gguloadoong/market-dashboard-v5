@@ -68,9 +68,9 @@ function getShiftDirection(prevZone, curZone) {
 // F&G 구간 전환 감지 + 시그널 발행 훅
 function useFearGreedSignal(score, market, storageKey) {
   const prevRef = useRef(null);
-  // 극단값 알림 발화 여부 추적 — 같은 극단 구간 반복 발화 방지
-  // 극단 구간 탈출 후 재진입 시에만 다시 발화
-  const extremeAlertedRef = useRef(false);
+  // 극단값 발화 여부 — localStorage 영속 (새로고침 시 재발화 방지)
+  const extremeKey = `fg_extreme_alerted_${storageKey}`;
+  const extremeAlertedRef = useRef(localStorage.getItem(extremeKey) === '1');
 
   useEffect(() => {
     if (score == null) return;
@@ -84,10 +84,9 @@ function useFearGreedSignal(score, market, storageKey) {
     const prevZone = getZone(prevRef.current);
     const curZone = getZone(score);
 
-    // 극단값(≤20 / ≥80) 우선 처리 — 구간 전환과 동일 tick에서 충돌 시
-    // signalEngine dedupe로 두 번째 시그널이 silent drop 되는 문제 회피.
-    // 극단값이 더 강한 정보이므로 우선 발화하고 구간 전환은 skip.
-    const isExtreme = score <= 20 || score >= 80;
+    // 극단값(zone 0=극단적 공포 / zone 4=극단적 탐욕) 우선 처리
+    // — getZone 경계(≤24, ≥75)와 단일 소스화하여 라벨/트리거 불일치 방지
+    const isExtreme = curZone === 0 || curZone === 4;
     let extremeFired = false;
 
     if (isExtreme) {
@@ -120,11 +119,13 @@ function useFearGreedSignal(score, market, storageKey) {
         });
         addSignal(sig);
         extremeAlertedRef.current = true;
+        localStorage.setItem(extremeKey, '1');
         extremeFired = true;
       }
     } else {
       // 극단 구간 탈출 → 다음 재진입 시 재발화 가능
       extremeAlertedRef.current = false;
+      localStorage.removeItem(extremeKey);
     }
 
     // 구간 전환 — 극단값이 발화된 같은 tick에서는 skip (dedupe 충돌 회피)
@@ -159,6 +160,36 @@ function useFearGreedSignal(score, market, storageKey) {
     prevRef.current = score;
     localStorage.setItem(storageKey, String(score));
   }, [score, market, storageKey]);
+}
+
+// 데이터 전용 — 시그널 발화 없음. useInvestorSignals 등 내부 훅에서 사용.
+// useFearGreed()는 시그널 발화 side-effect가 있어 다중 호출 시 중복 발화됨.
+export function useFearGreedScores() {
+  const crypto = useQuery({
+    queryKey: ['fearGreed', 'crypto'],
+    queryFn: fetchCryptoFG,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+  const us = useQuery({
+    queryKey: ['fearGreed', 'us'],
+    queryFn: fetchUsFG,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+  const kr = useQuery({
+    queryKey: ['fearGreed', 'kr'],
+    queryFn: fetchKrFG,
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+  return { crypto, us, kr };
 }
 
 export function useFearGreed() {

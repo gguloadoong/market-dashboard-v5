@@ -15,7 +15,7 @@ import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/ta
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
-import { useFearGreed } from './useFearGreed';
+import { useFearGreedScores } from './useFearGreed';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -146,7 +146,7 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
   // 시장별 개별 F&G 사용 — 평균 시 미장 공포(20)+코인 탐욕(75)=평균 47로 미발화되는 문제 해소
-  const { crypto, us, kr } = useFearGreed();
+  const { crypto, us, kr } = useFearGreedScores();
   // 시장별 F&G map ref — detectCapitulation 내부에서 item.market 기준 조회
   const fgMapRef = useRef({ crypto: null, us: null, kr: null });
 

@@ -47,7 +47,7 @@ export const THRESHOLDS = {
   },
   VOL_PRICE: {
     HIGH_VOL_LOW_PRICE_RATIO: 1.5, // 거래량 1.5배 이상인데 가격 정체 (완화: 2→1.5)
-    HIGH_VOL_MAX_PRICE: 2,         // 가격 변동 2% 이하면 정체 (완화: 1→2)
+    HIGH_VOL_MAX_PRICE: 1.5,       // 가격 변동 1.5% 이하면 정체 (완화: 1→1.5, 2%는 국장 기준 정체 아님)
     BIG_PRICE_MIN: 5,              // 큰 가격 변동 최소 5%
     STRONG_RATIO: 5,               // 거래량 5배 이상 — 강한 누적 시그널
   },
