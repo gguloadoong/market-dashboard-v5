@@ -68,9 +68,11 @@ function getShiftDirection(prevZone, curZone) {
 // F&G 구간 전환 감지 + 시그널 발행 훅
 function useFearGreedSignal(score, market, storageKey) {
   const prevRef = useRef(null);
-  // 극단값 발화 여부 — localStorage 영속 (새로고침 시 재발화 방지)
-  const extremeKey = `fg_extreme_alerted_${storageKey}`;
-  const extremeAlertedRef = useRef(localStorage.getItem(extremeKey) === '1');
+  // 마지막 발화한 극단 zone 번호를 localStorage 영속 (0=극단적 공포, 4=극단적 탐욕)
+  // boolean 대신 zone 번호 저장 — zone 0↔4 전환 시 재발화 허용
+  const extremeKey = `fg_extreme_zone_${storageKey}`;
+  const storedZone = localStorage.getItem(extremeKey);
+  const extremeAlertedRef = useRef(storedZone != null ? Number(storedZone) : null);
 
   useEffect(() => {
     if (score == null) return;
@@ -90,7 +92,7 @@ function useFearGreedSignal(score, market, storageKey) {
     let extremeFired = false;
 
     if (isExtreme) {
-      if (!extremeAlertedRef.current) {
+      if (extremeAlertedRef.current !== curZone) { // 다른 극단 zone 또는 첫 진입 시에만 발화
         // curZone === 4 (극단적 탐욕, score ≥75) → 역발상 매도, zone 0 (극단적 공포) → 역발상 매수
         // score >= 80 대신 curZone 기준 — getZone 경계(75)와 일치시켜 라벨↔방향 충돌 방지
         const direction = curZone === 4 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
@@ -120,13 +122,13 @@ function useFearGreedSignal(score, market, storageKey) {
           },
         });
         addSignal(sig);
-        extremeAlertedRef.current = true;
-        localStorage.setItem(extremeKey, '1');
+        extremeAlertedRef.current = curZone;
+        localStorage.setItem(extremeKey, String(curZone));
         extremeFired = true;
       }
     } else {
-      // 극단 구간 탈출 → 다음 재진입 시 재발화 가능
-      extremeAlertedRef.current = false;
+      // 극단 구간 탈출 → ref/storage 초기화, 재진입 시 재발화 가능
+      extremeAlertedRef.current = null;
       localStorage.removeItem(extremeKey);
     }
 

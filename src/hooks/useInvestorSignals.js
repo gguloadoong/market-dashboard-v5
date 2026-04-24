@@ -141,8 +141,14 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
   const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
-  // fx_impact 기준값 — 사용자 세션 시작 시점 환율 저장 (5분 폴링 비교 → 세션 기준 비교로 변경)
-  const fxBaseRef = useRef({ rate: null, dateKey: null });
+  // fx_impact 기준값 — localStorage에서 당일(KST) 기준 환율 복원, 재접속 시 동일 기준 유지
+  const fxBaseRef = useRef((() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('fx_base_daily') || 'null');
+      const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+      return stored?.dateKey === todayKey ? stored : { rate: null, dateKey: null };
+    } catch { return { rate: null, dateKey: null }; }
+  })());
 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
   // 시장별 개별 F&G 사용 — 평균 시 미장 공포(20)+코인 탐욕(75)=평균 47로 미발화되는 문제 해소
@@ -649,9 +655,11 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
   const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const base = baseRef.current;
 
-  // 첫 호출 또는 날짜 변경 → 기준값 재설정 후 skip (다음 폴링부터 비교)
+  // 첫 호출 또는 날짜 변경 → 기준값 재설정 후 localStorage 저장 (재접속 시 당일 기준 복원)
   if (!base.rate || base.dateKey !== todayKey) {
-    baseRef.current = { rate: krwRate, dateKey: todayKey };
+    const newBase = { rate: krwRate, dateKey: todayKey };
+    baseRef.current = newBase;
+    try { localStorage.setItem('fx_base_daily', JSON.stringify(newBase)); } catch {}
     return;
   }
 
