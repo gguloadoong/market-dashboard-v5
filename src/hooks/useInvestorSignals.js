@@ -665,35 +665,35 @@ function detectFxImpactSignal(krwRate, baseRef, loaded, signaledRef) {
     baseRef.current = newBase;
     // 일자 경계: 어제 기준 FX 시그널 제거 (새 baseline과 스케일 불일치, 방향 역전 가능)
     removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
-    if (signaledRef) signaledRef.current = { direction: null, changePct: null };
+    signaledRef.current = { direction: null, changePct: null };
     try { localStorage.setItem('fx_base_daily', JSON.stringify(newBase)); } catch {}
     return;
   }
 
   const baseRate = base.rate;
-  // 값 변동 없으면 skip
   if (baseRate === krwRate) return;
 
   const result = detectFxImpact(krwRate, baseRate);
   if (!result) return;
   // threshold 미달 — 정상화 시 기존 시그널 제거 (stale 경보 방지)
   if (Math.abs(result.changePct) < THRESHOLDS.FX.MIN_CHANGE_PCT) {
-    if (signaledRef?.current?.direction !== null) {
+    if (signaledRef.current.direction !== null) {
       removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
-      if (signaledRef) signaledRef.current = { direction: null, changePct: null };
+      signaledRef.current = { direction: null, changePct: null };
     }
     return;
   }
 
   // 방향·변동률 미변경(±0.1% 내) 시 매 폴링 재발화 방지
-  if (signaledRef?.current?.direction === result.direction &&
-      Math.abs((result.changePct - (signaledRef.current.changePct ?? 0))) < 0.1) {
+  const FX_REFIRE_DELTA_PCT = 0.1;
+  if (signaledRef.current.direction === result.direction &&
+      Math.abs(result.changePct - (signaledRef.current.changePct ?? 0)) < FX_REFIRE_DELTA_PCT) {
     return;
   }
 
   removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
   createFxImpactSignal(krwRate, baseRate, result.changePct, result.impact);
-  if (signaledRef) signaledRef.current = { direction: result.direction, changePct: result.changePct };
+  signaledRef.current = { direction: result.direction, changePct: result.changePct };
 }
 
 /** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대

@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { fetchFearGreed as gwFearGreed, fetchKrFearGreed as gwKrFearGreed } from '../api/_gateway.js';
-import { createSignal, addSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
+import { createSignal, addSignal, removeSignalByTypeAndSymbol, getActiveSignals } from '../engine/signalEngine';
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
 
 // 점수 → 레이블 매핑
@@ -78,9 +78,19 @@ function useFearGreedSignal(score, market, storageKey) {
       const raw = localStorage.getItem(extremeKey);
       const stored = raw != null ? JSON.parse(raw) : null;
       // TTL 4시간 — 시그널 만료 후 재접속 시 재발화 허용 (FEAR_GREED_SHIFT TTL과 동일)
-      const valid = stored && (Date.now() - stored.ts) < 4 * 3600 * 1000
+      // TTL 12h — FEAR_GREED_SHIFT 시그널 TTL(signalTypes.js:55)과 동일
+      const valid = stored && (Date.now() - stored.ts) < 12 * 3600 * 1000
                     && (stored.zone === 0 || stored.zone === 4);
-      extremeAlertedRef.current = valid ? stored.zone : null;
+      const restoredZone = valid ? stored.zone : null;
+      // 리로드 시 엔진 시그널(_signals)은 초기화됨 — 엔진에 시그널 없으면 재발화 허용
+      if (restoredZone !== null) {
+        const engineHas = getActiveSignals().some(
+          s => s.type === 'fear_greed_shift' && s.symbol === storageKey.replace('fg_prev_', ''),
+        );
+        extremeAlertedRef.current = engineHas ? restoredZone : null;
+      } else {
+        extremeAlertedRef.current = null;
+      }
     } catch { extremeAlertedRef.current = null; }
   }
 
