@@ -8,6 +8,7 @@
 # 4. 배포 성공 시 .last-deployed-commit 갱신
 
 set -euo pipefail
+trap '' SIGPIPE  # 서브프로세스 SIGPIPE 전파 방지
 
 # ── 0. 배포 전 컨센서스 게이트 ────────────────────────────────────
 EXPLICIT_DEPLOY=1 bash "$(dirname "$0")/pre-deploy-consensus.sh"
