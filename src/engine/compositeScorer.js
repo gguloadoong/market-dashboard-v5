@@ -2,6 +2,7 @@
 // 종목별 방향성 점수 (-100 ~ +100) 산출
 
 import { DIRECTIONS } from './signalTypes';
+import { THRESHOLDS } from '../constants/signalThresholds';
 
 // ─── 가중치 상수 ────────────────────────────────────────────
 const WEIGHT = {
@@ -75,7 +76,7 @@ function calcSentimentScore(sentiment) {
     if (pcr > 1.2) score += 20;      // 풋 과잉 = 역발상 매수
     else if (pcr > 1.0) score += 10;
     else if (pcr < 0.7) score -= 20;  // 콜 과잉 = 역발상 매도
-    else if (pcr < 0.85) score -= 10;
+    else if (pcr < THRESHOLDS.PCR.NEUTRAL_LOW) score -= 10;
   }
 
   return Math.max(-100, Math.min(100, score));

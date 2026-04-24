@@ -4,8 +4,8 @@ export const THRESHOLDS = {
     BULLISH_STRONG: 1.5,  // PCR > 1.5: 극도공포 → 강한 역발상 매수
     BULLISH:        1.2,  // PCR > 1.2: 공포 → 역발상 매수
     CAUTION_HIGH:   1.0,  // PCR > 1.0: 경계 시작 (신규: 경고 시그널)
-    NEUTRAL_HIGH:   0.90, // PCR 0.90~1.0: 중립 상단 (완화: 0.85→0.90)
-    NEUTRAL_LOW:    0.90, // PCR 0.90 이하: 경계 시작 (완화: 0.85→0.90)
+    NEUTRAL_HIGH:   0.90, // PCR 0.90~1.0: 중립 상단 (compositeScorer 미사용 — createPCRSignal 로직 개선 시 활용)
+    NEUTRAL_LOW:    0.90, // PCR 0.90 이하: 경계 시작 (compositeScorer.js:78에서 참조)
     CAUTION_LOW:    0.7,  // PCR 0.7~0.90: 경계 (신규)
     BEARISH:        0.7,  // PCR < 0.7: 탐욕 → 역발상 매도
     BEARISH_STRONG: 0.5,  // PCR < 0.5: 극도탐욕 → 강한 매도
