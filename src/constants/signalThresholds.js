@@ -108,7 +108,7 @@ export const THRESHOLDS = {
     MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
   },
   NEWS_CLUSTER: {
-    WINDOW_MS: 8 * 3600000,      // 뉴스 집중 감지 윈도 8시간 (완화: 4h→8h)
-    MIN_CLUSTER: 2,              // 최소 뉴스 건수 (완화: 3→2)
+    WINDOW_MS: 4 * 3600000,      // 4시간 (원본 유지 — 8h는 집중 아님)
+    MIN_CLUSTER: 2,              // 완화: 3→2 (건수만 완화)
   },
 };

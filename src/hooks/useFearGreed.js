@@ -132,13 +132,17 @@ function useFearGreedSignal(score, market, storageKey) {
         });
         addSignal(sig);
         extremeAlertedRef.current = curZone;
-        localStorage.setItem(extremeKey, JSON.stringify({ zone: curZone, ts: Date.now() }));
+        try {
+          localStorage.setItem(extremeKey, JSON.stringify({ zone: curZone, ts: Date.now() }));
+        } catch { /* quota/private mode 등 — 영속 실패 시 무시 */ }
         extremeFired = true;
       }
     } else {
       // 극단 구간 탈출 → ref/storage 초기화, 재진입 시 재발화 가능
       extremeAlertedRef.current = null;
-      localStorage.removeItem(extremeKey);
+      try {
+        localStorage.removeItem(extremeKey);
+      } catch { /* 영속 실패 시 무시 */ }
     }
 
     // 구간 전환 — 극단값이 발화된 같은 tick에서는 skip (dedupe 충돌 회피)
@@ -171,72 +175,31 @@ function useFearGreedSignal(score, market, storageKey) {
 
     // 현재 값 저장
     prevRef.current = score;
-    localStorage.setItem(storageKey, String(score));
+    try {
+      localStorage.setItem(storageKey, String(score));
+    } catch { /* 영속 실패 시 무시 — prevRef는 유지됨 */ }
   }, [score, market, storageKey]);
+}
+
+// 3개 시장 F&G 쿼리 — useFearGreedScores/useFearGreed 양쪽에서 공유
+function useFearGreedQueries() {
+  const crypto = useQuery({ queryKey: ['fearGreed', 'crypto'], queryFn: fetchCryptoFG, staleTime: 5 * 60 * 1000, refetchInterval: 10 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  const us = useQuery({ queryKey: ['fearGreed', 'us'], queryFn: fetchUsFG, staleTime: 5 * 60 * 1000, refetchInterval: 10 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  const kr = useQuery({ queryKey: ['fearGreed', 'kr'], queryFn: fetchKrFG, staleTime: 2 * 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  return { crypto, us, kr };
 }
 
 // 데이터 전용 — 시그널 발화 없음. useInvestorSignals 등 내부 훅에서 사용.
 // useFearGreed()는 시그널 발화 side-effect가 있어 다중 호출 시 중복 발화됨.
 export function useFearGreedScores() {
-  const crypto = useQuery({
-    queryKey: ['fearGreed', 'crypto'],
-    queryFn: fetchCryptoFG,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-  const us = useQuery({
-    queryKey: ['fearGreed', 'us'],
-    queryFn: fetchUsFG,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-  const kr = useQuery({
-    queryKey: ['fearGreed', 'kr'],
-    queryFn: fetchKrFG,
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-  return { crypto, us, kr };
+  return useFearGreedQueries();
 }
 
 export function useFearGreed() {
-  const crypto = useQuery({
-    queryKey: ['fearGreed', 'crypto'],
-    queryFn: fetchCryptoFG,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-
-  const us = useQuery({
-    queryKey: ['fearGreed', 'us'],
-    queryFn: fetchUsFG,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-
-  const kr = useQuery({
-    queryKey: ['fearGreed', 'kr'],
-    queryFn: fetchKrFG,
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-    refetchIntervalInBackground: false,
-    retry: 1,
-  });
-
+  const { crypto, us, kr } = useFearGreedQueries();
   // F&G 구간 전환 시 시그널 엔진에 이벤트 발행
   useFearGreedSignal(crypto.data?.score, 'crypto', 'fg_prev_crypto');
   useFearGreedSignal(us.data?.score, 'us', 'fg_prev_us');
   useFearGreedSignal(kr.data?.score, 'kr', 'fg_prev_kr');
-
   return { crypto, us, kr };
 }
