@@ -23,12 +23,30 @@ function setCached(symbol, data) {
   } catch {}
 }
 
-// 기본 4종목 칩 (목업 기준)
+// 크론 pre-gen 22종목 (국장 8 + 미장 9 + 코인 5) — update-ai-debate.js TOP_SYMBOLS와 동기화
 const DEFAULT_SYMBOLS = [
   { symbol: '005930', name: '삼성전자', market: 'kr' },
   { symbol: '000660', name: 'SK하이닉스', market: 'kr' },
+  { symbol: '005380', name: '현대차', market: 'kr' },
+  { symbol: '000270', name: '기아', market: 'kr' },
+  { symbol: '373220', name: 'LG에너지솔루션', market: 'kr' },
+  { symbol: '207940', name: '삼성바이오로직스', market: 'kr' },
+  { symbol: '068270', name: '셀트리온', market: 'kr' },
+  { symbol: '035420', name: 'NAVER', market: 'kr' },
+  { symbol: 'AAPL', name: 'Apple', market: 'us' },
+  { symbol: 'MSFT', name: 'Microsoft', market: 'us' },
   { symbol: 'NVDA', name: 'NVIDIA', market: 'us' },
+  { symbol: 'GOOGL', name: 'Alphabet', market: 'us' },
+  { symbol: 'AMZN', name: 'Amazon', market: 'us' },
+  { symbol: 'META', name: 'Meta', market: 'us' },
+  { symbol: 'TSLA', name: 'Tesla', market: 'us' },
+  { symbol: 'JPM', name: 'JPMorgan', market: 'us' },
+  { symbol: 'AVGO', name: 'Broadcom', market: 'us' },
   { symbol: 'BTC', name: '비트코인', market: 'crypto' },
+  { symbol: 'ETH', name: '이더리움', market: 'crypto' },
+  { symbol: 'XRP', name: '리플', market: 'crypto' },
+  { symbol: 'SOL', name: '솔라나', market: 'crypto' },
+  { symbol: 'BNB', name: '바이낸스코인', market: 'crypto' },
 ];
 
 // 메시지 배열에서 핵심 요약 추출 (Bull 1줄 + Bear 1줄 + verdict)

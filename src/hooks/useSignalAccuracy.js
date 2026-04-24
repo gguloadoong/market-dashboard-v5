@@ -4,10 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 // 제거된 레거시 시그널 타입 — Supabase 과거 레코드 차단 (#162 whale 제거 후속)
 // 향후 Supabase 뷰 마이그레이션으로 whale_* 레코드 정리 완료 시 이 Set 제거
 const LEGACY_SIGNAL_TYPES = new Set([
+  // 제거된 whale 시그널 (#162)
   'whale_exchange_inflow',
   'whale_exchange_outflow',
   'whale_stablecoin_inflow',
   'whale_large_single',
+  // trading-signal-bot 모델 타입 — v5 공용 signal_history 분리 전(~2026-04-17) 레코드
+  'DNA', 'QUANT', 'SENSE', 'WALL_ST', 'SHARK', 'CONSENSUS',
 ]);
 
 async function fetchSignalAccuracy() {
