@@ -837,9 +837,9 @@ export function removeAllSignalsByType(type) {
   if (_signals.length !== before) _notify();
 }
 
-/** 뉴스 클러스터 시그널 — 특정 종목에 뉴스 3건+ 집중 */
+/** 뉴스 클러스터 시그널 — 특정 종목에 뉴스 집중 (THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER 기준) */
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
-  if (newsCount < 3) return null;
+  if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
   if (bullCount > bearCount) direction = DIRECTIONS.BULLISH;
   else if (bearCount > bullCount) direction = DIRECTIONS.BEARISH;

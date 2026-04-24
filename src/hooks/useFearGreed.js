@@ -74,8 +74,13 @@ function useFearGreedSignal(score, market, storageKey) {
   // useRef lazy init — localStorage는 초기화 시 1회만 읽음 (매 렌더 I/O 방지)
   const extremeAlertedRef = useRef();
   if (extremeAlertedRef.current === undefined) {
-    const raw = localStorage.getItem(extremeKey);
-    extremeAlertedRef.current = raw != null ? Number(raw) : null;
+    try {
+      const raw = localStorage.getItem(extremeKey);
+      const stored = raw != null ? JSON.parse(raw) : null;
+      // TTL 4시간 — 시그널 만료 후 재접속 시 재발화 허용 (FEAR_GREED_SHIFT TTL과 동일)
+      const valid = stored && (Date.now() - stored.ts) < 4 * 3600 * 1000;
+      extremeAlertedRef.current = valid ? stored.zone : null;
+    } catch { extremeAlertedRef.current = null; }
   }
 
   useEffect(() => {
@@ -127,7 +132,7 @@ function useFearGreedSignal(score, market, storageKey) {
         });
         addSignal(sig);
         extremeAlertedRef.current = curZone;
-        localStorage.setItem(extremeKey, String(curZone));
+        localStorage.setItem(extremeKey, JSON.stringify({ zone: curZone, ts: Date.now() }));
         extremeFired = true;
       }
     } else {
