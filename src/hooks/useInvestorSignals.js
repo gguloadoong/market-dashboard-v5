@@ -663,7 +663,8 @@ function detectFxImpactSignal(krwRate, baseRef, loaded, signaledRef) {
   if (!base.rate || base.dateKey !== todayKey) {
     const newBase = { rate: krwRate, dateKey: todayKey };
     baseRef.current = newBase;
-    // 일자 경계: 어제 signaledRef와 새 baseline은 스케일이 달라 dedupe 비교 무효
+    // 일자 경계: 어제 기준 FX 시그널 제거 (새 baseline과 스케일 불일치, 방향 역전 가능)
+    removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
     if (signaledRef) signaledRef.current = { direction: null, changePct: null };
     try { localStorage.setItem('fx_base_daily', JSON.stringify(newBase)); } catch {}
     return;
