@@ -26,6 +26,7 @@ import { useKisUsWebSocket } from './hooks/useKisUsWebSocket';
 import { usePrices } from './hooks/usePrices';
 import { useCoins } from './hooks/useCoins';
 import { useIndices } from './hooks/useIndices';
+import { useFearGreed } from './hooks/useFearGreed';
 
 // PWA 설치 유도 배너 — standalone이 아닌 환경에서 1회 표시
 function InstallBanner() {
@@ -65,6 +66,8 @@ function InstallBanner() {
 }
 
 export default function App() {
+  // F&G 시그널 발화 단일 인스턴스 — 다중 호출 시 시그널 중복 발화 방지
+  useFearGreed();
   const { dark, toggle: toggleDark } = useDarkMode();
   const { watchlist, krSymbols, usSymbols } = useWatchlist();
   const { indices, krwRate, krwRateLoaded } = useIndices();

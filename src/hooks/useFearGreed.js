@@ -89,7 +89,8 @@ function useFearGreedSignal(score, market, storageKey) {
     // 이전 값 복원 (localStorage)
     if (prevRef.current === null) {
       const stored = localStorage.getItem(storageKey);
-      prevRef.current = stored != null ? Number(stored) : score;
+      const parsed = Number(stored);
+      prevRef.current = Number.isFinite(parsed) ? parsed : score;
     }
 
     const prevZone = getZone(prevRef.current);
@@ -127,7 +128,6 @@ function useFearGreedSignal(score, market, storageKey) {
             prevLabel,
             curLabel,
             current: score,
-            extreme: true,
           },
         });
         addSignal(sig);

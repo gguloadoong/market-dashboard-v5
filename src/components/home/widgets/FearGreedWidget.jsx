@@ -1,6 +1,6 @@
 // Fear & Greed 지수 위젯 — 코인(Alternative.me) + 미장(CNN Money) + 국장(VKOSPI+외국인)
 // Market Pulse 영역 하단에 표시
-import { useFearGreed, getFgLabel, getFgColor } from '../../../hooks/useFearGreed';
+import { useFearGreedScores, getFgLabel, getFgColor } from '../../../hooks/useFearGreed';
 
 function FgGauge({ score, label, color, sub }) {
   const pct = Math.min(100, Math.max(0, score ?? 0));
@@ -43,7 +43,7 @@ function formatForeignNet(net) {
 }
 
 export default function FearGreedWidget() {
-  const { crypto, us, kr } = useFearGreed();
+  const { crypto, us, kr } = useFearGreedScores();
 
   const cryptoScore = crypto.data?.score;
   const cryptoLabel = getFgLabel(cryptoScore);
