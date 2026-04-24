@@ -145,13 +145,10 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const fxBaseRef = useRef({ rate: null, dateKey: null });
 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
-  // 3시장 평균 F&G 사용 (kr·us·crypto 중 사용 가능한 값들)
+  // 시장별 개별 F&G 사용 — 평균 시 미장 공포(20)+코인 탐욕(75)=평균 47로 미발화되는 문제 해소
   const { crypto, us, kr } = useFearGreed();
-  const fearGreedValue = useMemo(() => {
-    const scores = [crypto.data?.score, us.data?.score, kr.data?.score].filter(v => v != null);
-    return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  }, [crypto.data?.score, us.data?.score, kr.data?.score]);
-  const fearGreedRef = useRef(fearGreedValue);
+  // 시장별 F&G map ref — detectCapitulation 내부에서 item.market 기준 조회
+  const fgMapRef = useRef({ crypto: null, us: null, kr: null });
 
   // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
   useEffect(() => {
@@ -168,8 +165,12 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   }, [krwRateLoaded]);
 
   useEffect(() => {
-    fearGreedRef.current = fearGreedValue;
-  }, [fearGreedValue]);
+    fgMapRef.current = {
+      crypto: crypto.data?.score ?? null,
+      us: us.data?.score ?? null,
+      kr: kr.data?.score ?? null,
+    };
+  }, [crypto.data?.score, us.data?.score, kr.data?.score]);
 
   useEffect(() => {
     let retryTimer = null; // 재시도 타이머 추적 (언마운트 시 정리)
@@ -207,8 +208,8 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
         // ── 신규: 환율 영향 (#113: useIndices().krwRate 주입) ──
         detectFxImpactSignal(krwRateRef.current, fxBaseRef, krwRateLoadedRef.current);
 
-        // ── Tier2: 투매 감지 (캐피튤레이션) — F&G 직접 주입 (연쇄 의존 해소) ──
-        detectCapitulation(items, fearGreedRef.current);
+        // ── Tier2: 투매 감지 (캐피튤레이션) — 시장별 F&G 주입 (평균 사용 시 미발화 문제 해소) ──
+        detectCapitulation(items, fgMapRef.current);
 
         // ── Tier2: 스텔스 활동 (뉴스 없는 거래 폭발) ──
         detectStealthActivity(items);
@@ -668,12 +669,14 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
 
 /** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대
  * @param {Array} allItems - 전체 종목 배열
- * @param {number|null} fearGreedValue - 현재 F&G 수치 (직접 주입, fear_greed_shift 시그널 의존 해소)
+ * @param {{ kr: number|null, us: number|null, crypto: number|null }} fgMap - 시장별 F&G map
+ *   (평균 사용 시 미장 공포(20)+코인 탐욕(75)=평균 47로 발화 안 되던 문제 해소)
  */
-function detectCapitulation(allItems, fearGreedValue) {
+function detectCapitulation(allItems, fgMap) {
   if (!allItems?.length) return;
-  if (fearGreedValue == null) {
-    console.warn('[capitulation] F&G 데이터 미수신 — 투매 감지 비활성');
+  if (!fgMap || (fgMap.kr == null && fgMap.us == null && fgMap.crypto == null)) {
+    // 폴링 시마다 도배되지 않도록 개발 환경에서만 출력
+    if (import.meta.env.DEV) console.warn('[capitulation] F&G 데이터 미수신 — 투매 감지 비활성');
     return;
   }
 
@@ -691,11 +694,17 @@ function detectCapitulation(allItems, fearGreedValue) {
       const vol = item.volume ?? item.volume24h ?? 0;
       const volRatio = threshold > 0 ? vol / threshold : 0;
 
-      // 가격 급락 + 거래량 폭발 + 공포 지수 낮음
-      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fearGreedValue <= T.FEAR_GREED_MAX) {
+      // 시장별 F&G 조회 — item.market 기준 ('coin'은 'crypto'로 매핑)
+      const itemMarket = (item.market || item._market || '').toLowerCase();
+      const fgKey = itemMarket === 'coin' ? 'crypto' : itemMarket;
+      const fg = fgMap[fgKey];
+      if (fg == null) continue; // 해당 시장 F&G 미수신이면 스킵
+
+      // 가격 급락 + 거래량 폭발 + 해당 시장 공포 지수 낮음
+      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fg <= T.FEAR_GREED_MAX) {
         createCapitulationSignal(
           item.symbol, item.name ?? item.symbol,
-          market.toLowerCase(), pct, volRatio, fearGreedValue,
+          market.toLowerCase(), pct, volRatio, fg,
         );
       }
     }

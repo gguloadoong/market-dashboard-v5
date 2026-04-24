@@ -13,6 +13,8 @@
 --
 -- tsb 영향: 없음 — tsb는 tsb_signal_history / tsb_model_stats_* 뷰만 읽음.
 
+BEGIN;
+
 -- [1] tsb 레코드 물리 삭제
 DELETE FROM public.signal_history
 WHERE signal_type IN ('DNA', 'QUANT', 'SENSE', 'WALL_ST', 'SHARK', 'CONSENSUS');
@@ -113,3 +115,5 @@ ORDER BY b.total_signals DESC;
 -- 권한 재부여 (DROP → CREATE 방식이 아니라 CREATE OR REPLACE이므로 권한 보존됨.
 -- 하지만 명시적으로 재확인.)
 GRANT SELECT ON public.signal_accuracy TO anon;
+
+COMMIT;
