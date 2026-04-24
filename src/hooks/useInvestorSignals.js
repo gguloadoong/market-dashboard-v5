@@ -688,6 +688,7 @@ function detectCapitulation(allItems, fgMap) {
     const fgKey = market === 'COIN' ? 'crypto' : market.toLowerCase();
     const fg = fgMap[fgKey];
     if (fg == null) continue; // 해당 시장 F&G 미수신이면 시장 전체 스킵
+    if (fg > T.FEAR_GREED_MAX) continue; // 공포 구간 아님 — item 순회 비용 제거
 
     const threshold = calcPercentileVolume(allItems, market);
     if (threshold <= 0) continue;
