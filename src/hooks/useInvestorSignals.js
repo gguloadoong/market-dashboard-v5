@@ -663,6 +663,8 @@ function detectFxImpactSignal(krwRate, baseRef, loaded, signaledRef) {
   if (!base.rate || base.dateKey !== todayKey) {
     const newBase = { rate: krwRate, dateKey: todayKey };
     baseRef.current = newBase;
+    // 일자 경계: 어제 signaledRef와 새 baseline은 스케일이 달라 dedupe 비교 무효
+    if (signaledRef) signaledRef.current = { direction: null, changePct: null };
     try { localStorage.setItem('fx_base_daily', JSON.stringify(newBase)); } catch {}
     return;
   }
