@@ -15,6 +15,7 @@ import { detectGap, detectRebalancingWindow, detectFxImpact } from '../engine/ta
 import { SIGNAL_TYPES, DIRECTIONS, STABLECOIN_SYMBOLS } from '../engine/signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 import { clampPct } from '../utils/clampPct';
+import { useFearGreed } from './useFearGreed';
 
 // 교차시장 상관관계 쌍 — leader가 먼저 움직이면 lagger가 따라갈 가능성
 const CROSS_MARKET_PAIRS = [
@@ -140,7 +141,17 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
   const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
-  const fxPrevRef = useRef(null); // fx_impact 이전 환율 (첫 호출은 skip, #113)
+  // fx_impact 기준값 — 당일 첫 환율을 저장 (이전 폴링 비교 → 일중 기준 비교로 변경)
+  const fxBaseRef = useRef({ rate: null, dateKey: null });
+
+  // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
+  // 3시장 평균 F&G 사용 (kr·us·crypto 중 사용 가능한 값들)
+  const { crypto, us, kr } = useFearGreed();
+  const fgScores = [crypto.data?.score, us.data?.score, kr.data?.score].filter(v => v != null);
+  const fearGreedValue = fgScores.length > 0
+    ? fgScores.reduce((a, b) => a + b, 0) / fgScores.length
+    : null;
+  const fearGreedRef = useRef(fearGreedValue);
 
   // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
   useEffect(() => {
@@ -155,6 +166,10 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   useEffect(() => {
     krwRateLoadedRef.current = krwRateLoaded;
   }, [krwRateLoaded]);
+
+  useEffect(() => {
+    fearGreedRef.current = fearGreedValue;
+  }, [fearGreedValue]);
 
   useEffect(() => {
     let retryTimer = null; // 재시도 타이머 추적 (언마운트 시 정리)
@@ -190,10 +205,10 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
         detectRebalancingSignal();
 
         // ── 신규: 환율 영향 (#113: useIndices().krwRate 주입) ──
-        detectFxImpactSignal(krwRateRef.current, fxPrevRef, krwRateLoadedRef.current);
+        detectFxImpactSignal(krwRateRef.current, fxBaseRef, krwRateLoadedRef.current);
 
-        // ── Tier2: 투매 감지 (캐피튤레이션) ──
-        detectCapitulation(items);
+        // ── Tier2: 투매 감지 (캐피튤레이션) — F&G 직접 주입 (연쇄 의존 해소) ──
+        detectCapitulation(items, fearGreedRef.current);
 
         // ── Tier2: 스텔스 활동 (뉴스 없는 거래 폭발) ──
         detectStealthActivity(items);
@@ -616,43 +631,49 @@ function detectRebalancingSignal() {
   createRebalancingSignal(result.isQuarterEnd, result.daysLeft);
 }
 
-/** 환율 영향 — useIndices().krwRate를 직접 주입받아 이전 값과 비교 (#113)
- * 기존 구현은 allItems에서 USDKRW 심볼을 찾았으나 allItems에는 주식·코인만 포함되어 항상 skip되던 dead path.
+/** 환율 영향 — 당일 첫 환율(=시가/전일종가 대용) 대비 변동률 비교 (#113)
+ * 기존 구현은 이전 폴링(5분 전) 값과 비교 → 일중 누적 변동을 놓치고 자잘한 변동에 매번 발화.
+ * 변경: 매일 첫 환율을 fxBaseRef에 저장하고, 같은 날에는 그 기준값과 비교.
+ * 자정(KST) 경과 시 dateKey 변경 → 기준값 재설정.
  * @param {number|null} krwRate - 현재 원/달러 환율
- * @param {{ current: number|null }} prevRef - 이전 환율 ref (첫 호출은 skip)
+ * @param {{ current: { rate: number|null, dateKey: string|null } }} baseRef - 당일 기준값 ref
  * @param {boolean} loaded - 환율 fetch 완료 여부 (DEFAULT_KRW_RATE sentinel과 실제값 충돌 회피)
  */
-function detectFxImpactSignal(krwRate, prevRef, loaded) {
+function detectFxImpactSignal(krwRate, baseRef, loaded) {
   // 환율 fetch 미완료 또는 값 자체가 falsy면 skip — DEFAULT_KRW_RATE 값으로는 판정하지 않음 (Codex P2)
   if (!loaded || !krwRate) return;
 
-  const prevRate = prevRef.current;
-  // 첫 호출(prev=null) skip — 다음 주기부터 비교
-  if (prevRate == null) {
-    prevRef.current = krwRate;
+  // 당일 키 (KST 날짜)
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const base = baseRef.current;
+
+  // 첫 호출 또는 날짜 변경 → 기준값 재설정 후 skip (다음 폴링부터 비교)
+  if (!base.rate || base.dateKey !== todayKey) {
+    baseRef.current = { rate: krwRate, dateKey: todayKey };
     return;
   }
-  // 값 변동 없으면 skip (prev 유지)
-  if (prevRate === krwRate) return;
 
-  const result = detectFxImpact(krwRate, prevRate);
-  prevRef.current = krwRate;
+  const baseRate = base.rate;
+  // 값 변동 없으면 skip
+  if (baseRate === krwRate) return;
+
+  const result = detectFxImpact(krwRate, baseRate);
   if (!result) return;
 
   // type+symbol dedupe 우회 — 환율은 자주 변하므로 매 변동마다 최신 시그널로 교체 (Codex P1)
   removeSignalByTypeAndSymbol(SIGNAL_TYPES.FX_IMPACT, 'USDKRW');
-  createFxImpactSignal(krwRate, prevRate, result.changePct, result.impact);
+  createFxImpactSignal(krwRate, baseRate, result.changePct, result.impact);
 }
 
-/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대 */
-function detectCapitulation(allItems) {
+/** 투매 감지 (캐피튤레이션) — 가격 급락 + 거래량 폭발 + 공포 극대
+ * @param {Array} allItems - 전체 종목 배열
+ * @param {number|null} fearGreedValue - 현재 F&G 수치 (직접 주입, fear_greed_shift 시그널 의존 해소)
+ */
+function detectCapitulation(allItems, fearGreedValue) {
   if (!allItems?.length) return;
+  if (fearGreedValue == null) return; // F&G 데이터 없으면 투매 판단 불가
 
   const T = THRESHOLDS.CAPITULATION;
-  // 공포탐욕 지수는 기존 시그널에서 추출 — 없으면 투매 감지 스킵
-  const fgSignal = getActiveSignals().find(s => s.type === SIGNAL_TYPES.FEAR_GREED_SHIFT);
-  const fearGreed = fgSignal?.meta?.current;
-  if (fearGreed == null) return; // F&G 데이터 없으면 투매 판단 불가
 
   const markets = ['KR', 'US', 'COIN'];
   for (const market of markets) {
@@ -667,10 +688,10 @@ function detectCapitulation(allItems) {
       const volRatio = threshold > 0 ? vol / threshold : 0;
 
       // 가격 급락 + 거래량 폭발 + 공포 지수 낮음
-      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fearGreed <= T.FEAR_GREED_MAX) {
+      if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fearGreedValue <= T.FEAR_GREED_MAX) {
         createCapitulationSignal(
           item.symbol, item.name ?? item.symbol,
-          market.toLowerCase(), pct, volRatio, fearGreed,
+          market.toLowerCase(), pct, volRatio, fearGreedValue,
         );
       }
     }

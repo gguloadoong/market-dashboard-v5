@@ -68,6 +68,9 @@ function getShiftDirection(prevZone, curZone) {
 // F&G 구간 전환 감지 + 시그널 발행 훅
 function useFearGreedSignal(score, market, storageKey) {
   const prevRef = useRef(null);
+  // 극단값 알림 발화 여부 추적 — 같은 극단 구간 반복 발화 방지
+  // 극단 구간 탈출 후 재진입 시에만 다시 발화
+  const extremeAlertedRef = useRef(false);
 
   useEffect(() => {
     if (score == null) return;
@@ -95,10 +98,35 @@ function useFearGreedSignal(score, market, storageKey) {
           direction,
           strength: Math.abs(curZone - prevZone) >= 2 ? 4 : 2, // 2구간 이상 점프 시 강도 4
           title: `${market} 공포탐욕 구간 전환: ${prevLabel} → ${curLabel}`,
-          meta: { prevScore: prevRef.current, curScore: score, prevLabel, curLabel },
+          meta: { prevScore: prevRef.current, curScore: score, prevLabel, curLabel, current: score },
         });
         addSignal(sig);
       }
+    }
+
+    // 극단값 상시 발화 — 구간 전환 없어도 ≤20(극단 공포) 또는 ≥80(극단 탐욕)이면 발화
+    // 단, 이미 같은 극단 구간에서 발화했다면 재진입 전까지 skip
+    const isExtreme = score <= 20 || score >= 80;
+    if (isExtreme) {
+      if (!extremeAlertedRef.current) {
+        const direction = score >= 80 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
+        const curLabel = getFgLabel(score);
+        const sig = createSignal({
+          type: SIGNAL_TYPES.FEAR_GREED_SHIFT,
+          symbol: market,
+          name: `${market} 공포탐욕`,
+          market,
+          direction,
+          strength: 4,
+          title: `${market} ${curLabel} 극단값 (${score}) — 역발상 기회`,
+          meta: { curScore: score, curLabel, current: score, extreme: true },
+        });
+        addSignal(sig);
+        extremeAlertedRef.current = true;
+      }
+    } else {
+      // 극단 구간 탈출 → 다음 재진입 시 재발화 가능
+      extremeAlertedRef.current = false;
     }
 
     // 현재 값 저장
