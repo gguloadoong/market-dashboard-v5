@@ -141,7 +141,7 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   const sectorRanksPrevRef = useRef(null); // 섹터 순위 이전 상태 (localStorage 대신 메모리)
   const krwRateRef = useRef(krwRate); // 최신 환율 ref
   const krwRateLoadedRef = useRef(krwRateLoaded); // 환율 fetch 완료 여부 (sentinel 충돌 방지, #113)
-  // fx_impact 기준값 — 당일 첫 환율을 저장 (이전 폴링 비교 → 일중 기준 비교로 변경)
+  // fx_impact 기준값 — 사용자 세션 시작 시점 환율 저장 (5분 폴링 비교 → 세션 기준 비교로 변경)
   const fxBaseRef = useRef({ rate: null, dateKey: null });
 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
@@ -684,6 +684,11 @@ function detectCapitulation(allItems, fgMap) {
 
   const markets = ['KR', 'US', 'COIN'];
   for (const market of markets) {
+    // fgKey는 외부 market 루프 기준 — 내부 item 루프마다 재계산 불필요
+    const fgKey = market === 'COIN' ? 'crypto' : market.toLowerCase();
+    const fg = fgMap[fgKey];
+    if (fg == null) continue; // 해당 시장 F&G 미수신이면 시장 전체 스킵
+
     const threshold = calcPercentileVolume(allItems, market);
     if (threshold <= 0) continue;
 
@@ -693,12 +698,6 @@ function detectCapitulation(allItems, fgMap) {
       const pct = clampPct(item.changePct ?? item.change24h ?? 0);
       const vol = item.volume ?? item.volume24h ?? 0;
       const volRatio = threshold > 0 ? vol / threshold : 0;
-
-      // 시장별 F&G 조회 — item.market 기준 ('coin'은 'crypto'로 매핑)
-      const itemMarket = (item.market || item._market || '').toLowerCase();
-      const fgKey = itemMarket === 'coin' ? 'crypto' : itemMarket;
-      const fg = fgMap[fgKey];
-      if (fg == null) continue; // 해당 시장 F&G 미수신이면 스킵
 
       // 가격 급락 + 거래량 폭발 + 해당 시장 공포 지수 낮음
       if (pct <= T.PRICE_DROP && volRatio >= T.VOLUME_RATIO && fg <= T.FEAR_GREED_MAX) {

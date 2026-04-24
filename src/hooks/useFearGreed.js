@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { fetchFearGreed as gwFearGreed, fetchKrFearGreed as gwKrFearGreed } from '../api/_gateway.js';
-import { createSignal, addSignal } from '../engine/signalEngine';
+import { createSignal, addSignal, removeSignalByTypeAndSymbol } from '../engine/signalEngine';
 import { SIGNAL_TYPES, DIRECTIONS } from '../engine/signalTypes';
 
 // 점수 → 레이블 매핑
@@ -95,13 +95,16 @@ function useFearGreedSignal(score, market, storageKey) {
         const direction = score >= 80 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
         const prevLabel = getFgLabel(prevRef.current);
         const curLabel = getFgLabel(score);
+        // 기존 zone-shift 시그널(strength 4) 제거 후 극단값 시그널(strength 5) 발화
+        // — TTL 내 기존 시그널이 남아있으면 dedupe로 silent drop되는 버그 방지
+        removeSignalByTypeAndSymbol(SIGNAL_TYPES.FEAR_GREED_SHIFT, market);
         const sig = createSignal({
           type: SIGNAL_TYPES.FEAR_GREED_SHIFT,
           symbol: market,
           name: `${market} 공포탐욕`,
           market,
           direction,
-          strength: 4,
+          strength: 5,
           title: `${market} ${curLabel} 극단값 (${score}) — 역발상 기회`,
           // from/to 키 — 구간 전환 meta 구조와 동일하게 통일
           meta: {
