@@ -70,7 +70,7 @@ export const THRESHOLDS = {
   MARKET_MOOD: {
     DIRECTION_THRESHOLD: 0.5,    // 방향 판단 기준 0.5% (완화: 1→0.5)
     MIN_FLIPS: 2,                // 최소 전환 시장 수
-    STALE_MS: 30 * 60 * 1000,    // 이전 상태 유효 시간 30분 (완화: 10분→30분)
+    STALE_MS: 20 * 60 * 1000,    // 이전 상태 유효 시간 20분 (급변장세 대응: 30분→20분)
   },
   CAPITULATION: {
     PRICE_DROP: -3,              // 가격 하락 -3% 이상 (완화: -5→-3)

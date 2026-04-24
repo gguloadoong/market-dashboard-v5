@@ -147,10 +147,10 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
   // F&G 값 직접 구독 — capitulation 연쇄 의존(fear_greed_shift 시그널 활성 여부) 해소
   // 3시장 평균 F&G 사용 (kr·us·crypto 중 사용 가능한 값들)
   const { crypto, us, kr } = useFearGreed();
-  const fgScores = [crypto.data?.score, us.data?.score, kr.data?.score].filter(v => v != null);
-  const fearGreedValue = fgScores.length > 0
-    ? fgScores.reduce((a, b) => a + b, 0) / fgScores.length
-    : null;
+  const fearGreedValue = useMemo(() => {
+    const scores = [crypto.data?.score, us.data?.score, kr.data?.score].filter(v => v != null);
+    return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+  }, [crypto.data?.score, us.data?.score, kr.data?.score]);
   const fearGreedRef = useRef(fearGreedValue);
 
   // allItems가 변경될 때마다 ref 갱신 — useEffect 내에서 안전하게 참조
@@ -644,7 +644,8 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
   if (!loaded || !krwRate) return;
 
   // 당일 키 (KST 날짜)
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // KST(UTC+9) 기준 날짜키 — toISOString()은 UTC라 09:00 KST에 날짜가 바뀌는 버그 방지
+  const todayKey = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
   const base = baseRef.current;
 
   // 첫 호출 또는 날짜 변경 → 기준값 재설정 후 skip (다음 폴링부터 비교)
@@ -671,7 +672,10 @@ function detectFxImpactSignal(krwRate, baseRef, loaded) {
  */
 function detectCapitulation(allItems, fearGreedValue) {
   if (!allItems?.length) return;
-  if (fearGreedValue == null) return; // F&G 데이터 없으면 투매 판단 불가
+  if (fearGreedValue == null) {
+    console.warn('[capitulation] F&G 데이터 미수신 — 투매 감지 비활성');
+    return;
+  }
 
   const T = THRESHOLDS.CAPITULATION;
 
