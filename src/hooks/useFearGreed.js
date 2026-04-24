@@ -91,7 +91,9 @@ function useFearGreedSignal(score, market, storageKey) {
 
     if (isExtreme) {
       if (!extremeAlertedRef.current) {
-        const direction = score >= 80 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
+        // curZone === 4 (극단적 탐욕, score ≥75) → 역발상 매도, zone 0 (극단적 공포) → 역발상 매수
+        // score >= 80 대신 curZone 기준 — getZone 경계(75)와 일치시켜 라벨↔방향 충돌 방지
+        const direction = curZone === 4 ? DIRECTIONS.BEARISH : DIRECTIONS.BULLISH;
         const prevLabel = getFgLabel(prevRef.current);
         const curLabel = getFgLabel(score);
         // 기존 zone-shift 시그널(strength 4) 제거 후 극단값 시그널(strength 5) 발화
