@@ -225,9 +225,12 @@ export function usePrices() {
     let usTimerId = null;
     let krTimerId = null;
     let destroyed = false;
-    // generation 카운터 — in-flight 콜백이 onVisible 이후 체인을 중복 생성하는 race 방지
+    // generation 카운터 — stale finally의 재스케줄링 차단 (in-flight fetch 자체는 정상 완료)
     let usGen = 0;
     let krGen = 0;
+    // in-flight 플래그 — onVisible의 즉시 호출과 타이머 콜백 중복 요청 방지
+    let usInFlight = false;
+    let krInFlight = false;
 
     // 장중·프리·애프터마켓은 NORMAL(30s), 완전 마감·주말만 CLOSED(5min)
     const usActive = () => isUsMarketOpen() || isUsPreMarket() || isUsAfterMarket();
@@ -239,8 +242,10 @@ export function usePrices() {
       usTimerId = setTimeout(async () => {
         if (destroyed || myGen !== usGen) return;
         try {
+          usInFlight = true;
           if (!document.hidden) await refreshUsStocks();
         } finally {
+          usInFlight = false;
           if (!destroyed && myGen === usGen) scheduleUs();
         }
       }, delay);
@@ -254,8 +259,10 @@ export function usePrices() {
       krTimerId = setTimeout(async () => {
         if (destroyed || myGen !== krGen) return;
         try {
+          krInFlight = true;
           if (!document.hidden) await refreshKoreanStocks();
         } finally {
+          krInFlight = false;
           if (!destroyed && myGen === krGen) scheduleKr();
         }
       }, delay);
@@ -266,13 +273,13 @@ export function usePrices() {
     scheduleUs();
     scheduleKr();
 
-    // 탭 복귀 시 즉시 갱신 — clearTimeout + scheduleUs 내부 ++gen으로 in-flight 무효화
+    // 탭 복귀 시 즉시 갱신 — in-flight 중이면 중복 호출 생략, gen 증가로 stale 체인 무효화
     const onVisible = () => {
       if (document.hidden) return;
       clearTimeout(usTimerId);
       clearTimeout(krTimerId);
-      refreshUsStocks();
-      refreshKoreanStocks();
+      if (!usInFlight) refreshUsStocks();
+      if (!krInFlight) refreshKoreanStocks();
       scheduleUs();
       scheduleKr();
     };
