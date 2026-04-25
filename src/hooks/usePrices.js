@@ -7,7 +7,7 @@ import { fetchSnapshot } from '../api/snapshot';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch } from '../api/stocks';
 import { checkAndAlertBatch } from '../utils/priceAlert';
 import { POLLING } from '../constants/polling';
-import { isKoreanMarketOpen, isUsMarketOpen } from '../utils/marketHours';
+import { isKoreanMarketOpen, isUsMarketOpen, isUsPreMarket, isUsAfterMarket } from '../utils/marketHours';
 
 // US_STOCK_LIST 메타맵 — 모듈 스코프에 1회만 생성 (sector/nameEn fallback)
 const US_META_MAP = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
@@ -229,27 +229,35 @@ export function usePrices() {
     let usGen = 0;
     let krGen = 0;
 
+    // 장중·프리·애프터마켓은 NORMAL(30s), 완전 마감·주말만 CLOSED(5min)
+    const usActive = () => isUsMarketOpen() || isUsPreMarket() || isUsAfterMarket();
+
     const scheduleUs = () => {
       if (destroyed) return;
       const myGen = ++usGen;
-      const delay = isUsMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
+      const delay = usActive() ? POLLING.NORMAL : POLLING.CLOSED;
       usTimerId = setTimeout(async () => {
         if (destroyed || myGen !== usGen) return;
-        if (!document.hidden) await refreshUsStocks();
-        if (destroyed || myGen !== usGen) return;
-        scheduleUs();
+        try {
+          if (!document.hidden) await refreshUsStocks();
+        } finally {
+          if (!destroyed && myGen === usGen) scheduleUs();
+        }
       }, delay);
     };
 
     const scheduleKr = () => {
       if (destroyed) return;
       const myGen = ++krGen;
+      // 한국장: 정규장(09:00~15:30)만 NORMAL, 이후 시간외/주말은 CLOSED
       const delay = isKoreanMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
       krTimerId = setTimeout(async () => {
         if (destroyed || myGen !== krGen) return;
-        if (!document.hidden) await refreshKoreanStocks();
-        if (destroyed || myGen !== krGen) return;
-        scheduleKr();
+        try {
+          if (!document.hidden) await refreshKoreanStocks();
+        } finally {
+          if (!destroyed && myGen === krGen) scheduleKr();
+        }
       }, delay);
     };
 
@@ -258,13 +266,11 @@ export function usePrices() {
     scheduleUs();
     scheduleKr();
 
-    // 탭 복귀 시 즉시 갱신 — generation 증가로 in-flight 체인 무효화 후 재시작
+    // 탭 복귀 시 즉시 갱신 — clearTimeout + scheduleUs 내부 ++gen으로 in-flight 무효화
     const onVisible = () => {
       if (document.hidden) return;
       clearTimeout(usTimerId);
       clearTimeout(krTimerId);
-      usGen++;
-      krGen++;
       refreshUsStocks();
       refreshKoreanStocks();
       scheduleUs();
