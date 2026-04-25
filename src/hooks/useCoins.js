@@ -3,7 +3,7 @@
 // 스파크라인: CoinGecko(5분) — 유일한 소스
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchSnapshot } from '../api/snapshot';
-import { fetchCoins, fetchCoinsUpbitOnly, fetchUpbitAllSymbols, fetchCoinGecko, getSparklineCache } from '../api/coins';
+import { fetchCoinsUpbitOnly, fetchUpbitAllSymbols, fetchCoinGecko, getSparklineCache } from '../api/coins';
 import { subscribeCoinPrices, unsubscribeCoinPrices } from '../api/coinWs';
 import { POLLING } from '../constants/polling';
 import { checkAndAlertBatch } from '../utils/priceAlert';
@@ -101,31 +101,15 @@ export function useCoins(krwRateRef) {
     } catch (err) { console.warn('[useCoins] quick refresh 실패:', err.message); }
   }, [krwRateRef]);
 
-  // 전체 갱신 (60초, CoinPaprika/Binance + Upbit)
+  // 전체 갱신 (60초, Upbit)
   const refreshCoins = useCallback(async () => {
     try {
-      const data = await fetchCoins(krwRateRef.current);
+      if (!coinsRef.current.length) return; // 빈 상태면 snapshot 대기
+      const data = await fetchCoinsUpbitOnly(coinsRef.current, krwRateRef.current);
       if (data.length > 0) {
-        setCoins(prev => {
-          // 심볼 대소문자 정규화 — BTC/btc 중복 방지
-          const seen = new Set();
-          return data
-            .filter(c => {
-              const key = c.symbol?.toUpperCase();
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            })
-            .map(c => {
-              const sym = c.symbol?.toUpperCase();
-              const old = prev.find(p =>
-                p.id === c.id ||
-                (p.symbol?.toUpperCase() === sym)
-              );
-              return { ...c, sparkline: c.sparkline?.length ? c.sparkline : old?.sparkline ?? [] };
-            });
-        });
+        setCoins(data);
         saveCoinCache(data);
+        checkAndAlertBatch(data, 'coin');
         setCoinError(false);
       }
     } catch (err) { console.warn('[useCoins] full refresh 실패:', err.message); setCoinError(true); }
@@ -149,8 +133,6 @@ export function useCoins(krwRateRef) {
   useEffect(() => {
     // 마운트 즉시 Upbit REST로 첫 가격 로드 (WS 연결 대기 없이 ~1s 내 실제 가격 표시)
     refreshCoinsQuick();
-    // snapshot/cache 없을 때 즉시 전체 갱신 (60초 대기 없이 빈 코인탭 방지)
-    if (!coinsRef.current.length) refreshCoins();
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
     const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
