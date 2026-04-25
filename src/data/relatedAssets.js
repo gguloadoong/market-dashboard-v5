@@ -44,7 +44,7 @@ export const RELATED_ASSETS = {
       { symbol: 'MARA',   type: 'stock',  reason: 'BTC 채굴 대표주',            market: 'US' },
       { symbol: 'ETH',    type: 'coin',   reason: '2위 코인, 강한 상관관계',   market: 'COIN' },
       { symbol: 'SOL',    type: 'coin',   reason: 'BTC 강세 시 동반 상승',      market: 'COIN' },
-      { symbol: 'BNB',    type: 'coin',   reason: '대형 코인 동조화',            market: 'COIN' },
+      { symbol: 'XRP',    type: 'coin',   reason: '대형 코인 동조화',            market: 'COIN' },
     ],
   },
 
@@ -97,7 +97,7 @@ export const RELATED_ASSETS = {
       { symbol: 'COIN',   type: 'stock',  reason: '코인베이스 (거래소 주식)',  market: 'US' },
       { symbol: 'BTC',    type: 'coin',   reason: '코인 시장 동조화',           market: 'COIN' },
       { symbol: 'ETH',    type: 'coin',   reason: '강한 상관관계',               market: 'COIN' },
-      { symbol: 'CAKE',   type: 'coin',   reason: 'BSC 생태계 DEX',              market: 'COIN' },
+      { symbol: 'SOL',    type: 'coin',   reason: '대형 코인 동조화',            market: 'COIN' },
     ],
   },
 
@@ -182,7 +182,7 @@ export const RELATED_ASSETS = {
     related: [
       { symbol: 'ETH',    type: 'coin',   reason: 'ETH 레이어2',                 market: 'COIN' },
       { symbol: 'OP',     type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
-      { symbol: 'MATIC',  type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
+      { symbol: 'POL',    type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
     ],
   },
 
@@ -192,12 +192,12 @@ export const RELATED_ASSETS = {
     related: [
       { symbol: 'ETH',    type: 'coin',   reason: 'ETH 레이어2',                 market: 'COIN' },
       { symbol: 'ARB',    type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
-      { symbol: 'MATIC',  type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
+      { symbol: 'POL',    type: 'coin',   reason: '레이어2 경쟁 코인',           market: 'COIN' },
     ],
   },
 
-  MATIC: {
-    label: '폴리곤',
+  POL: {
+    label: '폴리곤 에코시스템 토큰',
     sector: '레이어2',
     related: [
       { symbol: 'ETH',    type: 'coin',   reason: 'ETH 레이어2/사이드체인',     market: 'COIN' },
