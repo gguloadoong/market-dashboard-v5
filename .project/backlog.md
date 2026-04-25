@@ -338,3 +338,35 @@
 | 2026-03-28 | Vercel Pro 전환 + 배포 파이프라인 정비 |
 | 2026-03-28 | 독립 리뷰 2단계 체계 수립 (code-reviewer + Codex gate) |
 | 2026-03-28 | Playwright E2E 테스트 환경 구축 |
+
+---
+
+## 🟠 Phase 8: 운영 안정성 강화 (2026-04-25 스프린트)
+
+### ~~[P0-9] KRX 공휴일 목록 추가~~ ✅ 완료
+- 문제: marketHours.js에 KRX 공휴일 없음 → 평일 공휴일에 "거래중" 오표시
+- 해결: KRX_HOLIDAYS Set + isKrxHoliday() 추가 (2025~2027 법정공휴일)
+- 완료 기준: 어린이날(5/5) KST 09:00~15:30 접근 시 "휴장" 반환
+
+### [P0-10] 배포 쿨다운 가드
+- 문제: 연속 배포 시 10분 이내 중복 배포 차단 규칙 없음 (Issue #202)
+- 해결: deploy.sh에 .last-deploy-time 추적 + 10분 이내 차단 + FORCE_DEPLOY=1 우회
+- 완료 기준: npm run deploy 즉시 재실행 시 차단 메시지 + exit 1
+
+### [P1-13] Reviewer Loop Deadlock 해소
+- 문제: pre-deploy-consensus.sh Opus PASS + Codex BLOCK 충돌 시 중재 없음 (Issue #38)
+- 해결: 충돌 시 "Codex BLOCK 우선 + 수동 판단 요구" 분기 추가
+- 완료 기준: Opus PASS + Codex BLOCK → 배포 차단 + 명확한 안내 메시지
+
+### ~~[P1-14] 코인 리스트 정합성 수정~~ ✅ 완료
+- 문제: CoinPaprika Top 200 중 업비트 미상장 코인 ~30-50개 노출 중
+- 해결: EXCLUDED_SYMBOLS 확대 + 한글명 매핑 보완 + 미상장 코인 제거
+- 완료 기준: 코인 탭 전 종목 업비트 KRW 마켓 상장 종목만 노출
+
+### [P2-18] 클라이언트 폴링 장 마감/주말 완화
+- 문제: usePrices.js 30초 폴링이 장 마감/주말에도 계속 → Upstash 낭비
+- 해결: isKoreanMarketOpen()/isUsMarketOpen() 기반 인터벌 동적 조정
+
+### [P2-19] 핵심 알고리즘 단위 테스트 (ADR-014 이행)
+- 문제: signalEngine, marketHours 등 핵심 파일 테스트 0개
+- 해결: Vitest 기반 marketHours 14케이스 + signalEngine 기본 케이스
