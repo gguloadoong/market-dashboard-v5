@@ -6,7 +6,8 @@ const DEV_MULTIPLIER = Number(import.meta.env.VITE_DEV_POLLING_MULTIPLIER) || 1;
 
 export const POLLING = {
   FAST:      10_000  * DEV_MULTIPLIER,   // 10초 — Upbit 빠른 갱신 (WS 끊김 시만 사용)
-  NORMAL:    30_000  * DEV_MULTIPLIER,   // 30초 — 주식 가격 갱신
+  NORMAL:    30_000  * DEV_MULTIPLIER,   // 30초 — 주식 가격 갱신 (장중)
+  CLOSED:   300_000  * DEV_MULTIPLIER,   // 5분  — 장 마감/주말 완화 (Upstash 절감)
   SLOW:      60_000  * DEV_MULTIPLIER,   // 60초 — 코인 전체 갱신 (WS가 실시간 커버하므로 REST는 보조)
   SPARKLINE: 300_000 * DEV_MULTIPLIER,   // 5분  — CoinGecko 스파크라인
 };

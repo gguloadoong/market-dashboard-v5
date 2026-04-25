@@ -7,6 +7,7 @@ import { fetchSnapshot } from '../api/snapshot';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch } from '../api/stocks';
 import { checkAndAlertBatch } from '../utils/priceAlert';
 import { POLLING } from '../constants/polling';
+import { isKoreanMarketOpen, isUsMarketOpen } from '../utils/marketHours';
 
 // US_STOCK_LIST 메타맵 — 모듈 스코프에 1회만 생성 (sector/nameEn fallback)
 const US_META_MAP = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
@@ -221,16 +222,48 @@ export function usePrices() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    let usTimerId = null;
+    let krTimerId = null;
+    let destroyed = false;
+
+    const scheduleUs = () => {
+      if (destroyed) return;
+      const delay = isUsMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
+      usTimerId = setTimeout(async () => {
+        if (!document.hidden) await refreshUsStocks();
+        scheduleUs();
+      }, delay);
+    };
+
+    const scheduleKr = () => {
+      if (destroyed) return;
+      const delay = isKoreanMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
+      krTimerId = setTimeout(async () => {
+        if (!document.hidden) await refreshKoreanStocks();
+        scheduleKr();
+      }, delay);
+    };
+
     refreshUsStocks();
     refreshKoreanStocks();
-    const usId = setInterval(() => { if (!document.hidden) refreshUsStocks(); }, POLLING.NORMAL);
-    const krId = setInterval(() => { if (!document.hidden) refreshKoreanStocks(); }, POLLING.NORMAL);
-    // 탭 복귀 시 즉시 갱신
-    const onVisible = () => { if (!document.hidden) { refreshUsStocks(); refreshKoreanStocks(); } };
+    scheduleUs();
+    scheduleKr();
+
+    // 탭 복귀 시 즉시 갱신 + 다음 스케줄 재시작
+    const onVisible = () => {
+      if (document.hidden) return;
+      clearTimeout(usTimerId);
+      clearTimeout(krTimerId);
+      refreshUsStocks();
+      refreshKoreanStocks();
+      scheduleUs();
+      scheduleKr();
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      clearInterval(usId);
-      clearInterval(krId);
+      destroyed = true;
+      clearTimeout(usTimerId);
+      clearTimeout(krTimerId);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refreshUsStocks, refreshKoreanStocks]);
