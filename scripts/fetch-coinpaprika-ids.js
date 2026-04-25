@@ -61,7 +61,7 @@ function dedupBySymbolRankFirst(coins) {
 function renderJs(entries) {
   const lines = entries.map(([sym, id]) => `  ${JSON.stringify(sym)}: ${JSON.stringify(id)},`);
   return `// 자동 생성 파일 — scripts/fetch-coinpaprika-ids.js로 갱신 (#184)
-// 생성일: ${new Date().toISOString().slice(0, 10)} / 출처: CoinPaprika Top ${TOP_N} ∪ Upbit KRW
+// 생성일: ${new Date().toISOString().slice(0, 10)} / 출처: CoinPaprika Top ${TOP_N} ∩ Upbit KRW
 // 수정 금지 — 갱신 시 스크립트 재실행
 
 export const COIN_PAPRIKA_IDS = Object.freeze({
@@ -85,24 +85,21 @@ async function main() {
 
   const deduped = dedupBySymbolRankFirst(paprika);
 
-  // 1) Paprika ∩ Upbit 우선 (실 사용자 노출 가능성 높은 심볼)
+  // Paprika ∩ Upbit 만 사용 (업비트 미상장 코인 노출 방지)
+  // 2026-04-25: 부족분 채움 로직 제거 — 업비트에서 거래 불가능한 종목이 노출되는 P1 버그 (Phase 8 P1-14)
   const intersect = [];
-  const remaining = [];
   for (const [sym, c] of deduped) {
-    if (upbit.has(sym)) intersect.push(c); else remaining.push(c);
+    if (upbit.has(sym)) intersect.push(c);
   }
-  // 2) 부족분은 rank 순으로 채움
   intersect.sort((a, b) => a.rank - b.rank);
-  remaining.sort((a, b) => a.rank - b.rank);
-  const targetSize = Math.max(100, Math.min(TOP_N, intersect.length + remaining.length));
-  const picked = [...intersect, ...remaining].slice(0, targetSize);
+  const picked = intersect;
 
   const entries = picked
     .map(c => [c.symbol.toUpperCase(), c.id])
     .sort((a, b) => a[0].localeCompare(b[0]));
 
   await writeFile(OUT_PATH, renderJs(entries), 'utf8');
-  console.log(`[coinPaprikaIds] 생성 완료: ${entries.length}개 (Upbit 교집합 ${intersect.length})`);
+  console.log(`[coinPaprikaIds] 생성 완료: ${entries.length}개 (Upbit 교집합만)`);
 }
 
 main().catch(e => {

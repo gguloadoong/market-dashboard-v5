@@ -18,11 +18,12 @@ const COIN_KO_NAME = {
   SHIB: '시바이누', XLM: '스텔라루멘', FIL: '파일코인', ICP: '인터넷컴퓨터',
   HBAR: '헤데라', ETC: '이더리움클래식', SAND: '샌드박스', MANA: '디센트럴랜드',
   SEI: '세이', LTC: '라이트코인', TRX: '트론', BCH: '비트코인캐시',
-  AAVE: '에이브', MKR: '메이커', RENDER: '렌더', FET: '페치AI',
-  TAO: '비텐서', WLD: '월드코인', JUP: '주피터', ONDO: '온도',
-  PENDLE: '펜들', STX: '스택스', TIA: '셀레스티아', PYTH: '피스',
+  AAVE: '에이브', MKR: '메이커', RENDER: '렌더', FET: '페치.ai',
+  TAO: '비텐서', WLD: '월드코인', JUP: '주피터', ONDO: '온도 파이낸스',
+  PENDLE: '펜들', STX: '스택스', TIA: '셀레스티아', PYTH: '피스 네트워크',
   BONK: '봉크', WIF: '위프', FLOKI: '플로키', GALA: '갈라',
   IMX: '이뮤터블X', EOS: '이오스', MATIC: '폴리곤',
+  POL: '폴리곤',
 };
 
 /** CoinPaprika 영문명 → 한국어명 변환 (매핑 없으면 원본 반환) */
@@ -32,9 +33,13 @@ function getCoinKoName(symbol, englishName) {
 
 // 필터링 대상: 가격 변동이 없거나 원본 자산의 래핑본인 토큰
 const EXCLUDED_SYMBOLS = new Set([
+  // 스테이블코인
   'USDT','USDC','DAI','BUSD','TUSD','PYUSD','USDS','USDE','FDUSD','FRAX',
   'LUSD','USDP','GUSD','SUSD','ALUSD','CRVUSD','GHO','CUSD','EURI','USDD',
+  // 래핑/스테이킹/파생상품 (BTC/ETH/SOL/FTM 1:1 페그 또는 LST/LRT)
   'WBTC','WETH','STETH','WSTETH','CBETH','RETH','WEETH','EZETH','RSETH',
+  'BETH','BNSOL','CBBTC','EBTC','JITOSOL','LBTC','LSETH',
+  'MSOL','SFRXETH','SFTMX','WBETH',
 ]);
 
 // ─── localStorage 캐시 유틸 ─────────────────────────────────
