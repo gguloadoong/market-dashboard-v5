@@ -115,14 +115,40 @@ export function useCoins(krwRateRef) {
     } catch (err) { console.warn('[useCoins] full refresh 실패:', err.message); setCoinError(true); }
   }, [krwRateRef]);
 
-  // 스파크라인 갱신 (5분, CoinGecko 전용)
+  // 스파크라인 + 시총 갱신 (5분, CoinGecko 전용)
   const refreshSparklines = useCallback(async () => {
     try {
-      await fetchCoinGecko();
+      const cgData = await fetchCoinGecko();
       const sparkCache = getSparklineCache();
+      // CoinGecko 심볼 중복 방지 — 동일 심볼이 둘 이상이면 mcap 덮어쓰기 스킵
+      const symCount = new Map();
+      if (Array.isArray(cgData)) {
+        for (const coin of cgData) {
+          if (coin.symbol) {
+            const s = coin.symbol.toUpperCase();
+            symCount.set(s, (symCount.get(s) || 0) + 1);
+          }
+        }
+      }
+      const mcapMap = new Map();
+      if (Array.isArray(cgData)) {
+        for (const coin of cgData) {
+          if (coin.symbol && coin.market_cap) {
+            const s = coin.symbol.toUpperCase();
+            if (symCount.get(s) === 1) mcapMap.set(s, coin.market_cap);
+          }
+        }
+      }
       setCoins(prev => prev.map(c => {
-        const spark = sparkCache[c.symbol];
-        return spark?.length ? { ...c, sparkline: spark } : c;
+        const spark      = sparkCache[c.symbol.toUpperCase()];
+        const newMcap    = mcapMap.get(c.symbol.toUpperCase());
+        const hasSpark   = spark?.length > 0;
+        const hasNewMcap = newMcap && newMcap !== c.marketCap;
+        if (!hasSpark && !hasNewMcap) return c;
+        const updated = { ...c };
+        if (hasSpark) updated.sparkline = spark;
+        if (hasNewMcap) updated.marketCap = newMcap;
+        return updated;
       }));
     } catch {
       // CoinGecko 실패해도 가격에는 영향 없음
