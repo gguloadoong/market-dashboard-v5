@@ -283,12 +283,12 @@ export function usePrices() {
       const nowKrActive = isKoreanMarketOpen();
       if (!prevUsActive && nowUsActive) {
         clearTimeout(usTimerId);
-        if (!usInFlight) refreshUsStocks();
+        if (!usInFlight && !document.hidden) refreshUsStocks();
         scheduleUs();
       }
       if (!prevKrActive && nowKrActive) {
         clearTimeout(krTimerId);
-        if (!krInFlight) refreshKoreanStocks();
+        if (!krInFlight && !document.hidden) refreshKoreanStocks();
         scheduleKr();
       }
       prevUsActive = nowUsActive;
