@@ -1,5 +1,61 @@
 // 장 운영시간 유틸리티
 
+// ─── KRX 휴장일 (완전 휴장) ────────────────────────────────────
+// 출처: 한국법령정보센터 공공기관 법정 공휴일 + KRX 거래소 휴장일 기준
+// 포맷: 'YYYY-M-D' (KST 기준, 월/일 앞에 0 없음)
+// 주말 겹치는 공휴일은 isWeekday()가 자동 처리 — 평일 대체공휴일만 등재
+const KRX_HOLIDAYS = new Set([
+  // 2025
+  '2025-1-1',   // 신정
+  '2025-1-28',  // 설날 연휴 (전날)
+  '2025-1-29',  // 설날
+  '2025-1-30',  // 설날 연휴 (다음날)
+  '2025-3-1',   // 삼일절 (토요일 — 평일 아니라 무효지만 명세대로 등재)
+  '2025-5-5',   // 어린이날
+  '2025-5-6',   // 어린이날 대체공휴일 (5/5가 월요일이지만 부처님오신날 5/5와 겹쳐 대체)
+  '2025-5-15',  // 부처님오신날(석가탄신일)
+  '2025-6-6',   // 현충일
+  '2025-8-15',  // 광복절
+  '2025-10-3',  // 개천절
+  '2025-10-5',  // 추석 연휴
+  '2025-10-6',  // 추석 연휴
+  '2025-10-7',  // 추석 연휴
+  '2025-10-9',  // 한글날
+  '2025-12-25', // 성탄절
+  // 2026
+  '2026-1-1',   // 신정
+  '2026-2-16',  // 설날 연휴
+  '2026-2-17',  // 설날
+  '2026-2-18',  // 설날 연휴
+  '2026-3-1',   // 삼일절
+  '2026-5-5',   // 어린이날
+  '2026-5-25',  // 부처님오신날(석가탄신일)
+  '2026-6-6',   // 현충일
+  '2026-8-15',  // 광복절
+  '2026-9-24',  // 추석 연휴
+  '2026-9-25',  // 추석
+  '2026-10-3',  // 개천절
+  '2026-10-9',  // 한글날
+  '2026-12-25', // 성탄절
+  // 2027
+  '2027-1-1',   // 신정
+  '2027-2-8',   // 설날 대체공휴일
+  '2027-2-9',   // 설날 연휴
+  '2027-2-10',  // 설날
+  '2027-2-11',  // 설날 연휴
+  '2027-3-1',   // 삼일절
+  '2027-5-5',   // 어린이날
+  '2027-5-13',  // 부처님오신날(석가탄신일)
+  '2027-6-6',   // 현충일
+  '2027-8-15',  // 광복절
+  '2027-9-14',  // 추석 연휴
+  '2027-9-15',  // 추석
+  '2027-9-16',  // 추석 연휴
+  '2027-10-4',  // 개천절 대체공휴일
+  '2027-10-9',  // 한글날
+  '2027-12-25', // 성탄절
+]);
+
 // ─── NYSE 휴장일 (완전 휴장) ───────────────────────────────────
 // 포맷: 'YYYY-M-D' (ET 기준, 월/일 앞에 0 없음)
 const NYSE_HOLIDAYS = new Set([
@@ -42,12 +98,20 @@ function etDateKey(d) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
+function kstDateKey(d) {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
 function isNyseHoliday(est) {
   return NYSE_HOLIDAYS.has(etDateKey(est));
 }
 
 function isNyseEarlyClose(est) {
   return NYSE_EARLY_CLOSE.has(etDateKey(est));
+}
+
+function isKrxHoliday(kst) {
+  return KRX_HOLIDAYS.has(kstDateKey(kst));
 }
 
 // 한국 기준 현재 시간
@@ -73,6 +137,7 @@ function isWeekday(d) {
 export function isKoreanMarketOpen() {
   const kst = nowKST();
   if (!isWeekday(kst)) return false;
+  if (isKrxHoliday(kst)) return false;
   const h = kst.getHours(), m = kst.getMinutes();
   const minutes = h * 60 + m;
   return minutes >= 9 * 60 && minutes < 15 * 60 + 30;
@@ -107,7 +172,7 @@ export function isUsAfterMarket(est = nowEST()) {
 
 export function getKoreanMarketStatus() {
   const kst = nowKST();
-  if (!isWeekday(kst)) return { status: 'closed', label: '휴장', color: 'neutral' };
+  if (!isWeekday(kst) || isKrxHoliday(kst)) return { status: 'closed', label: '휴장', color: 'neutral' };
   if (isKoreanMarketOpen()) return { status: 'open', label: '거래중', color: 'up' };
   const h = kst.getHours(), m = kst.getMinutes();
   const minutes = h * 60 + m;
