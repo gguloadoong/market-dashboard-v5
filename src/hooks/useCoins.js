@@ -115,14 +115,25 @@ export function useCoins(krwRateRef) {
     } catch (err) { console.warn('[useCoins] full refresh 실패:', err.message); setCoinError(true); }
   }, [krwRateRef]);
 
-  // 스파크라인 갱신 (5분, CoinGecko 전용)
+  // 스파크라인 + 시총 갱신 (5분, CoinGecko 전용)
   const refreshSparklines = useCallback(async () => {
     try {
-      await fetchCoinGecko();
+      const cgData = await fetchCoinGecko();
       const sparkCache = getSparklineCache();
+      const mcapMap = new Map();
+      if (Array.isArray(cgData)) {
+        for (const coin of cgData) {
+          if (coin.symbol && coin.market_cap) {
+            mcapMap.set(coin.symbol.toUpperCase(), coin.market_cap);
+          }
+        }
+      }
       setCoins(prev => prev.map(c => {
-        const spark = sparkCache[c.symbol];
-        return spark?.length ? { ...c, sparkline: spark } : c;
+        const spark    = sparkCache[c.symbol];
+        const marketCap = mcapMap.get(c.symbol) ?? c.marketCap;
+        const updated  = spark?.length ? { ...c, sparkline: spark } : { ...c };
+        if (marketCap) updated.marketCap = marketCap;
+        return updated;
       }));
     } catch {
       // CoinGecko 실패해도 가격에는 영향 없음

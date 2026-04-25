@@ -1,47 +1,14 @@
 // 주식 데이터
-// 미국: /api/d (통합 게이트웨이) → Stooq.com (CORS OK) → Yahoo Finance v7 프록시 fallback → v8 chart fallback
+// 미국: /api/d (통합 게이트웨이) → 네이버 해외시세 fallback (#204: Stooq 직접 호출 제거 — CORS 차단)
 // 한국: /api/d (통합 게이트웨이) → Yahoo .KS 프록시 fallback
 import {
   fetchUsPrice, fetchHantooPrice, fetchNaverPrice,
   fetchEtfPrices, fetchMarketIndices, fetchHantooIndices as gwHantooIndices,
 } from './_gateway.js';
 
-// ─── Stooq.com (미국 주식, CORS 허용) ────────────────────────
-// Stooq JSON 배치 API는 최신 1 row만 반환한다.
-// 전일 종가를 얻으려면 각 심볼에 대해 CSV 2일치를 별도 요청해야 하나,
-// 배치 처리 성능을 위해 Prev_Close 필드(f=...p 포함) 방식을 사용한다.
-// f 파라미터: s=심볼, d2=날짜, t2=시각, o=시가, h=고가, l=저가, c=현재가, v=거래량, n=이름, p=전일종가
-async function fetchStooq(symbols) {
-  const syms = symbols.map(s => `${s.toLowerCase()}.us`).join(',');
-  // f=sd2t2ohlcvnp: p 필드로 전일 종가(Prev_Close) 포함
-  const url  = `https://stooq.com/q/l/?s=${syms}&f=sd2t2ohlcvnp&h&e=json`;
-  // 타임아웃 5000ms — 실패 시 빠르게 다음 소스로 fallback
-  const res  = await fetch(url, { signal: AbortSignal.timeout(5000) });
-  if (!res.ok) throw new Error(`Stooq ${res.status}`);
-  const data = await res.json();
-  // Stooq JSON 필드명: 소문자 (close, previous, volume, symbol 등)
-  return (data.symbols || [])
-    .filter(s => (s.close ?? s.Close) && (s.close ?? s.Close) !== 'N/D' && parseFloat(s.close ?? s.Close) > 0)
-    .map(s => {
-      const close     = parseFloat(s.close ?? s.Close);
-      // previous(p 필드) 전일 종가 — 없으면 change=0
-      const prevClose = parseFloat(s.previous ?? s.Prev_Close) || 0;
-      return {
-        symbol:    (s.symbol ?? s.Symbol).split('.')[0].toUpperCase(),
-        price:     close,
-        change:    prevClose > 0 ? parseFloat((close - prevClose).toFixed(2)) : 0,
-        changePct: prevClose > 0
-          ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2))
-          : 0,
-        volume:    parseInt(s.volume ?? s.Volume) || 0,
-        _source:   'stooq',
-      };
-    });
-}
-
-// #173: fetchYahooQuoteBatch / fetchYahooChart 제거 — allorigins 경유는
-//       CORS 차단으로 실질 작동 안 하던 dead fallback. 주 소스(통합 게이트웨이,
-//       Stooq, Naver) 로 충분 커버.
+// #173/#204: fetchStooq / fetchYahooQuoteBatch / fetchYahooChart 제거 —
+//            모두 CORS 차단으로 브라우저에서 실질 작동 안 함.
+//            게이트웨이(/api/d) + 네이버 해외시세로 충분 커버.
 
 // ─── 미국 주식 ─────────────────────────────────────────────────
 export async function fetchUsStocksBatch(symbols) {
@@ -67,25 +34,13 @@ export async function fetchUsStocksBatch(symbols) {
     }
   } catch (e) { console.warn('[미장] Edge 프록시 실패:', e.message); }
 
-  // 2) Stooq (직접 CORS 허용, EOD 데이터) — missing symbol만 조회
-  const miss2 = missing();
-  if (miss2.length > 0) {
-    try {
-      const data = await fetchStooq(miss2);
-      addResults(data);
-      if (missing().length === 0) return [...collected.values()];
-      if (data.length > 0) console.warn(`[미장] Stooq 부분 결과: ${data.length}/${miss2.length}`);
-    } catch (e) { console.warn('[미장] Stooq 실패:', e.message); }
-  }
+  // #173/#204: Stooq/Yahoo 클라이언트 직접 호출 제거 (CORS 차단)
 
-  // #173: 구 fallback 3(Yahoo v7 proxy), 4(Yahoo v8 chart proxy) 제거 —
-  //       allorigins CORS 차단으로 실질 작동 안 함. Naver 서버 fallback 이 최종 안전망.
-
-  // 5) 네이버 해외시세 fallback — 통합 게이트웨이/Stooq 모두 실패한 심볼 처리
+  // 2) 네이버 해외시세 fallback — 게이트웨이 실패한 심볼 처리
   const miss5 = missing();
   if (miss5.length > 0) {
     try {
-      console.warn(`[미장] Yahoo/Stooq 전부 실패 ${miss5.length}개 → 네이버 해외시세 fallback: ${miss5.join(',')}`);
+      console.warn(`[미장] 게이트웨이 실패 ${miss5.length}개 → 네이버 해외시세 fallback: ${miss5.join(',')}`);
       const res = await fetch(`/api/naver-us-price?symbols=${miss5.join(',')}`, {
         signal: AbortSignal.timeout(10000),
       });
