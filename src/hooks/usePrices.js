@@ -225,21 +225,30 @@ export function usePrices() {
     let usTimerId = null;
     let krTimerId = null;
     let destroyed = false;
+    // generation 카운터 — in-flight 콜백이 onVisible 이후 체인을 중복 생성하는 race 방지
+    let usGen = 0;
+    let krGen = 0;
 
     const scheduleUs = () => {
       if (destroyed) return;
+      const myGen = ++usGen;
       const delay = isUsMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
       usTimerId = setTimeout(async () => {
+        if (destroyed || myGen !== usGen) return;
         if (!document.hidden) await refreshUsStocks();
+        if (destroyed || myGen !== usGen) return;
         scheduleUs();
       }, delay);
     };
 
     const scheduleKr = () => {
       if (destroyed) return;
+      const myGen = ++krGen;
       const delay = isKoreanMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
       krTimerId = setTimeout(async () => {
+        if (destroyed || myGen !== krGen) return;
         if (!document.hidden) await refreshKoreanStocks();
+        if (destroyed || myGen !== krGen) return;
         scheduleKr();
       }, delay);
     };
@@ -249,11 +258,13 @@ export function usePrices() {
     scheduleUs();
     scheduleKr();
 
-    // 탭 복귀 시 즉시 갱신 + 다음 스케줄 재시작
+    // 탭 복귀 시 즉시 갱신 — generation 증가로 in-flight 체인 무효화 후 재시작
     const onVisible = () => {
       if (document.hidden) return;
       clearTimeout(usTimerId);
       clearTimeout(krTimerId);
+      usGen++;
+      krGen++;
       refreshUsStocks();
       refreshKoreanStocks();
       scheduleUs();
