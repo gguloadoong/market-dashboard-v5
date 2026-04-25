@@ -10,6 +10,22 @@
 set -euo pipefail
 trap '' SIGPIPE  # 서브프로세스 SIGPIPE 전파 방지
 
+# ── 쿨다운 가드: 10분 이내 연속 배포 차단 ──────────────────────────
+COOLDOWN_FILE=".last-deploy-time"
+COOLDOWN_SECONDS=600  # 10분
+
+if [ -f "$COOLDOWN_FILE" ]; then
+  LAST_DEPLOY=$(cat "$COOLDOWN_FILE")
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - LAST_DEPLOY))
+  if [ "$ELAPSED" -lt "$COOLDOWN_SECONDS" ] && [ "${FORCE_DEPLOY:-0}" != "1" ]; then
+    REMAINING=$((COOLDOWN_SECONDS - ELAPSED))
+    echo "⏱ 배포 쿨다운 중 (${ELAPSED}초 경과, ${REMAINING}초 남음)"
+    echo "  긴급 배포 시: FORCE_DEPLOY=1 npm run deploy"
+    exit 1
+  fi
+fi
+
 # ── 0. 배포 전 컨센서스 게이트 ────────────────────────────────────
 EXPLICIT_DEPLOY=1 bash "$(dirname "$0")/pre-deploy-consensus.sh"
 echo ""
@@ -176,6 +192,7 @@ echo ""
 if [ "$CONCLUSION" = "success" ]; then
   echo "✅ GitHub Actions 배포 성공!"
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
+  date +%s > "$COOLDOWN_FILE"
   echo ""
 
   # ── CF Workers 배포 — 실패는 smoke test 후 exit 1 전파 ──────────
@@ -235,6 +252,7 @@ if echo "$FAIL_LOG" | grep -q "token provided via.*argument is not valid\|The to
   echo ""
   echo "✅ vercel --prod 배포 완료"
   echo "$CURRENT_COMMIT" > "$LAST_DEPLOYED_FILE"
+  date +%s > "$COOLDOWN_FILE"
   echo ""
 
   # ── CF Workers 배포 (fallback 경로) — 실패는 smoke test 후 exit 1 전파 ──
