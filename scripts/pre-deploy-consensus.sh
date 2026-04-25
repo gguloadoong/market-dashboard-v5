@@ -255,6 +255,80 @@ else
   check "개발팀 승인" "PASS" "알고리즘 파일 변경 없음"
 fi
 
+# ── Gate 5.5: Opus code-reviewer / Codex gate 충돌 중재 ──────────────────────
+# 최신 code-review-{BRANCH}.md 와 codex-review-{BRANCH}.md artifact를 읽어 충돌 감지.
+# 충돌 시 BLOCK 우선 원칙 적용 (PASS+BLOCK → BLOCK).
+# SKIP_CODEX_REVIEW=1 설정 시 Codex 단독 BLOCK + Opus PASS 조합만 허용 (경고 후 통과).
+CURRENT_BRANCH_GATE=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+SAFE_BRANCH_GATE="${CURRENT_BRANCH_GATE//\//-}"
+
+OPUS_ARTIFACT=".tmp/code-review-${SAFE_BRANCH_GATE}.md"
+CODEX_ARTIFACT=".tmp/codex-review-${SAFE_BRANCH_GATE}.md"
+
+# Opus verdict 추출 (artifact 있을 때만)
+OPUS_VERDICT_GATE="SKIP"
+if [ -f "$OPUS_ARTIFACT" ]; then
+  _raw=$(grep -oE "VERDICT:[[:space:]]*(PASS|BLOCK)" "$OPUS_ARTIFACT" | tail -1 || true)
+  OPUS_VERDICT_GATE=$(echo "$_raw" | awk '{print $2}')
+  [ -z "$OPUS_VERDICT_GATE" ] && OPUS_VERDICT_GATE="UNKNOWN"
+fi
+
+# Codex verdict 추출 (artifact 있을 때만)
+CODEX_VERDICT_GATE="SKIP"
+if [ -f "$CODEX_ARTIFACT" ]; then
+  _codex_text=$(cat "$CODEX_ARTIFACT")
+  if echo "$_codex_text" | grep -iqE "DECISION:[[:space:]]*BLOCK|patch is incorrect|\"overall_correctness\"[[:space:]]*:[[:space:]]*\"(incorrect|fail)"; then
+    CODEX_VERDICT_GATE="BLOCK"
+  elif echo "$_codex_text" | grep -iqE "DECISION:[[:space:]]*PASS"; then
+    CODEX_VERDICT_GATE="PASS"
+  else
+    CODEX_VERDICT_GATE="UNKNOWN"
+  fi
+fi
+
+# artifact 둘 다 없으면 SKIP (배포 차단 안 함)
+if [ "$OPUS_VERDICT_GATE" = "SKIP" ] && [ "$CODEX_VERDICT_GATE" = "SKIP" ]; then
+  SKIP=$((SKIP + 1))
+  echo -e "${YELLOW}    ⚠️  리뷰 artifact 없음 — 배포 전 npm run review:code 실행 권장 (SKIP)${NC}"
+else
+  # 중재 매트릭스 적용
+  if [ "$OPUS_VERDICT_GATE" = "PASS" ] && [ "$CODEX_VERDICT_GATE" = "PASS" ]; then
+    check "리뷰 게이트 (Opus+Codex)" "PASS" "Opus PASS / Codex PASS"
+  elif [ "$OPUS_VERDICT_GATE" = "BLOCK" ] || [ "$CODEX_VERDICT_GATE" = "BLOCK" ]; then
+    # 충돌 또는 양측 BLOCK — BLOCK 우선 원칙
+    if [ "$OPUS_VERDICT_GATE" != "$CODEX_VERDICT_GATE" ] \
+       && [ "$OPUS_VERDICT_GATE" != "SKIP" ] && [ "$CODEX_VERDICT_GATE" != "SKIP" ] \
+       && [ "$OPUS_VERDICT_GATE" != "UNKNOWN" ] && [ "$CODEX_VERDICT_GATE" != "UNKNOWN" ]; then
+      # 정확히 PASS+BLOCK 충돌 케이스
+      echo -e "${YELLOW}    ⚠️  리뷰 결과 불일치 감지${NC}"
+      echo -e "        Opus code-reviewer: ${OPUS_VERDICT_GATE}"
+      echo -e "        Codex gate: ${CODEX_VERDICT_GATE}"
+      echo ""
+      echo -e "        처리 방법:"
+      echo -e "        1. 두 리뷰 결과 artifact를 확인하세요:"
+      echo -e "           - ${OPUS_ARTIFACT}"
+      echo -e "           - ${CODEX_ARTIFACT} (있으면)"
+      echo -e "        2. BLOCK 지적 사항을 수정 후 재실행"
+      echo -e "        3. SKIP_CODEX_REVIEW=1 설정 시 Codex 단독 BLOCK은 무시됩니다"
+      echo -e "           (사유를 PR 본문에 반드시 기록하세요)"
+      # SKIP_CODEX_REVIEW=1 + Codex BLOCK + Opus PASS → 경고 후 통과
+      if [ "${SKIP_CODEX_REVIEW:-0}" = "1" ] && [ "$CODEX_VERDICT_GATE" = "BLOCK" ] && [ "$OPUS_VERDICT_GATE" = "PASS" ]; then
+        echo -e "${YELLOW}    ⚠️  SKIP_CODEX_REVIEW=1 — Codex BLOCK 무시 (Opus PASS 우선)${NC}"
+        check "리뷰 게이트 (Opus+Codex)" "PASS" "Opus PASS / Codex BLOCK → SKIP_CODEX_REVIEW=1로 우회"
+      else
+        check "리뷰 게이트 (Opus+Codex)" "FAIL" "Opus ${OPUS_VERDICT_GATE} / Codex ${CODEX_VERDICT_GATE} — BLOCK 우선 차단"
+      fi
+    else
+      # BLOCK+BLOCK 또는 UNKNOWN 포함 케이스
+      check "리뷰 게이트 (Opus+Codex)" "FAIL" "Opus ${OPUS_VERDICT_GATE} / Codex ${CODEX_VERDICT_GATE} — 재검토 필요"
+    fi
+  else
+    # PASS+SKIP, PASS+UNKNOWN 등 — 경고만 (배포 차단 안 함)
+    SKIP=$((SKIP + 1))
+    echo -e "${YELLOW}    ⚠️  리뷰 게이트: Opus ${OPUS_VERDICT_GATE} / Codex ${CODEX_VERDICT_GATE} — 수동 확인 권장 (SKIP)${NC}"
+  fi
+fi
+
 # ── Gate 6: 조직장 승인 (이준혁 CPO) ─────────────────────────────────────────
 echo -e "${BLUE}[6/6] 조직장 승인 — 이준혁 CPO${NC}"
 # CLAUDE.md의 배포 방향과 일치하는지: 배포 조건 (P0/P1 수정 or 주요 기능 완료) 확인
