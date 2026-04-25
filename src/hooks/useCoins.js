@@ -120,11 +120,22 @@ export function useCoins(krwRateRef) {
     try {
       const cgData = await fetchCoinGecko();
       const sparkCache = getSparklineCache();
+      // CoinGecko 심볼 중복 방지 — 동일 심볼이 둘 이상이면 mcap 덮어쓰기 스킵
+      const symCount = new Map();
+      if (Array.isArray(cgData)) {
+        for (const coin of cgData) {
+          if (coin.symbol) {
+            const s = coin.symbol.toUpperCase();
+            symCount.set(s, (symCount.get(s) || 0) + 1);
+          }
+        }
+      }
       const mcapMap = new Map();
       if (Array.isArray(cgData)) {
         for (const coin of cgData) {
           if (coin.symbol && coin.market_cap) {
-            mcapMap.set(coin.symbol.toUpperCase(), coin.market_cap);
+            const s = coin.symbol.toUpperCase();
+            if (symCount.get(s) === 1) mcapMap.set(s, coin.market_cap);
           }
         }
       }
