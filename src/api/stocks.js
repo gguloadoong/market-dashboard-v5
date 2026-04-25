@@ -37,11 +37,11 @@ export async function fetchUsStocksBatch(symbols) {
   // #173/#204: Stooq/Yahoo 클라이언트 직접 호출 제거 (CORS 차단)
 
   // 2) 네이버 해외시세 fallback — 게이트웨이 실패한 심볼 처리
-  const miss5 = missing();
-  if (miss5.length > 0) {
+  const miss2 = missing();
+  if (miss2.length > 0) {
     try {
-      console.warn(`[미장] 게이트웨이 실패 ${miss5.length}개 → 네이버 해외시세 fallback: ${miss5.join(',')}`);
-      const res = await fetch(`/api/naver-us-price?symbols=${miss5.join(',')}`, {
+      console.warn(`[미장] 게이트웨이 실패 ${miss2.length}개 → 네이버 해외시세 fallback: ${miss2.join(',')}`);
+      const res = await fetch(`/api/naver-us-price?symbols=${miss2.join(',')}`, {
         signal: AbortSignal.timeout(10000),
       });
       if (res.ok) {
@@ -170,35 +170,10 @@ export async function fetchEtfPricesBatch(symbols) {
 // KOSPI: ^KS11, KOSDAQ: ^KQ11 (Yahoo Finance 공식 티커)
 const _toNum = s => parseFloat((s || '').toString().replace(/,/g, '')) || 0;
 
-// #173: fetchYahooRace 제거 — allorigins 경유 지수 프록시는 CORS 차단 dead path.
-//       KOSPI 는 Stooq + 한투 지수 fallback, 나머지는 통합 게이트웨이만 사용.
+// #173/#204: fetchYahooRace/fetchStooqKospi 제거 — CORS 차단 dead path.
+//            KOSPI: 게이트웨이(0단계) → 한투 지수(2단계) 2중 fallback으로 충분.
 
-// ─── Stooq 한국 지수 (CORS 허용, 실시간에 가까운 데이터) ──────
-// 검증 결과: ^kospi 동작 확인, ^kosdaq N/D
-async function fetchStooqKospi() {
-  // f=sd2t2ohlcvnp: p 필드로 전일 종가(Prev_Close) 포함
-  const res = await fetch('https://stooq.com/q/l/?s=^kospi&f=sd2t2ohlcvnp&h&e=json', {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!res.ok) throw new Error(`Stooq KOSPI ${res.status}`);
-  const data = await res.json();
-  // Stooq JSON 필드명: 소문자 (close, previous 등)
-  const s = (data.symbols || []).find(x => (x.close ?? x.Close) && (x.close ?? x.Close) !== 'N/D');
-  if (!s) throw new Error('Stooq KOSPI: N/D');
-  const close     = parseFloat(s.close ?? s.Close);
-  // previous(p 필드) 전일 종가 기준 — 없으면 change=0
-  const prevClose = parseFloat(s.previous ?? s.Prev_Close) || 0;
-  return {
-    id:        'KOSPI',
-    value:     parseFloat(close.toFixed(2)),
-    change:    prevClose > 0 ? parseFloat((close - prevClose).toFixed(2)) : 0,
-    changePct: prevClose > 0 ? parseFloat(((close - prevClose) / prevClose * 100).toFixed(2)) : 0,
-    isDelayed: false,
-    dataDelay: '실시간(추정)',
-  };
-}
-
-// 모든 지수 — Yahoo Finance 티커 매핑 (KOSPI 제외: Stooq 사용)
+// 모든 지수 — Yahoo Finance 티커 매핑 (KOSPI: 게이트웨이/한투 전담)
 const ALL_INDICES = [
   // KOSPI는 Stooq로 별도 처리
   { id: 'KOSDAQ', symbol: '^KQ11'    },
@@ -245,21 +220,6 @@ export async function fetchIndices() {
     } catch (e) { console.warn('[지수] 한투 지수 fallback 실패:', e.message); }
   }
 
-  // 3) 여전히 누락된 지수: Stooq(KOSPI) fallback. #173: Yahoo allorigins race 제거 (CORS dead).
-  const stillMissing = ALL_INDEX_IDS.filter(id => !have.has(id));
-  if (stillMissing.length > 0) {
-    const fallbackPromises = stillMissing.map(async (id) => {
-      if (id === 'KOSPI') {
-        try { return await fetchStooqKospi(); } catch {}
-      }
-      return null;
-    });
-
-    const settled = await Promise.allSettled(fallbackPromises);
-    for (const r of settled) {
-      if (r.status === 'fulfilled' && r.value) results.push(r.value);
-    }
-  }
-
+  // #204: 3단계 Stooq KOSPI fallback 제거 — CORS 차단. 게이트웨이+한투로 충분.
   return results;
 }

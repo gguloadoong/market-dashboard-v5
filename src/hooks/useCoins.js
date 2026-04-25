@@ -140,10 +140,14 @@ export function useCoins(krwRateRef) {
         }
       }
       setCoins(prev => prev.map(c => {
-        const spark    = sparkCache[c.symbol];
-        const marketCap = mcapMap.get(c.symbol) ?? c.marketCap;
-        const updated  = spark?.length ? { ...c, sparkline: spark } : { ...c };
-        if (marketCap) updated.marketCap = marketCap;
+        const spark      = sparkCache[c.symbol.toUpperCase()];
+        const newMcap    = mcapMap.get(c.symbol.toUpperCase());
+        const hasSpark   = spark?.length > 0;
+        const hasNewMcap = newMcap && newMcap !== c.marketCap;
+        if (!hasSpark && !hasNewMcap) return c;
+        const updated = { ...c };
+        if (hasSpark) updated.sparkline = spark;
+        if (hasNewMcap) updated.marketCap = newMcap;
         return updated;
       }));
     } catch {
