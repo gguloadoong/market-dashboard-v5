@@ -203,8 +203,8 @@ async function fetchYahooCandles(symbol, count = 60) {
       candles.push({ open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] });
     }
   }
-  const result = candles.slice(-count);
-  return result.length > 0 ? result : null;
+  const sliced = candles.slice(-count);
+  return sliced.length > 0 ? sliced : null;
 }
 
 async function fetchCandles(symbol, market) {
@@ -460,10 +460,9 @@ function calculateCompositeScore(ta, flow, sentiment) {
 }
 
 // ─── 시그널 ID 생성 ──────────────────────────────────────
-let _idCounter = 0;
-function generateId() {
-  _idCounter += 1;
-  return `srv_${Date.now()}_${_idCounter}`;
+function generateId(type, symbol) {
+  const dateKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return `${type}:${symbol}:${dateKey}`;
 }
 
 // ─── 시그널 빌더 (순수 함수) ────────────────────────────
@@ -474,7 +473,7 @@ function buildCompositeSignal(target, score, ta, currentPrice) {
   const market = target.market;
   const title = `${target.name} ${score.label} (${score.score > 0 ? '+' : ''}${score.score})`;
   return {
-    id: generateId(),
+    id: generateId(SIGNAL_TYPES.COMPOSITE_SCORE, target.symbol),
     type: SIGNAL_TYPES.COMPOSITE_SCORE,
     symbol: target.symbol,
     name: target.name,
@@ -502,7 +501,7 @@ function buildSRSignal(target, sr, currentPrice) {
   const label = sr.breakType === 'resistance' ? '저항선 돌파' : '지지선 이탈';
   const title = `${target.name} ${sr.breakLevel.toLocaleString()} ${label}`;
   return {
-    id: generateId(),
+    id: generateId(SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK, target.symbol),
     type: SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
     symbol: target.symbol,
     name: target.name,
@@ -524,7 +523,7 @@ function buildDBSignal(target, db, currentPrice) {
   const label = db.broken ? '넥라인 돌파' : '넥라인 접근';
   const title = `${target.name} 이중바닥 ${label} — 넥라인 ${db.neckline.toLocaleString()}`;
   return {
-    id: generateId(),
+    id: generateId(SIGNAL_TYPES.DOUBLE_BOTTOM, target.symbol),
     type: SIGNAL_TYPES.DOUBLE_BOTTOM,
     symbol: target.symbol,
     name: target.name,
@@ -552,7 +551,7 @@ function buildRecoverySignal(target, rec, currentPrice) {
   const strength = Math.abs(rec.drawdown) >= 15 ? 4 : 3;
   const title = `${target.name} ${Math.abs(rec.drawdown).toFixed(1)}% 급락 후 안정화 — BB 축소 ${(rec.bbShrink * 100).toFixed(0)}%`;
   return {
-    id: generateId(),
+    id: generateId(SIGNAL_TYPES.RECOVERY_DETECTION, target.symbol),
     type: SIGNAL_TYPES.RECOVERY_DETECTION,
     symbol: target.symbol,
     name: target.name,
@@ -597,9 +596,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'CRON_SECRET not configured' });
   }
   const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
-  const provided = Buffer.alloc(expected.length);
-  Buffer.from(authHeader).copy(provided);
-  if (!timingSafeEqual(provided, expected)) {
+  const incoming = Buffer.from(authHeader);
+  if (incoming.length !== expected.length) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  if (!timingSafeEqual(incoming, expected)) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
