@@ -866,6 +866,8 @@ const SERVER_SIGNAL_TYPES = new Set([
 /** 서버 사전 계산 시그널 일괄 로드 — 서버 관할 타입만 replace (stale 방지) */
 export function loadSignals(serverArr) {
   if (!Array.isArray(serverArr)) return;
+  // 빈 배열 = cron 장애 가능성 — 기존 시그널 유지
+  if (serverArr.length === 0) return;
   const now = Date.now();
 
   // 서버 관할 타입 기존 시그널 전부 제거

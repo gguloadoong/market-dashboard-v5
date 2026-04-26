@@ -3,6 +3,7 @@
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
 import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
+import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 120 };
 
@@ -28,16 +29,20 @@ const SIGNAL_TTL = {
 };
 
 // ─── 종목 목록 (확장) ──────────────────────────────────────
-const COIN_SYMBOLS = [
-  'BTC','ETH','SOL','XRP','DOGE','ADA','AVAX','DOT','LINK','BNB',
-  'TRX','TON','MATIC','LTC','BCH','UNI','ATOM','NEAR','APT',
-  'ARB','OP','SUI','HBAR',
-  'ORCA','PYTH','JTO','BONK','WIF','RAY','TIA',
-];
-const US_SYMBOLS = [
-  'NVDA','AAPL','TSLA','MSFT','META','GOOGL','AMZN','AMD','COIN','MSTR',
-  'PLTR','ARM','MU','NFLX','AVGO','ORCL','UBER',
-];
+const COIN_NAMES = {
+  BTC:'비트코인',ETH:'이더리움',SOL:'솔라나',XRP:'리플',DOGE:'도지코인',
+  ADA:'에이다',AVAX:'아발란체',DOT:'폴카닷',LINK:'체인링크',BNB:'바이낸스코인',
+  TRX:'트론',TON:'톤코인',MATIC:'폴리곤',LTC:'라이트코인',BCH:'비트코인캐시',
+  UNI:'유니스왑',ATOM:'코스모스',NEAR:'니어',APT:'앱토스',
+  ARB:'아비트럼',OP:'옵티미즘',SUI:'수이',HBAR:'헤데라',
+  ORCA:'오르카',PYTH:'파이스',JTO:'지토',BONK:'봉크',WIF:'위프',RAY:'레이디움',TIA:'셀레스티아',
+};
+const US_NAMES = {
+  NVDA:'엔비디아',AAPL:'애플',TSLA:'테슬라',MSFT:'마이크로소프트',META:'메타',
+  GOOGL:'알파벳',AMZN:'아마존',AMD:'AMD',COIN:'코인베이스',MSTR:'마이크로스트래티지',
+  PLTR:'팔란티어',ARM:'ARM',MU:'마이크론',NFLX:'넷플릭스',AVGO:'브로드컴',
+  ORCL:'오라클',UBER:'우버',
+};
 const KR_SYMBOLS = {
   '005930':'삼성전자','000660':'SK하이닉스','005380':'현대차',
   '373220':'LG에너지솔루션','035420':'NAVER','035720':'카카오',
@@ -46,8 +51,8 @@ const KR_SYMBOLS = {
 };
 
 const TARGETS = [
-  ...COIN_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'crypto' })),
-  ...US_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'us' })),
+  ...Object.keys(COIN_NAMES).map(s => ({ symbol: s, name: COIN_NAMES[s], market: 'crypto' })),
+  ...Object.keys(US_NAMES).map(s => ({ symbol: s, name: US_NAMES[s], market: 'us' })),
   ...Object.entries(KR_SYMBOLS).map(([code, name]) => ({ symbol: code, name, market: 'kr' })),
 ];
 
@@ -588,7 +593,10 @@ export default async function handler(req, res) {
   if (!process.env.CRON_SECRET) {
     return res.status(500).json({ error: 'CRON_SECRET not configured' });
   }
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const expected = `Bearer ${process.env.CRON_SECRET}`;
+  const a = Buffer.from(authHeader.padEnd(expected.length));
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
@@ -700,6 +708,13 @@ export default async function handler(req, res) {
       durationMs,
     },
   };
+
+  // 과반 실패 시 기존 캐시 유지 — 외부 API 장애로 빈 시그널 노출 방지
+  const failRate = failed.length / TARGETS.length;
+  if (failRate > 0.5) {
+    await recordCronFailure('compute-signals', `fetch fail rate ${(failRate * 100).toFixed(0)}% — KV write skipped`);
+    return res.status(200).json({ ok: false, skipped: true, failRate, durationMs });
+  }
 
   try {
     await setSnap('signals:latest', payload, 1200);
