@@ -855,6 +855,45 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
   }));
 }
 
+// 서버 시그널 관할 타입 (클라이언트 계산 대상에서 제외)
+const SERVER_SIGNAL_TYPES = new Set([
+  'composite_score',
+  'support_resistance_break',
+  'double_bottom',
+  'recovery_detection',
+]);
+
+/** 서버 사전 계산 시그널 일괄 로드 — 서버 관할 타입만 replace (stale 방지) */
+export function loadSignals(serverArr) {
+  if (!Array.isArray(serverArr)) return;
+  const now = Date.now();
+
+  // 서버 관할 타입 기존 시그널 전부 제거
+  _signals = _signals.filter(s => !SERVER_SIGNAL_TYPES.has(s.type));
+
+  // 서버 응답 주입
+  for (const raw of serverArr) {
+    if (!SERVER_SIGNAL_TYPES.has(raw.type)) continue;
+    _signals.push({
+      ...raw,
+      id: raw.id || _generateId(),
+      timestamp: raw.timestamp || now,
+      expiresAt: raw.expiresAt || (now + getTTL(raw.type)),
+    });
+  }
+
+  if (_signals.length > MAX_SIGNALS) {
+    _signals.sort((a, b) => b.timestamp - a.timestamp);
+    _signals = _signals.slice(0, MAX_SIGNALS);
+  }
+
+  _notify(); // 한 번만 — 폭주 차단
+}
+
+export function isServerManagedSignalType(type) {
+  return SERVER_SIGNAL_TYPES.has(type);
+}
+
 /** 마켓 온도계 — 활성 시그널 가중합 → -1(극도약세) ~ +1(극도강세) */
 export function getMarketTemperature() {
   const signals = getActiveSignals();

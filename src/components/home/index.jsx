@@ -10,7 +10,7 @@ import NotableMoversSection from './NotableMoversSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import { useNewsSignals } from '../../hooks/useNewsSignals';
-import { useCompositeSignals } from '../../hooks/useCompositeSignals';
+import { useServerSignals } from '../../hooks/useServerSignals';
 import CommandCenterWidget from './CommandCenterWidget';
 import SignalBoardWidget from './SignalBoardWidget';
 import AiDebateSection from './AiDebateSection';
@@ -114,8 +114,8 @@ export default function HomeDashboard({
   // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — 레버리지/인버스 ETF 제외
   useNewsSignals(allNews, stockItems);
 
-  // 복합 퀀트 시그널 (TA + Flow + Sentiment → 방향성 점수) — 레버리지/인버스 ETF 제외
-  useCompositeSignals(stockItems);
+  // 서버 사전 계산 시그널 (composite_score + 패턴) — KV에서 1분 폴링 (#213)
+  useServerSignals();
 
   const hasData = krStocks.length > 0 || usStocks.length > 0 || coins.length > 0 || etfs.length > 0;
 

@@ -9,7 +9,7 @@ export const config = { runtime: 'edge' };
 
 import { Redis } from '@upstash/redis';
 
-const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing'];
+const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing', 'compute-signals'];
 const HEALTHY_THRESHOLD = 3; // failCount >= 3 이면 unhealthy
 
 export default async function handler(request) {
