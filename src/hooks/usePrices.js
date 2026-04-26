@@ -268,6 +268,10 @@ export function usePrices() {
       }, delay);
     };
 
+    // 단일 스냅샷으로 scheduleUs/Kr 및 prev* 초기화 — 경계 시점 이중 읽기 race 방지
+    let prevUsActive = usActive();
+    let prevKrActive = isKoreanMarketOpen();
+
     refreshUsStocks();
     refreshKoreanStocks();
     scheduleUs();
@@ -275,8 +279,6 @@ export function usePrices() {
 
     // 시장 전환 감지기 — 1분마다 closed→open 전환 체크, 즉시 NORMAL 폴링 재시작
     // CLOSED(5분) 타이머가 장 개시 직전 예약된 경우 최대 5분 stale 구간 방지
-    let prevUsActive = usActive();
-    let prevKrActive = isKoreanMarketOpen();
     const transitionCheckerId = setInterval(() => {
       if (destroyed) return;
       const nowUsActive = usActive();
