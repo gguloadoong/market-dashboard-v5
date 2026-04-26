@@ -54,6 +54,9 @@ function _resolvePrice(meta) {
 }
 
 export function addSignal(signal) {
+  // 서버 관할 타입은 loadSignals 전용 — 클라이언트 경로 차단 (깜빡임 방지)
+  if (SERVER_SIGNAL_TYPES.has(signal.type)) return signal;
+
   // 중복 제거: 같은 type+symbol 조합
   const existIdx = _signals.findIndex(
     s => s.type === signal.type && s.symbol === signal.symbol,
