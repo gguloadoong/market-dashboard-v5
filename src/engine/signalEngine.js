@@ -872,6 +872,8 @@ export function loadSignals(serverArr) {
   _signals = _signals.filter(s => !SERVER_SIGNAL_TYPES.has(s.type));
 
   // 서버 응답 주입
+  // TODO(#215 Phase 2): addSignal 경유 시 _recordForAccuracy 호출 가능하나
+  // 서버 생성 시그널은 price_at_fire가 이미 확정이므로 별도 accuracy 파이프라인 필요
   for (const raw of serverArr) {
     if (!SERVER_SIGNAL_TYPES.has(raw.type)) continue;
     _signals.push({

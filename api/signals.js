@@ -1,10 +1,10 @@
 // api/signals.js — 사전 계산된 시그널 조회 (KV 읽기)
 // compute-signals 크론이 'signals:latest' 키에 사전 저장한 페이로드를 그대로 노출
 export const config = { runtime: 'edge' };
-import { getSnap } from './_price-cache.js';
+import { getSnapWithFallback } from './_price-cache.js';
 
 export default async function handler() {
-  const data = await getSnap('signals:latest');
+  const data = await getSnapWithFallback('signals:latest');
   if (!data) {
     return new Response(JSON.stringify({
       ts: 0,
