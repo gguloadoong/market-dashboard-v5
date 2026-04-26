@@ -348,25 +348,19 @@
 - 해결: KRX_HOLIDAYS Set + isKrxHoliday() 추가 (2025~2027 법정공휴일)
 - 완료 기준: 어린이날(5/5) KST 09:00~15:30 접근 시 "휴장" 반환
 
-### [P0-10] 배포 쿨다운 가드
-- 문제: 연속 배포 시 10분 이내 중복 배포 차단 규칙 없음 (Issue #202)
-- 해결: deploy.sh에 .last-deploy-time 추적 + 10분 이내 차단 + FORCE_DEPLOY=1 우회
-- 완료 기준: npm run deploy 즉시 재실행 시 차단 메시지 + exit 1
+### ~~[P0-10] 배포 쿨다운 가드~~ ✅ 완료
+- 해결: deploy.sh 쿨다운 가드 구현 확인 (commit 4c93a8f)
 
-### [P1-13] Reviewer Loop Deadlock 해소
-- 문제: pre-deploy-consensus.sh Opus PASS + Codex BLOCK 충돌 시 중재 없음 (Issue #38)
-- 해결: 충돌 시 "Codex BLOCK 우선 + 수동 판단 요구" 분기 추가
-- 완료 기준: Opus PASS + Codex BLOCK → 배포 차단 + 명확한 안내 메시지
+### ~~[P1-13] Reviewer Loop Deadlock 해소~~ ✅ 완료
+- 해결: pre-deploy-consensus.sh Gate 5.5 — BLOCK 우선 원칙 + SKIP_CODEX_REVIEW=1 분기 (commit b4116a9)
 
 ### ~~[P1-14] 코인 리스트 정합성 수정~~ ✅ 완료
 - 문제: CoinPaprika Top 200 중 업비트 미상장 코인 ~30-50개 노출 중
 - 해결: EXCLUDED_SYMBOLS 확대 + 한글명 매핑 보완 + 미상장 코인 제거
-- 완료 기준: 코인 탭 전 종목 업비트 KRW 마켓 상장 종목만 노출
 
-### [P2-18] 클라이언트 폴링 장 마감/주말 완화
-- 문제: usePrices.js 30초 폴링이 장 마감/주말에도 계속 → Upstash 낭비
-- 해결: isKoreanMarketOpen()/isUsMarketOpen() 기반 인터벌 동적 조정
+### ~~[P2-18] 클라이언트 폴링 장 마감/주말 완화~~ ✅ 완료 (PR #211)
+- 해결: POLLING.CLOSED(5분) + recursive setTimeout + 1분 전환 감지기
+- generation 카운터 race 방지, in-flight guard, hidden탭 guard, 경계 race 수정 포함
 
-### [P2-19] 핵심 알고리즘 단위 테스트 (ADR-014 이행)
-- 문제: signalEngine, marketHours 등 핵심 파일 테스트 0개
-- 해결: Vitest 기반 marketHours 14케이스 + signalEngine 기본 케이스
+### ~~[P2-19] 핵심 알고리즘 단위 테스트~~ ✅ 완료 (commit 8722c82)
+- 해결: marketHours 35케이스 + signalEngine 18케이스, 전체 88테스트 PASS
