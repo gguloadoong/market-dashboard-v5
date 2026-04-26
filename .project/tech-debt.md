@@ -1,6 +1,6 @@
 ---
 담당: 박서연 (Staff FE)
-마지막 업데이트: 2026-04-18
+마지막 업데이트: 2026-04-26
 ---
 
 # 기술 부채 목록
@@ -13,12 +13,7 @@
 
 ## 🟡 P1 — 다음 스프린트
 
-| 파일 | 내용 | 등록일 |
-|------|------|--------|
-| `api/cron/update-kr.js` | 한투/Naver 개별 fallback 61종목 제한 — KRX+Naver 전종목 모두 실패 시 `HANTOO_NAME_MAP` 61종목(KOSPI 50+KOSDAQ 10+ETF 1)만 스냅샷 저장. 1~2순위 정상 시 ~4000종목 커버되므로 P1 유지 | 2026-04-04 |
-| `scripts/pre-deploy-consensus.sh` | Reviewer Loop Deadlock — Opus PASS + Codex BLOCK 충돌 시 중재 규칙 없음 (Issue #38) | 2026-04-04 |
-| `scripts/review-summary.sh` | Codex gate 재실행 시 스테일 artifact 잔존 가능 (Issue #39) | 2026-04-04 |
-| `api/krx-etf.js` | 2s 타임아웃 공격성 모니터링 — Codex P2 재지적 (Issue #143 기각). 설계 근거: 5영업일 × 2s = 10s ≤ gateway 12s (#115 15s hang 방지). 실패 시 Edge cache(s-maxage=3600) + 빈 ETF graceful fallback. 프로덕션 KRX p95 응답시간 확인 후 3s 상향 여부 재판단 | 2026-04-18 |
+현재 없음 ✅
 
 ---
 
@@ -53,3 +48,7 @@
 | 2026-04-04 | `scripts/pre-deploy-consensus.sh` | PM nonce 인젝션 차단, Gate5 ancestor 검색, gh set-e 방지 (PR #37) |
 | 2026-04-08 | `src/data/relatedAssets.js` + `NewsSidePanel.jsx` | Stage 3 섹터 확장 `Object.entries` 전수 순회 → `SECTOR_SYMBOL_INDEX` 역인덱스 Map O(1) 조회로 교체 |
 | 2026-04-08 | `api/cron/update-us.js` | Yahoo v8 per-symbol 병렬화 — `CONCURRENCY=30` 배치 + `Promise.allSettled`로 이미 구현 완료 확인. 추가 작업 불필요 |
+| 2026-04-26 | `scripts/pre-deploy-consensus.sh` | Reviewer Loop Deadlock — Gate 5.5 구현 확인 (Issue #38 CLOSED, commit b4116a9) |
+| 2026-04-26 | `scripts/review-summary.sh` | Codex gate 스테일 artifact — Issue #39 CLOSED, 기존 구현으로 충분 |
+| 2026-04-26 | `api/cron/update-kr.js` | 61종목 fallback 제한 — 1~2순위 정상 시 ~4000종목 커버, 수정 불필요로 결정 |
+| 2026-04-26 | `api/krx-etf.js` | 2s 타임아웃 — Issue #143 기각 확정, 설계 근거 충분 (Edge cache + graceful fallback) |
