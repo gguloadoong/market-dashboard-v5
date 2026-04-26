@@ -79,7 +79,6 @@ const CG_API_KEY = import.meta.env.VITE_COINGECKO_API_KEY ?? '';
 const CG_HEADERS = CG_API_KEY ? { 'x-cg-demo-api-key': CG_API_KEY } : {};
 
 let cgSparklineCache = {};
-let cgFullCache = [];
 
 export async function fetchCoinGecko() {
   const url = [
@@ -94,7 +93,6 @@ export async function fetchCoinGecko() {
   const res = await fetch(url, { headers: CG_HEADERS, signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
   const data = await res.json();
-  cgFullCache = data;
 
   // 스파크라인 캐시 (심볼 기준)
   for (const coin of data) {
