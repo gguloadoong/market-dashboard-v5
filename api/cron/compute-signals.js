@@ -4,7 +4,7 @@
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
 import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
 
-export const config = { runtime: 'nodejs', maxDuration: 60 };
+export const config = { runtime: 'nodejs', maxDuration: 120 };
 
 // ─── 시그널 타입 (signalTypes.js 와 동기화) ─────────────────
 const SIGNAL_TYPES = {
@@ -45,6 +45,12 @@ const KR_SYMBOLS = {
   '068270':'셀트리온','012330':'현대모비스','000270':'기아',
 };
 
+const TARGETS = [
+  ...COIN_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'crypto' })),
+  ...US_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'us' })),
+  ...Object.entries(KR_SYMBOLS).map(([code, name]) => ({ symbol: code, name, market: 'kr' })),
+];
+
 // ─── TA 계산 함수 (api/ta-indicators.js 와 동기화 필수) ──
 function sma(data, period) {
   if (data.length < period) return null;
@@ -78,8 +84,8 @@ function calcRSI(closes, period = 14) {
   const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
   const value = 100 - 100 / (1 + rs);
   let score = 0;
-  if (value <= 30) score = 30 * (1 - value / 30);
-  else if (value >= 70) score = -30 * ((value - 70) / 30);
+  if (value < 30) score = 30 * (1 - value / 30);
+  else if (value > 70) score = -30 * ((value - 70) / 30);
   else score = (50 - value) * (30 / 20) * 0.3;
   return { value: +value.toFixed(2), score: +score.toFixed(1) };
 }
@@ -577,22 +583,18 @@ async function fetchGlobalSentiment() {
 
 // ─── 메인 핸들러 ────────────────────────────────────────
 export default async function handler(req, res) {
-  // CRON_SECRET 인증
+  // CRON_SECRET 인증 — fail-closed: 환경변수 미설정 시 호출 차단
   const authHeader = req.headers['authorization'] || '';
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET) {
+    return res.status(500).json({ error: 'CRON_SECRET not configured' });
+  }
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
   const startedAt = Date.now();
   const signals = [];
   const failed = [];
-
-  // 종목 통합 리스트
-  const TARGETS = [
-    ...COIN_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'crypto' })),
-    ...US_SYMBOLS.map(s => ({ symbol: s, name: s, market: 'us' })),
-    ...Object.entries(KR_SYMBOLS).map(([code, name]) => ({ symbol: code, name, market: 'kr' })),
-  ];
 
   // 글로벌 sentiment (코인 F&G)
   let globalSentiment = { fearGreed: null, fundingRate: null, pcr: null };
@@ -601,7 +603,7 @@ export default async function handler(req, res) {
   } catch { /* ignore */ }
 
   let fetchedCount = 0;
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 15; // 동시 처리 상향 — maxDuration 120s로 여유 확보
 
   for (let i = 0; i < TARGETS.length; i += BATCH_SIZE) {
     const batch = TARGETS.slice(i, i + BATCH_SIZE);
@@ -649,9 +651,10 @@ export default async function handler(req, res) {
           pcr: isCrypto ? null : globalSentiment.pcr,
         };
 
-        // 복합 점수 — flow는 서버에서 미수집(클라이언트 투자자 시그널과 분리)
+        // 복합 점수 — flow=null 시 TA(40%)+sentiment(25%)만 = 최대 65점
+        // 임계값 26 = 기존 40 × (0.65) — flow 없는 스케일 보정
         const composite = calculateCompositeScore(ta, null, sentiment);
-        if (Math.abs(composite.score) >= 40) {
+        if (Math.abs(composite.score) >= 26) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
 
