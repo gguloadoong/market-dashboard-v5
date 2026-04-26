@@ -338,6 +338,14 @@
 | 2026-03-28 | Vercel Pro 전환 + 배포 파이프라인 정비 |
 | 2026-03-28 | 독립 리뷰 2단계 체계 수립 (code-reviewer + Codex gate) |
 | 2026-03-28 | Playwright E2E 테스트 환경 구축 |
+| 2026-04-25 | [P0-9] KRX 공휴일 목록 추가 — KRX_HOLIDAYS + isKrxHoliday() (2025~2027 법정공휴일) |
+| 2026-04-25 | [P0-10] 배포 쿨다운 가드 — deploy.sh 10분 이내 연속 배포 차단 (commit 4c93a8f) |
+| 2026-04-25 | [P1-13] Reviewer Loop Deadlock 해소 — pre-deploy-consensus.sh Gate 5.5 BLOCK 우선 원칙 (commit b4116a9) |
+| 2026-04-25 | [P1-14] 코인 리스트 정합성 수정 — EXCLUDED_SYMBOLS 확대 + 미상장 코인 제거 (PR #207) |
+| 2026-04-25 | pre-deploy 게이트 단계 진행 로그 기록 — _gate_begin/_gate_finish helper + .tmp/deploy-progress.log (commit c3eb3f2) |
+| 2026-04-26 | [P2-18] 클라이언트 폴링 동적 조정 — POLLING.CLOSED(5분) + recursive setTimeout + 1분 전환 감지기 (PR #211, 머지 대기) |
+| 2026-04-26 | [P2-19] 핵심 알고리즘 단위 테스트 — marketHours 35케이스 + signalEngine 18케이스, 전체 88테스트 PASS (commit 8722c82) |
+| 2026-04-26 | 잔여 이슈/PR 전수 감사 — PR #209 중복 close, 스테일 항목 정리 |
 
 ---
 
