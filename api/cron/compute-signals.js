@@ -163,6 +163,7 @@ async function fetchUpbitCandles(symbol, count = 60) {
   );
   if (!res.ok) return null;
   const data = await res.json();
+  if (!data.length) return null;
   return data.reverse().map(d => ({
     close: d.trade_price,
     volume: d.candle_acc_trade_volume,
@@ -179,6 +180,7 @@ async function fetchBinanceCandles(symbol, count = 60) {
   );
   if (!res.ok) return null;
   const data = await res.json();
+  if (!data.length) return null;
   return data.map(d => ({
     open: +d[1], high: +d[2], low: +d[3], close: +d[4], volume: +d[5],
   }));
@@ -201,7 +203,8 @@ async function fetchYahooCandles(symbol, count = 60) {
       candles.push({ open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] });
     }
   }
-  return candles.slice(-count);
+  const result = candles.slice(-count);
+  return result.length > 0 ? result : null;
 }
 
 async function fetchCandles(symbol, market) {
@@ -468,7 +471,7 @@ function buildCompositeSignal(target, score, ta, currentPrice) {
   const now = Date.now();
   const direction = score.direction;
   const strength = Math.abs(score.score) >= 70 ? 4 : 3;
-  const market = target.market === 'crypto' ? 'crypto' : target.market;
+  const market = target.market;
   const title = `${target.name} ${score.label} (${score.score > 0 ? '+' : ''}${score.score})`;
   return {
     id: generateId(),
@@ -495,7 +498,7 @@ function buildSRSignal(target, sr, currentPrice) {
   if (!sr?.breakType || !sr?.breakLevel) return null;
   const now = Date.now();
   const direction = sr.breakType === 'resistance' ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
-  const market = target.market === 'crypto' ? 'crypto' : target.market;
+  const market = target.market;
   const label = sr.breakType === 'resistance' ? '저항선 돌파' : '지지선 이탈';
   const title = `${target.name} ${sr.breakLevel.toLocaleString()} ${label}`;
   return {
@@ -516,7 +519,7 @@ function buildSRSignal(target, sr, currentPrice) {
 function buildDBSignal(target, db, currentPrice) {
   if (!db?.approaching) return null;
   const now = Date.now();
-  const market = target.market === 'crypto' ? 'crypto' : target.market;
+  const market = target.market;
   const strength = db.broken ? 4 : 3;
   const label = db.broken ? '넥라인 돌파' : '넥라인 접근';
   const title = `${target.name} 이중바닥 ${label} — 넥라인 ${db.neckline.toLocaleString()}`;
@@ -545,7 +548,7 @@ function buildDBSignal(target, db, currentPrice) {
 function buildRecoverySignal(target, rec, currentPrice) {
   if (!rec) return null;
   const now = Date.now();
-  const market = target.market === 'crypto' ? 'crypto' : target.market;
+  const market = target.market;
   const strength = Math.abs(rec.drawdown) >= 15 ? 4 : 3;
   const title = `${target.name} ${Math.abs(rec.drawdown).toFixed(1)}% 급락 후 안정화 — BB 축소 ${(rec.bbShrink * 100).toFixed(0)}%`;
   return {
@@ -593,10 +596,10 @@ export default async function handler(req, res) {
   if (!process.env.CRON_SECRET) {
     return res.status(500).json({ error: 'CRON_SECRET not configured' });
   }
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  const a = Buffer.from(authHeader.padEnd(expected.length));
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+  const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
+  const provided = Buffer.alloc(expected.length);
+  Buffer.from(authHeader).copy(provided);
+  if (!timingSafeEqual(provided, expected)) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
@@ -660,9 +663,9 @@ export default async function handler(req, res) {
         };
 
         // 복합 점수 — flow=null 시 TA(40%)+sentiment(25%)만 = 최대 65점
-        // 임계값 26 = 기존 40 × (0.65) — flow 없는 스케일 보정
+        // 임계값 30 = compositeScorer 라벨 경계(±30)와 일치 → NEUTRAL 시그널 노출 방지
         const composite = calculateCompositeScore(ta, null, sentiment);
-        if (Math.abs(composite.score) >= 26) {
+        if (Math.abs(composite.score) >= 30) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
 

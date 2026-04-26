@@ -15,13 +15,13 @@ export function useServerSignals() {
     let lastTs = 0;
 
     async function tick() {
-      if (document.hidden) return;
+      if (document.hidden || cancelled) return;
       try {
         const res = await fetch(API_URL, { signal: AbortSignal.timeout(8000) });
         if (!res.ok || cancelled) return;
         const data = await res.json();
+        if (cancelled) return;
         if (data.ts && data.ts === lastTs) {
-          // CDN 캐시 히트 — 시그널 동일, 메타만 갱신
           setMeta(m => ({ ...m, loading: false, stale: !!data.stale }));
           return;
         }
@@ -29,7 +29,7 @@ export function useServerSignals() {
         lastTs = data.ts || 0;
         setMeta({ loading: false, ts: data.ts, count: data.count || 0, stale: !!data.stale });
       } catch {
-        setMeta(m => ({ ...m, loading: false }));
+        if (!cancelled) setMeta(m => ({ ...m, loading: false }));
       }
     }
 
