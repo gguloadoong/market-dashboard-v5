@@ -25,7 +25,11 @@ export function useServerSignals() {
           setMeta(m => ({ ...m, loading: false, stale: !!data.stale }));
           return;
         }
-        loadSignals(data.signals || []);
+        const signals = data.signals || [];
+        // stale + 0건 = KV miss/cron 장애 → 기존 시그널 유지
+        if (!(data.stale && signals.length === 0)) {
+          loadSignals(signals);
+        }
         lastTs = data.ts || 0;
         setMeta({ loading: false, ts: data.ts, count: data.count || 0, stale: !!data.stale });
       } catch {
