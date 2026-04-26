@@ -25,6 +25,32 @@ PASS=0
 FAIL=0
 SKIP=0
 
+# ── 진행 로그 (deploy-tui 등 외부 모니터에서 읽음) — chore-only, 동작 변경 없음 ──
+GATE_PROGRESS_LOG="${GATE_PROGRESS_LOG:-.tmp/deploy-progress.log}"
+CURRENT_GATE="0"
+mkdir -p .tmp 2>/dev/null || true
+: > "$GATE_PROGRESS_LOG" 2>/dev/null || GATE_PROGRESS_LOG=""
+if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
+  printf '%s\t0\tdeploy-consensus 시작\tSTART\t%s\n' \
+    "$(date +%s)" "$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+    >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
+fi
+
+_gate_begin() {
+  CURRENT_GATE="$1"
+  if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
+    printf '%s\t%s\t%s\tRUNNING\t\n' "$(date +%s)" "$1" "$2" \
+      >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
+  fi
+}
+
+_gate_finish() {
+  if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
+    printf '%s\t99\t완료\tALL_DONE\t\n' "$(date +%s)" \
+      >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
+  fi
+}
+
 check() {
   local name="$1"
   local result="$2"  # PASS or FAIL
@@ -36,6 +62,10 @@ check() {
     echo -e "${RED}  🚫 ${name}${NC}${detail:+ — ${detail}}"
     FAIL=$((FAIL + 1))
   fi
+  if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "${CURRENT_GATE:-?}" "$name" "$result" "$detail" \
+      >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
+  fi
 }
 
 echo ""
@@ -46,6 +76,7 @@ echo ""
 
 # ── Gate 1: 빌드 통과 ────────────────────────────────────────────────────────
 echo -e "${BLUE}[1/6] 빌드 검증${NC}"
+_gate_begin 1 "빌드 검증"
 if npm run build --silent 2>/dev/null; then
   check "빌드" "PASS" "vite build 성공"
 else
@@ -61,6 +92,7 @@ fi
 
 # ── Gate 2: P0/P1 이슈 없음 ──────────────────────────────────────────────────
 echo -e "${BLUE}[2/6] P0/P1 오픈 이슈 확인${NC}"
+_gate_begin 2 "P0/P1 오픈 이슈"
 # || true: set -e 환경에서 gh 인증/네트워크 실패 시 스크립트 전체 종료 방지
 # 빈 문자열 결과 → 하단 empty-string 체크에서 FAIL 처리 (알 수 없는 상태를 PASS로 처리 금지)
 P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null || true)
@@ -80,6 +112,7 @@ fi
 
 # ── Gate 3: PM 검토 — 이준혁 (기획 정합성) ──────────────────────────────────
 echo -e "${BLUE}[3/6] PM 검토 — 이준혁 (작업 의도 정합성 검토)${NC}"
+_gate_begin 3 "PM 검토"
 PM_VERDICT="SKIP"
 if command -v claude &>/dev/null && [ -f ".project/backlog.md" ]; then
   # nonce: 실행 시마다 랜덤 생성 → 커밋 메시지로 미리 알 수 없어 프롬프트 인젝션 차단
@@ -151,6 +184,7 @@ fi
 
 # ── Gate 4: QA 승인 (장성민) ─────────────────────────────────────────────────
 echo -e "${BLUE}[4/6] QA 승인 — 장성민 (품질 기준 검증)${NC}"
+_gate_begin 4 "QA 승인"
 QUALITY_FILE=".project/quality-baseline.md"
 QA_ISSUES=0
 # 파일 존재 확인 수준의 소프트 게이트 — 실제 기준 충족 여부는 PR 리뷰 단계에서 검증
@@ -177,6 +211,7 @@ fi
 
 # ── Gate 5: 개발팀 승인 ──────────────────────────────────────────────────────
 echo -e "${BLUE}[5/6] 개발팀 승인 — FE(박서연) / BE(김민준)${NC}"
+_gate_begin 5 "개발팀 승인"
 # 최근 커밋에 리뷰되지 않은 알고리즘 파일 변경 없는지 확인
 ALGO_CHANGED=0
 if [ ! -f ".algo-files" ]; then
@@ -259,6 +294,7 @@ fi
 # 최신 code-review-{BRANCH}.md 와 codex-review-{BRANCH}.md artifact를 읽어 충돌 감지.
 # 충돌 시 BLOCK 우선 원칙 적용 (PASS+BLOCK → BLOCK).
 # SKIP_CODEX_REVIEW=1 설정 시 Codex 단독 BLOCK + Opus PASS 조합만 허용 (경고 후 통과).
+_gate_begin 5.5 "Opus+Codex 충돌 중재"
 CURRENT_BRANCH_GATE=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 SAFE_BRANCH_GATE="${CURRENT_BRANCH_GATE//\//-}"
 
@@ -331,6 +367,7 @@ fi
 
 # ── Gate 6: 조직장 승인 (이준혁 CPO) ─────────────────────────────────────────
 echo -e "${BLUE}[6/6] 조직장 승인 — 이준혁 CPO${NC}"
+_gate_begin 6 "조직장 승인"
 # CLAUDE.md의 배포 방향과 일치하는지: 배포 조건 (P0/P1 수정 or 주요 기능 완료) 확인
 DEPLOY_CONDITION_MET=0
 
@@ -362,10 +399,12 @@ if [ "$FAIL" -eq 0 ]; then
   fi
   echo -e "${GREEN}✅ 컨센서스 PASS (${PASS}/${TOTAL}${SKIP_MSG}) — 배포 가능${NC}"
   echo ""
+  _gate_finish
   exit 0
 else
   echo -e "${RED}🚫 컨센서스 FAIL (${FAIL}건 미통과) — 배포 불가${NC}"
   echo -e "${YELLOW}   위 항목 해결 후 재실행: npm run deploy:check${NC}"
   echo ""
+  _gate_finish
   exit 1
 fi
