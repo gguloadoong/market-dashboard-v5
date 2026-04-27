@@ -277,40 +277,40 @@ export function usePrices() {
     scheduleUs();
     scheduleKr();
 
-    // 탭 복귀 시 즉시 갱신 + 시장 전환 체크
-    // 기존 1분 setInterval 제거 → visibilitychange 이벤트로 대체
-    // — 탭이 포그라운드로 돌아올 때만 전환 감지, 백그라운드 CPU 낭비 제거
+    // 탭 복귀 시 즉시 갱신
     const onVisible = () => {
       if (document.hidden) return;
       clearTimeout(usTimerId);
       clearTimeout(krTimerId);
-
-      // 시장 전환(closed→open) 감지 — 탭 복귀 시점에만 체크
-      const nowUsActive = usActive();
-      const nowKrActive = isKoreanMarketOpen();
-      if (!prevUsActive && nowUsActive) {
-        // US 장 열림 전환 — 즉시 갱신 후 NORMAL 인터벌로 재스케줄
-        if (!usInFlight) refreshUsStocks();
-      } else if (!usInFlight) {
-        refreshUsStocks();
-      }
-      if (!prevKrActive && nowKrActive) {
-        // KR 장 열림 전환 — 즉시 갱신 후 NORMAL 인터벌로 재스케줄
-        if (!krInFlight) refreshKoreanStocks();
-      } else if (!krInFlight) {
-        refreshKoreanStocks();
-      }
-      prevUsActive = nowUsActive;
-      prevKrActive = nowKrActive;
-
+      if (!usInFlight) refreshUsStocks();
+      if (!krInFlight) refreshKoreanStocks();
       scheduleUs();
       scheduleKr();
     };
     document.addEventListener('visibilitychange', onVisible);
+
+    // 시장 전환 감지 — 2분마다 체크 (CLOSED 5분 stale 방지, document.hidden 시 skip)
+    const transitionCheckerId = setInterval(() => {
+      if (destroyed || document.hidden) return;
+      const nowUsActive = usActive();
+      const nowKrActive = isKoreanMarketOpen();
+      if ((!prevUsActive && nowUsActive) || (!prevKrActive && nowKrActive)) {
+        clearTimeout(usTimerId);
+        clearTimeout(krTimerId);
+        if (!usInFlight) refreshUsStocks();
+        if (!krInFlight) refreshKoreanStocks();
+        scheduleUs();
+        scheduleKr();
+      }
+      prevUsActive = nowUsActive;
+      prevKrActive = nowKrActive;
+    }, 2 * 60_000);
+
     return () => {
       destroyed = true;
       clearTimeout(usTimerId);
       clearTimeout(krTimerId);
+      clearInterval(transitionCheckerId);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refreshUsStocks, refreshKoreanStocks]);

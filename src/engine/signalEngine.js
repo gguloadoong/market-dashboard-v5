@@ -16,7 +16,10 @@ export function beginBatch() {
 }
 
 export function endBatch() {
-  if (_batchDepth === 0) return;
+  if (_batchDepth === 0) {
+    if (import.meta.env?.DEV) console.warn('[signalEngine] endBatch without matching beginBatch — leak 가능성');
+    return;
+  }
   _batchDepth--;
   if (_batchDepth === 0 && _batchDirty) {
     _batchDirty = false;

@@ -1,7 +1,7 @@
 // 주목할만한 움직임 — 복합 스코어 기반 히어로 수평 카드
 // 변동폭 + 거래량 순위 + 뉴스 매칭 복합 점수 + WHY 뉴스 연결
 import { DEFAULT_KRW_RATE } from '../../constants/market';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls, findRelatedNews, DERIVATIVE_RE } from './utils';
 import { buildStockKeywords, matchesKeywords } from '../../utils/newsAlias';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
@@ -183,18 +183,14 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
   const usOpen = getUsMarketStatus().status === 'open';
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
-  // ref에 저장해 매초 setState 없이 관리, 슬롯 경계 도달 시에만 리렌더
-  const timeSlotRef = useRef(Math.floor(Date.now() / SLOT_MS));
-  const [timeSlotTick, setTimeSlotTick] = useState(0);
+  const [timeSlot, setTimeSlot] = useState(Math.floor(Date.now() / SLOT_MS));
   useEffect(() => {
     const msToNextBoundary = SLOT_MS - (Date.now() % SLOT_MS);
     let intervalId = null;
     const timerId = setTimeout(() => {
-      timeSlotRef.current = Math.floor(Date.now() / SLOT_MS);
-      setTimeSlotTick(t => t + 1);
+      setTimeSlot(Math.floor(Date.now() / SLOT_MS));
       intervalId = setInterval(() => {
-        timeSlotRef.current = Math.floor(Date.now() / SLOT_MS);
-        setTimeSlotTick(t => t + 1);
+        setTimeSlot(Math.floor(Date.now() / SLOT_MS));
       }, SLOT_MS);
     }, msToNextBoundary);
     return () => { clearTimeout(timerId); if (intervalId) clearInterval(intervalId); };
@@ -275,13 +271,13 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
       .sort((a, b) => {
         if (b._totalScore !== a._totalScore) return b._totalScore - a._totalScore;
         // 동점 시 timeSlot 기반 해시로 순환 — 같은 종목이 고정되지 않도록
-        const hashA = ((a.symbol || a.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlotRef.current)) & 0x7fffffff;
-        const hashB = ((b.symbol || b.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlotRef.current)) & 0x7fffffff;
+        const hashA = ((a.symbol || a.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlot)) & 0x7fffffff;
+        const hashB = ((b.symbol || b.id || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, timeSlot)) & 0x7fffffff;
         return hashA - hashB;
       })
       .slice(0, 7);
-  // timeSlotTick: 슬롯 경계(20분)마다만 증가 — 매초 리렌더 제거
-  }, [allItems, recentNews, krOpen, usOpen, timeSlotTick]);
+  // timeSlot: 슬롯 경계(20분)마다만 증가 — 매초 리렌더 제거
+  }, [allItems, recentNews, krOpen, usOpen, timeSlot]);
 
   // 최소 2개 보장 — 점수 부족하면 변동폭 기준 fallback
   const displayed = useMemo(() => {
