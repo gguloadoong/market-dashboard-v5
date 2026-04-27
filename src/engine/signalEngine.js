@@ -844,8 +844,9 @@ export function removeAllSignalsByType(type) {
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
   if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
-  if (bullCount > bearCount) direction = DIRECTIONS.BULLISH;
-  else if (bearCount > bullCount) direction = DIRECTIONS.BEARISH;
+  const dominance = 0.6;
+  if (bullCount > bearCount && bullCount >= dominance * newsCount) direction = DIRECTIONS.BULLISH;
+  else if (bearCount > bullCount && bearCount >= dominance * newsCount) direction = DIRECTIONS.BEARISH;
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;

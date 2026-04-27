@@ -3,31 +3,31 @@ export const THRESHOLDS = {
   PCR: {
     BULLISH_STRONG: 1.5,  // PCR > 1.5: 극도공포 → 강한 역발상 매수
     BULLISH:        1.2,  // PCR > 1.2: 공포 → 역발상 매수
-    CAUTION_HIGH:   1.0,  // PCR > 1.0: 경계 시작 (신규: 경고 시그널)
-    NEUTRAL_HIGH:   0.90, // PCR 0.90~1.0: 중립 상단 (compositeScorer 미사용 — createPCRSignal 로직 개선 시 활용)
+    CAUTION_HIGH:   1.05, // PCR > 1.05: 경계 시작 (P1 강화: 1.0→1.05 과도 발화 억제)
+    NEUTRAL_HIGH:   0.90, // PCR 0.90~1.05: 중립 상단 (compositeScorer 미사용 — createPCRSignal 로직 개선 시 활용)
     NEUTRAL_LOW:    0.90, // PCR 0.90 이하: 경계 시작 (compositeScorer.js:78에서 참조)
-    CAUTION_LOW:    0.7,  // PCR 0.7~0.90: 경계 (신규)
+    CAUTION_LOW:    0.80, // PCR 0.80~0.90: 경계 (P1 강화: 0.7→0.80 과도 발화 억제)
     BEARISH:        0.7,  // PCR < 0.7: 탐욕 → 역발상 매도
     BEARISH_STRONG: 0.5,  // PCR < 0.5: 극도탐욕 → 강한 매도
   },
   FUNDING: {
     BEARISH_STRONG: 0.10, // > +0.10%: 강한 롱 과열
     BEARISH:        0.05, // > +0.05%: 롱 과열
-    CAUTION_BULL:   0.02, // > +0.02%: 롱 과열 징후 (완화: 0.03→0.02)
-    CAUTION_BEAR:  -0.02, // < -0.02%: 숏 과열 징후 (완화: -0.03→-0.02)
+    CAUTION_BULL:   0.03, // > +0.03%: 롱 과열 징후 (P1 강화: 0.02→0.03 과도 발화 억제)
+    CAUTION_BEAR:  -0.03, // < -0.03%: 숏 과열 징후 (P1 강화: -0.02→-0.03 과도 발화 억제)
     BULLISH:       -0.05, // < -0.05%: 숏 과열
     BULLISH_STRONG:-0.10, // < -0.10%: 강한 숏 과열
   },
   ORDER_FLOW: {
     STRONG:  0.30, // |imbalance| > 30%: 강한 불균형 시그널
-    CAUTION: 0.10, // |imbalance| > 10%: 주의 시그널 (완화: 0.15→0.10)
+    CAUTION: 0.15, // |imbalance| > 15%: 주의 시그널 (P1 강화: 0.10→0.15 과도 발화 억제)
   },
   SOCIAL: {
     BULLISH_STRONG: 0.85,
     BULLISH:        0.70,
     BEARISH:        0.30,
     BEARISH_STRONG: 0.15,
-    MIN_MESSAGES:    5,   // 5건 이상 (기존 10 → 5 완화)
+    MIN_MESSAGES:    8,   // 8건 이상 (P1 강화: 5→8 과도 발화 억제)
   },
   CROSS_MARKET: {
     DIVERGENCE: 3,        // 괴리율 3% 이상 시 시그널 (완화: 5→3)
@@ -40,13 +40,13 @@ export const THRESHOLDS = {
     MIN_NEWS: 2,          // 최소 뉴스 2건
   },
   MOMENTUM: {
-    MIN_SLOPE: 0.5,       // 최소 기울기 0.5%
+    MIN_SLOPE: 1.0,       // 최소 기울기 1.0% (P1 강화: 0.5→1.0 과도 발화 억제)
     STRONG: 3,            // 강한 모멘텀 3%
     MID: 1.5,             // 중간 모멘텀 1.5%
     MIN_SPARKLINE: 10,    // 최소 스파크라인 데이터 10개
   },
   VOL_PRICE: {
-    HIGH_VOL_LOW_PRICE_RATIO: 1.5, // 거래량 1.5배 이상인데 가격 정체 (완화: 2→1.5)
+    HIGH_VOL_LOW_PRICE_RATIO: 2.0, // 거래량 2.0배 이상인데 가격 정체 (P1 강화: 1.5→2.0 과도 발화 억제)
     HIGH_VOL_MAX_PRICE: 1.5,       // 가격 변동 1.5% 이하면 정체 (완화: 1→1.5, 2%는 국장 기준 정체 아님)
     BIG_PRICE_MIN: 5,              // 큰 가격 변동 최소 5%
     STRONG_RATIO: 5,               // 거래량 5배 이상 — 강한 누적 시그널
@@ -78,7 +78,7 @@ export const THRESHOLDS = {
     FEAR_GREED_MAX: 30,          // 공포탐욕 30 이하 (중간값: 25→30, 35는 투매 정의 희석 우려)
   },
   STEALTH: {
-    VOLUME_RATIO: 2,             // 거래량 평소 2배 이상 (완화: 3→2)
+    VOLUME_RATIO: 2.5,           // 거래량 평소 2.5배 이상 (P1 강화: 2→2.5 과도 발화 억제)
     NEWS_WINDOW_MS: 4 * 3600000, // 4시간 내 뉴스 클러스터 없어야 함
   },
   BTC_LEADING: {
@@ -104,11 +104,11 @@ export const THRESHOLDS = {
     VOLUME_NORMALIZE_RATIO: 1.5, // 거래량 정상화 (1.5배 이하)
   },
   SECTOR_OUTLIER: {
-    MIN_DEVIATION: 1.5,          // 섹터 평균 대비 최소 1.5σ 이탈 (완화: 2→1.5)
+    MIN_DEVIATION: 2.0,          // 섹터 평균 대비 최소 2.0σ 이탈 (P1 강화: 1.5→2.0 과도 발화 억제)
     MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
   },
   NEWS_CLUSTER: {
     WINDOW_MS: 4 * 3600000,      // 4시간 (원본 유지 — 8h는 집중 아님)
-    MIN_CLUSTER: 2,              // 완화: 3→2 (건수만 완화)
+    MIN_CLUSTER: 3,              // P1 강화: 2→3 (#221 시그널 품질 개선)
   },
 };
