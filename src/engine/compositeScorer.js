@@ -73,9 +73,9 @@ function calcSentimentScore(sentiment) {
   // PCR 역발상 (7% 가중)
   const pcr = sentiment.pcr;
   if (pcr != null) {
-    if (pcr > 1.2) score += 20;      // 풋 과잉 = 역발상 매수
-    else if (pcr > 1.0) score += 10;
-    else if (pcr < 0.7) score -= 20;  // 콜 과잉 = 역발상 매도
+    if (pcr > THRESHOLDS.PCR.BULLISH) score += 20;
+    else if (pcr > THRESHOLDS.PCR.CAUTION_HIGH) score += 10;
+    else if (pcr < THRESHOLDS.PCR.BEARISH) score -= 20;
     else if (pcr < THRESHOLDS.PCR.NEUTRAL_LOW) score -= 10;
   }
 

@@ -37,7 +37,7 @@ const SIGNAL_BOT_NAMES = {
 };
 
 // ── 카테고리 분류 ──
-const BOT_CATEGORIES = {
+export const BOT_CATEGORIES = {
   event: [
     'foreign_consecutive_buy', 'foreign_consecutive_sell',
     'institutional_consecutive_buy', 'institutional_consecutive_sell',

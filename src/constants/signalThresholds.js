@@ -110,5 +110,6 @@ export const THRESHOLDS = {
   NEWS_CLUSTER: {
     WINDOW_MS: 4 * 3600000,      // 4시간 (원본 유지 — 8h는 집중 아님)
     MIN_CLUSTER: 3,              // P1 강화: 2→3 (#221 시그널 품질 개선)
+    DOMINANCE_RATIO: 0.6,        // 방향 판정 최소 도미넌스 60%
   },
 };

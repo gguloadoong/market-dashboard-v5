@@ -844,7 +844,7 @@ export function removeAllSignalsByType(type) {
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
   if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
-  const dominance = 0.6;
+  const dominance = THRESHOLDS.NEWS_CLUSTER.DOMINANCE_RATIO;
   if (bullCount > bearCount && bullCount >= dominance * newsCount) direction = DIRECTIONS.BULLISH;
   else if (bearCount > bullCount && bearCount >= dominance * newsCount) direction = DIRECTIONS.BEARISH;
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;

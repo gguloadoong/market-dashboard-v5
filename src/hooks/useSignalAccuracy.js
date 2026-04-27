@@ -1,5 +1,6 @@
 // 시그널 적중률 조회 훅 — GET /api/signal-accuracy
 import { useQuery } from '@tanstack/react-query';
+import { BOT_CATEGORIES } from '../components/home/SignalScorecardTab';
 
 // 제거된 레거시 시그널 타입 — Supabase 과거 레코드 차단 (#162 whale 제거 후속)
 // 향후 Supabase 뷰 마이그레이션으로 whale_* 레코드 정리 완료 시 이 Set 제거
@@ -13,24 +14,8 @@ const LEGACY_SIGNAL_TYPES = new Set([
   'DNA', 'QUANT', 'SENSE', 'WALL_ST', 'SHARK', 'CONSENSUS',
 ]);
 
-// 성적표에 표시되어야 할 전체 봇 타입 목록 (SignalScorecardTab의 BOT_CATEGORIES와 동기화)
-const ALL_BOT_TYPES = [
-  // event
-  'foreign_consecutive_buy', 'foreign_consecutive_sell',
-  'institutional_consecutive_buy', 'institutional_consecutive_sell',
-  'volume_anomaly', 'fear_greed_shift',
-  'news_sentiment_cluster', 'sector_rotation', 'put_call_ratio',
-  'funding_rate_extreme', 'order_flow_imbalance', 'social_sentiment',
-  'sentiment_divergence', 'market_mood_shift', 'smart_money_flow',
-  // quant
-  'composite_score',
-  // pattern
-  'gap_analysis', 'rebalancing_alert', 'fx_impact', 'capitulation',
-  'stealth_activity', 'btc_leading', 'support_resistance_break',
-  'double_bottom', 'recovery_detection', 'sector_outlier',
-  'vwap_deviation', 'cross_market_correlation',
-  'momentum_divergence', 'volume_price_divergence',
-];
+// BOT_CATEGORIES에서 전체 봇 타입 동적 추출 — 단일 소스 (중복 정의 제거)
+const ALL_BOT_TYPES = Object.values(BOT_CATEGORIES).flat();
 
 async function fetchSignalAccuracy() {
   const res = await fetch('/api/signal-accuracy');
