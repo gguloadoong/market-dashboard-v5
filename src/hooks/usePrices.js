@@ -277,27 +277,7 @@ export function usePrices() {
     scheduleUs();
     scheduleKr();
 
-    // 시장 전환 감지기 — 1분마다 closed→open 전환 체크, 즉시 NORMAL 폴링 재시작
-    // CLOSED(5분) 타이머가 장 개시 직전 예약된 경우 최대 5분 stale 구간 방지
-    const transitionCheckerId = setInterval(() => {
-      if (destroyed) return;
-      const nowUsActive = usActive();
-      const nowKrActive = isKoreanMarketOpen();
-      if (!prevUsActive && nowUsActive) {
-        clearTimeout(usTimerId);
-        if (!usInFlight && !document.hidden) refreshUsStocks();
-        scheduleUs();
-      }
-      if (!prevKrActive && nowKrActive) {
-        clearTimeout(krTimerId);
-        if (!krInFlight && !document.hidden) refreshKoreanStocks();
-        scheduleKr();
-      }
-      prevUsActive = nowUsActive;
-      prevKrActive = nowKrActive;
-    }, 60_000);
-
-    // 탭 복귀 시 즉시 갱신 — in-flight 중이면 중복 호출 생략, gen 증가로 stale 체인 무효화
+    // 탭 복귀 시 즉시 갱신
     const onVisible = () => {
       if (document.hidden) return;
       clearTimeout(usTimerId);
@@ -308,6 +288,29 @@ export function usePrices() {
       scheduleKr();
     };
     document.addEventListener('visibilitychange', onVisible);
+
+    // 시장 전환 감지 — 2분마다 체크 (CLOSED 5분 stale 방지)
+    // prev는 hidden 여부와 무관하게 항상 최신 갱신 (hidden→visible 후 spurious 트리거 방지)
+    const transitionCheckerId = setInterval(() => {
+      if (destroyed) return;
+      const nowUsActive = usActive();
+      const nowKrActive = isKoreanMarketOpen();
+      if (!document.hidden) {
+        if (!prevUsActive && nowUsActive) {
+          clearTimeout(usTimerId);
+          if (!usInFlight) refreshUsStocks();
+          scheduleUs();
+        }
+        if (!prevKrActive && nowKrActive) {
+          clearTimeout(krTimerId);
+          if (!krInFlight) refreshKoreanStocks();
+          scheduleKr();
+        }
+      }
+      prevUsActive = nowUsActive;
+      prevKrActive = nowKrActive;
+    }, 2 * 60_000);
+
     return () => {
       destroyed = true;
       clearTimeout(usTimerId);

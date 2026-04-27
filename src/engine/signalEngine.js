@@ -7,8 +7,33 @@ const MAX_SIGNALS = 100;
 let _signals = [];
 let _subscribers = [];
 
+// ─── 배치 모드 — 스캔 중 다수 addSignal 호출을 하나의 _notify로 압축 ──
+let _batchDepth = 0;
+let _batchDirty = false;
+
+export function beginBatch() {
+  _batchDepth++;
+}
+
+export function endBatch() {
+  if (_batchDepth === 0) {
+    if (import.meta.env?.DEV) console.warn('[signalEngine] endBatch without matching beginBatch — leak 가능성');
+    return;
+  }
+  _batchDepth--;
+  if (_batchDepth === 0 && _batchDirty) {
+    _batchDirty = false;
+    _notify();
+  }
+}
+
 // ─── 구독자 알림 ────────────────────────────────────────────
 function _notify() {
+  // 배치 중이면 즉시 알림 대신 dirty 플래그만 — endBatch에서 1회 호출
+  if (_batchDepth > 0) {
+    _batchDirty = true;
+    return;
+  }
   const active = getActiveSignals();
   _subscribers.forEach(fn => fn(active));
 }
