@@ -20,6 +20,8 @@ export default function SignalBoardWidget({ onItemClick }) {
   const [activeTab, setActiveTab] = useState('live');
   // 모바일 기본 접힘 — 카운터만 노출
   const [expanded, setExpanded] = useState(false);
+  // 방향 필터 — null=전체, 'bullish', 'bearish', 'neutral'
+  const [filterDir, setFilterDir] = useState(null);
   const allSignals = useTopSignals(20);
   const { botMap } = useSignalAccuracy();
 
@@ -53,7 +55,15 @@ export default function SignalBoardWidget({ onItemClick }) {
     return all;
   }, [bullSignals, bearSignals, neutralSignals]);
 
-  const displayList = expanded ? combinedList : combinedList.slice(0, 5);
+  // 방향 필터 적용
+  const filteredCombinedList = useMemo(() => {
+    if (!filterDir) return combinedList;
+    if (filterDir === 'bullish') return bullSignals;
+    if (filterDir === 'bearish') return bearSignals;
+    return neutralSignals;
+  }, [filterDir, combinedList, bullSignals, bearSignals, neutralSignals]);
+
+  const displayList = expanded ? filteredCombinedList : filteredCombinedList.slice(0, 5);
 
   const handleClick = useCallback((signal) => {
     if (signal.symbol && onItemClick) {
@@ -122,17 +132,26 @@ export default function SignalBoardWidget({ onItemClick }) {
 
       {/* 카운터 3개 — 큰 숫자 + 레이블만 (카드 배경 없음) */}
       <div className="flex gap-8 mb-5 px-1">
-        <button className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setExpanded(true)}>
-          <div className="text-[28px] font-extrabold text-[#F04452] leading-none tracking-tight">{bullCount}</div>
-          <div className="text-[12px] font-medium text-[#8B95A1] mt-1">강세 시그널</div>
+        <button
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => { setExpanded(true); setFilterDir(d => d === 'bullish' ? null : 'bullish'); }}
+        >
+          <div className={`text-[28px] font-extrabold leading-none tracking-tight ${filterDir === 'bullish' ? 'underline underline-offset-4' : ''}`} style={{ color: '#F04452' }}>{bullCount}</div>
+          <div className={`text-[12px] font-medium mt-1 ${filterDir === 'bullish' ? 'text-[#F04452] font-bold' : 'text-[#8B95A1]'}`}>강세 시그널</div>
         </button>
-        <button className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setExpanded(true)}>
-          <div className="text-[28px] font-extrabold text-[#1764ED] leading-none tracking-tight">{bearCount}</div>
-          <div className="text-[12px] font-medium text-[#8B95A1] mt-1">약세 시그널</div>
+        <button
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => { setExpanded(true); setFilterDir(d => d === 'bearish' ? null : 'bearish'); }}
+        >
+          <div className={`text-[28px] font-extrabold leading-none tracking-tight ${filterDir === 'bearish' ? 'underline underline-offset-4' : ''}`} style={{ color: '#1764ED' }}>{bearCount}</div>
+          <div className={`text-[12px] font-medium mt-1 ${filterDir === 'bearish' ? 'text-[#1764ED] font-bold' : 'text-[#8B95A1]'}`}>약세 시그널</div>
         </button>
-        <button className="cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setExpanded(true)}>
-          <div className="text-[28px] font-extrabold text-[#8B95A1] leading-none tracking-tight">{neutralCount}</div>
-          <div className="text-[12px] font-medium text-[#8B95A1] mt-1">중립</div>
+        <button
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => { setExpanded(true); setFilterDir(d => d === 'neutral' ? null : 'neutral'); }}
+        >
+          <div className={`text-[28px] font-extrabold leading-none tracking-tight ${filterDir === 'neutral' ? 'underline underline-offset-4' : ''}`} style={{ color: '#8B95A1' }}>{neutralCount}</div>
+          <div className={`text-[12px] font-medium mt-1 ${filterDir === 'neutral' ? 'text-[#4E5968] font-bold' : 'text-[#8B95A1]'}`}>중립</div>
         </button>
       </div>
 
