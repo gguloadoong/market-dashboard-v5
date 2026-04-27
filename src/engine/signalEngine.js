@@ -715,7 +715,7 @@ export function createCapitulationSignal(symbol, name, market, priceDrop, volRat
   }));
 }
 
-/** 내부자 의심 (스텔스 활동) — 거래량 폭발인데 뉴스 없음 */
+/** 스텔스 활동 — 거래량 폭발인데 뉴스 없음 */
 export function createStealthActivitySignal(symbol, name, market, volRatio) {
   const T = THRESHOLDS.STEALTH;
   if (volRatio < T.VOLUME_RATIO) return null;
@@ -728,7 +728,7 @@ export function createStealthActivitySignal(symbol, name, market, volRatio) {
   if (hasNews) return null; // 뉴스 있으면 스텔스 아님
 
   const strength = hasVolume ? 4 : 3;
-  const title = `${name} 뉴스 없는 거래량 ${volRatio.toFixed(1)}배 폭발 — 내부자 의심`;
+  const title = `${name} 뉴스 없는 거래량 ${volRatio.toFixed(1)}배 폭발 — 거래 패턴 주목`;
 
   return addSignal(createSignal({
     type: SIGNAL_TYPES.STEALTH_ACTIVITY,

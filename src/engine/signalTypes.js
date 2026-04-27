@@ -121,7 +121,7 @@ export const TYPE_META = {
     easyDesc: (m) => {
       const pct = m?.changePct ?? 0;
       const name = m?.name || '종목';
-      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 투매 또는 세력 매집 주의`;
+      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 이상 거래량 감지`;
       if (pct >= 1) return `${name} 상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
       return `${name} 거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
     },
@@ -219,7 +219,7 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.STEALTH_ACTIVITY]: {
     easyLabel: '뉴스 없는 거래 폭발 👀',
-    easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 누군가 움직이고 있어요`,
+    easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 거래 패턴 변화 감지`,
   },
   [SIGNAL_TYPES.BTC_LEADING]: {
     easyLabel: (m) => `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
