@@ -28,7 +28,7 @@ const SIGNAL_BOT_NAMES = {
   rebalancing_alert:             '리밸런싱 경보',
   fx_impact:                     '환율 충격',
   capitulation:                  '투매 감지',
-  stealth_activity:              '세력 의심 매집',
+  stealth_activity:              '뉴스 없는 거래 폭발',
   btc_leading:                   'BTC 선행 신호',
   support_resistance_break:      '지지·저항 돌파',
   double_bottom:                 '이중바닥 패턴',
