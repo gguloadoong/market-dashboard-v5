@@ -6,5 +6,8 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "regions": ["icn1"],
-  "ignoreCommand": "exit 0"
+  "ignoreCommand": "exit 0",
+  "crons": [
+    { "path": "/api/cron/compute-signals", "schedule": "*/10 * * * *" }
+  ]
 }

@@ -54,6 +54,9 @@ function _resolvePrice(meta) {
 }
 
 export function addSignal(signal) {
+  // 서버 관할 타입은 loadSignals 전용 — 클라이언트 경로 차단 (깜빡임 방지)
+  if (SERVER_SIGNAL_TYPES.has(signal.type)) return signal;
+
   // 중복 제거: 같은 type+symbol 조합
   const existIdx = _signals.findIndex(
     s => s.type === signal.type && s.symbol === signal.symbol,
@@ -853,6 +856,52 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
     symbol, name, market, direction, strength,
     title, meta: { count: newsCount, bullCount, bearCount },
   }));
+}
+
+// 서버 시그널 관할 타입 (클라이언트 계산 대상에서 제외)
+const SERVER_SIGNAL_TYPES = new Set([
+  SIGNAL_TYPES.COMPOSITE_SCORE,
+  SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
+  SIGNAL_TYPES.DOUBLE_BOTTOM,
+  SIGNAL_TYPES.RECOVERY_DETECTION,
+]);
+
+/** 서버 사전 계산 시그널 일괄 로드 — 서버 관할 타입만 replace (stale 방지) */
+export function loadSignals(serverArr) {
+  if (!Array.isArray(serverArr)) return;
+  const now = Date.now();
+
+  // 서버 관할 타입 기존 시그널 전부 제거
+  _signals = _signals.filter(s => !SERVER_SIGNAL_TYPES.has(s.type));
+
+  // 서버 응답 주입
+  // TODO(#215 Phase 2): addSignal 경유 시 _recordForAccuracy 호출 가능하나
+  // 서버 생성 시그널은 price_at_fire가 이미 확정이므로 별도 accuracy 파이프라인 필요
+  const seenIds = new Set();
+  for (const raw of serverArr) {
+    if (!SERVER_SIGNAL_TYPES.has(raw.type)) continue;
+    if (!raw.symbol || !raw.market || !raw.direction) continue; // 필수 필드 방어
+    const id = raw.id || _generateId();
+    if (seenIds.has(id)) continue; // 페이로드 내 중복 방어
+    seenIds.add(id);
+    _signals.push({
+      ...raw,
+      id,
+      timestamp: raw.timestamp || now,
+      expiresAt: raw.expiresAt || (now + getTTL(raw.type)),
+    });
+  }
+
+  if (_signals.length > MAX_SIGNALS) {
+    _signals.sort((a, b) => b.timestamp - a.timestamp);
+    _signals = _signals.slice(0, MAX_SIGNALS);
+  }
+
+  _notify(); // 한 번만 — 폭주 차단
+}
+
+export function isServerManagedSignalType(type) {
+  return SERVER_SIGNAL_TYPES.has(type);
 }
 
 /** 마켓 온도계 — 활성 시그널 가중합 → -1(극도약세) ~ +1(극도강세) */
