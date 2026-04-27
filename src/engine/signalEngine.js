@@ -409,12 +409,12 @@ export function createPCRSignal(pcr, totalPuts, totalCalls) {
     strength = pcr < T.BEARISH_STRONG ? 4 : 3;
     hint = '역발상 매도 구간';
   } else if (pcr < T.CAUTION_LOW) {
-    // 0.7~0.85: 경계 하단 — 탐욕 징후
+    // BEARISH(0.70)~CAUTION_LOW(0.80): 경계 하단 — 탐욕 징후
     direction = DIRECTIONS.BEARISH;
     strength = 2;
     hint = '탐욕 징후 — 주의';
   } else {
-    return null; // 0.85~1.0: 완전 중립
+    return null; // CAUTION_LOW(0.80)~CAUTION_HIGH(1.05): 완전 중립
   }
   const title = `S&P500 PCR ${pcr.toFixed(2)} — ${hint}`;
   return addSignal(createSignal({
@@ -845,8 +845,9 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
   if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
   const dominance = THRESHOLDS.NEWS_CLUSTER.DOMINANCE_RATIO;
-  if (bullCount > bearCount && bullCount >= dominance * newsCount) direction = DIRECTIONS.BULLISH;
-  else if (bearCount > bullCount && bearCount >= dominance * newsCount) direction = DIRECTIONS.BEARISH;
+  const directional = bullCount + bearCount; // neutral 제외 — 방향성 있는 뉴스만 분모
+  if (directional > 0 && bullCount > bearCount && bullCount / directional >= dominance) direction = DIRECTIONS.BULLISH;
+  else if (directional > 0 && bearCount > bullCount && bearCount / directional >= dominance) direction = DIRECTIONS.BEARISH;
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;

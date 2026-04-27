@@ -76,7 +76,8 @@ function calcSentimentScore(sentiment) {
     if (pcr > THRESHOLDS.PCR.BULLISH) score += 20;
     else if (pcr > THRESHOLDS.PCR.CAUTION_HIGH) score += 10;
     else if (pcr < THRESHOLDS.PCR.BEARISH) score -= 20;
-    else if (pcr < THRESHOLDS.PCR.NEUTRAL_LOW) score -= 10;
+    else if (pcr < THRESHOLDS.PCR.CAUTION_LOW) score -= 10;   // 0.70~0.80: 약한 탐욕
+    else if (pcr < THRESHOLDS.PCR.NEUTRAL_LOW) score -= 5;    // 0.80~0.90: 경계 초입
   }
 
   return Math.max(-100, Math.min(100, score));
