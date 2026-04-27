@@ -289,18 +289,23 @@ export function usePrices() {
     };
     document.addEventListener('visibilitychange', onVisible);
 
-    // 시장 전환 감지 — 2분마다 체크 (CLOSED 5분 stale 방지, document.hidden 시 skip)
+    // 시장 전환 감지 — 2분마다 체크 (CLOSED 5분 stale 방지)
+    // prev는 hidden 여부와 무관하게 항상 최신 갱신 (hidden→visible 후 spurious 트리거 방지)
     const transitionCheckerId = setInterval(() => {
-      if (destroyed || document.hidden) return;
+      if (destroyed) return;
       const nowUsActive = usActive();
       const nowKrActive = isKoreanMarketOpen();
-      if ((!prevUsActive && nowUsActive) || (!prevKrActive && nowKrActive)) {
-        clearTimeout(usTimerId);
-        clearTimeout(krTimerId);
-        if (!usInFlight) refreshUsStocks();
-        if (!krInFlight) refreshKoreanStocks();
-        scheduleUs();
-        scheduleKr();
+      if (!document.hidden) {
+        if (!prevUsActive && nowUsActive) {
+          clearTimeout(usTimerId);
+          if (!usInFlight) refreshUsStocks();
+          scheduleUs();
+        }
+        if (!prevKrActive && nowKrActive) {
+          clearTimeout(krTimerId);
+          if (!krInFlight) refreshKoreanStocks();
+          scheduleKr();
+        }
       }
       prevUsActive = nowUsActive;
       prevKrActive = nowKrActive;
