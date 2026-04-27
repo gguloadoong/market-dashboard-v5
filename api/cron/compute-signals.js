@@ -2,7 +2,7 @@
 // Vercel Cron이 10분마다 호출: */10 * * * *
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
-import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
+import { setSnap, recordCronFailure } from '../_price-cache.js';
 import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 120 };
