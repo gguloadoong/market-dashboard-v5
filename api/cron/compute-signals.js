@@ -590,18 +590,18 @@ async function fetchGlobalSentiment() {
 
 // ─── 메인 핸들러 ────────────────────────────────────────
 export default async function handler(req, res) {
-  // CRON_SECRET 인증 — fail-closed: 환경변수 미설정 시 호출 차단
-  const authHeader = req.headers['authorization'] || '';
-  if (!process.env.CRON_SECRET) {
-    return res.status(500).json({ error: 'CRON_SECRET not configured' });
-  }
-  const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
-  const incoming = Buffer.from(authHeader);
-  if (incoming.length !== expected.length) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  if (!timingSafeEqual(incoming, expected)) {
-    return res.status(401).json({ error: 'unauthorized' });
+  // CRON_SECRET 인증 — Vercel 내부 cron(x-vercel-cron) 또는 Bearer 토큰
+  const isVercelInternal = !!req.headers['x-vercel-cron'];
+  if (!isVercelInternal) {
+    const authHeader = req.headers['authorization'] || '';
+    if (!process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const expected = Buffer.from(`Bearer ${process.env.CRON_SECRET}`);
+    const incoming = Buffer.from(authHeader);
+    if (incoming.length !== expected.length || !timingSafeEqual(incoming, expected)) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
   }
 
   const startedAt = Date.now();
