@@ -1,6 +1,7 @@
 // 시그널 봇 성적표 탭 — 적중률 기반 봇 랭킹
 import { useState, useMemo } from 'react';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
+import { BOT_CATEGORIES } from '../../constants/signalBotCategories';
 
 // ── 봇 한국어 이름 매핑 (사용자 친화 명칭) ──
 const SIGNAL_BOT_NAMES = {
@@ -36,27 +37,7 @@ const SIGNAL_BOT_NAMES = {
   sector_outlier:                '섹터 이탈 종목',
 };
 
-// ── 카테고리 분류 ──
-export const BOT_CATEGORIES = {
-  event: [
-    'foreign_consecutive_buy', 'foreign_consecutive_sell',
-    'institutional_consecutive_buy', 'institutional_consecutive_sell',
-    'volume_anomaly', 'fear_greed_shift',
-    'news_sentiment_cluster', 'sector_rotation', 'put_call_ratio',
-    'funding_rate_extreme', 'order_flow_imbalance', 'social_sentiment',
-    'sentiment_divergence', 'market_mood_shift',
-    'smart_money_flow', // 신규 추가 — 외국인+기관 동시 흐름 이벤트
-  ],
-  quant: ['composite_score'],
-  pattern: [
-    'gap_analysis', 'rebalancing_alert', 'fx_impact', 'capitulation',
-    'stealth_activity', 'btc_leading', 'support_resistance_break',
-    'double_bottom', 'recovery_detection', 'sector_outlier',
-    'vwap_deviation', 'cross_market_correlation',
-    'momentum_divergence', // 신규 추가 — 추세 전환 패턴
-    'volume_price_divergence', // 신규 추가 — 거래량·가격 괴리 패턴
-  ],
-};
+// ── 카테고리 분류 (src/constants/signalBotCategories.js 단일 소스) ──
 
 // 타입 → 카테고리 역매핑
 const TYPE_TO_CATEGORY = {};

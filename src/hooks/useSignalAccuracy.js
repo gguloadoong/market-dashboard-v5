@@ -1,6 +1,6 @@
 // 시그널 적중률 조회 훅 — GET /api/signal-accuracy
 import { useQuery } from '@tanstack/react-query';
-import { BOT_CATEGORIES } from '../components/home/SignalScorecardTab';
+import { BOT_CATEGORIES } from '../constants/signalBotCategories';
 
 // 제거된 레거시 시그널 타입 — Supabase 과거 레코드 차단 (#162 whale 제거 후속)
 // 향후 Supabase 뷰 마이그레이션으로 whale_* 레코드 정리 완료 시 이 Set 제거
