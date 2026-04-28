@@ -15,12 +15,19 @@ function getPct(w) {
   return Number.isFinite(raw) ? raw : 0;
 }
 
-// symbol + market 일치 여부 — 동명이종 시장 혼돈 방지
+// 시장 코드 정규화 — _market='KR'/'US'/'COIN'(대문자) ↔ signal.market='kr'/'us'/'crypto'
+function normalizeMarket(m) {
+  if (!m) return '';
+  const s = m.toLowerCase();
+  return s === 'coin' ? 'crypto' : s;
+}
+
+// symbol + market 복합 매칭 — 동명이종 시장 혼돈 방지
 function matchesMarket(watchItem, signal) {
   const wm = watchItem?._market ?? watchItem?.market;
   const sm = signal?.market;
   if (!wm || !sm) return true; // 한쪽이 없으면 symbol만으로 허용
-  return wm === sm;
+  return normalizeMarket(wm) === normalizeMarket(sm);
 }
 
 export function useWatchlistAlert(watchedItems = []) {
