@@ -17,6 +17,7 @@
    ├── TemperatureBar      — 시장 온도 인라인 바 + 공포탐욕 점수 + 지수 미니카드
    ├── HeroSignalCard      — 최강 시그널 TOP3 카드 (md:grid-cols-[1fr_260px])
    ├── WatchlistMini       — 관심종목 (마켓 배지 KR/US/COIN + 추가 버튼 + 검색 링크)
+   │   └── WatchlistAlertStrip — 이상 신호 스트립 (±3% 변동/시그널 발화 시만 표시, inline)
    └── EventStrip          — EventTicker 세로 롤링 (translateY, 3아이템, 9초 순환)
 2. NotableMoversSection    — 주목할 종목 (WHY 카드)
 3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분)

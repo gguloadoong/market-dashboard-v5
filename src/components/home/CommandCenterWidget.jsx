@@ -1,6 +1,7 @@
 // 커맨드 센터 위젯 — MarketPulse + Sentiment + HeroSignal + Watchlist + EventTicker 통합
 import { useMemo } from 'react';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
+import { useWatchlistAlert } from '../../hooks/useWatchlistAlert';
 import { useFearGreedScores } from '../../hooks/useFearGreed';
 import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
@@ -231,6 +232,48 @@ function getMktBadge(item) {
   return MKT_BADGE_CONFIG.US;
 }
 
+// 관심종목 이상 신호 스트립 — ±3% 이상 변동/시그널 발화 시만 1줄 표시
+function WatchlistAlertStrip({ watchedItems, onItemClick }) {
+  const alerts = useWatchlistAlert(watchedItems);
+  if (!alerts.length) return null;
+
+  return (
+    <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-3 -mx-3 mb-2 text-[12px] border-b border-gray-100 dark:border-gray-800">
+      {alerts.map((a, idx) => {
+        const isBull = a.direction === 'bullish';
+        const color = isBull ? '#F04452' : '#1764ED';
+        const isSignal = a.type === 'signal';
+        return (
+          <span key={`${a.symbol}-${a.type}-${idx}`} className="inline-flex items-center gap-1 whitespace-nowrap">
+            {idx > 0 && <span className="text-[#E5E8EB] dark:text-gray-700 mr-1">·</span>}
+            <span
+              className="inline-flex items-center gap-1 cursor-pointer hover:underline"
+              onClick={() => a.item && onItemClick?.(a.item)}
+              role="button"
+              tabIndex={0}
+            >
+              {isSignal ? (
+                <>
+                  <span aria-hidden="true">{isBull ? '🟢' : '🔴'}</span>
+                  <span className="font-semibold text-[#191F28] dark:text-gray-100">{a.name}</span>
+                  <span className="text-[#4E5968] dark:text-gray-400">시그널</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-[#191F28] dark:text-gray-100">{a.name}</span>
+                  <span className="font-bold tabular-nums font-mono" style={{ color }}>
+                    {a.pct > 0 ? '+' : ''}{a.pct.toFixed(1)}%
+                  </span>
+                </>
+              )}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
   const items = watchedItems.length > 0 ? watchedItems.slice(0, 6) : popularItems.slice(0, 4);
   const isEmpty = watchedItems.length === 0;
@@ -242,6 +285,9 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
         <span className="text-[14px] font-bold text-[#191F28]">관심종목</span>
         <span className="text-[12px] font-medium text-[#8B95A1] cursor-pointer hover:text-[#4E5968]">/ 검색</span>
       </div>
+
+      {/* 이상 신호 스트립 — alerts 비면 null 반환 */}
+      <WatchlistAlertStrip watchedItems={watchedItems} onItemClick={onItemClick} />
 
       {/* 빈 상태 안내 */}
       {isEmpty && (
