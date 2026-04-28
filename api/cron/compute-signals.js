@@ -574,20 +574,31 @@ function buildRecoverySignal(target, rec, currentPrice) {
 // ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
 // 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
 // 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
-// 2h TTL — 장 중 안정적 캐시, 마감(15:30 KST) 후 2h 이내 신선 데이터 보장
-// 날짜 기반 키는 일중 데이터 갱신을 반영 못하므로 단순 TTL 방식 사용
+// 장 외(장 마감 15:30 KST 이후 ~ 다음 날 장 개시 전)에만 2h 캐시 적용
+// 장 중에는 Naver 일중 데이터 변동 가능성이 있으므로 매 cron 신선 fetch
 const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
 const KR_FLOW_CACHE_TTL = 2 * 3600;
 
+function isKrxMarketOpen() {
+  const kst = new Date(Date.now() + 9 * 3600 * 1000);
+  const day = kst.getUTCDay(); // 0=일, 6=토
+  if (day === 0 || day === 6) return false;
+  const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return minutes >= 9 * 60 && minutes < 15 * 60 + 30; // KST 09:00~15:30
+}
+
 async function fetchKrFlowMap(krSymbols) {
-  // 캐시 우선 조회 — 현재 심볼셋 전체 커버 여부 확인 후 반환
+  // 장 중에는 캐시 skip — 장 외에만 2h 캐시 (매 cron 신선 fetch로 정확도 보장)
   const cacheKey = KR_FLOW_CACHE_KEY;
-  try {
-    const cached = await getSnap(cacheKey);
-    if (cached && typeof cached === 'object' && krSymbols.every((s) => s in cached)) {
-      return new Map(Object.entries(cached));
-    }
-  } catch { /* cache miss → fresh fetch */ }
+  const marketOpen = isKrxMarketOpen();
+  if (!marketOpen) {
+    try {
+      const cached = await getSnap(cacheKey);
+      if (cached && typeof cached === 'object' && krSymbols.every((s) => s in cached)) {
+        return new Map(Object.entries(cached));
+      }
+    } catch { /* cache miss → fresh fetch */ }
+  }
 
   const map = new Map();
   await Promise.allSettled(
@@ -653,9 +664,8 @@ async function fetchKrFlowMap(krSymbols) {
     })
   );
 
-  // 전체 성공 시에만 캐시 저장 — 부분 실패는 메모리 반환만 (오염 방지)
-  // 부분 실패 시 매 cron 재시도는 의도적 — Naver 회복 후 즉시 정상화 보장
-  if (map.size === krSymbols.length) {
+  // 장 외 + 전체 성공 시에만 캐시 저장 (장 중 신선도 보장, 부분 실패 오염 방지)
+  if (!marketOpen && map.size === krSymbols.length) {
     try {
       await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
     } catch { /* cache write 실패는 무시 */ }
