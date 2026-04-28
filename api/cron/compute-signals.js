@@ -571,6 +571,54 @@ function buildRecoverySignal(target, rec, currentPrice) {
   };
 }
 
+// ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
+async function fetchKrFlowMap(krSymbols) {
+  const map = new Map();
+  await Promise.allSettled(
+    krSymbols.map(async (symbol) => {
+      try {
+        const url = `https://m.stock.naver.com/api/stock/${symbol}/investors?periodType=DAILY&count=10`;
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Referer': 'https://m.stock.naver.com/',
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
+        if (!list.length) return;
+
+        let foreignBuyDays = 0, foreignSellDays = 0;
+        let instBuyDays = 0, instSellDays = 0;
+        let fBuyStreak = true, fSellStreak = true, iBuyStreak = true, iSellStreak = true;
+
+        for (const row of list.slice(0, 10)) {
+          const toNum = (v) => parseInt(String(v ?? 0).replace(/,/g, ''), 10) || 0;
+          const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
+          const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
+
+          if (fBuyStreak && foreign > 0) foreignBuyDays++;
+          else fBuyStreak = false;
+          if (fSellStreak && foreign < 0) foreignSellDays++;
+          else fSellStreak = false;
+          if (iBuyStreak && inst > 0) instBuyDays++;
+          else iBuyStreak = false;
+          if (iSellStreak && inst < 0) instSellDays++;
+          else iSellStreak = false;
+        }
+
+        map.set(symbol, { foreignBuyDays, foreignSellDays, instBuyDays, instSellDays, volumeRatio: 1 });
+      } catch {
+        // 실패 시 해당 종목 flow=null 유지 (전체 크론 영향 없음)
+      }
+    })
+  );
+  return map;
+}
+
 // ─── 시장 sentiment 글로벌 fetch (best-effort) ──
 async function fetchGlobalSentiment() {
   const sentiment = { fearGreed: null, fundingRate: null, pcr: null };
@@ -613,6 +661,13 @@ export default async function handler(req, res) {
   try {
     globalSentiment = await fetchGlobalSentiment();
   } catch { /* ignore */ }
+
+  // KR 투자자 동향 사전 fetch (외인/기관 연속 매수매도일 계산)
+  const krSymbols = TARGETS.filter((t) => t.market === 'kr').map((t) => t.symbol);
+  let krFlowMap = new Map();
+  try {
+    krFlowMap = await fetchKrFlowMap(krSymbols);
+  } catch { /* flow=null fallback */ }
 
   let fetchedCount = 0;
   const BATCH_SIZE = 15; // 동시 처리 상향 — maxDuration 120s로 여유 확보
@@ -663,10 +718,12 @@ export default async function handler(req, res) {
           pcr: isCrypto ? null : globalSentiment.pcr,
         };
 
-        // 복합 점수 — flow=null 시 TA(40%)+sentiment(25%)만 = 최대 65점
-        // 임계값 30 = compositeScorer 라벨 경계(±30)와 일치 → NEUTRAL 시그널 노출 방지
-        const composite = calculateCompositeScore(ta, null, sentiment);
-        if (Math.abs(composite.score) >= 30) {
+        // 복합 점수 — KR 종목은 flow(외인/기관) 35% 가중치 활성화, 코인/미장은 flow=null
+        // 임계값: flow 포함 KR=40, 나머지=30 (flow 35% 추가 시 점수 상승 반영)
+        const flow = target.market === 'kr' ? (krFlowMap.get(target.symbol) ?? null) : null;
+        const compositeThreshold = (target.market === 'kr' && flow) ? 40 : 30;
+        const composite = calculateCompositeScore(ta, flow, sentiment);
+        if (Math.abs(composite.score) >= compositeThreshold) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
 
