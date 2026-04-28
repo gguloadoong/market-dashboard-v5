@@ -870,9 +870,10 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
   if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
   const dominance = THRESHOLDS.NEWS_CLUSTER.DOMINANCE_RATIO;
-  const directional = bullCount + bearCount; // neutral 제외 — 방향성 있는 뉴스만 분모
-  if (directional > 0 && bullCount > bearCount && bullCount / directional >= dominance) direction = DIRECTIONS.BULLISH;
-  else if (directional > 0 && bearCount > bullCount && bearCount / directional >= dominance) direction = DIRECTIONS.BEARISH;
+  const directional = bullCount + bearCount;
+  // 분모: newsCount (전체 기준) — directional만 분모로 쓰면 중립 기사 다수 시 소수 bull/bear가 방향성 과장 (#234)
+  if (directional > 0 && bullCount > bearCount && bullCount / newsCount >= dominance) direction = DIRECTIONS.BULLISH;
+  else if (directional > 0 && bearCount > bullCount && bearCount / newsCount >= dominance) direction = DIRECTIONS.BEARISH;
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;
