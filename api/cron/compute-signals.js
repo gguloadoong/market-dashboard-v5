@@ -2,7 +2,7 @@
 // Vercel Cron이 10분마다 호출: */10 * * * *
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
-import { setSnap, recordCronFailure } from '../_price-cache.js';
+import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
 import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 120 };
@@ -572,7 +572,20 @@ function buildRecoverySignal(target, rec, currentPrice) {
 }
 
 // ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
+// 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
+// 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
+const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
+const KR_FLOW_CACHE_TTL = 12 * 3600; // 12시간 — 일 단위 데이터, cron 10분마다 Naver 호출 방지
+
 async function fetchKrFlowMap(krSymbols) {
+  // 캐시 우선 조회 (12h TTL)
+  try {
+    const cached = await getSnap(KR_FLOW_CACHE_KEY);
+    if (cached && typeof cached === 'object' && Object.keys(cached).length > 0) {
+      return new Map(Object.entries(cached));
+    }
+  } catch { /* cache miss → fresh fetch */ }
+
   const map = new Map();
   await Promise.allSettled(
     krSymbols.map(async (symbol) => {
@@ -588,15 +601,28 @@ async function fetchKrFlowMap(krSymbols) {
         });
         if (!res.ok) return;
         const json = await res.json();
-        const list = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
-        if (!list.length) return;
+        const rawList = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
+        if (!rawList.length) return;
+
+        // shape 검증 — 외인/기관 필드 중 하나라도 존재하지 않으면 flow 미적용 (silent zero 방지)
+        const sample = rawList[0];
+        const hasForeignField = 'frgnNetAmt' in sample || 'frgNetAmt' in sample || 'foreignNetAmt' in sample;
+        const hasInstField = 'instNetAmt' in sample || 'institutionNetAmt' in sample;
+        if (!hasForeignField || !hasInstField) return;
+
+        // 정렬 검증 — 명시적으로 최신 날짜 우선 정렬 (Naver 응답 순서 변경 대비)
+        const dateKey = (r) => String(r.bizDate ?? r.baseDate ?? r.date ?? '');
+        const list = rawList.slice().sort((a, b) => dateKey(b).localeCompare(dateKey(a))).slice(0, 10);
 
         let foreignBuyDays = 0, foreignSellDays = 0;
         let instBuyDays = 0, instSellDays = 0;
         let fBuyStreak = true, fSellStreak = true, iBuyStreak = true, iSellStreak = true;
 
-        for (const row of list.slice(0, 10)) {
-          const toNum = (v) => parseInt(String(v ?? 0).replace(/,/g, ''), 10) || 0;
+        for (const row of list) {
+          const toNum = (v) => {
+            const n = parseInt(String(v ?? 0).replace(/,/g, ''), 10);
+            return Number.isFinite(n) ? n : 0;
+          };
           const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
           const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
 
@@ -616,6 +642,14 @@ async function fetchKrFlowMap(krSymbols) {
       }
     })
   );
+
+  // 캐시 저장 (성공 항목이 있을 때만, 12h TTL)
+  if (map.size > 0) {
+    try {
+      await setSnap(KR_FLOW_CACHE_KEY, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
+    } catch { /* cache write 실패는 무시 */ }
+  }
+
   return map;
 }
 
@@ -719,10 +753,13 @@ export default async function handler(req, res) {
         };
 
         // 복합 점수 — KR 종목은 flow(외인/기관) 35% 가중치 활성화, 코인/미장은 flow=null
-        // 임계값: flow 포함 KR=40, 나머지=30 (flow 35% 추가 시 점수 상승 반영)
+        // volumeRatio는 1 고정 (Naver 거래량 미포함 — 향후 통합 예정)
+        // 임계값: flow가 실제 기여(flowScore≠0)한 경우만 40, 그 외 30 유지
+        //   → flowScore=0인 종목에 threshold만 높이면 기존 시그널 누락 발생하므로 사후 결정
         const flow = target.market === 'kr' ? (krFlowMap.get(target.symbol) ?? null) : null;
-        const compositeThreshold = (target.market === 'kr' && flow) ? 40 : 30;
         const composite = calculateCompositeScore(ta, flow, sentiment);
+        const flowContributed = Math.abs(composite.breakdown?.flow?.score ?? 0) > 0;
+        const compositeThreshold = flowContributed ? 40 : 30;
         if (Math.abs(composite.score) >= compositeThreshold) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
