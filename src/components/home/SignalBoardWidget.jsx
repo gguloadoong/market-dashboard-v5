@@ -5,6 +5,9 @@ import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { SIGNAL_TYPES } from '../../engine/signalTypes';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
+import { buildNarrative } from '../../utils/narrativeBuilder';
+import { matchesKeywords, buildStockKeywords } from '../../utils/newsAlias';
+import { KR_SECTOR_MAP } from '../../data/krStockList';
 import TickerLogo from './TickerLogo';
 import SignalScorecardTab from './SignalScorecardTab';
 
@@ -15,7 +18,7 @@ const FORCE_TYPES = [
   SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
 ];
 
-export default function SignalBoardWidget({ onItemClick }) {
+export default function SignalBoardWidget({ onItemClick, allItems = [], allNews = [] }) {
   // 탭 상태: 'live' | 'scorecard'
   const [activeTab, setActiveTab] = useState('live');
   // 모바일 기본 접힘 — 카운터만 노출
@@ -24,6 +27,42 @@ export default function SignalBoardWidget({ onItemClick }) {
   const [filterDir, setFilterDir] = useState(null);
   const allSignals = useTopSignals(20);
   const { botMap } = useSignalAccuracy();
+
+  // 시그널별 내러티브 사전 계산 — symbol 기준 캐싱
+  // sector 보강(KR), ±2시간 뉴스 매칭, 섹터 동조 종목 수 집계
+  const narrativeMap = useMemo(() => {
+    const map = new Map();
+    if (!allSignals.length) return map;
+    for (const sig of allSignals) {
+      if (!sig.symbol) continue;
+      // sector 보강 — meta.sector 없으면 KR 매핑 시도
+      const sector = sig.meta?.sector
+        || (sig.market === 'kr' ? KR_SECTOR_MAP.get(sig.symbol) : null);
+      // 관련 뉴스 (±2시간 + 키워드 매칭)
+      const ts = sig.timestamp || sig.createdAt || Date.now();
+      const market = sig.market === 'crypto' ? 'COIN' : sig.market?.toUpperCase();
+      const keywords = buildStockKeywords(sig.symbol, sig.name, market);
+      const relatedNews = (keywords.length && allNews.length)
+        ? allNews.filter(item => {
+            const pubMs = item.pubDate ? new Date(item.pubDate).getTime() : 0;
+            if (!pubMs || Math.abs(ts - pubMs) > 2 * 60 * 60 * 1000) return false;
+            const text = item.title + ' ' + (item.summary || item.description || '');
+            return matchesKeywords(text, keywords);
+          })
+        : [];
+      // 섹터 동조 — ±3% 이상 동반 변동 종목 수 (자기 자신 제외)
+      const sectorPeers = (sector && allItems.length)
+        ? allItems.filter(it =>
+            it.symbol !== sig.symbol
+            && it.sector === sector
+            && Math.abs(it.changePct ?? 0) >= 3,
+          ).length
+        : 0;
+      const enriched = sector ? { ...sig, meta: { ...sig.meta, sector } } : sig;
+      map.set(sig.id, buildNarrative({ signal: enriched, relatedNews, sectorPeers }));
+    }
+    return map;
+  }, [allSignals, allItems, allNews]);
 
   const { bullSignals, bearSignals, neutralSignals, bullCount, bearCount, neutralCount } = useMemo(() => {
     const bull = [], bear = [], neutral = [];
@@ -199,51 +238,58 @@ export default function SignalBoardWidget({ onItemClick }) {
             const isBear = signal.direction === 'bearish';
             const nameColor = isBull ? '#F04452' : isBear ? '#1764ED' : '#191F28';
             const dotColor = isBull ? '#F04452' : isBear ? '#1764ED' : '#8B95A1';
+            const narrative = narrativeMap.get(signal.id);
             return (
-              <button
-                key={signal.id}
-                onClick={() => handleClick(signal)}
-                className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
-                  signal.symbol ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
-                } ${idx > 0 ? 'border-t border-[#F2F3F5]' : ''}`}
-                style={idx > 0 ? {} : {}}
-              >
-                {signal.symbol && (
-                  <TickerLogo item={{ symbol: signal.symbol, name: signal.name, _market: signal.market === 'kr' ? 'KR' : signal.market === 'us' ? 'US' : signal.market === 'crypto' ? 'COIN' : '', id: signal.market === 'crypto' ? signal.symbol : undefined }} size={24} />
-                )}
-                <span className="text-[14px] font-semibold flex-shrink-0" style={{ color: nameColor }}>
-                  {extractName(signal)}
-                </span>
-                <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">
-                  {getEasyLabel(signal)}
-                  {/* 적중률 배지 */}
-                  {botMap.get(signal.type)?.totalFired > 0 && (
-                    <span
-                      className="ml-1 text-[10px] font-bold px-1 py-[1px] rounded-full"
-                      style={{
-                        color: '#fff',
-                        background: (botMap.get(signal.type)?.accuracy ?? 0) >= 70 ? '#2AC769'
-                          : (botMap.get(signal.type)?.accuracy ?? 0) >= 50 ? '#FF9500' : '#F04452',
-                      }}
-                    >
-                      {botMap.get(signal.type)?.accuracy ?? 0}%
-                    </span>
+              <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
+                <button
+                  onClick={() => handleClick(signal)}
+                  className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
+                    signal.symbol ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
+                  }`}
+                >
+                  {signal.symbol && (
+                    <TickerLogo item={{ symbol: signal.symbol, name: signal.name, _market: signal.market === 'kr' ? 'KR' : signal.market === 'us' ? 'US' : signal.market === 'crypto' ? 'COIN' : '', id: signal.market === 'crypto' ? signal.symbol : undefined }} size={24} />
                   )}
-                </span>
-                {/* 강도 도트 (원형) */}
-                <div className="flex gap-[3px] flex-shrink-0">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-[5px] h-[5px] rounded-full"
-                      style={{
-                        background: dotColor,
-                        opacity: i < (signal.strength || 0) ? 1 : 0.15,
-                      }}
-                    />
-                  ))}
-                </div>
-              </button>
+                  <span className="text-[14px] font-semibold flex-shrink-0" style={{ color: nameColor }}>
+                    {extractName(signal)}
+                  </span>
+                  <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">
+                    {getEasyLabel(signal)}
+                    {/* 적중률 배지 */}
+                    {botMap.get(signal.type)?.totalFired > 0 && (
+                      <span
+                        className="ml-1 text-[10px] font-bold px-1 py-[1px] rounded-full"
+                        style={{
+                          color: '#fff',
+                          background: (botMap.get(signal.type)?.accuracy ?? 0) >= 70 ? '#2AC769'
+                            : (botMap.get(signal.type)?.accuracy ?? 0) >= 50 ? '#FF9500' : '#F04452',
+                        }}
+                      >
+                        {botMap.get(signal.type)?.accuracy ?? 0}%
+                      </span>
+                    )}
+                  </span>
+                  {/* 강도 도트 (원형) */}
+                  <div className="flex gap-[3px] flex-shrink-0">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-[5px] h-[5px] rounded-full"
+                        style={{
+                          background: dotColor,
+                          opacity: i < (signal.strength || 0) ? 1 : 0.15,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </button>
+                {/* 내러티브 컨텍스트 — "왜 발화했는가" (매칭 부족 시 영역 숨김) */}
+                {narrative && (
+                  <div className="px-2 pb-2 -mt-1 text-[11px] text-[#6B7684] dark:text-[#8B95A1] leading-snug">
+                    🧩 컨텍스트: {narrative}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
