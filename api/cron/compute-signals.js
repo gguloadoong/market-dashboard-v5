@@ -574,17 +574,14 @@ function buildRecoverySignal(target, rec, currentPrice) {
 // ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
 // 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
 // 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
-// KST 기준 날짜별 캐시 키 — KST 자정에 갱신되어 한국 장 사이클과 정합
-// 키 자체가 날짜별로 달라져 심볼셋 변경도 다음 날 자동 반영
-const KR_FLOW_CACHE_TTL = 24 * 3600;
-function krFlowCacheKey() {
-  const kstDate = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  return `flow:kr-investors:${kstDate}`;
-}
+// 2h TTL — 장 중 안정적 캐시, 마감(15:30 KST) 후 2h 이내 신선 데이터 보장
+// 날짜 기반 키는 일중 데이터 갱신을 반영 못하므로 단순 TTL 방식 사용
+const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
+const KR_FLOW_CACHE_TTL = 2 * 3600;
 
 async function fetchKrFlowMap(krSymbols) {
   // 캐시 우선 조회 — 현재 심볼셋 전체 커버 여부 확인 후 반환
-  const cacheKey = krFlowCacheKey();
+  const cacheKey = KR_FLOW_CACHE_KEY;
   try {
     const cached = await getSnap(cacheKey);
     if (cached && typeof cached === 'object' && krSymbols.every((s) => s in cached)) {
