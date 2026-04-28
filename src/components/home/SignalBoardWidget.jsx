@@ -38,23 +38,25 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
       // sector 보강 — meta.sector 없으면 KR 매핑 시도
       const sector = sig.meta?.sector
         || (sig.market === 'kr' ? KR_SECTOR_MAP.get(sig.symbol) : null);
-      // 관련 뉴스 (±2시간 + 키워드 매칭)
-      const ts = sig.timestamp || sig.createdAt || Date.now();
+      // 관련 뉴스 (±2시간 + 키워드 매칭) — timestamp 없으면 매칭 스킵
+      const ts = sig.timestamp || sig.createdAt || null;
       const market = sig.market === 'crypto' ? 'COIN' : sig.market?.toUpperCase();
       const keywords = buildStockKeywords(sig.symbol, sig.name, market);
-      const relatedNews = (keywords.length && allNews.length)
+      const relatedNews = (ts && keywords.length && allNews.length)
         ? allNews.filter(item => {
             const pubMs = item.pubDate ? new Date(item.pubDate).getTime() : 0;
-            if (!pubMs || Math.abs(ts - pubMs) > 2 * 60 * 60 * 1000) return false;
-            const text = item.title + ' ' + (item.summary || item.description || '');
+            if (!Number.isFinite(pubMs) || !pubMs || Math.abs(ts - pubMs) > 2 * 60 * 60 * 1000) return false;
+            const text = (item.title || '') + ' ' + (item.summary || item.description || '');
             return matchesKeywords(text, keywords);
           })
         : [];
-      // 섹터 동조 — ±3% 이상 동반 변동 종목 수 (자기 자신 제외)
+      // 섹터 동조 — 시그널 방향 일치 + ±3% 이상 동반 종목 수 (자기 자신 제외)
+      const sigDir = Math.sign((sig.changePct ?? 0) || (sig.direction === 'bearish' ? -1 : 1));
       const sectorPeers = (sector && allItems.length)
         ? allItems.filter(it =>
             it.symbol !== sig.symbol
-            && it.sector === sector
+            && it.sector && it.sector === sector
+            && Math.sign(it.changePct ?? 0) === sigDir
             && Math.abs(it.changePct ?? 0) >= 3,
           ).length
         : 0;

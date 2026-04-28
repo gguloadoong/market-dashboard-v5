@@ -10,9 +10,9 @@ function truncate(text, max = MAX_LEN) {
   return text.length > max ? text.slice(0, max - 1) + '…' : text;
 }
 
-// 외인/기관 플로우 라벨 ("외인" / "기관" / null)
+// 외인/기관 플로우 라벨 ("외인" / "기관" / null) — 대소문자 무관 매칭
 function flowLabel(signal) {
-  const t = signal?.type || '';
+  const t = (signal?.type || '').toLowerCase();
   if (t.includes('foreign')) return '외인';
   if (t.includes('institutional')) return '기관';
   return null;
@@ -40,7 +40,7 @@ export function buildNarrative({ signal, relatedNews = [], sectorPeers = 0, flow
   }
   // 2. 뉴스 + 섹터 동조
   if (news.length > 0 && sector && sectorPeers >= SECTOR_MIN_PEERS) {
-    return truncate(`${name} '${newsHead20}' + ${sector}섹터 ${sectorPeers}개 동반 상승`);
+    return truncate(`${name} '${newsHead20}' + ${sector}섹터 ${sectorPeers}개 동반 ${direction}`);
   }
   // 3. 뉴스만
   if (news.length > 0) {
