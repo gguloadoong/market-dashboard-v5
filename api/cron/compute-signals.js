@@ -580,16 +580,17 @@ const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
 const KR_FLOW_CACHE_TTL = 2 * 3600;
 
 // KRX 공휴일 (2025~2027 법정공휴일, marketHours.js와 동기화)
+// marketHours.js와 동일한 Set — 포맷 'YYYY-M-D' (선행 0 없음)
 const KRX_HOLIDAYS = new Set([
-  '20250101','20250128','20250129','20250130','20250301','20250505',
-  '20250506','20250515','20250606','20250815','20251003','20251009',
-  '20251225',
-  '20260101','20260127','20260128','20260129','20260301','20260505',
-  '20260525','20260606','20260815','20260924','20260925','20260926',
-  '20261003','20261009','20261225',
-  '20270101','20270215','20270216','20270217','20270301','20270505',
-  '20270606','20270815','20271003','20271009','20271021','20271022',
-  '20271025','20271225',
+  '2025-1-1','2025-1-27','2025-1-28','2025-1-29','2025-1-30',
+  '2025-3-3','2025-5-5','2025-5-6','2025-6-6','2025-8-15',
+  '2025-10-2','2025-10-3','2025-10-6','2025-10-7','2025-10-8','2025-10-9','2025-12-25',
+  '2026-1-1','2026-2-16','2026-2-17','2026-2-18',
+  '2026-3-2','2026-5-5','2026-5-25','2026-8-17',
+  '2026-9-24','2026-9-25','2026-9-28','2026-10-5','2026-10-9','2026-12-25',
+  '2027-1-1','2027-2-8','2027-2-9','2027-3-1','2027-5-5','2027-5-13',
+  '2027-8-16','2027-9-14','2027-9-15','2027-9-16',
+  '2027-10-4','2027-10-11','2027-12-27',
 ]);
 
 function isKrxMarketOpen() {
@@ -597,7 +598,7 @@ function isKrxMarketOpen() {
   const kst = new Date(kstMs);
   const day = kst.getUTCDay(); // 0=일, 6=토
   if (day === 0 || day === 6) return false;
-  const dateStr = kst.toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr = `${kst.getUTCFullYear()}-${kst.getUTCMonth() + 1}-${kst.getUTCDate()}`;
   if (KRX_HOLIDAYS.has(dateStr)) return false;
   const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   return minutes >= 9 * 60 && minutes < 15 * 60 + 30; // KST 09:00~15:30
@@ -659,17 +660,13 @@ async function fetchKrFlowMap(krSymbols) {
         for (const row of list) {
           const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
           const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
-          // foreign=0 AND inst=0 → 거래정지/데이터 공백일 — streak 유지 (건너뜀)
+          // 양쪽 모두 0 → 거래정지/데이터 공백일 전체 건너뜀
           if (foreign === 0 && inst === 0) continue;
-
-          if (fBuyStreak && foreign > 0) foreignBuyDays++;
-          else fBuyStreak = false;
-          if (fSellStreak && foreign < 0) foreignSellDays++;
-          else fSellStreak = false;
-          if (iBuyStreak && inst > 0) instBuyDays++;
-          else iBuyStreak = false;
-          if (iSellStreak && inst < 0) instSellDays++;
-          else iSellStreak = false;
+          // 개별 0 → 해당 측 streak 유지 (방향 없는 날은 꺾지 않음)
+          if (foreign > 0) { if (fBuyStreak) foreignBuyDays++; fSellStreak = false; }
+          else if (foreign < 0) { if (fSellStreak) foreignSellDays++; fBuyStreak = false; }
+          if (inst > 0) { if (iBuyStreak) instBuyDays++; iSellStreak = false; }
+          else if (inst < 0) { if (iSellStreak) instSellDays++; iBuyStreak = false; }
         }
 
         map.set(symbol, { foreignBuyDays, foreignSellDays, instBuyDays, instSellDays, volumeRatio: 1 });
