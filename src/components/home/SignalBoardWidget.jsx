@@ -48,6 +48,21 @@ export default function SignalBoardWidget({ onItemClick }) {
     [allSignals],
   );
 
+  // 적중률 높은 시그널 — accuracy >= 60인 현재 발화 시그널, 최대 2건
+  const highAccuracySignals = useMemo(() => {
+    return allSignals
+      .filter(s => {
+        const bot = botMap.get(s.type);
+        return bot && bot.totalFired > 0 && bot.accuracy >= 60;
+      })
+      .sort((a, b) => {
+        const accA = botMap.get(a.type)?.accuracy ?? 0;
+        const accB = botMap.get(b.type)?.accuracy ?? 0;
+        return accB - accA;
+      })
+      .slice(0, 2);
+  }, [allSignals, botMap]);
+
   // 통합 리스트: 모든 시그널 (세력 포착 포함)
   const combinedList = useMemo(() => {
     const all = [...bullSignals, ...bearSignals, ...neutralSignals];
@@ -158,6 +173,44 @@ export default function SignalBoardWidget({ onItemClick }) {
       {/* 모바일: 카운터만 노출, 리스트는 접힌 상태 기본 — 펼치기 버튼으로 토글 */}
       {/* 데스크톱: 항상 표시 */}
       <div className={expanded ? '' : 'hidden lg:block'}>
+        {/* 적중률 높은 시그널 (있을 때만) */}
+        {highAccuracySignals.length > 0 && (
+          <div className="mb-3 rounded-xl bg-[#F0FFF6] dark:bg-[#0D2A1A] px-3 py-2.5">
+            <div className="flex items-center gap-1 mb-2">
+              <span className="text-[12px] font-bold text-[#2AC769]">✅ 적중률 높은 시그널</span>
+            </div>
+            <div className="space-y-1">
+              {highAccuracySignals.map(sig => {
+                const acc = botMap.get(sig.type)?.accuracy ?? 0;
+                const label = getEasyLabel(sig);
+                const truncated = label.length > 40 ? label.slice(0, 40) + '…' : label;
+                return (
+                  <button
+                    key={sig.id}
+                    onClick={() => handleClick(sig)}
+                    className="w-full flex items-center justify-between text-left gap-2 py-0.5"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[13px] font-semibold text-[#191F28] dark:text-[#E5E8EB] flex-shrink-0">
+                        {extractName(sig)}
+                      </span>
+                      <span className="text-[12px] text-[#4E5968] dark:text-[#8B95A1] truncate">
+                        {truncated}
+                      </span>
+                    </div>
+                    <span
+                      className="flex-shrink-0 text-[11px] font-bold px-1.5 py-[2px] rounded-full"
+                      style={{ color: '#fff', background: '#2AC769' }}
+                    >
+                      {acc}%↑
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* 세력 포착 (있을 때만) */}
         {forceSignals.length > 0 && (
           <div className="mb-3">
