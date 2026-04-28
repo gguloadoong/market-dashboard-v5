@@ -2,7 +2,7 @@
 // Vercel Cron이 10분마다 호출: */10 * * * *
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
-import { setSnap, recordCronFailure } from '../_price-cache.js';
+import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
 import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 120 };
@@ -571,6 +571,121 @@ function buildRecoverySignal(target, rec, currentPrice) {
   };
 }
 
+// ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
+// 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
+// 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
+// 장 외(장 마감 15:30 KST 이후 ~ 다음 날 장 개시 전)에만 2h 캐시 적용
+// 장 중에는 Naver 일중 데이터 변동 가능성이 있으므로 매 cron 신선 fetch
+const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
+const KR_FLOW_CACHE_TTL = 2 * 3600;
+
+// KRX 공휴일 (2025~2027 법정공휴일, marketHours.js와 동기화)
+// marketHours.js와 동일한 Set — 포맷 'YYYY-M-D' (선행 0 없음)
+const KRX_HOLIDAYS = new Set([
+  '2025-1-1','2025-1-27','2025-1-28','2025-1-29','2025-1-30',
+  '2025-3-3','2025-5-5','2025-5-6','2025-6-6','2025-8-15',
+  '2025-10-2','2025-10-3','2025-10-6','2025-10-7','2025-10-8','2025-10-9','2025-12-25',
+  '2026-1-1','2026-2-16','2026-2-17','2026-2-18',
+  '2026-3-2','2026-5-5','2026-5-25','2026-8-17',
+  '2026-9-24','2026-9-25','2026-9-28','2026-10-5','2026-10-9','2026-12-25',
+  '2027-1-1','2027-2-8','2027-2-9','2027-3-1','2027-5-5','2027-5-13',
+  '2027-8-16','2027-9-14','2027-9-15','2027-9-16',
+  '2027-10-4','2027-10-11','2027-12-27',
+]);
+
+function isKrxMarketOpen() {
+  const kstMs = Date.now() + 9 * 3600 * 1000;
+  const kst = new Date(kstMs);
+  const day = kst.getUTCDay(); // 0=일, 6=토
+  if (day === 0 || day === 6) return false;
+  const dateStr = `${kst.getUTCFullYear()}-${kst.getUTCMonth() + 1}-${kst.getUTCDate()}`;
+  if (KRX_HOLIDAYS.has(dateStr)) return false;
+  const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return minutes >= 9 * 60 && minutes < 15 * 60 + 30; // KST 09:00~15:30
+}
+
+async function fetchKrFlowMap(krSymbols) {
+  // 장 중에는 캐시 skip — 장 외에만 2h 캐시 (매 cron 신선 fetch로 정확도 보장)
+  const cacheKey = KR_FLOW_CACHE_KEY;
+  const marketOpen = isKrxMarketOpen();
+  if (!marketOpen) {
+    try {
+      const cached = await getSnap(cacheKey);
+      if (cached && typeof cached === 'object' && krSymbols.every((s) => cached[s] != null)) {
+        return new Map(Object.entries(cached));
+      }
+    } catch { /* cache miss → fresh fetch */ }
+  }
+
+  const map = new Map();
+  await Promise.allSettled(
+    krSymbols.map(async (symbol) => {
+      try {
+        const url = `https://m.stock.naver.com/api/stock/${symbol}/investors?periodType=DAILY&count=10`;
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Referer': 'https://m.stock.naver.com/',
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const rawList = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
+        if (!rawList.length) return;
+
+        // shape 검증 — null 포함 실제 값 존재 여부 확인 (`in` 연산자는 null 값도 통과)
+        const hasValidForeign = rawList.some(
+          (r) => r.frgnNetAmt != null || r.frgNetAmt != null || r.foreignNetAmt != null,
+        );
+        const hasValidInst = rawList.some(
+          (r) => r.instNetAmt != null || r.institutionNetAmt != null,
+        );
+        if (!hasValidForeign || !hasValidInst) {
+          console.warn(`[compute-signals] ${symbol} Naver shape 불일치 — flow 미적용`);
+          return;
+        }
+
+        // 최신 날짜 우선 정렬 (Naver 응답 순서 미보장)
+        // stcTrdDd/bizday는 investor-trend.js에서 검증된 실제 Naver 응답 필드명
+        const dateKey = (r) => String(r.stcTrdDd ?? r.bizday ?? r.bizDate ?? r.baseDate ?? r.date ?? '');
+        const list = rawList.slice().sort((a, b) => dateKey(b).localeCompare(dateKey(a))).slice(0, 10);
+
+        let foreignBuyDays = 0, foreignSellDays = 0;
+        let instBuyDays = 0, instSellDays = 0;
+        let fBuyStreak = true, fSellStreak = true, iBuyStreak = true, iSellStreak = true;
+
+        const toNum = (v) => { const n = parseInt(String(v ?? 0).replace(/,/g, ''), 10); return Number.isFinite(n) ? n : 0; };
+        for (const row of list) {
+          const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
+          const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
+          // 양쪽 모두 0 → 거래정지/데이터 공백일 전체 건너뜀
+          if (foreign === 0 && inst === 0) continue;
+          // 개별 0 → 해당 측 streak 유지 (방향 없는 날은 꺾지 않음)
+          if (foreign > 0) { if (fBuyStreak) foreignBuyDays++; fSellStreak = false; }
+          else if (foreign < 0) { if (fSellStreak) foreignSellDays++; fBuyStreak = false; }
+          if (inst > 0) { if (iBuyStreak) instBuyDays++; iSellStreak = false; }
+          else if (inst < 0) { if (iSellStreak) instSellDays++; iBuyStreak = false; }
+        }
+
+        map.set(symbol, { foreignBuyDays, foreignSellDays, instBuyDays, instSellDays, volumeRatio: 1 });
+      } catch (e) {
+        console.warn(`[compute-signals] ${symbol} flow fetch 실패:`, e?.message);
+      }
+    })
+  );
+
+  // 장 외 + 전체 성공 시에만 캐시 저장 (장 중 신선도 보장, 부분 실패 오염 방지)
+  if (!marketOpen && map.size === krSymbols.length) {
+    try {
+      await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
+    } catch { /* cache write 실패는 무시 */ }
+  }
+
+  return map;
+}
+
 // ─── 시장 sentiment 글로벌 fetch (best-effort) ──
 async function fetchGlobalSentiment() {
   const sentiment = { fearGreed: null, fundingRate: null, pcr: null };
@@ -613,6 +728,13 @@ export default async function handler(req, res) {
   try {
     globalSentiment = await fetchGlobalSentiment();
   } catch { /* ignore */ }
+
+  // KR 투자자 동향 사전 fetch (외인/기관 연속 매수매도일 계산)
+  const krSymbols = TARGETS.filter((t) => t.market === 'kr').map((t) => t.symbol);
+  let krFlowMap = new Map();
+  try {
+    krFlowMap = await fetchKrFlowMap(krSymbols);
+  } catch { /* flow=null fallback */ }
 
   let fetchedCount = 0;
   const BATCH_SIZE = 15; // 동시 처리 상향 — maxDuration 120s로 여유 확보
@@ -663,9 +785,12 @@ export default async function handler(req, res) {
           pcr: isCrypto ? null : globalSentiment.pcr,
         };
 
-        // 복합 점수 — flow=null 시 TA(40%)+sentiment(25%)만 = 최대 65점
-        // 임계값 30 = compositeScorer 라벨 경계(±30)와 일치 → NEUTRAL 시그널 노출 방지
-        const composite = calculateCompositeScore(ta, null, sentiment);
+        // 복합 점수 — KR 종목은 flow(외인/기관) 35% 가중치 활성화, 코인/미장은 flow=null
+        // volumeRatio는 1 고정 (Naver 거래량 미포함 — 향후 통합 예정)
+        // 임계값 30 — compositeScorer 라벨 경계(±30)와 일관, flow 추가 시에도 유지
+        // (조건부 40 상향은 flowWeighted 경계 부근에서 역설적 시그널 누락 발생)
+        const flow = target.market === 'kr' ? (krFlowMap.get(target.symbol) ?? null) : null;
+        const composite = calculateCompositeScore(ta, flow, sentiment);
         if (Math.abs(composite.score) >= 30) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
