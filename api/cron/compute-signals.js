@@ -574,19 +574,20 @@ function buildRecoverySignal(target, rec, currentPrice) {
 // ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
 // 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
 // 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
-// 날짜별 캐시 키 — 심볼셋 변경 시 다음 날 자동 반영, cron 반복 호출 방지
-// TTL 24h이지만 키 자체가 날짜별로 달라져 자정 이후 자연 갱신
+// KST 기준 날짜별 캐시 키 — KST 자정에 갱신되어 한국 장 사이클과 정합
+// 키 자체가 날짜별로 달라져 심볼셋 변경도 다음 날 자동 반영
 const KR_FLOW_CACHE_TTL = 24 * 3600;
 function krFlowCacheKey() {
-  return `flow:kr-investors:${new Date().toISOString().slice(0, 10)}`;
+  const kstDate = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  return `flow:kr-investors:${kstDate}`;
 }
 
 async function fetchKrFlowMap(krSymbols) {
-  // 캐시 우선 조회 (날짜별 키 — 심볼셋 변경 다음 날 자동 반영)
+  // 캐시 우선 조회 — 현재 심볼셋 전체 커버 여부 확인 후 반환
   const cacheKey = krFlowCacheKey();
   try {
     const cached = await getSnap(cacheKey);
-    if (cached && typeof cached === 'object' && Object.keys(cached).length > 0) {
+    if (cached && typeof cached === 'object' && krSymbols.every((s) => s in cached)) {
       return new Map(Object.entries(cached));
     }
   } catch { /* cache miss → fresh fetch */ }
@@ -616,7 +617,10 @@ async function fetchKrFlowMap(krSymbols) {
         const hasValidInst = rawList.some(
           (r) => r.instNetAmt != null || r.institutionNetAmt != null,
         );
-        if (!hasValidForeign || !hasValidInst) return;
+        if (!hasValidForeign || !hasValidInst) {
+          console.warn(`[compute-signals] ${symbol} Naver shape 불일치 — flow 미적용`);
+          return;
+        }
 
         // 최신 날짜 우선 정렬 (Naver 응답 순서 미보장)
         const dateKey = (r) => String(r.bizDate ?? r.baseDate ?? r.date ?? '');
@@ -645,13 +649,14 @@ async function fetchKrFlowMap(krSymbols) {
         }
 
         map.set(symbol, { foreignBuyDays, foreignSellDays, instBuyDays, instSellDays, volumeRatio: 1 });
-      } catch {
-        // 실패 시 해당 종목 flow=null 유지 (전체 크론 영향 없음)
+      } catch (e) {
+        console.warn(`[compute-signals] ${symbol} flow fetch 실패:`, e?.message);
       }
     })
   );
 
-  // 전체 성공 시에만 캐시 저장 — 부분 실패는 메모리 반환만 (12h 오염 방지)
+  // 전체 성공 시에만 캐시 저장 — 부분 실패는 메모리 반환만 (오염 방지)
+  // 부분 실패 시 매 cron 재시도는 의도적 — Naver 회복 후 즉시 정상화 보장
   if (map.size === krSymbols.length) {
     try {
       await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
