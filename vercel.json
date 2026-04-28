@@ -8,6 +8,7 @@
   "regions": ["icn1"],
   "ignoreCommand": "exit 0",
   "crons": [
-    { "path": "/api/cron/compute-signals", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/compute-signals", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/health-check", "schedule": "0 0 * * *" }
   ]
 }
