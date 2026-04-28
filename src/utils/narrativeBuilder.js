@@ -35,7 +35,7 @@ export function buildNarrative({ signal, relatedNews = [], sectorPeers = 0, flow
 
   // 1. 뉴스 + 외인플로우 동시
   if (news.length > 0 && flow) {
-    const action = signal.direction === 'bearish' ? '순매도' : '순매수';
+    const action = signal.direction === 'bearish' ? '순매도' : signal.direction === 'bullish' ? '순매수' : '순매수/도';
     return truncate(`${name} ${flow} ${action} + '${newsHead20}' 뉴스`);
   }
   // 2. 뉴스 + 섹터 동조
