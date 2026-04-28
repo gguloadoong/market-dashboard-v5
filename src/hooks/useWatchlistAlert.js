@@ -16,7 +16,7 @@ function getPct(w) {
 }
 
 export function useWatchlistAlert(watchedItems = []) {
-  const topSignals = useTopSignals(10);
+  const topSignals = useTopSignals(30); // 관심종목 시그널 누락 방지 (#236)
 
   return useMemo(() => {
     if (!Array.isArray(watchedItems) || watchedItems.length === 0) return [];
