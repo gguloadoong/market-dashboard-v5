@@ -4,7 +4,7 @@
 //   - type='mover':  ±3% 이상 변동 종목 (시그널 없는 것만, 보완)
 // 최대 3건 반환. 이상 없으면 빈 배열.
 import { useMemo } from 'react';
-import { useTopSignals } from './useSignals';
+import { useSignals } from './useSignals';
 
 const MOVER_THRESHOLD = 3; // ±3% 이상 변동 임계치
 const MAX_ALERTS = 3;
@@ -15,8 +15,16 @@ function getPct(w) {
   return Number.isFinite(raw) ? raw : 0;
 }
 
+// symbol + market 일치 여부 — 동명이종 시장 혼돈 방지
+function matchesMarket(watchItem, signal) {
+  const wm = watchItem?._market ?? watchItem?.market;
+  const sm = signal?.market;
+  if (!wm || !sm) return true; // 한쪽이 없으면 symbol만으로 허용
+  return wm === sm;
+}
+
 export function useWatchlistAlert(watchedItems = []) {
-  const topSignals = useTopSignals(30); // 관심종목 시그널 누락 방지 (#236)
+  const allSignals = useSignals(); // 전체 활성 시그널 (cap 없음, market 매칭 위해)
 
   return useMemo(() => {
     if (!Array.isArray(watchedItems) || watchedItems.length === 0) return [];
@@ -24,9 +32,9 @@ export function useWatchlistAlert(watchedItems = []) {
     // 1) signal 알림 — 관심종목 중 시그널 발화된 종목
     const signalSymbols = new Set();
     const signalAlerts = [];
-    for (const sig of topSignals || []) {
+    for (const sig of allSignals || []) {
       if (!sig?.symbol) continue;
-      const matched = watchedItems.find(w => w.symbol === sig.symbol);
+      const matched = watchedItems.find(w => w.symbol === sig.symbol && matchesMarket(w, sig));
       if (!matched) continue;
       if (signalSymbols.has(sig.symbol)) continue; // 중복 방지
       signalSymbols.add(sig.symbol);
@@ -61,5 +69,5 @@ export function useWatchlistAlert(watchedItems = []) {
 
     // 3) signal 우선 + mover 보완, 최대 3건
     return [...signalAlerts, ...moverAlerts].slice(0, MAX_ALERTS);
-  }, [watchedItems, topSignals]);
+  }, [watchedItems, allSignals]);
 }
