@@ -610,7 +610,7 @@ async function fetchKrFlowMap(krSymbols) {
   if (!marketOpen) {
     try {
       const cached = await getSnap(cacheKey);
-      if (cached && typeof cached === 'object' && krSymbols.every((s) => s in cached)) {
+      if (cached && typeof cached === 'object' && krSymbols.every((s) => cached[s] != null)) {
         return new Map(Object.entries(cached));
       }
     } catch { /* cache miss → fresh fetch */ }
@@ -659,6 +659,8 @@ async function fetchKrFlowMap(krSymbols) {
         for (const row of list) {
           const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
           const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
+          // foreign=0 AND inst=0 → 거래정지/데이터 공백일 — streak 유지 (건너뜀)
+          if (foreign === 0 && inst === 0) continue;
 
           if (fBuyStreak && foreign > 0) foreignBuyDays++;
           else fBuyStreak = false;
