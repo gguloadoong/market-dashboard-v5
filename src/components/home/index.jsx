@@ -228,7 +228,7 @@ export default function HomeDashboard({
       )}
 
       {/* ─── 3. 시그널 보드 (시그널 + 세력 포착 통합) ────── */}
-      <SignalBoardWidget onItemClick={handleSignalItemClick} />
+      <SignalBoardWidget onItemClick={handleSignalItemClick} allItems={allItems} allNews={allNews} />
 
       {/* ─── 3.5. AI 종목토론 (별도 섹션) ──────────────── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} krStocks={krStocks} allItems={allItems} />
