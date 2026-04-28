@@ -574,13 +574,18 @@ function buildRecoverySignal(target, rec, currentPrice) {
 // ─── KR 투자자 동향 일괄 fetch (Naver Finance, 인증 불필요) ───
 // 응답 shape 가정: row에 frgnNetAmt/instNetAmt 와 bizDate/baseDate 중 하나 존재
 // 필드명이 모두 빗나가면 silent zero가 되어 잘못된 시그널 위험 → shape 검증 후 미일치 시 null
-const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
-const KR_FLOW_CACHE_TTL = 12 * 3600; // 12시간 — 일 단위 데이터, cron 10분마다 Naver 호출 방지
+// 날짜별 캐시 키 — 심볼셋 변경 시 다음 날 자동 반영, cron 반복 호출 방지
+// TTL 24h이지만 키 자체가 날짜별로 달라져 자정 이후 자연 갱신
+const KR_FLOW_CACHE_TTL = 24 * 3600;
+function krFlowCacheKey() {
+  return `flow:kr-investors:${new Date().toISOString().slice(0, 10)}`;
+}
 
 async function fetchKrFlowMap(krSymbols) {
-  // 캐시 우선 조회 (12h TTL)
+  // 캐시 우선 조회 (날짜별 키 — 심볼셋 변경 다음 날 자동 반영)
+  const cacheKey = krFlowCacheKey();
   try {
-    const cached = await getSnap(KR_FLOW_CACHE_KEY);
+    const cached = await getSnap(cacheKey);
     if (cached && typeof cached === 'object' && Object.keys(cached).length > 0) {
       return new Map(Object.entries(cached));
     }
@@ -604,13 +609,16 @@ async function fetchKrFlowMap(krSymbols) {
         const rawList = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
         if (!rawList.length) return;
 
-        // shape 검증 — 외인/기관 필드 중 하나라도 존재하지 않으면 flow 미적용 (silent zero 방지)
-        const sample = rawList[0];
-        const hasForeignField = 'frgnNetAmt' in sample || 'frgNetAmt' in sample || 'foreignNetAmt' in sample;
-        const hasInstField = 'instNetAmt' in sample || 'institutionNetAmt' in sample;
-        if (!hasForeignField || !hasInstField) return;
+        // shape 검증 — null 포함 실제 값 존재 여부 확인 (`in` 연산자는 null 값도 통과)
+        const hasValidForeign = rawList.some(
+          (r) => r.frgnNetAmt != null || r.frgNetAmt != null || r.foreignNetAmt != null,
+        );
+        const hasValidInst = rawList.some(
+          (r) => r.instNetAmt != null || r.institutionNetAmt != null,
+        );
+        if (!hasValidForeign || !hasValidInst) return;
 
-        // 정렬 검증 — 명시적으로 최신 날짜 우선 정렬 (Naver 응답 순서 변경 대비)
+        // 최신 날짜 우선 정렬 (Naver 응답 순서 미보장)
         const dateKey = (r) => String(r.bizDate ?? r.baseDate ?? r.date ?? '');
         const list = rawList.slice().sort((a, b) => dateKey(b).localeCompare(dateKey(a))).slice(0, 10);
 
@@ -643,10 +651,10 @@ async function fetchKrFlowMap(krSymbols) {
     })
   );
 
-  // 캐시 저장 (성공 항목이 있을 때만, 12h TTL)
-  if (map.size > 0) {
+  // 전체 성공 시에만 캐시 저장 — 부분 실패는 메모리 반환만 (12h 오염 방지)
+  if (map.size === krSymbols.length) {
     try {
-      await setSnap(KR_FLOW_CACHE_KEY, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
+      await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
     } catch { /* cache write 실패는 무시 */ }
   }
 
@@ -754,12 +762,12 @@ export default async function handler(req, res) {
 
         // 복합 점수 — KR 종목은 flow(외인/기관) 35% 가중치 활성화, 코인/미장은 flow=null
         // volumeRatio는 1 고정 (Naver 거래량 미포함 — 향후 통합 예정)
-        // 임계값: flow가 실제 기여(flowScore≠0)한 경우만 40, 그 외 30 유지
-        //   → flowScore=0인 종목에 threshold만 높이면 기존 시그널 누락 발생하므로 사후 결정
+        // 임계값: flow 가중 기여분(weighted)이 threshold 갭(10)을 메꿀 만큼 클 때만 40으로 상향
+        //   → raw score 기준이면 작은 기여(+5)에도 threshold가 올라 오히려 시그널 누락 발생
         const flow = target.market === 'kr' ? (krFlowMap.get(target.symbol) ?? null) : null;
         const composite = calculateCompositeScore(ta, flow, sentiment);
-        const flowContributed = Math.abs(composite.breakdown?.flow?.score ?? 0) > 0;
-        const compositeThreshold = flowContributed ? 40 : 30;
+        const flowWeighted = Math.abs(composite.breakdown?.flow?.weighted ?? 0);
+        const compositeThreshold = flowWeighted >= 10 ? 40 : 30;
         if (Math.abs(composite.score) >= compositeThreshold) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
