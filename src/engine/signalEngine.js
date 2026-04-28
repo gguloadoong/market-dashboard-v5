@@ -7,8 +7,33 @@ const MAX_SIGNALS = 100;
 let _signals = [];
 let _subscribers = [];
 
+// ─── 배치 모드 — 스캔 중 다수 addSignal 호출을 하나의 _notify로 압축 ──
+let _batchDepth = 0;
+let _batchDirty = false;
+
+export function beginBatch() {
+  _batchDepth++;
+}
+
+export function endBatch() {
+  if (_batchDepth === 0) {
+    if (import.meta.env?.DEV) console.warn('[signalEngine] endBatch without matching beginBatch — leak 가능성');
+    return;
+  }
+  _batchDepth--;
+  if (_batchDepth === 0 && _batchDirty) {
+    _batchDirty = false;
+    _notify();
+  }
+}
+
 // ─── 구독자 알림 ────────────────────────────────────────────
 function _notify() {
+  // 배치 중이면 즉시 알림 대신 dirty 플래그만 — endBatch에서 1회 호출
+  if (_batchDepth > 0) {
+    _batchDirty = true;
+    return;
+  }
   const active = getActiveSignals();
   _subscribers.forEach(fn => fn(active));
 }
@@ -54,6 +79,9 @@ function _resolvePrice(meta) {
 }
 
 export function addSignal(signal) {
+  // 서버 관할 타입은 loadSignals 전용 — 클라이언트 경로 차단 (깜빡임 방지)
+  if (SERVER_SIGNAL_TYPES.has(signal.type)) return signal;
+
   // 중복 제거: 같은 type+symbol 조합
   const existIdx = _signals.findIndex(
     s => s.type === signal.type && s.symbol === signal.symbol,
@@ -406,12 +434,12 @@ export function createPCRSignal(pcr, totalPuts, totalCalls) {
     strength = pcr < T.BEARISH_STRONG ? 4 : 3;
     hint = '역발상 매도 구간';
   } else if (pcr < T.CAUTION_LOW) {
-    // 0.7~0.85: 경계 하단 — 탐욕 징후
+    // BEARISH(0.70)~CAUTION_LOW(0.80): 경계 하단 — 탐욕 징후
     direction = DIRECTIONS.BEARISH;
     strength = 2;
     hint = '탐욕 징후 — 주의';
   } else {
-    return null; // 0.85~1.0: 완전 중립
+    return null; // CAUTION_LOW(0.80)~CAUTION_HIGH(1.05): 완전 중립
   }
   const title = `S&P500 PCR ${pcr.toFixed(2)} — ${hint}`;
   return addSignal(createSignal({
@@ -712,7 +740,7 @@ export function createCapitulationSignal(symbol, name, market, priceDrop, volRat
   }));
 }
 
-/** 내부자 의심 (스텔스 활동) — 거래량 폭발인데 뉴스 없음 */
+/** 스텔스 활동 — 거래량 폭발인데 뉴스 없음 */
 export function createStealthActivitySignal(symbol, name, market, volRatio) {
   const T = THRESHOLDS.STEALTH;
   if (volRatio < T.VOLUME_RATIO) return null;
@@ -725,7 +753,7 @@ export function createStealthActivitySignal(symbol, name, market, volRatio) {
   if (hasNews) return null; // 뉴스 있으면 스텔스 아님
 
   const strength = hasVolume ? 4 : 3;
-  const title = `${name} 뉴스 없는 거래량 ${volRatio.toFixed(1)}배 폭발 — 내부자 의심`;
+  const title = `${name} 뉴스 없는 거래량 ${volRatio.toFixed(1)}배 폭발 — 거래 패턴 주목`;
 
   return addSignal(createSignal({
     type: SIGNAL_TYPES.STEALTH_ACTIVITY,
@@ -841,8 +869,10 @@ export function removeAllSignalsByType(type) {
 export function createNewsClusterSignal(symbol, name, market, newsCount, bullCount, bearCount) {
   if (newsCount < THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER) return null;
   let direction = DIRECTIONS.NEUTRAL;
-  if (bullCount > bearCount) direction = DIRECTIONS.BULLISH;
-  else if (bearCount > bullCount) direction = DIRECTIONS.BEARISH;
+  const dominance = THRESHOLDS.NEWS_CLUSTER.DOMINANCE_RATIO;
+  const directional = bullCount + bearCount; // neutral 제외 — 방향성 있는 뉴스만 분모
+  if (directional > 0 && bullCount > bearCount && bullCount / directional >= dominance) direction = DIRECTIONS.BULLISH;
+  else if (directional > 0 && bearCount > bullCount && bearCount / directional >= dominance) direction = DIRECTIONS.BEARISH;
   const strength = newsCount >= 8 ? 4 : newsCount >= 5 ? 3 : 2;
   const sentimentLabel = direction === DIRECTIONS.BULLISH ? '호재 위주' : direction === DIRECTIONS.BEARISH ? '악재 위주' : '혼재';
   const title = `${name} 관련 뉴스 ${newsCount}건 집중 — ${sentimentLabel}`;
@@ -853,6 +883,52 @@ export function createNewsClusterSignal(symbol, name, market, newsCount, bullCou
     symbol, name, market, direction, strength,
     title, meta: { count: newsCount, bullCount, bearCount },
   }));
+}
+
+// 서버 시그널 관할 타입 (클라이언트 계산 대상에서 제외)
+const SERVER_SIGNAL_TYPES = new Set([
+  SIGNAL_TYPES.COMPOSITE_SCORE,
+  SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
+  SIGNAL_TYPES.DOUBLE_BOTTOM,
+  SIGNAL_TYPES.RECOVERY_DETECTION,
+]);
+
+/** 서버 사전 계산 시그널 일괄 로드 — 서버 관할 타입만 replace (stale 방지) */
+export function loadSignals(serverArr) {
+  if (!Array.isArray(serverArr)) return;
+  const now = Date.now();
+
+  // 서버 관할 타입 기존 시그널 전부 제거
+  _signals = _signals.filter(s => !SERVER_SIGNAL_TYPES.has(s.type));
+
+  // 서버 응답 주입
+  // TODO(#215 Phase 2): addSignal 경유 시 _recordForAccuracy 호출 가능하나
+  // 서버 생성 시그널은 price_at_fire가 이미 확정이므로 별도 accuracy 파이프라인 필요
+  const seenIds = new Set();
+  for (const raw of serverArr) {
+    if (!SERVER_SIGNAL_TYPES.has(raw.type)) continue;
+    if (!raw.symbol || !raw.market || !raw.direction) continue; // 필수 필드 방어
+    const id = raw.id || _generateId();
+    if (seenIds.has(id)) continue; // 페이로드 내 중복 방어
+    seenIds.add(id);
+    _signals.push({
+      ...raw,
+      id,
+      timestamp: raw.timestamp || now,
+      expiresAt: raw.expiresAt || (now + getTTL(raw.type)),
+    });
+  }
+
+  if (_signals.length > MAX_SIGNALS) {
+    _signals.sort((a, b) => b.timestamp - a.timestamp);
+    _signals = _signals.slice(0, MAX_SIGNALS);
+  }
+
+  _notify(); // 한 번만 — 폭주 차단
+}
+
+export function isServerManagedSignalType(type) {
+  return SERVER_SIGNAL_TYPES.has(type);
 }
 
 /** 마켓 온도계 — 활성 시그널 가중합 → -1(극도약세) ~ +1(극도강세) */

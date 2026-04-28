@@ -121,7 +121,7 @@ export const TYPE_META = {
     easyDesc: (m) => {
       const pct = m?.changePct ?? 0;
       const name = m?.name || '종목';
-      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 투매 또는 세력 매집 주의`;
+      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 이상 거래량 감지`;
       if (pct >= 1) return `${name} 상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
       return `${name} 거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
     },
@@ -219,24 +219,26 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.STEALTH_ACTIVITY]: {
     easyLabel: '뉴스 없는 거래 폭발 👀',
-    easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 누군가 움직이고 있어요`,
+    easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 거래 패턴 변화 감지`,
   },
   [SIGNAL_TYPES.BTC_LEADING]: {
     easyLabel: (m) => `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
     easyDesc: (m) => `BTC ${(m?.btcChange ?? 0) > 0 ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}% 움직임 — ${m?.alt || '알트코인'} 아직 미반영`,
   },
   [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: {
-    easyLabel: (m) => m?.breakType === 'resistance' ? '저항선 돌파 🚀' : '지지선 이탈 ⚠️',
+    easyLabel: (m) => m?.breakType === 'resistance' ? '저항선 뚫고 올라갔어요 🚀' : '지지선 깨졌어요 ⚠️',
     easyDesc: (m) => m?.breakType === 'resistance'
       ? `${m.name || '종목'} ${m.level?.toLocaleString() || '?'}원 저항선 돌파 — 상승 탄력`
       : `${m.name || '종목'} ${m.level?.toLocaleString() || '?'}원 지지선 이탈 — 추가 하락 주의`,
   },
   [SIGNAL_TYPES.DOUBLE_BOTTOM]: {
-    easyLabel: '이중바닥 패턴 감지 📈',
-    easyDesc: (m) => `${m.name || '종목'} 이중바닥 형성 — 넥라인 ${m.neckline?.toLocaleString() || '?'}원 돌파 시 강한 반등`,
+    easyLabel: (m) => m?.broken
+      ? '바닥 두 번 찍고 돌파 🚀'
+      : '바닥 두 번 — 반등 시도 중 📈',
+    easyDesc: (m) => `${m.name || '종목'} ${m.bottom1?.toLocaleString() || '?'}원 근처에서 두 번 바닥 형성 — 넥라인 ${m.neckline?.toLocaleString() || '?'}원 ${m.broken ? '돌파됨' : '돌파 시 반등'}`,
   },
   [SIGNAL_TYPES.RECOVERY_DETECTION]: {
-    easyLabel: '급락 후 안정화 — 반등 모색 🌱',
+    easyLabel: '급락 후 진정세 — 반등 가능성 🌱',
     easyDesc: (m) => `${m.name || '종목'} ${Math.abs(m?.drawdown ?? 0).toFixed(1)}% 급락 후 변동성 축소 — 회복 신호`,
   },
   [SIGNAL_TYPES.SECTOR_OUTLIER]: {
@@ -248,11 +250,11 @@ export const TYPE_META = {
   [SIGNAL_TYPES.COMPOSITE_SCORE]: {
     easyLabel: (m) => {
       const s = m?.compositeScore ?? 0;
-      if (s >= 70) return '강세 흐름 진행 중 🔥';
-      if (s >= 30) return '상승 타이밍 접근 중 📈';
-      if (s <= -70) return '강한 하락 경고 🚨';
-      if (s <= -30) return '하락 압력 감지 ⚠️';
-      return '관망 구간 👀';
+      if (s >= 70) return '여러 지표 동시 강세 🔥';
+      if (s >= 30) return '오를 분위기 감지 중 📈';
+      if (s <= -70) return '여러 지표 동시 약세 🚨';
+      if (s <= -30) return '내릴 분위기 감지 ⚠️';
+      return '방향 탐색 중 👀';
     },
     easyDesc: (m) => {
       const parts = [];

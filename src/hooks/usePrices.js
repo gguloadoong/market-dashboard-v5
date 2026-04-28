@@ -7,6 +7,7 @@ import { fetchSnapshot } from '../api/snapshot';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch } from '../api/stocks';
 import { checkAndAlertBatch } from '../utils/priceAlert';
 import { POLLING } from '../constants/polling';
+import { isKoreanMarketOpen, isUsMarketOpen, isUsPreMarket, isUsAfterMarket } from '../utils/marketHours';
 
 // US_STOCK_LIST 메타맵 — 모듈 스코프에 1회만 생성 (sector/nameEn fallback)
 const US_META_MAP = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
@@ -221,16 +222,100 @@ export function usePrices() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    let usTimerId = null;
+    let krTimerId = null;
+    let destroyed = false;
+    // generation 카운터 — stale finally의 재스케줄링 차단 (in-flight fetch 자체는 정상 완료)
+    let usGen = 0;
+    let krGen = 0;
+    // in-flight 플래그 — onVisible의 즉시 호출과 타이머 콜백 중복 요청 방지
+    let usInFlight = false;
+    let krInFlight = false;
+
+    // 장중·프리·애프터마켓은 NORMAL(30s), 완전 마감·주말만 CLOSED(5min)
+    const usActive = () => isUsMarketOpen() || isUsPreMarket() || isUsAfterMarket();
+
+    const scheduleUs = () => {
+      if (destroyed) return;
+      const myGen = ++usGen;
+      const delay = usActive() ? POLLING.NORMAL : POLLING.CLOSED;
+      usTimerId = setTimeout(async () => {
+        if (destroyed || myGen !== usGen) return;
+        try {
+          usInFlight = true;
+          if (!document.hidden) await refreshUsStocks();
+        } finally {
+          usInFlight = false;
+          if (!destroyed && myGen === usGen) scheduleUs();
+        }
+      }, delay);
+    };
+
+    const scheduleKr = () => {
+      if (destroyed) return;
+      const myGen = ++krGen;
+      // 한국장: 정규장(09:00~15:30)만 NORMAL, 이후 시간외/주말은 CLOSED
+      const delay = isKoreanMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
+      krTimerId = setTimeout(async () => {
+        if (destroyed || myGen !== krGen) return;
+        try {
+          krInFlight = true;
+          if (!document.hidden) await refreshKoreanStocks();
+        } finally {
+          krInFlight = false;
+          if (!destroyed && myGen === krGen) scheduleKr();
+        }
+      }, delay);
+    };
+
+    // 단일 스냅샷으로 scheduleUs/Kr 및 prev* 초기화 — 경계 시점 이중 읽기 race 방지
+    let prevUsActive = usActive();
+    let prevKrActive = isKoreanMarketOpen();
+
     refreshUsStocks();
     refreshKoreanStocks();
-    const usId = setInterval(() => { if (!document.hidden) refreshUsStocks(); }, POLLING.NORMAL);
-    const krId = setInterval(() => { if (!document.hidden) refreshKoreanStocks(); }, POLLING.NORMAL);
+    scheduleUs();
+    scheduleKr();
+
     // 탭 복귀 시 즉시 갱신
-    const onVisible = () => { if (!document.hidden) { refreshUsStocks(); refreshKoreanStocks(); } };
+    const onVisible = () => {
+      if (document.hidden) return;
+      clearTimeout(usTimerId);
+      clearTimeout(krTimerId);
+      if (!usInFlight) refreshUsStocks();
+      if (!krInFlight) refreshKoreanStocks();
+      scheduleUs();
+      scheduleKr();
+    };
     document.addEventListener('visibilitychange', onVisible);
+
+    // 시장 전환 감지 — 2분마다 체크 (CLOSED 5분 stale 방지)
+    // prev는 hidden 여부와 무관하게 항상 최신 갱신 (hidden→visible 후 spurious 트리거 방지)
+    const transitionCheckerId = setInterval(() => {
+      if (destroyed) return;
+      const nowUsActive = usActive();
+      const nowKrActive = isKoreanMarketOpen();
+      if (!document.hidden) {
+        if (!prevUsActive && nowUsActive) {
+          clearTimeout(usTimerId);
+          if (!usInFlight) refreshUsStocks();
+          scheduleUs();
+        }
+        if (!prevKrActive && nowKrActive) {
+          clearTimeout(krTimerId);
+          if (!krInFlight) refreshKoreanStocks();
+          scheduleKr();
+        }
+      }
+      prevUsActive = nowUsActive;
+      prevKrActive = nowKrActive;
+    }, 2 * 60_000);
+
     return () => {
-      clearInterval(usId);
-      clearInterval(krId);
+      destroyed = true;
+      clearTimeout(usTimerId);
+      clearTimeout(krTimerId);
+      clearInterval(transitionCheckerId);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [refreshUsStocks, refreshKoreanStocks]);

@@ -13,27 +13,6 @@ const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
 const NEWS_WINDOW = THRESHOLDS.NEWS_CLUSTER.WINDOW_MS;
 const MIN_CLUSTER = THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER;
 
-// 호재/악재 키워드 (newsSignal.js 기반 단순화)
-const BULL_KW = [
-  '실적 개선', '흑자전환', '수주', '목표가 상향', '투자의견 상향',
-  '신사업', '호실적', '어닝 서프라이즈', '매출 증가', '영업이익 증가',
-  '상장', '승인', '계약', '최고가', '신고가',
-];
-const BEAR_KW = [
-  '적자', '리콜', '제재', '목표가 하향', '투자의견 하향',
-  '매도', '부도', '하락', '급락', '손실', '소송', '벌금',
-  '상장폐지', '거래정지', '해킹', '파산',
-];
-
-function classifyNews(title) {
-  const lower = (title || '').toLowerCase();
-  const isBull = BULL_KW.some(kw => lower.includes(kw));
-  const isBear = BEAR_KW.some(kw => lower.includes(kw));
-  if (isBull && !isBear) return 'bull';
-  if (isBear && !isBull) return 'bear';
-  return 'neutral';
-}
-
 /**
  * 뉴스 클러스터 시그널 스캔
  * @param {Array} allNews - 전체 뉴스 배열 ({ title, pubDate, ... })
@@ -102,9 +81,10 @@ export function useNewsSignals(allNews = [], allItems = []) {
         const text = article.title + ' ' + (article.summary || article.description || '');
         if (matchesKeywords(text, keywords)) {
           matchCount++;
-          const cls = classifyNews(article.title);
-          if (cls === 'bull') bullCount++;
-          else if (cls === 'bear') bearCount++;
+          const score = getNewsSentimentScore(text);
+          let cls = 'neutral';
+          if (score >= 1) { bullCount++; cls = 'bull'; }
+          else if (score <= -1) { bearCount++; cls = 'bear'; }
           matched.push({ article, cls });
         }
       }

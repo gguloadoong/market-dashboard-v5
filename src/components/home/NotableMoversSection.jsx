@@ -183,14 +183,15 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
   const usOpen = getUsMarketStatus().status === 'open';
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
-  // 첫 tick을 다음 20분 경계까지의 남은 시간으로 정렬
-  const [timeSlot, setTimeSlot] = useState(() => Math.floor(Date.now() / SLOT_MS));
+  const [timeSlot, setTimeSlot] = useState(Math.floor(Date.now() / SLOT_MS));
   useEffect(() => {
     const msToNextBoundary = SLOT_MS - (Date.now() % SLOT_MS);
     let intervalId = null;
     const timerId = setTimeout(() => {
       setTimeSlot(Math.floor(Date.now() / SLOT_MS));
-      intervalId = setInterval(() => setTimeSlot(Math.floor(Date.now() / SLOT_MS)), SLOT_MS);
+      intervalId = setInterval(() => {
+        setTimeSlot(Math.floor(Date.now() / SLOT_MS));
+      }, SLOT_MS);
     }, msToNextBoundary);
     return () => { clearTimeout(timerId); if (intervalId) clearInterval(intervalId); };
   }, []);
@@ -275,6 +276,7 @@ export default function NotableMoversSection({ allItems = [], recentNews = [], k
         return hashA - hashB;
       })
       .slice(0, 7);
+  // timeSlot: 슬롯 경계(20분)마다만 증가 — 매초 리렌더 제거
   }, [allItems, recentNews, krOpen, usOpen, timeSlot]);
 
   // 최소 2개 보장 — 점수 부족하면 변동폭 기준 fallback

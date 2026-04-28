@@ -1,6 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import JavaScriptObfuscator from 'javascript-obfuscator'
+
+function jsObfuscatorPlugin() {
+  return {
+    name: 'js-obfuscator',
+    renderChunk(code, chunk) {
+      if (!chunk.fileName.endsWith('.js')) return null
+      const result = JavaScriptObfuscator.obfuscate(code, {
+        compact: true,
+        controlFlowFlattening: false,
+        deadCodeInjection: false,
+        stringArray: true,
+        stringArrayEncoding: ['base64'],
+        stringArrayThreshold: 0.8,
+        renameGlobals: false,
+        selfDefending: false,
+      })
+      return { code: result.getObfuscatedCode(), map: null }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -18,6 +39,9 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
+    // 프로덕션에서만 JS 번들 난독화 — API URL·로직 역분석 방지
+    // controlFlowFlattening/deadCodeInjection 비활성화로 런타임 성능 영향 없음
+    ...(mode === 'production' ? [jsObfuscatorPlugin()] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
@@ -92,10 +116,9 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ],
-  // 프로덕션 빌드: console.log/warn/info/debug를 dead code로 처리해 번들에서 제거
-  // console.error는 보존 — React 런타임 오류·미처리 Promise rejection 디버깅 필요
+  // 프로덕션 빌드: 모든 console.* 제거 — F12 console 탭에 API 정보 노출 방지
   esbuild: {
-    pure: mode === 'production' ? ['console.log', 'console.warn', 'console.info', 'console.debug'] : [],
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
   test: {
     environment: 'node',
