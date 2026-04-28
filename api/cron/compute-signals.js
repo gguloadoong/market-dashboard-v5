@@ -579,10 +579,26 @@ function buildRecoverySignal(target, rec, currentPrice) {
 const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
 const KR_FLOW_CACHE_TTL = 2 * 3600;
 
+// KRX 공휴일 (2025~2027 법정공휴일, marketHours.js와 동기화)
+const KRX_HOLIDAYS = new Set([
+  '20250101','20250128','20250129','20250130','20250301','20250505',
+  '20250506','20250515','20250606','20250815','20251003','20251009',
+  '20251225',
+  '20260101','20260127','20260128','20260129','20260301','20260505',
+  '20260525','20260606','20260815','20260924','20260925','20260926',
+  '20261003','20261009','20261225',
+  '20270101','20270215','20270216','20270217','20270301','20270505',
+  '20270606','20270815','20271003','20271009','20271021','20271022',
+  '20271025','20271225',
+]);
+
 function isKrxMarketOpen() {
-  const kst = new Date(Date.now() + 9 * 3600 * 1000);
+  const kstMs = Date.now() + 9 * 3600 * 1000;
+  const kst = new Date(kstMs);
   const day = kst.getUTCDay(); // 0=일, 6=토
   if (day === 0 || day === 6) return false;
+  const dateStr = kst.toISOString().slice(0, 10).replace(/-/g, '');
+  if (KRX_HOLIDAYS.has(dateStr)) return false;
   const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   return minutes >= 9 * 60 && minutes < 15 * 60 + 30; // KST 09:00~15:30
 }
@@ -639,11 +655,8 @@ async function fetchKrFlowMap(krSymbols) {
         let instBuyDays = 0, instSellDays = 0;
         let fBuyStreak = true, fSellStreak = true, iBuyStreak = true, iSellStreak = true;
 
+        const toNum = (v) => { const n = parseInt(String(v ?? 0).replace(/,/g, ''), 10); return Number.isFinite(n) ? n : 0; };
         for (const row of list) {
-          const toNum = (v) => {
-            const n = parseInt(String(v ?? 0).replace(/,/g, ''), 10);
-            return Number.isFinite(n) ? n : 0;
-          };
           const foreign = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
           const inst = toNum(row.instNetAmt ?? row.institutionNetAmt);
 
@@ -775,13 +788,11 @@ export default async function handler(req, res) {
 
         // 복합 점수 — KR 종목은 flow(외인/기관) 35% 가중치 활성화, 코인/미장은 flow=null
         // volumeRatio는 1 고정 (Naver 거래량 미포함 — 향후 통합 예정)
-        // 임계값: flow 가중 기여분(weighted)이 threshold 갭(10)을 메꿀 만큼 클 때만 40으로 상향
-        //   → raw score 기준이면 작은 기여(+5)에도 threshold가 올라 오히려 시그널 누락 발생
+        // 임계값 30 — compositeScorer 라벨 경계(±30)와 일관, flow 추가 시에도 유지
+        // (조건부 40 상향은 flowWeighted 경계 부근에서 역설적 시그널 누락 발생)
         const flow = target.market === 'kr' ? (krFlowMap.get(target.symbol) ?? null) : null;
         const composite = calculateCompositeScore(ta, flow, sentiment);
-        const flowWeighted = Math.abs(composite.breakdown?.flow?.weighted ?? 0);
-        const compositeThreshold = flowWeighted >= 10 ? 40 : 30;
-        if (Math.abs(composite.score) >= compositeThreshold) {
+        if (Math.abs(composite.score) >= 30) {
           signals.push(buildCompositeSignal(target, composite, ta, currentPrice));
         }
 
