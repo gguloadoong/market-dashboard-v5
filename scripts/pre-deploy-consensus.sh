@@ -36,17 +36,25 @@ if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
     >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
 fi
 
+# 탭/개행을 공백으로 sanitize — TSV 깨짐 방지 (Gemini 봇 리뷰 반영)
+_gate_sanitize() {
+  printf '%s' "$1" | tr '\t\n' '  '
+}
+
 _gate_begin() {
-  CURRENT_GATE="$1"
+  CURRENT_GATE="${1:-?}"
   if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
-    printf '%s\t%s\t%s\tRUNNING\t\n' "$(date +%s)" "$1" "$2" \
+    printf '%s\t%s\t%s\tRUNNING\t\n' "$(date +%s)" "${1:-?}" "$(_gate_sanitize "${2:-}")" \
       >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
   fi
 }
 
+# _gate_finish [STATE] [DETAIL]  — STATE 기본 ALL_DONE (CodeRabbit 봇 리뷰 반영)
 _gate_finish() {
+  local _state="${1:-ALL_DONE}"
+  local _detail="${2:-}"
   if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
-    printf '%s\t99\t완료\tALL_DONE\t\n' "$(date +%s)" \
+    printf '%s\t99\t완료\t%s\t%s\n' "$(date +%s)" "$_state" "$(_gate_sanitize "$_detail")" \
       >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
   fi
 }
@@ -63,7 +71,8 @@ check() {
     FAIL=$((FAIL + 1))
   fi
   if [ -n "${GATE_PROGRESS_LOG:-}" ]; then
-    printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "${CURRENT_GATE:-?}" "$name" "$result" "$detail" \
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "${CURRENT_GATE:-?}" \
+      "$(_gate_sanitize "$name")" "$result" "$(_gate_sanitize "$detail")" \
       >> "$GATE_PROGRESS_LOG" 2>/dev/null || true
   fi
 }
@@ -95,12 +104,8 @@ echo -e "${BLUE}[2/6] P0/P1 오픈 이슈 확인${NC}"
 _gate_begin 2 "P0/P1 오픈 이슈"
 # || true: set -e 환경에서 gh 인증/네트워크 실패 시 스크립트 전체 종료 방지
 # 빈 문자열 결과 → 하단 empty-string 체크에서 FAIL 처리 (알 수 없는 상태를 PASS로 처리 금지)
-P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null \
-  || gh api "repos/{owner}/{repo}/issues?state=open&labels=P0&per_page=100" --jq 'length' 2>/dev/null \
-  || true)
-P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null \
-  || gh api "repos/{owner}/{repo}/issues?state=open&labels=P1&per_page=100" --jq 'length' 2>/dev/null \
-  || true)
+P0_ISSUES=$(gh issue list --label "P0" --state open --json number --jq 'length' 2>/dev/null || true)
+P1_ISSUES=$(gh issue list --label "P1" --state open --json number --jq 'length' 2>/dev/null || true)
 if [ -z "$P0_ISSUES" ] || [ -z "$P1_ISSUES" ]; then
   check "P0/P1 이슈" "FAIL" "GitHub API 오류 — gh 인증 또는 네트워크 확인 후 재실행"
 else
@@ -294,11 +299,11 @@ else
   check "개발팀 승인" "PASS" "알고리즘 파일 변경 없음"
 fi
 
+_gate_begin 5.5 "Opus+Codex 충돌 중재"
 # ── Gate 5.5: Opus code-reviewer / Codex gate 충돌 중재 ──────────────────────
 # 최신 code-review-{BRANCH}.md 와 codex-review-{BRANCH}.md artifact를 읽어 충돌 감지.
 # 충돌 시 BLOCK 우선 원칙 적용 (PASS+BLOCK → BLOCK).
 # SKIP_CODEX_REVIEW=1 설정 시 Codex 단독 BLOCK + Opus PASS 조합만 허용 (경고 후 통과).
-_gate_begin 5.5 "Opus+Codex 충돌 중재"
 CURRENT_BRANCH_GATE=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 SAFE_BRANCH_GATE="${CURRENT_BRANCH_GATE//\//-}"
 
@@ -403,12 +408,12 @@ if [ "$FAIL" -eq 0 ]; then
   fi
   echo -e "${GREEN}✅ 컨센서스 PASS (${PASS}/${TOTAL}${SKIP_MSG}) — 배포 가능${NC}"
   echo ""
-  _gate_finish
+  _gate_finish PASS "PASS=${PASS} FAIL=${FAIL} SKIP=${SKIP}"
   exit 0
 else
   echo -e "${RED}🚫 컨센서스 FAIL (${FAIL}건 미통과) — 배포 불가${NC}"
   echo -e "${YELLOW}   위 항목 해결 후 재실행: npm run deploy:check${NC}"
   echo ""
-  _gate_finish
+  _gate_finish FAIL "PASS=${PASS} FAIL=${FAIL} SKIP=${SKIP}"
   exit 1
 fi
