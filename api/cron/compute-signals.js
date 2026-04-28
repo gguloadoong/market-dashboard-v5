@@ -623,7 +623,8 @@ async function fetchKrFlowMap(krSymbols) {
         }
 
         // 최신 날짜 우선 정렬 (Naver 응답 순서 미보장)
-        const dateKey = (r) => String(r.bizDate ?? r.baseDate ?? r.date ?? '');
+        // stcTrdDd/bizday는 investor-trend.js에서 검증된 실제 Naver 응답 필드명
+        const dateKey = (r) => String(r.stcTrdDd ?? r.bizday ?? r.bizDate ?? r.baseDate ?? r.date ?? '');
         const list = rawList.slice().sort((a, b) => dateKey(b).localeCompare(dateKey(a))).slice(0, 10);
 
         let foreignBuyDays = 0, foreignSellDays = 0;
