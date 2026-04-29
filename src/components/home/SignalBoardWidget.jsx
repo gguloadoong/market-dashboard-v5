@@ -92,7 +92,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     [allSignals],
   );
 
-  // 적중률 높은 시그널 — accuracy >= 60인 현재 발화 시그널, 최대 2건
+  // 적중률 높은 시그널 — totalFired >= 30 && accuracy >= 60인 현재 발화 시그널, 최대 2건
   const highAccuracySignals = useMemo(() => {
     return allSignals
       .filter(s => {

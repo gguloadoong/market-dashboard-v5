@@ -213,8 +213,8 @@ export default function SignalScorecardTab() {
   const [category, setCategory] = useState('all');
 
   // 카테고리 필터 + 정렬 (레거시는 hook에서 이미 차단됨)
-  // 정렬 우선순위: ① 발화 있는 봇(totalFired≥10) — 적중률 내림차순
-  //               ② cold 봇(totalFired 1~9) — 적중률 내림차순
+  // 정렬 우선순위: ① 발화 있는 봇(totalFired≥30) — 적중률 내림차순
+  //               ② cold 봇(totalFired 1~29) — 적중률 내림차순
   //               ③ 집계 중 봇(isMissing or totalFired===0) — 이름순
   const filteredBots = useMemo(() => {
     const filtered = category === 'all'
