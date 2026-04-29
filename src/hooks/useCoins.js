@@ -178,7 +178,7 @@ export function useCoins(krwRateRef) {
   useEffect(() => {
     if (!coinsReady) return;
     refreshSparklines();
-  }, [coinsReady, refreshSparklines]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [coinsReady, refreshSparklines]);
 
   // Upbit WebSocket
   useEffect(() => {
