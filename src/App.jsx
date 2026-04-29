@@ -103,9 +103,9 @@ export default function App() {
   const [searchOpen, setSearchOpen]     = useState(false);
 
   // P3-2: 결정 사이클 측정 — 마운트 시 새 사이클 시작
-  useEffect(() => { cycleStart(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { cycleStart(); }, []);
   const handleItemClick = useCallback((item) => {
-    if (item) cycleStep('chart_open', { market: item.market ?? item._market });
+    if (item) cycleStep('chart_open', { market: item.market ?? item._market, from: 'list' });
     setSelectedItem(item);
   }, []);
   const [notifBanner, setNotifBanner]   = useState(() => {

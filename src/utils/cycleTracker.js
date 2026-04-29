@@ -1,22 +1,28 @@
 // 5분 결정 사이클 측정 — 진입→시그널→차트→결정 단계별 타이밍을 Vercel Analytics로 전송
-// P3-2: 7일치 누적 후 p50/p90 분포로 사이클 길이 분석 가능
+// P3-2: watchlist_add(결정) 시 사이클 리셋 → 다음 사이클의 elapsed_ms가 정확한 구간 길이
 import { track } from '@vercel/analytics';
 
 const KEY = 'cycle_start_ts';
 
 function elapsed() {
-  const ts = sessionStorage.getItem(KEY);
-  return ts ? Date.now() - parseInt(ts, 10) : 0;
+  try {
+    const ts = sessionStorage.getItem(KEY);
+    if (!ts) return 0;
+    const parsed = parseInt(ts, 10);
+    return Number.isFinite(parsed) ? Date.now() - parsed : 0;
+  } catch { return 0; }
 }
 
 export function cycleStart() {
-  sessionStorage.setItem(KEY, String(Date.now()));
+  try {
+    sessionStorage.setItem(KEY, String(Date.now()));
+  } catch { /* 프라이빗 모드/쿼터 초과 시 무시 */ }
 }
 
 export function cycleStep(step, extra = {}) {
   try {
     track('decision_cycle', { step, elapsed_ms: elapsed(), ...extra });
   } catch {
-    // analytics 실패가 UX를 방해하지 않도록 무시
+    if (import.meta.env.DEV) console.warn('[cycleTracker] track 실패', step);
   }
 }

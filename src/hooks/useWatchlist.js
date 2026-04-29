@@ -2,7 +2,7 @@
 // v2: `${market}:${symbol}` 형식 ('KR:005930', 'US:AAPL', 'COIN:bitcoin')
 // 외부 API는 기존 호환 — `toggle`/`isWatched`에 raw symbol 전달 시 market 추론해 복합키로 변환
 import { useState, useCallback, useMemo } from 'react';
-import { cycleStep } from '../utils/cycleTracker';
+import { cycleStep, cycleStart } from '../utils/cycleTracker';
 
 const KEY_V1 = 'watchlist_v1';
 const KEY_V2 = 'watchlist_v2';
@@ -73,18 +73,20 @@ export function useWatchlist() {
   const toggle = useCallback((id, market) => {
     const key = toCompositeKey(id, market);
     if (!key) return;
+    const willAdd = !watchlist.has(key);
+    // 상태 업데이터 외부에서 부작용 처리 (updater는 순수 함수 유지)
+    if (willAdd) {
+      cycleStep('watchlist_add', { market: market ?? key.split(':')[0] });
+      cycleStart(); // 결정 완료 → 다음 사이클 시작
+    }
     setWatchlist(prev => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-        cycleStep('watchlist_add', { market: market ?? key.split(':')[0] });
-      }
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       save(next);
       return next;
     });
-  }, []);
+  }, [watchlist]);
 
   const isWatched = useCallback(
     (id, market) => watchlist.has(toCompositeKey(id, market)),
