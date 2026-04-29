@@ -380,10 +380,17 @@ _gate_begin 6 "조직장 승인"
 # CLAUDE.md의 배포 방향과 일치하는지: 배포 조건 (P0/P1 수정 or 주요 기능 완료) 확인
 DEPLOY_CONDITION_MET=0
 
+# 마지막 배포 커밋 기준으로 비교 (origin/main..HEAD는 동기화 시 항상 빈 범위)
+LAST_DEPLOYED=$(cat .last-deployed-commit 2>/dev/null | tr -d '[:space:]')
+if [ -n "$LAST_DEPLOYED" ] && git cat-file -e "${LAST_DEPLOYED}^{commit}" 2>/dev/null; then
+  LOG_BASE="$LAST_DEPLOYED"
+else
+  LOG_BASE="origin/main"
+fi
 # P0/P1 수정이 있었나?
-RECENT_FIX=$(git log origin/main..HEAD --oneline 2>/dev/null | { grep "fix:" || true; } | wc -l | tr -d ' ')
+RECENT_FIX=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep "fix:" || true; } | wc -l | tr -d ' ')
 # 주요 기능 완료 (feat:) 커밋?
-RECENT_FEAT=$(git log origin/main..HEAD --oneline 2>/dev/null | { grep "feat:" || true; } | wc -l | tr -d ' ')
+RECENT_FEAT=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep "feat:" || true; } | wc -l | tr -d ' ')
 
 if [ "$RECENT_FIX" -gt 0 ] || [ "$RECENT_FEAT" -gt 0 ]; then
   DEPLOY_CONDITION_MET=1
