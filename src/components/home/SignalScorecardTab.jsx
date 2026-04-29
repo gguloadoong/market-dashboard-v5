@@ -103,7 +103,7 @@ function BotRankingList({ bots }) {
       {bots.map((bot, idx) => {
         const isExpanded = expandedIdx === idx;
         const isMissing = bot.isMissing === true;
-        const isCold = !isMissing && bot.totalFired < 10;
+        const isCold = !isMissing && bot.totalFired < 30;
         const name = SIGNAL_BOT_NAMES[bot.type] || bot.type;
         const color = accuracyColor(bot.accuracy);
         const streak = (bot.recentResults || []).slice(-10);
@@ -133,7 +133,7 @@ function BotRankingList({ bots }) {
                       opacity: isMissing ? 0.8 : isCold ? 0.7 : 1,
                     }}
                   >
-                    {isMissing ? '집계 중' : isCold ? `~${bot.accuracy}%` : `${bot.accuracy}%`}
+                    {isMissing ? '집계 중' : isCold ? '데이터 누적 중' : `${bot.accuracy}%`}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 mt-1">
@@ -213,16 +213,16 @@ export default function SignalScorecardTab() {
   const [category, setCategory] = useState('all');
 
   // 카테고리 필터 + 정렬 (레거시는 hook에서 이미 차단됨)
-  // 정렬 우선순위: ① 발화 있는 봇(totalFired≥10) — 적중률 내림차순
-  //               ② cold 봇(totalFired 1~9) — 적중률 내림차순
+  // 정렬 우선순위: ① 발화 있는 봇(totalFired≥30) — 적중률 내림차순
+  //               ② cold 봇(totalFired 1~29) — 적중률 내림차순
   //               ③ 집계 중 봇(isMissing or totalFired===0) — 이름순
   const filteredBots = useMemo(() => {
     const filtered = category === 'all'
       ? bots
       : bots.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
     return [...filtered].sort((a, b) => {
-      const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 10 ? 1 : 0;
-      const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 10 ? 1 : 0;
+      const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 30 ? 1 : 0;
+      const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 30 ? 1 : 0;
       if (rankA !== rankB) return rankA - rankB;
       if (rankA === 0) return b.accuracy - a.accuracy;
       if (rankA === 1) return b.accuracy - a.accuracy;
