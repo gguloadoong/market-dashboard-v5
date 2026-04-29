@@ -21,7 +21,7 @@ export function cycleStart() {
 
 export function cycleStep(step, extra = {}) {
   try {
-    track('decision_cycle', { step, elapsed_ms: elapsed(), ...extra });
+    track('decision_cycle', { ...extra, step, elapsed_ms: elapsed() });
   } catch {
     if (import.meta.env.DEV) console.warn('[cycleTracker] track 실패', step);
   }
