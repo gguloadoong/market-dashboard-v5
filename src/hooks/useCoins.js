@@ -164,7 +164,7 @@ export function useCoins(krwRateRef) {
     // (신규 유저/캐시 없음은 아래 coinsReady effect에서 처리)
     if (coinsRef.current.length > 0) { sparklineMountCalledRef.current = true; refreshSparklines(); }
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
-    const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
+    const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.BACKGROUND);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
     // 탭 복귀 시 즉시 갱신
     const onVisible = () => { if (!document.hidden) refreshCoinsQuick(); };

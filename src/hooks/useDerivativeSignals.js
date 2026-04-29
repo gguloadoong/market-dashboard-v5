@@ -122,11 +122,11 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     runVWAP();
 
     // 폴링 설정
-    pcrTimer = setInterval(() => { if (!document.hidden) runPCR(); }, 5 * 60 * 1000);
-    frTimer = setInterval(() => { if (!document.hidden) runFundingRate(); }, 5 * 60 * 1000);
-    ofTimer = setInterval(() => { if (!document.hidden) runOrderFlow(); }, 60 * 1000);
-    socialTimer = setInterval(() => { if (!document.hidden) runSocial(); }, 5 * 60 * 1000);
-    vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 5 * 60 * 1000);
+    pcrTimer = setInterval(() => { if (!document.hidden) runPCR(); }, 10 * 60 * 1000);
+    frTimer = setInterval(() => { if (!document.hidden) runFundingRate(); }, 10 * 60 * 1000);
+    ofTimer = setInterval(() => { if (!document.hidden) runOrderFlow(); }, 2 * 60 * 1000);
+    socialTimer = setInterval(() => { if (!document.hidden) runSocial(); }, 10 * 60 * 1000);
+    vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 10 * 60 * 1000);
 
     return () => {
       clearInterval(pcrTimer);

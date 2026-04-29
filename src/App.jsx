@@ -156,7 +156,7 @@ export default function App() {
     }
   }, [KR_ETFS, US_ETF_SYMBOLS]);
 
-  useEffect(() => { refreshEtfs(); const id = setInterval(() => { if (!document.hidden) refreshEtfs(); }, 60000); return () => clearInterval(id); }, [refreshEtfs]);
+  useEffect(() => { refreshEtfs(); const id = setInterval(() => { if (!document.hidden) refreshEtfs(); }, 120000); return () => clearInterval(id); }, [refreshEtfs]);
 
   // 전체 갱신
   const refreshAll = useCallback(async () => {

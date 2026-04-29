@@ -71,7 +71,7 @@ function getPriceFromItems(symbol, items) {
   return null;
 }
 
-const POLL_INTERVAL = 5 * 60 * 1000; // 5분
+const POLL_INTERVAL = 15 * 60 * 1000; // 15분 (일별 데이터라 장중 수치 변동 없음)
 const CONSECUTIVE_THRESHOLD = 3; // 3일 연속부터 시그널 발화
 // 기획: 20일 평균 대비 3배이나 히스토리 API 한계로 마켓 내 상위 5% 기준 적용
 const VOLUME_PERCENTILE_THRESHOLD = 0.95; // 상위 5% (95th percentile)

@@ -32,8 +32,8 @@ export function useSignalAccuracy() {
   const { data: raw = [], isLoading } = useQuery({
     queryKey: ['signal-accuracy'],
     queryFn: fetchSignalAccuracy,
-    staleTime: 5 * 60_000,       // 5분 캐시
-    refetchInterval: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    refetchInterval: 10 * 60_000,
     refetchIntervalInBackground: false,
     placeholderData: [],
   });

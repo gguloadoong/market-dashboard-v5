@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { loadSignals } from '../engine/signalEngine';
 
-const POLL_INTERVAL = 60 * 1000; // 1분 (서버 cron 10분 대비 충분)
+const POLL_INTERVAL = 3 * 60 * 1000; // 3분 (서버 cron 10분 주기, 60s 폴링은 90% 중복)
 const API_URL = '/api/signals';
 
 export function useServerSignals() {
