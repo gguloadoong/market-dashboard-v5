@@ -1,5 +1,6 @@
 // 마켓레이더 — 메인 앱 (훅 기반 상태 관리)
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { cycleStart, cycleStep } from './utils/cycleTracker';
 import Header from './components/Header';
 import MobileBottomNav from './components/MobileBottomNav';
 import SurgeBanner from './components/SurgeBanner';
@@ -100,6 +101,13 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState(null);
   const [newsContext, setNewsContext]   = useState(null); // 뉴스에서 종목 클릭 시 뉴스 맥락 전달
   const [searchOpen, setSearchOpen]     = useState(false);
+
+  // P3-2: 결정 사이클 측정 — 마운트 시 새 사이클 시작
+  useEffect(() => { cycleStart(); }, []);
+  const handleItemClick = useCallback((item) => {
+    if (item) cycleStep('chart_open', { market: item.market ?? item._market, from: 'list' });
+    setSelectedItem(item);
+  }, []);
   const [notifBanner, setNotifBanner]   = useState(() => {
     const perm = getNotificationPermission();
     const dismissed = sessionStorage.getItem('notif-banner-dismissed');
@@ -260,12 +268,14 @@ export default function App() {
 
   // 뉴스에서 종목 클릭 — 뉴스 맥락 함께 전달
   const handleNewsRelatedClick = useCallback((item) => {
+    if (item) cycleStep('chart_open', { market: item.market ?? item._market, from: 'news' });
     setNewsContext(selectedNews);
     setSelectedItem(item);
   }, [selectedNews]);
 
   // ChartSidePanel 관련종목 클릭 — 뉴스 맥락 초기화 후 새 종목 열기
   const handleChartRelatedClick = useCallback((item) => {
+    if (item) cycleStep('chart_open', { market: item.market ?? item._market, from: 'related' });
     setNewsContext(null);
     setSelectedItem(item);
   }, []);
@@ -368,7 +378,7 @@ export default function App() {
             <HomeDashboard
               indices={indices} krStocks={krStocks} usStocks={usStocks}
               coins={coins} etfs={mergedEtfs} krwRate={krwRate} krwRateLoaded={krwRateLoaded}
-              onItemClick={setSelectedItem} onNewsClick={setSelectedNews}
+              onItemClick={handleItemClick} onNewsClick={setSelectedNews}
               onTabChange={setActiveTab}
               dataReady={pricesReady && coinsReady}
             />
@@ -376,7 +386,7 @@ export default function App() {
             <SectorRotation krStocks={krStocks} usStocks={usStocks} coins={coins} />
           ) : activeTab === 'news' ? (
             <div className="lg:hidden h-[calc(100vh-112px)]">
-              <BreakingNewsPanel onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
+              <BreakingNewsPanel onItemClick={handleItemClick} onNewsClick={setSelectedNews} />
             </div>
           ) : (
             <>
@@ -392,7 +402,7 @@ export default function App() {
         </div>
 
         <div className="hidden lg:block self-start" style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}>
-          <UnifiedFeedPanel onItemClick={setSelectedItem} onNewsClick={setSelectedNews} />
+          <UnifiedFeedPanel onItemClick={handleItemClick} onNewsClick={setSelectedNews} />
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 // 시그널 보드 위젯 — SignalSummaryWidget + SeoulForceSection 통합
 // 카운터 3개 (강세/약세/중립) + 시그널 리스트 + 접기/펼치기 + 성적표 탭
 import { useState, useCallback, useMemo } from 'react';
+import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { SIGNAL_TYPES } from '../../engine/signalTypes';
@@ -127,6 +128,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     if (signal.symbol && onItemClick) {
       // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
       const market = signal.market === 'crypto' ? 'coin' : signal.market;
+      cycleStep('signal_click', { market, signal_type: signal.type });
       onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
     }
   }, [onItemClick]);
