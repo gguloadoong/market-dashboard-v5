@@ -222,7 +222,7 @@ export default function SignalScorecardTab() {
       : bots.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
     return [...filtered].sort((a, b) => {
       const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 30 ? 1 : 0;
-      const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 10 ? 1 : 0;
+      const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 30 ? 1 : 0;
       if (rankA !== rankB) return rankA - rankB;
       if (rankA === 0) return b.accuracy - a.accuracy;
       if (rankA === 1) return b.accuracy - a.accuracy;
