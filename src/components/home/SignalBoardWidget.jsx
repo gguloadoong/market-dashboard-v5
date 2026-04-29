@@ -1,6 +1,6 @@
 // 시그널 보드 위젯 — SignalSummaryWidget + SeoulForceSection 통합
 // 카운터 3개 (강세/약세/중립) + 시그널 리스트 + 접기/펼치기 + 성적표 탭
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
@@ -9,8 +9,10 @@ import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import { buildNarrative } from '../../utils/narrativeBuilder';
 import { matchesKeywords, buildStockKeywords } from '../../utils/newsAlias';
 import { KR_SECTOR_MAP } from '../../data/krStockList';
+import { useWatchlist } from '../../hooks/useWatchlist';
 import TickerLogo from './TickerLogo';
 import SignalScorecardTab from './SignalScorecardTab';
+import SignalInlinePanel from './SignalInlinePanel';
 
 const FORCE_TYPES = [
   SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
@@ -26,8 +28,11 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   const [expanded, setExpanded] = useState(false);
   // 방향 필터 — null=전체, 'bullish', 'bearish', 'neutral'
   const [filterDir, setFilterDir] = useState(null);
+  // 인라인 결정 패널 — 펼쳐진 시그널 id (null=모두 닫힘)
+  const [expandedId, setExpandedId] = useState(null);
   const allSignals = useTopSignals(20);
   const { botMap } = useSignalAccuracy();
+  const { toggle: toggleWatch, isWatched } = useWatchlist();
 
   // 시그널별 내러티브 사전 계산 — symbol 기준 캐싱
   // sector 보강(KR), ±2시간 뉴스 매칭, 섹터 동조 종목 수 집계
@@ -64,10 +69,33 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
           }).length
         : 0;
       const enriched = sector ? { ...sig, meta: { ...sig.meta, sector } } : sig;
-      map.set(sig.id, buildNarrative({ signal: enriched, relatedNews, sectorPeers }));
+      const narrative = buildNarrative({ signal: enriched, relatedNews, sectorPeers });
+      map.set(sig.id, { narrative, relatedNews });
     }
     return map;
   }, [allSignals, allItems, allNews]);
+
+  // allItems O(1) 조회 맵
+  const allItemsLookup = useMemo(() => {
+    const m = new Map();
+    for (const it of allItems) m.set(`${it._market}:${it.symbol}`, it);
+    return m;
+  }, [allItems]);
+
+  // 시그널 → 매칭 종목 (sparkline용)
+  const matchedItemMap = useMemo(() => {
+    const map = new Map();
+    for (const sig of allSignals) {
+      if (!sig.symbol) continue;
+      const norm = sig.market === 'crypto' ? 'COIN' : sig.market?.toUpperCase();
+      const it = allItemsLookup.get(`${norm}:${sig.symbol}`);
+      if (it) map.set(sig.id, it);
+    }
+    return map;
+  }, [allSignals, allItemsLookup]);
+
+  // 필터 변경 시 펼침 상태 초기화
+  useEffect(() => { setExpandedId(null); }, [filterDir]);
 
   const { bullSignals, bearSignals, neutralSignals, bullCount, bearCount, neutralCount } = useMemo(() => {
     const bull = [], bear = [], neutral = [];
@@ -127,6 +155,23 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   const handleClick = useCallback((signal) => {
     if (signal.symbol && onItemClick) {
       // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
+      const market = signal.market === 'crypto' ? 'coin' : signal.market;
+      cycleStep('signal_click', { market, signal_type: signal.type });
+      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
+    }
+  }, [onItemClick]);
+
+  // 시그널 카드 펼치기/접기 토글 — 펼칠 때만 이벤트 발화 (StrictMode 안전)
+  const handleToggleExpand = useCallback((signal) => {
+    if (!signal.symbol) return;
+    const willExpand = expandedId !== signal.id;
+    if (willExpand) cycleStep('signal_expand', { market: signal.market, signal_type: signal.type });
+    setExpandedId(willExpand ? signal.id : null);
+  }, [expandedId]);
+
+  // 차트 보기 — 인라인 패널 액션
+  const handleOpenChart = useCallback((signal) => {
+    if (signal.symbol && onItemClick) {
       const market = signal.market === 'crypto' ? 'coin' : signal.market;
       cycleStep('signal_click', { market, signal_type: signal.type });
       onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
@@ -297,11 +342,18 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
             const isBear = signal.direction === 'bearish';
             const nameColor = isBull ? '#F04452' : isBear ? '#1764ED' : '#191F28';
             const dotColor = isBull ? '#F04452' : isBear ? '#1764ED' : '#8B95A1';
-            const narrative = narrativeMap.get(signal.id);
+            const narrativeData = narrativeMap.get(signal.id);
+            const narrative = narrativeData?.narrative;
+            const relatedNews = narrativeData?.relatedNews;
+            const matchedItem = matchedItemMap.get(signal.id);
+            const isExpanded = expandedId === signal.id;
+            const watchedKey = matchedItem?.id || signal.symbol;
+            const marketKey = signal.market === 'crypto' ? 'COIN' : signal.market?.toUpperCase();
             return (
               <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
                 <button
-                  onClick={() => handleClick(signal)}
+                  onClick={() => handleToggleExpand(signal)}
+                  aria-expanded={signal.symbol ? isExpanded : undefined}
                   className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
                     signal.symbol ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
                   }`}
@@ -341,13 +393,38 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                       />
                     ))}
                   </div>
+                  {/* 펼치기 chevron — symbol 있는 시그널에만 표시 */}
+                  {signal.symbol && <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    className={`flex-shrink-0 text-[#B0B8C1] transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>}
                 </button>
                 {/* 내러티브 컨텍스트 — "왜 발화했는가" (매칭 부족 시 영역 숨김) */}
-                {narrative && (
+                {narrative && !isExpanded && (
                   <div className="px-2 pb-2 -mt-1 text-[11px] text-[#6B7684] dark:text-[#8B95A1] leading-snug">
                     🧩 컨텍스트: {narrative}
                   </div>
                 )}
+                {/* 인라인 결정 패널 */}
+                <SignalInlinePanel
+                  signal={signal}
+                  narrative={narrative}
+                  relatedNews={relatedNews}
+                  matchedItem={matchedItem}
+                  isOpen={isExpanded}
+                  isWatched={isWatched(watchedKey, marketKey)}
+                  onToggleWatch={() => toggleWatch(watchedKey, marketKey)}
+                  onOpenChart={() => handleOpenChart(signal)}
+                  botMap={botMap}
+                />
               </div>
             );
           })}

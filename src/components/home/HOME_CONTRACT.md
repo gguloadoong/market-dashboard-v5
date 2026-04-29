@@ -20,7 +20,7 @@
    │   └── WatchlistAlertStrip — 이상 신호 스트립 (±3% 변동/시그널 발화 시만 표시, inline)
    └── EventStrip          — EventTicker 세로 롤링 (translateY, 3아이템, 9초 순환)
 2. NotableMoversSection    — 주목할 종목 (WHY 카드)
-3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분)
+3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분) — 인라인 결정 패널(SignalInlinePanel) 포함
 4. AiDebateSection         — AI 종목토론 (별도 섹션, 4종목 칩 선택)
 5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터)
    ├── TopMoversWidget     — 급등/급락 탭 (KR/US/COIN 서브탭)
@@ -93,7 +93,8 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | `NewsFeedWidget.jsx` | 필터된 투자 뉴스 | `useAllNewsQuery` |
 | `FearGreedWidget.jsx` | CNN Fear & Greed 지수 | 외부 API |
 | `SignalSummaryWidget.jsx` | (비활성) 투자 시그널 — SignalBoardWidget에 통합됨 | `useTopSignals` |
-| `SignalBoardWidget.jsx` | 시그널 보드 (카운터 + 세력 포착 + 시그널 리스트 통합) | `useTopSignals` |
+| `SignalBoardWidget.jsx` | 시그널 보드 (카운터 + 세력 포착 + 시그널 리스트 통합) — 인라인 결정 패널 호스트 | `useTopSignals` |
+| `SignalInlinePanel.jsx` | 시그널 인라인 결정 패널 (카드 펼침: 트리거/컨텍스트/뉴스/Sparkline/액션) | `signal`, `narrative`, `relatedNews`, `matchedItem` |
 | `MarketSentimentWidget.jsx` | 통합 시장 심리 (온도계 + 공포탐욕) | `useSignals`, `useFearGreed`, `allItems` |
 | `MarketTemperatureWidget.jsx` | (비활성) 마켓 온도계 단독 — MarketSentimentWidget에 통합됨 | `useSignals` |
 | `DerivativesWidget.jsx` | 파생 시그널 | 파생/소셜 데이터 |
