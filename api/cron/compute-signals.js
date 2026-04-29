@@ -686,6 +686,9 @@ async function fetchKrFlowMap(krSymbols) {
     })
   );
 
+  // fallback 전 신선 성공 심볼 고정 (캐시 오염 방지 — Copilot/Gemini HIGH #257)
+  const freshSymbols = new Set(map.keys());
+
   // 실패 종목에 last-good 값 fallback (flow=null 대신 이전 성공분 사용)
   for (const symbol of krSymbols) {
     if (!map.has(symbol) && lastGood[symbol]) {
@@ -694,19 +697,19 @@ async function fetchKrFlowMap(krSymbols) {
     }
   }
 
-  // 성공 종목만 last-good에 누적 저장 (부분 실패해도 성공분은 항상 보존)
-  if (map.size > 0) {
+  // 신선 성공분만 last-good에 누적 저장 (fallback 값으로 기존 last-good 덮어쓰기 방지)
+  if (freshSymbols.size > 0) {
     try {
       const merged = { ...lastGood };
-      for (const symbol of krSymbols) {
-        if (map.has(symbol)) merged[symbol] = map.get(symbol);
+      for (const symbol of freshSymbols) {
+        merged[symbol] = map.get(symbol);
       }
       await setSnap(KR_FLOW_LAST_GOOD_KEY, merged, KR_FLOW_LAST_GOOD_TTL);
     } catch { /* last-good 저장 실패는 무시 */ }
   }
 
-  // 장 외 + 전체 성공 시에만 전수성공 캐시 저장 (기존 정책 유지)
-  if (!marketOpen && map.size === krSymbols.length) {
+  // 장 외 + 전수 신선 성공 시에만 전수성공 캐시 저장 (fallback 포함 시 오염 방지)
+  if (!marketOpen && freshSymbols.size === krSymbols.length) {
     try {
       await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
     } catch { /* cache write 실패는 무시 */ }
