@@ -29,7 +29,7 @@ async function fetchSignalAccuracy() {
  * @returns {{ bots: Array, overallAccuracy: number, isLoading: boolean, botMap: Map }}
  */
 export function useSignalAccuracy() {
-  const { data: raw = [], isLoading } = useQuery({
+  const { data: raw = [], isLoading, isError } = useQuery({
     queryKey: ['signal-accuracy'],
     queryFn: fetchSignalAccuracy,
     staleTime: 10 * 60_000,
@@ -60,22 +60,25 @@ export function useSignalAccuracy() {
       ])
   );
 
-  // API에 없는 봇도 "집계 중" 상태로 포함 (레거시 제외)
-  const missingBots = ALL_BOT_TYPES
-    .filter((t) => !apiBotsMap.has(t) && !LEGACY_SIGNAL_TYPES.has(t))
-    .map((t) => ({
-      type: t,
-      totalFired: 0,
-      hitCount: 0,
-      accuracy: 0,
-      accuracy1h: null,
-      accuracy4h: null,
-      accuracy24h: null,
-      trend: 0,
-      recentResults: [],
-      recentSignals: [],
-      isMissing: true,
-    }));
+  // 로딩/에러 중에는 placeholder 억제 — 실제 API 응답 후에만 "집계 중" 표시 (#226)
+  const dataReady = !isLoading && !isError;
+  const missingBots = dataReady
+    ? ALL_BOT_TYPES
+        .filter((t) => !apiBotsMap.has(t) && !LEGACY_SIGNAL_TYPES.has(t))
+        .map((t) => ({
+          type: t,
+          totalFired: 0,
+          hitCount: 0,
+          accuracy: 0,
+          accuracy1h: null,
+          accuracy4h: null,
+          accuracy24h: null,
+          trend: 0,
+          recentResults: [],
+          recentSignals: [],
+          isMissing: true,
+        }))
+    : [];
 
   const bots = [...apiBotsMap.values(), ...missingBots];
 
@@ -88,5 +91,5 @@ export function useSignalAccuracy() {
   // 타입별 빠른 조회용 Map
   const botMap = new Map(bots.map((b) => [b.type, b]));
 
-  return { bots, overallAccuracy, isLoading, botMap };
+  return { bots, overallAccuracy, isLoading, isError, botMap };
 }

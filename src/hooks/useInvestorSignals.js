@@ -192,8 +192,11 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
 
       const items = allItemsRef.current;
       // 스캔 전체를 배치로 묶어 _notify를 1회로 압축 — 다수 addSignal 호출로 인한 연속 리렌더 방지
-      beginBatch();
+      // beginBatch를 try 안에서 호출해 pair invariant 보장 (#229)
+      let _batchOpened = false;
       try {
+        beginBatch();
+        _batchOpened = true;
         // ── P0-1: 외국인/기관 연속 매수매도 시그널 ──
         await scanInvestorTrends(items);
 
@@ -236,8 +239,8 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
         // 에러 무시 — 다음 폴링에서 재시도
       } finally {
         runningRef.current = false;
-        // 배치 종료 — 스캔 중 쌓인 _notify를 1회 실행
-        endBatch();
+        // 배치 종료 — beginBatch가 성공한 경우에만 (pair invariant)
+        if (_batchOpened) endBatch();
       }
     }
 

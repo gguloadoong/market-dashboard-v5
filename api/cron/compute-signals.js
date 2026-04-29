@@ -578,6 +578,9 @@ function buildRecoverySignal(target, rec, currentPrice) {
 // 장 중에는 Naver 일중 데이터 변동 가능성이 있으므로 매 cron 신선 fetch
 const KR_FLOW_CACHE_KEY = 'flow:kr-investors';
 const KR_FLOW_CACHE_TTL = 2 * 3600;
+// fetch 실패 종목 fallback용 — 마지막 성공분 24h 보존 (#216)
+const KR_FLOW_LAST_GOOD_KEY = 'flow:kr-investors:last-good';
+const KR_FLOW_LAST_GOOD_TTL = 24 * 3600;
 
 // KRX 공휴일 (2025~2027 법정공휴일, marketHours.js와 동기화)
 // marketHours.js와 동일한 Set — 포맷 'YYYY-M-D' (선행 0 없음)
@@ -616,6 +619,13 @@ async function fetchKrFlowMap(krSymbols) {
       }
     } catch { /* cache miss → fresh fetch */ }
   }
+
+  // 실패 종목 fallback용 — 이전 cron 성공분 사전 로드 (#216)
+  let lastGood = {};
+  try {
+    const snap = await getSnap(KR_FLOW_LAST_GOOD_KEY);
+    if (snap && typeof snap === 'object') lastGood = snap;
+  } catch { /* lastGood 없으면 빈 객체 유지 */ }
 
   const map = new Map();
   await Promise.allSettled(
@@ -676,7 +686,26 @@ async function fetchKrFlowMap(krSymbols) {
     })
   );
 
-  // 장 외 + 전체 성공 시에만 캐시 저장 (장 중 신선도 보장, 부분 실패 오염 방지)
+  // 실패 종목에 last-good 값 fallback (flow=null 대신 이전 성공분 사용)
+  for (const symbol of krSymbols) {
+    if (!map.has(symbol) && lastGood[symbol]) {
+      map.set(symbol, lastGood[symbol]);
+      console.warn(`[compute-signals] ${symbol} flow fallback → last-good 사용`);
+    }
+  }
+
+  // 성공 종목만 last-good에 누적 저장 (부분 실패해도 성공분은 항상 보존)
+  if (map.size > 0) {
+    try {
+      const merged = { ...lastGood };
+      for (const symbol of krSymbols) {
+        if (map.has(symbol)) merged[symbol] = map.get(symbol);
+      }
+      await setSnap(KR_FLOW_LAST_GOOD_KEY, merged, KR_FLOW_LAST_GOOD_TTL);
+    } catch { /* last-good 저장 실패는 무시 */ }
+  }
+
+  // 장 외 + 전체 성공 시에만 전수성공 캐시 저장 (기존 정책 유지)
   if (!marketOpen && map.size === krSymbols.length) {
     try {
       await setSnap(cacheKey, Object.fromEntries(map), KR_FLOW_CACHE_TTL);
