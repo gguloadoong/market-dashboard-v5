@@ -32,7 +32,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
   useEffect(() => {
     let pcrTimer, frTimer, ofTimer, socialTimer, vwapTimer;
 
-    // PCR 폴링 (5분)
+    // PCR 폴링 (10분 — 거시 지표, 빠른 갱신 불필요)
     async function runPCR() {
       try {
         const data = await fetchPCR();
@@ -40,7 +40,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
-    // 펀딩비 폴링 (5분, BTC + ETH)
+    // 펀딩비 폴링 (10분, BTC + ETH — 거시 지표)
     async function runFundingRate() {
       try {
         const symbols = ['BTCUSDT', 'ETHUSDT'];
@@ -54,7 +54,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
-    // 주문장 불균형 폴링 (1분, BTC)
+    // 주문장 불균형 폴링 (2분, BTC 단일 — BTC 급등락 감지용)
     async function runOrderFlow() {
       try {
         const data = await fetchOrderFlow('BTCUSDT');
@@ -62,7 +62,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
-    // 소셜 감성 폴링 (5분, watchlist 상위 3개 or 기본 종목)
+    // 소셜 감성 폴링 (10분, watchlist 상위 3개 or 기본 종목)
     async function runSocial() {
       try {
         const defaultSymbols = ['AAPL', 'NVDA', 'TSLA'];
@@ -81,7 +81,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
       } catch {}
     }
 
-    // VWAP 계산 (5분, 기존 데이터 활용)
+    // VWAP 계산 (5분, 외부 API 없는 클라 계산 — 모멘텀 시그널 발화 주기 유지)
     function runVWAP() {
       try {
         const allStocks = [
@@ -126,7 +126,7 @@ export function useDerivativeSignals({ usStocks = [], krStocks = [], watchlistSy
     frTimer = setInterval(() => { if (!document.hidden) runFundingRate(); }, 10 * 60 * 1000);
     ofTimer = setInterval(() => { if (!document.hidden) runOrderFlow(); }, 2 * 60 * 1000);
     socialTimer = setInterval(() => { if (!document.hidden) runSocial(); }, 10 * 60 * 1000);
-    vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 10 * 60 * 1000);
+    vwapTimer = setInterval(() => { if (!document.hidden) runVWAP(); }, 5 * 60 * 1000);
 
     return () => {
       clearInterval(pcrTimer);

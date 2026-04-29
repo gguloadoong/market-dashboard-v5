@@ -1,5 +1,5 @@
 // 투자자 시그널 훅 — 외국인/기관 연속 매수매도 + 거래량 이상치 감지
-// 5분 간격 폴링으로 시그널 엔진에 시그널 추가
+// 15분 간격 폴링 — 일별 외인/기관 데이터라 장중 수치 변동 없음
 import { useEffect, useRef } from 'react';
 import { fetchInvestorTrendGateway } from '../api/_gateway';
 import {
