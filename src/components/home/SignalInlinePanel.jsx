@@ -16,7 +16,7 @@ export default function SignalInlinePanel({
   botMap,
 }) {
   const accuracy = (botMap?.get(signal?.type)?.accuracy) ?? null;
-  const totalFired = botMap.get(signal?.type)?.totalFired ?? 0;
+  const totalFired = botMap?.get(signal?.type)?.totalFired ?? 0;
   const showAccuracy = totalFired >= 30 && accuracy !== null;
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;

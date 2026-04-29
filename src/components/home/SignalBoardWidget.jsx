@@ -393,8 +393,8 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                       />
                     ))}
                   </div>
-                  {/* 펼치기 chevron */}
-                  <svg
+                  {/* 펼치기 chevron — symbol 있는 시그널에만 표시 */}
+                  {signal.symbol && <svg
                     width="14"
                     height="14"
                     viewBox="0 0 24 24"
@@ -405,7 +405,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                     className={`flex-shrink-0 text-[#B0B8C1] transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                   >
                     <path d="m6 9 6 6 6-6" />
-                  </svg>
+                  </svg>}
                 </button>
                 {/* 내러티브 컨텍스트 — "왜 발화했는가" (매칭 부족 시 영역 숨김) */}
                 {narrative && !isExpanded && (
