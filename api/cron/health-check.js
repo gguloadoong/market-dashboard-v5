@@ -60,6 +60,37 @@ async function runHealthChecks() {
   return Object.fromEntries(entries);
 }
 
+// ─── 24h 이내 이미 알림된 소스 집합 반환 ────────────────
+// since 파라미터는 updated_at 기준이라 created_at 필터는 클라이언트에서 처리
+async function getRecentlyAlertedSources(failedSources, repo, token) {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/issues?state=all&labels=bug%2Cai-generated&sort=created&direction=desc&per_page=50`,
+      { headers: { Authorization: `token ${token}`, 'User-Agent': 'market-dashboard-health-cron' }, signal: controller.signal }
+    );
+    if (!res.ok) return new Set();
+    const issues = await res.json();
+    const alerted = new Set();
+    const recent = issues.filter(i =>
+      i.title.includes('[헬스체크]') && new Date(i.created_at).getTime() > cutoff
+    );
+    for (const issue of recent) {
+      for (const s of failedSources) {
+        if (issue.title.includes(s)) alerted.add(s);
+      }
+    }
+    return alerted;
+  } catch (err) {
+    console.error('[health-cron] cooldown lookup 실패:', err.message);
+    return new Set();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── GitHub Issue 자동 생성 ──────────────────────────────
 async function createGithubIssue(failedSources, date) {
   const token = process.env.GITHUB_TOKEN;
@@ -99,11 +130,21 @@ export default async function handler(req, res) {
     .map(([k]) => k);
   const failCount = failedSources.length;
 
-  // GitHub Issue 생성 (fail이 있을 때만)
+  // GitHub Issue 생성 — 신규 소스만 (24h 이내 이미 알림된 소스 제외)
   let issueCreated = false;
+  let suppressedSources = [];
   if (failCount > 0) {
-    issueCreated = await createGithubIssue(failedSources, date).catch(() => false);
+    const token = process.env.GITHUB_TOKEN;
+    const repo  = process.env.GITHUB_REPO;
+    const alerted = (token && repo)
+      ? await getRecentlyAlertedSources(failedSources, repo, token)
+      : new Set();
+    const fresh = failedSources.filter(s => !alerted.has(s));
+    suppressedSources = failedSources.filter(s => alerted.has(s));
+    if (fresh.length > 0) {
+      issueCreated = await createGithubIssue(fresh, date).catch(() => false);
+    }
   }
 
-  return res.status(200).json({ date, results, failCount, issueCreated });
+  return res.status(200).json({ date, results, failCount, issueCreated, suppressedSources });
 }
