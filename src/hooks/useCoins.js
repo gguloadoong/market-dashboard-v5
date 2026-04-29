@@ -159,6 +159,9 @@ export function useCoins(krwRateRef) {
   useEffect(() => {
     // 마운트 즉시 Upbit REST로 첫 가격 로드 (WS 연결 대기 없이 ~1s 내 실제 가격 표시)
     refreshCoinsQuick();
+    // 캐시 데이터가 이미 있으면 즉시 mcap 병합 — prev≠[] 이므로 레이스 없음
+    // (신규 유저/캐시 없음은 아래 coinsReady effect에서 처리)
+    if (coinsRef.current.length > 0) refreshSparklines();
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
     const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
