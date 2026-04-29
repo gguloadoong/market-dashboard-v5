@@ -43,7 +43,8 @@ export function useCoins(krwRateRef) {
   const wsFlushTimer    = useRef(null);
   const wsHandlerRef    = useRef(null);   // WS handler ref (coinsReady effect에서 재사용)
   const wsSubscribedRef = useRef(false);  // 구독 성공 여부
-  const wsConnectedRef  = useRef(false);
+  const wsConnectedRef        = useRef(false);
+  const sparklineMountCalledRef = useRef(false); // 마운트 시 캐시 hit 경로 호출 여부 — coinsReady effect 중복 방지
   const coinsRef      = useRef(coins);
   coinsRef.current    = coins;
 
@@ -159,6 +160,9 @@ export function useCoins(krwRateRef) {
   useEffect(() => {
     // 마운트 즉시 Upbit REST로 첫 가격 로드 (WS 연결 대기 없이 ~1s 내 실제 가격 표시)
     refreshCoinsQuick();
+    // 캐시 데이터가 이미 있으면 즉시 mcap 병합 — prev≠[] 이므로 레이스 없음
+    // (신규 유저/캐시 없음은 아래 coinsReady effect에서 처리)
+    if (coinsRef.current.length > 0) { sparklineMountCalledRef.current = true; refreshSparklines(); }
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
     const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
@@ -173,10 +177,13 @@ export function useCoins(krwRateRef) {
     };
   }, [refreshCoinsQuick, refreshCoins, refreshSparklines]);
 
-  // 최초 로드 시 스파크라인 즉시 가져오기
+  // coins 스냅샷 로드 완료 후 즉시 CoinGecko marketCap 병합
+  // coinsReady 이전 호출 시 prev=[] → map 결과도 [] → mcap 소실 레이스 방지
+  // 캐시 hit 경로(sparklineMountCalledRef=true)는 마운트 시 이미 호출 — 중복 방지
   useEffect(() => {
+    if (!coinsReady || sparklineMountCalledRef.current) return;
     refreshSparklines();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [coinsReady, refreshSparklines]);
 
   // Upbit WebSocket
   useEffect(() => {
