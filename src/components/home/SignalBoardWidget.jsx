@@ -97,7 +97,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     return allSignals
       .filter(s => {
         const bot = botMap.get(s.type);
-        return bot && bot.totalFired > 0 && bot.accuracy >= 60;
+        return bot && bot.totalFired >= 30 && bot.accuracy >= 60;
       })
       .sort((a, b) => {
         const accA = botMap.get(a.type)?.accuracy ?? 0;
@@ -315,7 +315,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">
                     {getEasyLabel(signal)}
                     {/* 적중률 배지 */}
-                    {botMap.get(signal.type)?.totalFired > 0 && (
+                    {(botMap.get(signal.type)?.totalFired ?? 0) >= 30 && (
                       <span
                         className="ml-1 text-[10px] font-bold px-1 py-[1px] rounded-full"
                         style={{

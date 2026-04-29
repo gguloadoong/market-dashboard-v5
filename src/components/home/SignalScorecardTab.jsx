@@ -103,7 +103,7 @@ function BotRankingList({ bots }) {
       {bots.map((bot, idx) => {
         const isExpanded = expandedIdx === idx;
         const isMissing = bot.isMissing === true;
-        const isCold = !isMissing && bot.totalFired < 10;
+        const isCold = !isMissing && bot.totalFired < 30;
         const name = SIGNAL_BOT_NAMES[bot.type] || bot.type;
         const color = accuracyColor(bot.accuracy);
         const streak = (bot.recentResults || []).slice(-10);
@@ -133,7 +133,7 @@ function BotRankingList({ bots }) {
                       opacity: isMissing ? 0.8 : isCold ? 0.7 : 1,
                     }}
                   >
-                    {isMissing ? '집계 중' : isCold ? `~${bot.accuracy}%` : `${bot.accuracy}%`}
+                    {isMissing ? '집계 중' : isCold ? '데이터 누적 중' : `${bot.accuracy}%`}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 mt-1">
@@ -221,7 +221,7 @@ export default function SignalScorecardTab() {
       ? bots
       : bots.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
     return [...filtered].sort((a, b) => {
-      const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 10 ? 1 : 0;
+      const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 30 ? 1 : 0;
       const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 10 ? 1 : 0;
       if (rankA !== rankB) return rankA - rankB;
       if (rankA === 0) return b.accuracy - a.accuracy;
