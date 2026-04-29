@@ -60,6 +60,23 @@ async function runHealthChecks() {
   return Object.fromEntries(entries);
 }
 
+// ─── 24h 이내 동일 소스 이슈 중복 여부 확인 ─────────────
+async function hasRecentHealthIssue(failedSources, repo, token) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/issues?state=open&labels=bug%2Cai-generated&since=${since}&per_page=20`,
+      { headers: { Authorization: `token ${token}`, 'User-Agent': 'market-dashboard-health-cron' } }
+    );
+    if (!res.ok) return false;
+    const issues = await res.json();
+    return issues.some(issue =>
+      issue.title.includes('[헬스체크]') &&
+      failedSources.some(s => issue.title.includes(s))
+    );
+  } catch { return false; }
+}
+
 // ─── GitHub Issue 자동 생성 ──────────────────────────────
 async function createGithubIssue(failedSources, date) {
   const token = process.env.GITHUB_TOKEN;
@@ -99,11 +116,19 @@ export default async function handler(req, res) {
     .map(([k]) => k);
   const failCount = failedSources.length;
 
-  // GitHub Issue 생성 (fail이 있을 때만)
+  // GitHub Issue 생성 (fail이 있고 24h 이내 동일 소스 이슈 없을 때만)
   let issueCreated = false;
+  let cooldown = false;
   if (failCount > 0) {
-    issueCreated = await createGithubIssue(failedSources, date).catch(() => false);
+    const token = process.env.GITHUB_TOKEN;
+    const repo  = process.env.GITHUB_REPO;
+    cooldown = token && repo
+      ? await hasRecentHealthIssue(failedSources, repo, token)
+      : false;
+    if (!cooldown) {
+      issueCreated = await createGithubIssue(failedSources, date).catch(() => false);
+    }
   }
 
-  return res.status(200).json({ date, results, failCount, issueCreated });
+  return res.status(200).json({ date, results, failCount, issueCreated, cooldown });
 }
