@@ -43,7 +43,8 @@ export function useCoins(krwRateRef) {
   const wsFlushTimer    = useRef(null);
   const wsHandlerRef    = useRef(null);   // WS handler ref (coinsReady effect에서 재사용)
   const wsSubscribedRef = useRef(false);  // 구독 성공 여부
-  const wsConnectedRef  = useRef(false);
+  const wsConnectedRef        = useRef(false);
+  const sparklineMountCalledRef = useRef(false); // 마운트 시 캐시 hit 경로 호출 여부 — coinsReady effect 중복 방지
   const coinsRef      = useRef(coins);
   coinsRef.current    = coins;
 
@@ -161,7 +162,7 @@ export function useCoins(krwRateRef) {
     refreshCoinsQuick();
     // 캐시 데이터가 이미 있으면 즉시 mcap 병합 — prev≠[] 이므로 레이스 없음
     // (신규 유저/캐시 없음은 아래 coinsReady effect에서 처리)
-    if (coinsRef.current.length > 0) refreshSparklines();
+    if (coinsRef.current.length > 0) { sparklineMountCalledRef.current = true; refreshSparklines(); }
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
     const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.SLOW);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
@@ -178,8 +179,9 @@ export function useCoins(krwRateRef) {
 
   // coins 스냅샷 로드 완료 후 즉시 CoinGecko marketCap 병합
   // coinsReady 이전 호출 시 prev=[] → map 결과도 [] → mcap 소실 레이스 방지
+  // 캐시 hit 경로(sparklineMountCalledRef=true)는 마운트 시 이미 호출 — 중복 방지
   useEffect(() => {
-    if (!coinsReady) return;
+    if (!coinsReady || sparklineMountCalledRef.current) return;
     refreshSparklines();
   }, [coinsReady, refreshSparklines]);
 
