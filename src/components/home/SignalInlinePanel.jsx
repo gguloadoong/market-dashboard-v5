@@ -2,7 +2,6 @@
 // 시그널 카드 클릭 시 카드 아래에 펼쳐지는 결정 패널
 // 트리거 요약 / 컨텍스트 / 연관 뉴스 / Sparkline / 액션 버튼
 import { getEasyLabel } from '../../utils/signalLabel';
-import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import Sparkline from '../../components/Sparkline';
 
 export default function SignalInlinePanel({
@@ -14,9 +13,9 @@ export default function SignalInlinePanel({
   isWatched,
   onToggleWatch,
   onOpenChart,
+  botMap,
 }) {
-  const { botMap } = useSignalAccuracy();
-  const accuracy = botMap.get(signal?.type)?.accuracy ?? null;
+  const accuracy = (botMap?.get(signal?.type)?.accuracy) ?? null;
   const totalFired = botMap.get(signal?.type)?.totalFired ?? 0;
   const showAccuracy = totalFired >= 30 && accuracy !== null;
 
@@ -26,11 +25,11 @@ export default function SignalInlinePanel({
 
   return (
     <div className={`grid transition-[grid-template-rows] duration-200 ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-      <div className="overflow-hidden">
-        <div className="bg-[#F7F8FA] rounded-[10px] px-3 py-2.5 mt-1 mb-1">
+      <div inert={!isOpen || undefined} className="overflow-hidden">
+        <div className="bg-[#F7F8FA] dark:bg-[#1A2332] rounded-[10px] px-3 py-2.5 mt-1 mb-1">
           {/* 1. 트리거 요약 + 적중률 배지 */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] font-semibold text-[#191F28] truncate">
+            <span className="text-[13px] font-semibold text-[#191F28] dark:text-[#F9FAFB] truncate">
               {getEasyLabel(signal)}
             </span>
             {showAccuracy && (
@@ -60,6 +59,7 @@ export default function SignalInlinePanel({
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1.5 block text-[12px] text-[#1764ED] hover:underline truncate"
+            title={news.title}
             >
               📰 {news.title}
             </a>

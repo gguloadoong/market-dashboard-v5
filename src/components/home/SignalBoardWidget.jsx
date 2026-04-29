@@ -75,17 +75,24 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     return map;
   }, [allSignals, allItems, allNews]);
 
+  // allItems O(1) 조회 맵
+  const allItemsLookup = useMemo(() => {
+    const m = new Map();
+    for (const it of allItems) m.set(`${it._market}:${it.symbol}`, it);
+    return m;
+  }, [allItems]);
+
   // 시그널 → 매칭 종목 (sparkline용)
   const matchedItemMap = useMemo(() => {
     const map = new Map();
     for (const sig of allSignals) {
       if (!sig.symbol) continue;
       const norm = sig.market === 'crypto' ? 'COIN' : sig.market?.toUpperCase();
-      const it = allItems.find(x => x.symbol === sig.symbol && x._market === norm);
+      const it = allItemsLookup.get(`${norm}:${sig.symbol}`);
       if (it) map.set(sig.id, it);
     }
     return map;
-  }, [allSignals, allItems]);
+  }, [allSignals, allItemsLookup]);
 
   // 필터 변경 시 펼침 상태 초기화
   useEffect(() => { setExpandedId(null); }, [filterDir]);
@@ -154,12 +161,13 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     }
   }, [onItemClick]);
 
-  // 시그널 카드 펼치기/접기 토글 (인라인 결정 패널)
+  // 시그널 카드 펼치기/접기 토글 — 펼칠 때만 이벤트 발화 (StrictMode 안전)
   const handleToggleExpand = useCallback((signal) => {
     if (!signal.symbol) return;
-    cycleStep('signal_expand', { market: signal.market, signal_type: signal.type });
-    setExpandedId(prev => prev === signal.id ? null : signal.id);
-  }, []);
+    const willExpand = expandedId !== signal.id;
+    if (willExpand) cycleStep('signal_expand', { market: signal.market, signal_type: signal.type });
+    setExpandedId(willExpand ? signal.id : null);
+  }, [expandedId]);
 
   // 차트 보기 — 인라인 패널 액션
   const handleOpenChart = useCallback((signal) => {
@@ -345,7 +353,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
               <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
                 <button
                   onClick={() => handleToggleExpand(signal)}
-                  aria-expanded={isExpanded}
+                  aria-expanded={signal.symbol ? isExpanded : undefined}
                   className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
                     signal.symbol ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
                   }`}
@@ -415,6 +423,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   isWatched={isWatched(watchedKey, marketKey)}
                   onToggleWatch={() => toggleWatch(watchedKey, marketKey)}
                   onOpenChart={() => handleOpenChart(signal)}
+                  botMap={botMap}
                 />
               </div>
             );
