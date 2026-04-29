@@ -8,7 +8,7 @@ import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
 import { getNewsSentimentScore } from '../utils/newsSignal';
 import { clampPct } from '../utils/clampPct';
 
-const SCAN_INTERVAL = 5 * 60 * 1000; // 5분
+const SCAN_INTERVAL = 10 * 60 * 1000; // 10분 (데이터 변경 시 useEffect로 이미 재스캔)
 // NEWS_CLUSTER 임계값은 signalThresholds.js THRESHOLDS.NEWS_CLUSTER 단일 소스화
 const NEWS_WINDOW = THRESHOLDS.NEWS_CLUSTER.WINDOW_MS;
 const MIN_CLUSTER = THRESHOLDS.NEWS_CLUSTER.MIN_CLUSTER;

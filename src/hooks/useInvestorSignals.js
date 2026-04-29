@@ -1,5 +1,5 @@
 // 투자자 시그널 훅 — 외국인/기관 연속 매수매도 + 거래량 이상치 감지
-// 5분 간격 폴링으로 시그널 엔진에 시그널 추가
+// 15분 간격 폴링 — 일별 외인/기관 데이터라 장중 수치 변동 없음
 import { useEffect, useRef } from 'react';
 import { fetchInvestorTrendGateway } from '../api/_gateway';
 import {
@@ -71,7 +71,7 @@ function getPriceFromItems(symbol, items) {
   return null;
 }
 
-const POLL_INTERVAL = 5 * 60 * 1000; // 5분
+const POLL_INTERVAL = 15 * 60 * 1000; // 15분 (일별 데이터라 장중 수치 변동 없음)
 const CONSECUTIVE_THRESHOLD = 3; // 3일 연속부터 시그널 발화
 // 기획: 20일 평균 대비 3배이나 히스토리 API 한계로 마켓 내 상위 5% 기준 적용
 const VOLUME_PERCENTILE_THRESHOLD = 0.95; // 상위 5% (95th percentile)
@@ -253,7 +253,7 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
       }
     }, 2000);
 
-    // 5분 간격 폴링
+    // 15분 간격 폴링
     timerRef.current = setInterval(() => {
       if (!document.hidden) scan();
     }, POLL_INTERVAL);

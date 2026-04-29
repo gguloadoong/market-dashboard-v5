@@ -198,9 +198,9 @@ function useFearGreedSignal(score, market, storageKey) {
 
 // 3개 시장 F&G 쿼리 — useFearGreedScores/useFearGreed 양쪽에서 공유
 function useFearGreedQueries() {
-  const crypto = useQuery({ queryKey: ['fearGreed', 'crypto'], queryFn: fetchCryptoFG, staleTime: 5 * 60 * 1000, refetchInterval: 10 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
-  const us = useQuery({ queryKey: ['fearGreed', 'us'], queryFn: fetchUsFG, staleTime: 5 * 60 * 1000, refetchInterval: 10 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
-  const kr = useQuery({ queryKey: ['fearGreed', 'kr'], queryFn: fetchKrFG, staleTime: 2 * 60 * 1000, refetchInterval: 5 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  const crypto = useQuery({ queryKey: ['fearGreed', 'crypto'], queryFn: fetchCryptoFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  const us = useQuery({ queryKey: ['fearGreed', 'us'], queryFn: fetchUsFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  const kr = useQuery({ queryKey: ['fearGreed', 'kr'], queryFn: fetchKrFG, staleTime: 10 * 60 * 1000, refetchInterval: 15 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
   return { crypto, us, kr };
 }
 

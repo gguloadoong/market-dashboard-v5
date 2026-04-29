@@ -45,8 +45,8 @@ export function useIndices() {
   useEffect(() => {
     refreshIndices();
     refreshExchangeRate();
-    const indicesId = setInterval(() => { if (!document.hidden) refreshIndices(); }, POLLING.SLOW);
-    const rateId    = setInterval(() => { if (!document.hidden) refreshExchangeRate(); }, POLLING.NORMAL);
+    const indicesId = setInterval(() => { if (!document.hidden) refreshIndices(); }, POLLING.BACKGROUND);
+    const rateId    = setInterval(() => { if (!document.hidden) refreshExchangeRate(); }, POLLING.CLOSED);
     // 탭 복귀 시 즉시 갱신
     const onVisible = () => { if (!document.hidden) { refreshIndices(); refreshExchangeRate(); } };
     document.addEventListener('visibilitychange', onVisible);

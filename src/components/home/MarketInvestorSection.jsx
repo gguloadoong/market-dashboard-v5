@@ -153,7 +153,7 @@ export default function MarketInvestorSection() {
     queryFn:  fetchMarketInvestor,
     staleTime:    60_000,
     retry:        1,
-    refetchInterval: 60_000,
+    refetchInterval: 3 * 60_000,
     refetchIntervalInBackground: false,
   });
 
