@@ -253,7 +253,7 @@ export function useInvestorSignals(allItems = [], krwRate = null, krwRateLoaded 
       }
     }, 2000);
 
-    // 5분 간격 폴링
+    // 15분 간격 폴링
     timerRef.current = setInterval(() => {
       if (!document.hidden) scan();
     }, POLL_INTERVAL);
