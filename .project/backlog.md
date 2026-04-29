@@ -410,10 +410,9 @@
 ### ~~[P3-7] 헬스체크 이슈 쿨다운 — 동일 소스 24h 중복 방지~~ ✅ 완료 (2026-04-29 PR #247)
 - getRecentlyAlertedSources() — 신규 소스만 이슈 생성, 이미 알림된 소스 억제
 
-### [P3-1] 알고리즘 부채 3건 통합 fix (Codex 기각 #216/#226/#229)
-- flow/sentiment 손실 (compute-signals.js #216), global batch race (useInvestorSignals.js #229), accuracy 빈/로딩 상태 (useSignalAccuracy.js #226)
-- **완료 기준**: 단위 테스트 신규 PASS, cron 1일 운영 후 시그널 누락 0건
-- ⚠️ architect 게이트 필수 (알고리즘 파일)
+### ~~[P3-1] 알고리즘 부채 3건 통합 fix~~ ✅ 완료 (2026-04-30 PR #257)
+- batch pair invariant(#229), accuracy 로딩 상태(#226), flow last-good fallback(#216)
+- Copilot/Gemini HIGH 반영: freshSymbols Set 분리로 캐시 오염 방지
 
 ### ~~[P3-2] 5분 결정 사이클 측정 인스트루먼테이션~~ ✅ 완료 (2026-04-29 PR #249)
 - cycleTracker.js + Vercel Analytics — 진입→시그널→차트→관심종목 단계별 이벤트
