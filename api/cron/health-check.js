@@ -68,7 +68,7 @@ async function getRecentlyAlertedSources(failedSources, repo, token) {
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${repo}/issues?state=open&labels=bug%2Cai-generated&per_page=50`,
+      `https://api.github.com/repos/${repo}/issues?state=all&labels=bug%2Cai-generated&sort=created&direction=desc&per_page=50`,
       { headers: { Authorization: `token ${token}`, 'User-Agent': 'market-dashboard-health-cron' }, signal: controller.signal }
     );
     if (!res.ok) return new Set();
