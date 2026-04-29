@@ -103,7 +103,7 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
-  // 투자자 시그널 스캔 (5분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
+  // 투자자 시그널 스캔 (15분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
   // krwRate 주입 — fx_impact 시그널 발화용 (#113)
   useInvestorSignals(stockItems, krwRate, krwRateLoaded);
 

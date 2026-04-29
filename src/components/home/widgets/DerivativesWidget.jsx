@@ -84,7 +84,7 @@ export default function DerivativesWidget({ pcr: propPcr, btcFunding: propBtcFun
       finally { if (!cancelled) setLoading(false); }
     }
     load();
-    const poll   = setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);
+    const poll   = setInterval(() => { if (!document.hidden) load(); }, 10 * 60 * 1000);
     const ticker = setInterval(() => setTick(t => t + 1), 60 * 1000);
     return () => { cancelled = true; clearInterval(poll); clearInterval(ticker); };
   }, [isExternal]);
