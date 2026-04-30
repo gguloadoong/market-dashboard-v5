@@ -169,15 +169,6 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     setExpandedId(willExpand ? signal.id : null);
   }, [expandedId]);
 
-  // 차트 보기 — 인라인 패널 액션
-  const handleOpenChart = useCallback((signal) => {
-    if (signal.symbol && onItemClick) {
-      const market = signal.market === 'crypto' ? 'coin' : signal.market;
-      cycleStep('signal_click', { market, signal_type: signal.type });
-      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
-    }
-  }, [onItemClick]);
-
   // 탭 헤더 공통
   const tabHeader = (
     <div className="flex items-center justify-between mb-5">
@@ -422,7 +413,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   isOpen={isExpanded}
                   isWatched={isWatched(watchedKey, marketKey)}
                   onToggleWatch={() => toggleWatch(watchedKey, marketKey)}
-                  onOpenChart={() => handleOpenChart(signal)}
+                  onOpenChart={() => handleClick(signal)}
                   botMap={botMap}
                 />
               </div>
