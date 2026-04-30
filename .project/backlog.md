@@ -422,3 +422,65 @@
 
 ### ~~[P3-4] 시그널 → 1탭 결정 패널 (인라인 확장)~~ ✅ 완료 (2026-04-29 PR #253)
 - 시그널 카드 탭 → 인라인 패널: 트리거 요약/내러티브/뉴스/Sparkline/관심종목+차트 버튼
+
+---
+
+## 🟠 Phase 11: 운영 관측 강화 + 시그널 신뢰 사이클 마무리 (2026-04-30 스프린트 후보)
+
+> **목표**: Phase 10 사후 모니터링에서 드러난 외부 인프라 관측 사각지대 해소 + 시그널 신뢰 가시화의 마지막 1마일
+> **기준**: 운영 안정성(P1) > 측정 데이터 도착(P2-2 24h 누적) > 사용자 가치 추가
+> **리서치**: 2026-04-30 (장성민 QA + 김민준 BE + 이지원 Strategy + Analyst Opus)
+> **트리거**: 4/30 프로덕션 QA에서 `/api/d` 502 대규모 발견 — health-check 감시 사각지대 노출 (#258)
+
+### [P3-10] 운영 관측 사각지대 해소 — health-check 감시 보강 (#258 후속)
+- 출처: Issue #258 — 4/30 QA에서 KIS approval_key 502 + 뉴스핌/머니투데이/이데일리 RSS 502 동시 발생, health-check 자동 이슈 0건 (감시 미포함)
+- 작업 항목:
+  1. health-check.js 감시 소스 4건 추가 — `rss_newspim`, `rss_mt`, `rss_edaily`, `kis_approval`
+  2. cron 실행 빈도 KST 09:00 1회 → **1시간 간격** 변경 (장중 장애 즉시 감지)
+  3. health-check 전용 라벨 분리 + GitHub API per_page 50 → 100 상향 (쿨다운 누락 방지)
+- 사이즈: S (1일)
+- 우선순위: P1 (운영 신뢰성)
+
+### [P3-11] KIS approval_key Redis 캐시 이전
+- 출처: 4/30 BE 분석 — 현재 인스턴스 메모리 캐시만 사용 → Vercel cold start마다 KIS API 재호출 → rate-limit + 외부 장애 동시 취약
+- 작업: `api/hantoo-ws-approval.js` Redis 기반 캐시 (TTL 23h, 만료 직전 갱신) + cold start 안전성 확보
+- 사이즈: S (1일)
+- 우선순위: P1 (외부 의존 안정성)
+
+### [P3-12] /api/cron-health 엔드포인트 + flow fallback 발화율 카운터
+- 출처: 4/30 BE 검증 — `cron:fail:compute-signals` Redis 키 존재하지만 외부에서 모니터링 불가
+- 작업: 읽기 전용 헬스 엔드포인트 + flow last-good fallback 발화 빈도 카운터 (Redis INCR + 시간 윈도우)
+- 사이즈: S (1일)
+- 우선순위: P2 (관측성)
+
+### [P3-13] 관심종목 시그널 하이라이트 — 시그널 보드 상단 분리
+- 출처: 4/30 Strategy 분석 (이지원 추천 #1)
+- 근거: Phase 9~10에서 시그널 신뢰/인라인 패널/내러티브를 만들었지만 "내 종목 시그널" 한 번에 못 찾음. 30개 시그널 중 watchlist 매칭 항목을 상단 고정 섹션으로 분리.
+- 기준 충족: 매수 결정 5분 단축 ✅ / DAU 증가 ✅ / 경쟁사(토스/업비트/키움) 시그널 기반 알림 없음 ✅ / 현재 스택 ✅
+- 사이즈: S (1일)
+- 우선순위: P2 (사용자 가치)
+
+### [P3-14] 시그널 히스토리 타임라인 — 적중 이력 시각화 (백로그)
+- 출처: 4/30 Strategy 분석 (이지원 추천 #2)
+- 근거: 적중률 % 보여주지만 "이 63%가 진짜인지" 확인 불가. 과거 발화→결과 미니 타임라인을 SignalInlinePanel에 추가하면 신뢰가 숫자→증거로 전환.
+- 사이즈: M (3일)
+- 우선순위: P2 (사용자 가치)
+- 의존: signal-accuracy.js Redis 이력 TTL 확인 필요
+
+### [P3-15] 문서 정합성 — KR_FLOW_LAST_GOOD_TTL 주석 보완
+- 출처: 4/30 BE 검증 — last-good + last-good:prev 백업으로 실효 48h 복구 가능하나 주석은 "24h 보존"만
+- 작업: `api/cron/compute-signals.js:583` 주석 한 줄 수정
+- 사이즈: XS (10분)
+- 우선순위: P3 (위생)
+
+### Open Questions (Phase 11 착수 전)
+- [ ] cycleTracker(P3-2) 이벤트가 Vercel Analytics에 실제로 수집 중인가? 표본 수는?
+- [ ] signal-accuracy.js Redis 이력 TTL은 얼마인가? (P3-14 의존)
+- [ ] N≥30 조건 통과하는 시그널 타입 현재 몇 개? (적중률 섹션이 비어 있다면 P3-13 우선순위 상승)
+- [ ] PWA Push(P2-4) 구독자 수 / 일 발화 건수?
+- [ ] narrativeBuilder.js 톤/길이 가드레일이 코드에 명시되어 있는가? (Case 58 단정 회피 강제)
+
+### 보류 후보 (Phase 11 미선정)
+- **시장 상태 원라인 요약** (M, 3일) — 3시장 통합 한 문장. narrativeBuilder 패턴 재사용. 측정 데이터 도착 후 재검토.
+- **시그널 인앱 토스트 + 진동** (S, 1일) — PWA Notification API + navigator.vibrate. PWA 구독자 수 확인 후 우선순위 결정.
+- **종목 간 상관관계 미니맵** (L, 1주+) — 30일 가격 히스토리 + 피어슨 상관계수. 사용자 가치 미검증, 비용 큼.
