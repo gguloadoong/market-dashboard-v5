@@ -15,7 +15,7 @@ function authorize(req) {
 }
 
 // ─── 단일 소스 헬스 체크 ────────────────────────────────
-async function checkSource(name, url, options = {}) {
+async function checkSource(_name, url, options = {}) {
   const { timeoutMs = 10000, allow401 = false, allow405 = false, method = 'GET' } = options;
   const start = Date.now();
   const controller = new AbortController();
