@@ -13,10 +13,11 @@ export default function SignalInlinePanel({
   isWatched,
   onToggleWatch,
   onOpenChart,
-  botMap,
+  botMap = new Map(),
 }) {
-  const accuracy = (botMap?.get(signal?.type)?.accuracy) ?? null;
-  const totalFired = botMap?.get(signal?.type)?.totalFired ?? 0;
+  // botMap은 useSignalAccuracy가 항상 Map을 반환하지만, 컴포넌트 재사용/누락 방지로 기본값 부여
+  const accuracy = botMap.get(signal?.type)?.accuracy ?? null;
+  const totalFired = botMap.get(signal?.type)?.totalFired ?? 0;
   const showAccuracy = totalFired >= 30 && accuracy !== null;
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;
