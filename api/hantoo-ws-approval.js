@@ -18,7 +18,7 @@ const MEM_TTL_MS = 5 * 60 * 1000;   // 5분
 let memCachedKey = null;
 let memCacheExpiry = 0;
 
-// Redis 클라이언트 (lazy init — 환경변수 없으면 null)
+// Redis 클라이언트 (lazy init — 환경변수 없거나 init 실패 시 null)
 let redis = null;
 function getRedis() {
   if (redis) return redis;
@@ -26,9 +26,18 @@ function getRedis() {
   const kvUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
   const kvToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!kvUrl || !kvToken) return null;
-  redis = new Redis({ url: kvUrl, token: kvToken });
-  return redis;
+  // URL/token 형식 오류 등 init 단계 throw도 graceful degradation으로 처리
+  try {
+    redis = new Redis({ url: kvUrl, token: kvToken });
+    return redis;
+  } catch (e) {
+    console.error('[KIS WS Approval] Redis init 실패:', e.message);
+    return null;
+  }
 }
+
+// 진행 중인 신규 발급 요청 (request coalescing — 동시 요청 KIS 중복 호출 방지)
+let pendingFetch = null;
 
 async function readRedis() {
   const r = getRedis();
@@ -75,39 +84,44 @@ export default async function handler(req, res) {
     return res.status(200).json({ approval_key: redisCached });
   }
 
-  // Tier 3: KIS API 신규 발급
+  // Tier 3: KIS API 신규 발급 (request coalescing — 동시 요청은 같은 in-flight 공유)
   try {
-    const response = await fetch(`${HANTOO_BASE}/oauth2/Approval`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body:    JSON.stringify({
-        grant_type: 'client_credentials',
-        appkey:     appKey,
-        appsecret:  appSecret,
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
+    if (!pendingFetch) {
+      pendingFetch = (async () => {
+        const response = await fetch(`${HANTOO_BASE}/oauth2/Approval`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body:    JSON.stringify({
+            grant_type: 'client_credentials',
+            appkey:     appKey,
+            appsecret:  appSecret,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      console.error(`[KIS WS Approval] 발급 실패 ${response.status}: ${text.slice(0, 120)}`);
-      return res.status(502).json({ error: `KIS Approval 실패: ${response.status}` });
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`KIS Approval ${response.status}: ${text.slice(0, 120)}`);
+        }
+
+        const data = await response.json();
+        if (!data.approval_key) {
+          throw new Error('approval_key 없음');
+        }
+
+        // 캐시 갱신: 메모리 즉시 + Redis fire-and-forget (응답 블로킹 방지)
+        memCachedKey = data.approval_key;
+        memCacheExpiry = Date.now() + MEM_TTL_MS;
+        void writeRedis(data.approval_key);
+
+        return data.approval_key;
+      })().finally(() => { pendingFetch = null; });
     }
 
-    const data = await response.json();
-    if (!data.approval_key) {
-      console.error('[KIS WS Approval] 응답에 approval_key 없음:', JSON.stringify(data).slice(0, 200));
-      return res.status(502).json({ error: 'approval_key 없음' });
-    }
-
-    // 캐시 갱신: 메모리 + Redis
-    memCachedKey = data.approval_key;
-    memCacheExpiry = now + MEM_TTL_MS;
-    await writeRedis(data.approval_key);
-
-    return res.status(200).json({ approval_key: data.approval_key });
+    const approvalKey = await pendingFetch;
+    return res.status(200).json({ approval_key: approvalKey });
   } catch (e) {
-    console.error('[KIS WS Approval] 예외:', e.message);
-    return res.status(500).json({ error: e.message });
+    console.error('[KIS WS Approval]', e.message);
+    return res.status(502).json({ error: e.message });
   }
 }
