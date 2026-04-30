@@ -1,5 +1,5 @@
 // 데이터 소스 헬스 모니터 cron
-// 매일 UTC 00:00 (KST 09:00) 실행 — Yahoo/Stooq/Alpaca/네이버/RSS 연결 상태 점검
+// 매시간 정각 (UTC) 실행 — Yahoo/Stooq/Alpaca/네이버/RSS/KIS 연결 상태 점검
 import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 60 };
@@ -16,14 +16,15 @@ function authorize(req) {
 
 // ─── 단일 소스 헬스 체크 ────────────────────────────────
 async function checkSource(name, url, options = {}) {
-  const { timeoutMs = 10000, allow401 = false } = options;
+  const { timeoutMs = 10000, allow401 = false, allow405 = false, method = 'GET' } = options;
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+    const res = await fetch(url, { method, signal: controller.signal, redirect: 'follow' });
     const latencyMs = Date.now() - start;
-    if (res.ok || (allow401 && res.status === 401)) {
+    // POST 전용 엔드포인트는 GET 시 405를 반환 — 서버 도달성만 확인 목적이면 정상
+    if (res.ok || (allow401 && res.status === 401) || (allow405 && res.status === 405)) {
       return { status: latencyMs < 5000 ? 'ok' : 'slow', latencyMs };
     }
     return { status: 'fail', error: `HTTP ${res.status}`, latencyMs };
@@ -49,6 +50,11 @@ async function runHealthChecks() {
     { key: 'rss_hankyung', url: 'https://feeds.hankyung.com/economy',        opts: { timeoutMs: 5000 } },
     { key: 'rss_yonhap',   url: 'https://www.yna.co.kr/rss/economy.xml',    opts: { timeoutMs: 5000 } },
     { key: 'rss_mk',       url: 'https://www.mk.co.kr/rss/40300001/',        opts: { timeoutMs: 5000 } },
+    { key: 'rss_newspim',  url: 'https://www.newspim.com/rss/economy.xml',  opts: { timeoutMs: 5000 } },
+    { key: 'rss_mt',       url: 'https://rss.mt.co.kr/mt_rss.xml',          opts: { timeoutMs: 5000 } },
+    { key: 'rss_edaily',   url: 'https://rss.edaily.co.kr/economy_news.xml', opts: { timeoutMs: 5000 } },
+    // KIS approval — POST 엔드포인트지만 GET 시 405 반환을 정상으로 간주(서버 도달성 확인)
+    { key: 'kis_approval', url: 'https://openapi.koreainvestment.com:9443/oauth2/Approval', opts: { timeoutMs: 8000, allow405: true } },
   ];
 
   // 병렬 실행
@@ -68,7 +74,7 @@ async function getRecentlyAlertedSources(failedSources, repo, token) {
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${repo}/issues?state=all&labels=bug%2Cai-generated&sort=created&direction=desc&per_page=50`,
+      `https://api.github.com/repos/${repo}/issues?state=all&labels=health-check&sort=created&direction=desc&per_page=100`,
       { headers: { Authorization: `token ${token}`, 'User-Agent': 'market-dashboard-health-cron' }, signal: controller.signal }
     );
     if (!res.ok) return new Set();
@@ -109,7 +115,7 @@ async function createGithubIssue(failedSources, date) {
       'Content-Type': 'application/json',
       'User-Agent': 'market-dashboard-health-cron',
     },
-    body: JSON.stringify({ title, body, labels: ['bug', 'ai-generated'] }),
+    body: JSON.stringify({ title, body, labels: ['bug', 'ai-generated', 'health-check'] }),
   });
   return res.ok;
 }
