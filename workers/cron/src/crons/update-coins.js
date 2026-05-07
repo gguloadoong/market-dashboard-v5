@@ -150,7 +150,11 @@ export async function updateCoins(env) {
     // #185: full 먼저 저장 → hot 후 저장 (kr/us와 순서 통일).
     //        클라이언트가 hot → full lazy 순으로 읽으므로
     //        full이 hot보다 오래된 적이 없어야 hot 데이터를 덮어쓰지 않음.
-    await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
+    const snapOk = await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
+    if (!snapOk) {
+      await recordCronFailure('coins', 'snap:coins Redis 쓰기 실패');
+      return { ok: false, count: 0 };
+    }
     try {
       const hot = [...items]
         .sort((a, b) => {
