@@ -8,7 +8,7 @@
 //   Phase 2: ticker/all(6s) or 청크 fallback(6s) → ~6s
 //   Worst case: ~11s
 
-import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure } from '../price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure, recordCronSuccess } from '../price-cache.js';
 
 // #104 Opus: Upbit markets 전량 실패 + Bithumb fallback 경로에서도 최소한의 한글명 보장.
 // 라이브 Upbit 한글명 매핑을 1-off 로 추출 (Top 40 KRW 마켓).
@@ -142,24 +142,28 @@ export async function updateCoins(env) {
     });
     console.log(`[update-coins] 저장: ${items.length}개 (source=upbit)`);
 
-    if (items.length > 0) {
-      // #185: full 먼저 저장 → hot 후 저장 (kr/us와 순서 통일).
-      //        클라이언트가 hot → full lazy 순으로 읽으므로
-      //        full이 hot보다 오래된 적이 없어야 hot 데이터를 덮어쓰지 않음.
-      await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
-      try {
-        const hot = [...items]
-          .sort((a, b) => {
-            const v = (b.accTradePrice24h || 0) - (a.accTradePrice24h || 0);
-            if (v !== 0) return v;
-            return String(a.symbol).localeCompare(String(b.symbol));
-          })
-          .slice(0, 200);
-        await setSnap(SNAP_KEYS.COINS_HOT, hot, SNAP_TTL.HOT);
-      } catch (e) {
-        console.warn('[update-coins] hot 저장 실패:', e?.message || e);
-      }
+    if (items.length === 0) {
+      await recordCronFailure('coins', 'items 0개 — tickers 변환 결과 없음');
+      return { ok: false, count: 0 };
     }
+
+    // #185: full 먼저 저장 → hot 후 저장 (kr/us와 순서 통일).
+    //        클라이언트가 hot → full lazy 순으로 읽으므로
+    //        full이 hot보다 오래된 적이 없어야 hot 데이터를 덮어쓰지 않음.
+    await setSnap(SNAP_KEYS.COINS, items, SNAP_TTL.COINS);
+    try {
+      const hot = [...items]
+        .sort((a, b) => {
+          const v = (b.accTradePrice24h || 0) - (a.accTradePrice24h || 0);
+          if (v !== 0) return v;
+          return String(a.symbol).localeCompare(String(b.symbol));
+        })
+        .slice(0, 200);
+      await setSnap(SNAP_KEYS.COINS_HOT, hot, SNAP_TTL.HOT);
+    } catch (e) {
+      console.warn('[update-coins] hot 저장 실패:', e?.message || e);
+    }
+    await recordCronSuccess('coins');
 
     return { ok: true, count: items.length };
   } catch (err) {

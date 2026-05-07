@@ -9,6 +9,7 @@ import { getRedis } from '../price-cache.js';
 const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing'];
 const FAIL_THRESHOLD = 3;         // 누적 실패 3회 이상
 const COOLDOWN_SEC = 3600;        // 같은 크론 재알림 쿨다운 1h
+const COINS_STALE_MS = 10 * 60 * 1000; // coins 10분 이상 미갱신 시 스테일 감지
 const CF_ACCOUNT_ID = '43055b37765f34c1a1d7173a46ff5b92';
 
 export async function watchdog(env) {
@@ -24,12 +25,15 @@ export async function watchdog(env) {
     return { ok: false, reason: 'no-redis' };
   }
 
-  // 5 크론 × 3 키(failCount / lastError / alertCooldown) = 15 키 한 번에 조회
-  const keys = CRON_NAMES.flatMap((c) => [
-    `cron:fail:${c}`,
-    `cron:lastError:${c}`,
-    `cron:watchdog:alert:${c}`,
-  ]);
+  // 5 크론 × 3 키(failCount / lastError / alertCooldown) + 1(lastOk:coins) = 16 키 한 번에 조회
+  const keys = [
+    ...CRON_NAMES.flatMap((c) => [
+      `cron:fail:${c}`,
+      `cron:lastError:${c}`,
+      `cron:watchdog:alert:${c}`,
+    ]),
+    'cron:lastOk:coins',
+  ];
 
   let vals;
   try {
@@ -63,6 +67,22 @@ export async function watchdog(env) {
       failCount,
       lastErrorMsg,
     });
+  }
+
+  // coins 스테일니스 체크 — cron:fail 카운터와 별개로 장시간 미갱신 감지
+  // lastOk 가 null 이면 (첫 배포 직후 / 키 만료) 보수적으로 알림 생략
+  const lastOkRaw = vals[CRON_NAMES.length * 3]; // index 15
+  if (lastOkRaw !== null) {
+    const coinsIdx = CRON_NAMES.indexOf('coins');
+    const coinsCooldown = !!vals[coinsIdx * 3 + 2];
+    const ageMs = Date.now() - parseInt(lastOkRaw, 10);
+    if (ageMs > COINS_STALE_MS && !coinsCooldown && !alerts.some((a) => a.cron === 'coins')) {
+      alerts.push({
+        cron: 'coins',
+        failCount: 0,
+        lastErrorMsg: `마지막 성공 ${Math.round(ageMs / 60000)}분 전 — 스케줄러 정지 의심`,
+      });
+    }
   }
 
   if (alerts.length === 0) {

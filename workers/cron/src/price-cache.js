@@ -112,3 +112,15 @@ export async function recordCronFailure(cronName, errorMessage) {
     ]);
   } catch (e) { console.error(`[price-cache] recordCronFailure 실패:`, e); }
 }
+
+// 크론 정상 완료 시 호출 — lastOk 타임스탬프 갱신 + fail 카운터 리셋
+// TTL 1800s: 5분 주기 cron이 30분간 침묵하면 키 만료 → watchdog 스테일니스 감지
+export async function recordCronSuccess(cronName) {
+  if (!_redis) return;
+  try {
+    await Promise.all([
+      _redis.set(`cron:lastOk:${cronName}`, Date.now(), { ex: 1800 }),
+      _redis.del(`cron:fail:${cronName}`),
+    ]);
+  } catch (e) { console.error(`[price-cache] recordCronSuccess 실패:`, e); }
+}
