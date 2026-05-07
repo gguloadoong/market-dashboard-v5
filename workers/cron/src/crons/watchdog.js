@@ -70,13 +70,16 @@ export async function watchdog(env) {
   }
 
   // coins 스테일니스 체크 — cron:fail 카운터와 별개로 장시간 미갱신 감지
-  // lastOk 가 null 이면 (첫 배포 직후 / 키 만료) 보수적으로 알림 생략
+  // lastOk 가 null 이면 (첫 배포 직후 / 키 만료) 보수적으로 알림 생략.
+  // fail 카운터가 이미 누적 중이면 스킵 — 같은 cooldown 키 선점으로 실제 오류 알림 차단 방지.
   const lastOkRaw = vals[CRON_NAMES.length * 3]; // index 15
   if (lastOkRaw !== null) {
     const coinsIdx = CRON_NAMES.indexOf('coins');
+    const coinsFailCount = parseInt(vals[coinsIdx * 3] || '0', 10);
     const coinsCooldown = !!vals[coinsIdx * 3 + 2];
-    const ageMs = Date.now() - parseInt(lastOkRaw, 10);
-    if (ageMs > COINS_STALE_MS && !coinsCooldown && !alerts.some((a) => a.cron === 'coins')) {
+    const lastOkMs = parseInt(lastOkRaw, 10);
+    const ageMs = Number.isFinite(lastOkMs) ? Date.now() - lastOkMs : 0;
+    if (coinsFailCount === 0 && ageMs > COINS_STALE_MS && !coinsCooldown && !alerts.some((a) => a.cron === 'coins')) {
       alerts.push({
         cron: 'coins',
         failCount: 0,

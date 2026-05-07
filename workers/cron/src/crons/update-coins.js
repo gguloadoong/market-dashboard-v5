@@ -155,6 +155,8 @@ export async function updateCoins(env) {
       await recordCronFailure('coins', 'snap:coins Redis 쓰기 실패');
       return { ok: false, count: 0 };
     }
+    // full snap 성공 직후 기록 — hot은 파생 데이터로 best-effort
+    await recordCronSuccess('coins');
     try {
       const hot = [...items]
         .sort((a, b) => {
@@ -167,7 +169,6 @@ export async function updateCoins(env) {
     } catch (e) {
       console.warn('[update-coins] hot 저장 실패:', e?.message || e);
     }
-    await recordCronSuccess('coins');
 
     return { ok: true, count: items.length };
   } catch (err) {
