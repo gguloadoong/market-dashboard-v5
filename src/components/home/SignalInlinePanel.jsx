@@ -1,8 +1,9 @@
 // 시그널 인라인 확장 패널 (P3-4)
 // 시그널 카드 클릭 시 카드 아래에 펼쳐지는 결정 패널
-// 트리거 요약 / 컨텍스트 / 연관 뉴스 / Sparkline / 액션 버튼
+// 트리거 요약 / 컨텍스트 / 연관 뉴스 / Sparkline / 액션 버튼 / 히스토리 타임라인(P3-14)
 import { getEasyLabel } from '../../utils/signalLabel';
 import Sparkline from '../../components/Sparkline';
+import { useSignalHistory } from '../../hooks/useSignalHistory';
 
 export default function SignalInlinePanel({
   signal,
@@ -19,6 +20,14 @@ export default function SignalInlinePanel({
   const accuracy = botMap.get(signal?.type)?.accuracy ?? null;
   const totalFired = botMap.get(signal?.type)?.totalFired ?? 0;
   const showAccuracy = totalFired >= 30 && accuracy !== null;
+
+  // 시그널 히스토리 타임라인 (P3-14): 패널 열렸을 때만 조회
+  const { data: history = [] } = useSignalHistory(signal?.type, {
+    enabled: isOpen && !!signal?.type,
+    limit: 10,
+  });
+  const historyRows = history.slice(0, 5);
+  const showHistory = historyRows.length >= 5;
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;
   const hasSparkline = matchedItem?.sparkline?.length >= 3;
@@ -97,6 +106,42 @@ export default function SignalInlinePanel({
               차트 보기
             </button>
           </div>
+
+          {/* 6. 히스토리 타임라인 (P3-14) — 5건 이상일 때만 노출 */}
+          {showHistory && (
+            <div className="mt-3 border-t border-[#E5E8EB] dark:border-[#2C3543] pt-2">
+              <div className="text-[11px] font-semibold text-[#8B95A1] mb-1.5">최근 발생 이력</div>
+              <div className="flex flex-col gap-1">
+                {historyRows.map((row, i) => {
+                  const dateLabel = new Date(row.firedAt).toLocaleDateString('ko-KR', {
+                    timeZone: 'Asia/Seoul',
+                    month: 'numeric',
+                    day: 'numeric',
+                  });
+                  const dirColor = row.direction === 'bullish' ? '#F04452' : '#1764ED';
+                  const dirArrow = row.direction === 'bullish' ? '▲' : '▼';
+                  const hit1hLabel = row.hit1h === true ? '✅' : '❌';
+                  const hit24hLabel = row.hit24h === null ? '측정중' : row.hit24h === true ? '✅' : '❌';
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1.5 text-[11px] text-[#191F28] dark:text-[#E5E8EB]"
+                    >
+                      <span className="w-[38px] flex-shrink-0 text-[#8B95A1]">{dateLabel}</span>
+                      <span className="flex-1 truncate">{row.symbol}</span>
+                      <span style={{ color: dirColor }} className="font-bold">{dirArrow}</span>
+                      <span className="w-[22px] text-center">{hit1hLabel}</span>
+                      <span className="w-[34px] text-center text-[10px]">{hit24hLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-1 flex justify-end gap-2 text-[10px] text-[#8B95A1]">
+                <span>1h</span>
+                <span>24h</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
