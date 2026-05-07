@@ -1,8 +1,8 @@
 // api/signal-history.js — 시그널 히스토리 직접 조회 (P3-14)
 export const config = { runtime: 'edge' };
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const ALLOWED_LIMIT = 30;
 const DEFAULT_LIMIT = 10;
@@ -17,9 +17,10 @@ function supabaseHeaders() {
 }
 
 export default async function handler(req) {
+  const ERR_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Signal-History-Error': '1' };
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(JSON.stringify({ history: [], _error: 'supabase not configured' }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } });
+      { status: 200, headers: ERR_HEADERS });
   }
   const url = new URL(req.url);
   const type = url.searchParams.get('type') || '';
@@ -44,7 +45,7 @@ export default async function handler(req) {
       const detail = await res.text().catch(() => '');
       return new Response(JSON.stringify({
         history: [], _error: { status: res.status, detail: detail.slice(0, 200) },
-      }), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Signal-History-Error': '1' } });
+      }), { status: 200, headers: ERR_HEADERS });
     }
     const rows = await res.json();
     const history = (Array.isArray(rows) ? rows : []).map((r) => ({
@@ -65,6 +66,6 @@ export default async function handler(req) {
   } catch (e) {
     return new Response(JSON.stringify({
       history: [], _error: { message: (e?.message || '').slice(0, 200) },
-    }), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Signal-History-Error': '1' } });
+    }), { status: 200, headers: ERR_HEADERS });
   }
 }

@@ -28,6 +28,7 @@ export default function SignalInlinePanel({
   });
   const historyRows = history.slice(0, 5);
   const showHistory = historyRows.length >= 5;
+  const hitLabel = (v) => v === null ? '측정중' : v === true ? '✅' : '❌';
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;
   const hasSparkline = matchedItem?.sparkline?.length >= 3;
@@ -122,7 +123,6 @@ export default function SignalInlinePanel({
                     : '-';
                   const dirColor = row.direction === 'bullish' ? '#F04452' : '#1764ED';
                   const dirArrow = row.direction === 'bullish' ? '▲' : row.direction === 'bearish' ? '▼' : '▶';
-                  const hitLabel = (v) => v === null ? '측정중' : v === true ? '✅' : '❌';
                   const hit1hLabel = hitLabel(row.hit1h);
                   const hit24hLabel = hitLabel(row.hit24h);
                   return (
