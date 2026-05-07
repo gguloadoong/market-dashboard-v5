@@ -460,12 +460,11 @@
 - 사이즈: S (1일)
 - 우선순위: P2 (사용자 가치)
 
-### [P3-14] 시그널 히스토리 타임라인 — 적중 이력 시각화 (백로그)
+### [P3-14] 시그널 히스토리 타임라인 — 적중 이력 시각화 ✅ 완료 (PR #269, 2026-05-07)
 - 출처: 4/30 Strategy 분석 (이지원 추천 #2)
 - 근거: 적중률 % 보여주지만 "이 63%가 진짜인지" 확인 불가. 과거 발화→결과 미니 타임라인을 SignalInlinePanel에 추가하면 신뢰가 숫자→증거로 전환.
-- 사이즈: M (3일)
-- 우선순위: P2 (사용자 가치)
-- 의존: signal-accuracy.js Redis 이력 TTL 확인 필요
+- 구현: api/signal-history.js (Edge API) + useSignalHistory 훅 + SignalInlinePanel 히스토리 섹션
+- Supabase signal_history anon SELECT 정책 추가 (RLS 해결)
 
 ### [P3-15] 문서 정합성 — KR_FLOW_LAST_GOOD_TTL 주석 보완
 - 출처: 4/30 BE 검증 — last-good + last-good:prev 백업으로 실효 48h 복구 가능하나 주석은 "24h 보존"만
