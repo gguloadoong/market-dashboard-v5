@@ -113,18 +113,21 @@ export default function SignalInlinePanel({
               <div className="text-[11px] font-semibold text-[#8B95A1] mb-1.5">최근 발생 이력</div>
               <div className="flex flex-col gap-1">
                 {historyRows.map((row, i) => {
-                  const dateLabel = new Date(row.firedAt).toLocaleDateString('ko-KR', {
-                    timeZone: 'Asia/Seoul',
-                    month: 'numeric',
-                    day: 'numeric',
-                  });
+                  const dateLabel = row.firedAt
+                    ? new Date(row.firedAt).toLocaleDateString('ko-KR', {
+                        timeZone: 'Asia/Seoul',
+                        month: 'numeric',
+                        day: 'numeric',
+                      })
+                    : '-';
                   const dirColor = row.direction === 'bullish' ? '#F04452' : '#1764ED';
-                  const dirArrow = row.direction === 'bullish' ? '▲' : '▼';
-                  const hit1hLabel = row.hit1h === true ? '✅' : '❌';
-                  const hit24hLabel = row.hit24h === null ? '측정중' : row.hit24h === true ? '✅' : '❌';
+                  const dirArrow = row.direction === 'bullish' ? '▲' : row.direction === 'bearish' ? '▼' : '▶';
+                  const hitLabel = (v) => v === null ? '측정중' : v === true ? '✅' : '❌';
+                  const hit1hLabel = hitLabel(row.hit1h);
+                  const hit24hLabel = hitLabel(row.hit24h);
                   return (
                     <div
-                      key={i}
+                      key={`${row.firedAt}-${row.symbol}-${i}`}
                       className="flex items-center gap-1.5 text-[11px] text-[#191F28] dark:text-[#E5E8EB]"
                     >
                       <span className="w-[38px] flex-shrink-0 text-[#8B95A1]">{dateLabel}</span>
@@ -136,9 +139,9 @@ export default function SignalInlinePanel({
                   );
                 })}
               </div>
-              <div className="mt-1 flex justify-end gap-2 text-[10px] text-[#8B95A1]">
-                <span>1h</span>
-                <span>24h</span>
+              <div className="mt-1 flex justify-end text-[10px] text-[#8B95A1]">
+                <span className="w-[22px] text-center">1h</span>
+                <span className="w-[34px] text-center">24h</span>
               </div>
             </div>
           )}
