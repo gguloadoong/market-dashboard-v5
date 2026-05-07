@@ -126,9 +126,32 @@ CODE_REVIEWER_RESULT=$(grep -E '^\s*-?\s*\[(CRITICAL|HIGH|SEC|PERF|STYLE)\]' "$R
 echo -e "${GREEN}[pr] code-review PASS (커밋: ${HEAD_COMMIT:0:8})${NC}"
 echo -e "${YELLOW}[pr] 주요 지적: ${CODE_REVIEWER_RESULT}${NC}"
 
-# ─── 3/5 PR 생성 ─────────────────────────────────────────────────────────────
+# ─── 3/5 Gemini gate ─────────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}[pr] === 3/5 PR 생성 ===${NC}"
+echo -e "${GREEN}[pr] === 3/5 Gemini gate ===${NC}"
+GEMINI_STATUS="SKIPPED"
+
+set +e
+GEMINI_OUTPUT=$(bash scripts/gemini-review-gate.sh strict origin/main 2>&1)
+GEMINI_EXIT=$?
+set -e
+echo "$GEMINI_OUTPUT"
+
+if [ "$GEMINI_EXIT" -ne 0 ]; then
+  if [ "${SKIP_GEMINI_REVIEW:-0}" = "1" ]; then
+    echo -e "${YELLOW}[pr] Gemini gate BLOCK → SKIP_GEMINI_REVIEW=1 우회${NC}"
+    GEMINI_STATUS="BLOCK → SKIP_GEMINI_REVIEW=1 우회"
+  else
+    echo -e "${RED}[pr] Gemini gate BLOCK — 수정 후 재실행하세요${NC}"
+    exit 1
+  fi
+else
+  GEMINI_STATUS="PASS"
+fi
+
+# ─── 4/5 PR 생성 ─────────────────────────────────────────────────────────────
+echo ""
+echo -e "${GREEN}[pr] === 4/5 PR 생성 ===${NC}"
 
 # ── 이슈 자동 연결 ──────────────────────────────────────────────────────────
 # 브랜치명에서 이슈번호 추출 (feature/#36-설명 → 36)
@@ -162,8 +185,11 @@ REVIEW_BODY="## 독립 리뷰 결과
 ### code-reviewer (Claude Opus)
 ${CODE_REVIEWER_RESULT}
 
+### Gemini gate (${GEMINI_MODEL:-gemini-2.5-pro})
+- ${GEMINI_STATUS}
+
 ---
-> ⚠️ PR 후 봇 리뷰 채택/기각 기준: 위 리뷰에서 이미 검토된 항목과 일치하면 채택, 상충하면 재검토 후 판단 (사전 승인 결과 원복 방지)
+> ⚠️ PR 후 봇 리뷰 채택/기각 기준: 위 두 리뷰에서 이미 검토된 항목과 일치하면 채택, 상충하면 재검토 후 판단 (사전 승인 결과 원복 방지)
 
 ${CLOSES_LINE:+${CLOSES_LINE}
 
@@ -179,12 +205,12 @@ REPO="gguloadoong/market-dashboard-v5"
 
 # ─── 4.5/5 프로젝트 문서 자동 현행화 ───────────────────────────────────────
 echo ""
-echo -e "${GREEN}[pr] === 3.5/5 프로젝트 문서 현행화 ===${NC}"
+echo -e "${GREEN}[pr] === 4.5/5 프로젝트 문서 현행화 ===${NC}"
 bash scripts/update-project-docs.sh 2>/dev/null || true  # 실패해도 PR 흐름 차단 안 함
 
 # ─── 5/5 봇 리뷰 폴링 (Copilot 필수 + 1 other) ──────────────────────────
 echo ""
-echo -e "${GREEN}[pr] === 4/5 봇 리뷰 폴링 (최대 15분) ===${NC}"
+echo -e "${GREEN}[pr] === 5/5 봇 리뷰 폴링 (최대 15분) ===${NC}"
 echo -e "${YELLOW}[pr] 필수 조건: Copilot 도착 + Gemini·CodeRabbit 중 1명${NC}"
 echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${SAFE_BRANCH}.md${NC}"
 

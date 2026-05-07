@@ -199,7 +199,7 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 2. git checkout -b feature/#이슈번호-설명
 3. 작업 완료 후 커밋 & 푸시
 4. npm run review:code   ← Claude Opus 독립 리뷰 (artifact 저장 필수)
-5. npm run pr "PR 제목"  ← 빌드 + artifact 검증 + PR 생성 + 봇 폴링
+5. npm run pr "PR 제목"  ← 빌드 + artifact 검증 + Gemini gate + PR 생성 + 봇 폴링
 ```
 
 **`gh pr create` 직접 호출 금지. 반드시 `npm run pr`을 사용한다.**
@@ -217,13 +217,18 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 
 **수동으로 `Closes #이슈번호`를 넣을 필요 없음 — 브랜치명만 규칙대로 만들면 자동 처리.**
 
-### PR 생성 전 독립 리뷰
+### PR 생성 전 독립 리뷰 (2단계 필수)
 
 ```
-# npm run review:code (Claude Opus)
+# 1단계: npm run review:code (Claude Opus)
 → .tmp/code-review-{BRANCH}.md artifact 저장
 → VERDICT: BLOCK → 수정 후 재실행
-→ VERDICT: PASS → npm run pr 실행
+→ VERDICT: PASS → 다음 단계
+
+# 2단계: Gemini gate (create-pr.sh 자동 실행, gemini-2.5-pro)
+→ npm run review:gate
+→ PASS → PR 생성
+→ BLOCK → 지적 수정 후 재실행 (또는 SKIP_GEMINI_REVIEW=1 + 사유 기록)
 ```
 
 ### PR 생성 후 봇 리뷰 (필수 응답)
@@ -232,7 +237,7 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 
 ```
 봇 리뷰 채택/기각 기준:
-- PR 전 code-reviewer (Opus) 결과를 1차 기준으로 삼는다
+- PR 전 code-reviewer (Opus) + Gemini gate 결과를 1차 기준으로 삼는다
 - 봇이 이미 사전 검토된 항목을 수정하자고 하면 → 사유 명시 후 기각 (원복 방지)
 - 봇이 사전 검토에서 놓친 새로운 버그/보안 문제 → 우선 채택
 - HIGH/CRITICAL → 채택 강권, 기각 시 반드시 반론 근거 기록
@@ -243,7 +248,7 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 ### 리뷰 종합 코멘트 (자동화)
 
 ```bash
-npm run review:summary   # Opus 재실행 → PR 코멘트 자동 게시
+npm run review:summary   # Opus + Gemini gate 재실행 → PR 코멘트 자동 게시
 ```
 
 - 봇 리뷰(Gemini/Copilot/CodeRabbit) 채택/기각 처리 완료 후 실행
@@ -258,6 +263,7 @@ npm run review:summary   # Opus 재실행 → PR 코멘트 자동 게시
 
 ### 최종 검토
 > 🤖 code-reviewer (Claude Opus): PASS/BLOCK
+> ✨ Gemini gate (gemini-2.5-pro): PASS/BLOCK
 ```
 
 ### 기획 리뷰
