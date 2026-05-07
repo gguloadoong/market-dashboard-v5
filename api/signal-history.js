@@ -34,7 +34,7 @@ export default async function handler(req) {
 
   const cutoffIso = new Date(Date.now() - 30 * 86400_000).toISOString();
   const cols = 'symbol,direction,fired_at,price_at_fire,hit_1h,hit_24h,change_1h,change_24h';
-  const qs = `select=${cols}&signal_type=eq.${encodeURIComponent(type)}&fired_at=gte.${cutoffIso}&order=fired_at.desc&limit=${limit}`;
+  const qs = `select=${cols}&signal_type=eq.${encodeURIComponent(type)}&fired_at=gte.${encodeURIComponent(cutoffIso)}&order=fired_at.desc&limit=${limit}`;
 
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/signal_history?${qs}`, {

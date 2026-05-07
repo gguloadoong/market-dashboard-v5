@@ -24,11 +24,11 @@ export default function SignalInlinePanel({
   // 시그널 히스토리 타임라인 (P3-14): 패널 열렸을 때만 조회
   const { data: history = [] } = useSignalHistory(signal?.type, {
     enabled: isOpen && !!signal?.type,
-    limit: 10,
+    limit: 5,
   });
   const historyRows = history.slice(0, 5);
   const showHistory = historyRows.length >= 5;
-  const hitLabel = (v) => v === null ? '측정중' : v === true ? '✅' : '❌';
+  const hitLabel = (v) => (v == null) ? '측정중' : v ? '✅' : '❌';
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;
   const hasSparkline = matchedItem?.sparkline?.length >= 3;
@@ -111,7 +111,13 @@ export default function SignalInlinePanel({
           {/* 6. 히스토리 타임라인 (P3-14) — 5건 이상일 때만 노출 */}
           {showHistory && (
             <div className="mt-3 border-t border-[#E5E8EB] dark:border-[#2C3543] pt-2">
-              <div className="text-[11px] font-semibold text-[#8B95A1] mb-1.5">최근 발생 이력</div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-[#8B95A1]">최근 발생 이력</span>
+                <div className="flex text-[10px] text-[#8B95A1]">
+                  <span className="w-[22px] text-center">1h</span>
+                  <span className="w-[34px] text-center">24h</span>
+                </div>
+              </div>
               <div className="flex flex-col gap-1">
                 {historyRows.map((row, i) => {
                   const dateLabel = row.firedAt
@@ -138,10 +144,6 @@ export default function SignalInlinePanel({
                     </div>
                   );
                 })}
-              </div>
-              <div className="mt-1 flex justify-end text-[10px] text-[#8B95A1]">
-                <span className="w-[22px] text-center">1h</span>
-                <span className="w-[34px] text-center">24h</span>
               </div>
             </div>
           )}
