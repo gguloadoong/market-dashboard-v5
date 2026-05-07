@@ -25,14 +25,15 @@ export async function watchdog(env) {
     return { ok: false, reason: 'no-redis' };
   }
 
-  // 5 크론 × 3 키(failCount / lastError / alertCooldown) + 1(lastOk:coins) = 16 키 한 번에 조회
+  // 5 크론 × 3 키(failCount / lastError / alertCooldown) + 2(lastOk:coins, stale cooldown) = 17 키
   const keys = [
     ...CRON_NAMES.flatMap((c) => [
       `cron:fail:${c}`,
       `cron:lastError:${c}`,
       `cron:watchdog:alert:${c}`,
     ]),
-    'cron:lastOk:coins',
+    'cron:lastOk:coins',              // index 15
+    'cron:watchdog:alert:coins:stale', // index 16 — fail alert(cron:watchdog:alert:coins)와 분리된 stale 전용 쿨다운
   ];
 
   let vals;
@@ -70,18 +71,17 @@ export async function watchdog(env) {
   }
 
   // coins 스테일니스 체크 — cron:fail 카운터와 별개로 장시간 미갱신 감지
-  // lastOk 가 null 이면 (첫 배포 직후 / 키 만료) 보수적으로 알림 생략.
-  // fail 카운터가 이미 누적 중이면 스킵 — 같은 cooldown 키 선점으로 실제 오류 알림 차단 방지.
-  const lastOkRaw = vals[CRON_NAMES.length * 3]; // index 15
-  if (lastOkRaw !== null) {
-    const coinsIdx = CRON_NAMES.indexOf('coins');
-    const coinsFailCount = parseInt(vals[coinsIdx * 3] || '0', 10);
-    const coinsCooldown = !!vals[coinsIdx * 3 + 2];
+  // - lastOk null 이면 (첫 배포 직후) 보수적으로 생략
+  // - stale 전용 쿨다운 키(cron:watchdog:alert:coins:stale) 사용 → fail alert cooldown과 충돌 없음
+  // - fail alert가 이미 발송 예정이면(alerts에 coins 존재) stale 스킵 — 중복 방지
+  const lastOkRaw = vals[CRON_NAMES.length * 3];     // index 15
+  const staleCooldown = !!vals[CRON_NAMES.length * 3 + 1]; // index 16
+  if (lastOkRaw !== null && !staleCooldown) {
     const lastOkMs = parseInt(lastOkRaw, 10);
     const ageMs = Number.isFinite(lastOkMs) ? Date.now() - lastOkMs : 0;
-    if (coinsFailCount === 0 && ageMs > COINS_STALE_MS && !coinsCooldown && !alerts.some((a) => a.cron === 'coins')) {
+    if (ageMs > COINS_STALE_MS && !alerts.some((a) => a.cron === 'coins')) {
       alerts.push({
-        cron: 'coins',
+        cron: 'coins:stale',
         failCount: 0,
         lastErrorMsg: `마지막 성공 ${Math.round(ageMs / 60000)}분 전 — 스케줄러 정지 의심`,
       });
