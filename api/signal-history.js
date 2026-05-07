@@ -8,6 +8,9 @@ const ALLOWED_LIMIT = 30;
 const DEFAULT_LIMIT = 10;
 const TYPE_PATTERN = /^[a-z0-9_]{3,40}$/;
 
+const CORS = { 'Access-Control-Allow-Origin': '*' };
+const ERR_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Signal-History-Error': '1', ...CORS };
+
 function supabaseHeaders() {
   return {
     apikey: SUPABASE_KEY,
@@ -17,7 +20,6 @@ function supabaseHeaders() {
 }
 
 export default async function handler(req) {
-  const ERR_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Signal-History-Error': '1' };
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(JSON.stringify({ history: [], _error: 'supabase not configured' }),
       { status: 200, headers: ERR_HEADERS });
@@ -25,11 +27,11 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const type = url.searchParams.get('type') || '';
   const limitRaw = parseInt(url.searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
-  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : DEFAULT_LIMIT, 1), ALLOWED_LIMIT);
+  const limit = Math.min(Math.max(isNaN(limitRaw) ? DEFAULT_LIMIT : limitRaw, 1), ALLOWED_LIMIT);
 
   if (!TYPE_PATTERN.test(type)) {
     return new Response(JSON.stringify({ history: [], _error: 'invalid type' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } });
+      { status: 400, headers: { 'Content-Type': 'application/json', ...CORS } });
   }
 
   const cutoffIso = new Date(Date.now() - 30 * 86400_000).toISOString();
@@ -42,10 +44,8 @@ export default async function handler(req) {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return new Response(JSON.stringify({
-        history: [], _error: { status: res.status, detail: detail.slice(0, 200) },
-      }), { status: 200, headers: ERR_HEADERS });
+      return new Response(JSON.stringify({ history: [], _error: 'upstream error' }),
+        { status: 200, headers: ERR_HEADERS });
     }
     const rows = await res.json();
     const history = (Array.isArray(rows) ? rows : []).map((r) => ({
@@ -62,10 +62,10 @@ export default async function handler(req) {
       { status: 200, headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+        ...CORS,
       }});
   } catch (e) {
-    return new Response(JSON.stringify({
-      history: [], _error: { message: (e?.message || '').slice(0, 200) },
-    }), { status: 200, headers: ERR_HEADERS });
+    return new Response(JSON.stringify({ history: [], _error: 'fetch error' }),
+      { status: 200, headers: ERR_HEADERS });
   }
 }

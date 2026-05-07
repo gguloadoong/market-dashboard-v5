@@ -22,12 +22,13 @@ export default function SignalInlinePanel({
   const showAccuracy = totalFired >= 30 && accuracy !== null;
 
   // 시그널 히스토리 타임라인 (P3-14): 패널 열렸을 때만 조회
+  // limit=6으로 요청 → >= 5건 확인 시 노출 (4건 이하는 데이터 부족으로 숨김)
   const { data: history = [] } = useSignalHistory(signal?.type, {
     enabled: isOpen && !!signal?.type,
-    limit: 5,
+    limit: 6,
   });
   const historyRows = history.slice(0, 5);
-  const showHistory = historyRows.length >= 5;
+  const showHistory = history.length >= 5;
   const hitLabel = (v) => (v == null) ? '측정중' : v ? '✅' : '❌';
 
   const news = Array.isArray(relatedNews) && relatedNews.length > 0 ? relatedNews[0] : null;
