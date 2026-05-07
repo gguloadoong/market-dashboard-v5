@@ -64,7 +64,7 @@ export default async function handler(req) {
         'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
         ...CORS,
       }});
-  } catch (e) {
+  } catch {
     return new Response(JSON.stringify({ history: [], _error: 'fetch error' }),
       { status: 200, headers: ERR_HEADERS });
   }
