@@ -113,15 +113,12 @@ export async function recordCronFailure(cronName, errorMessage) {
   } catch (e) { console.error(`[price-cache] recordCronFailure 실패:`, e); }
 }
 
-// 크론 정상 완료 시 호출 — lastOk 타임스탬프 갱신 + fail 카운터 리셋
-// TTL 없음: 장기 장애(수 시간+) 시에도 키 만료로 감지가 끊기지 않도록 영구 유지.
-//           cron 정상 실행마다 overwrite되므로 orphan 키 걱정 없음.
+// 크론 정상 완료 시 호출 — lastOk 타임스탬프만 갱신.
+// TTL 없음: 장기 장애 시에도 키 만료로 감지가 끊기지 않도록 영구 유지.
+// cron:fail은 건드리지 않음 — 1h TTL 자연 만료. del 시 flapping 감지 불가.
 export async function recordCronSuccess(cronName) {
   if (!_redis) return;
   try {
-    await Promise.all([
-      _redis.set(`cron:lastOk:${cronName}`, Date.now()),
-      _redis.del(`cron:fail:${cronName}`),
-    ]);
+    await _redis.set(`cron:lastOk:${cronName}`, Date.now());
   } catch (e) { console.error(`[price-cache] recordCronSuccess 실패:`, e); }
 }
