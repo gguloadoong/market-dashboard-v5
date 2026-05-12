@@ -133,62 +133,67 @@ function foreignToScore(net) {
 export default async function handler(req, res) {
   const hantooReady = !!(process.env.HANTOO_APP_KEY && process.env.HANTOO_APP_SECRET);
 
-  // 모든 응답에 CORS 헤더 공통 적용 — 에러 응답 포함
   res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // HANTOO 환경변수 미설정 — Redis 캐시 먼저 시도, 없으면 not_configured
+  if (!hantooReady) {
+    let cached = null;
+    try { cached = await getSnap(CACHE_KEY); } catch {}
+    if (cached) {
+      const ageSec = Math.round((Date.now() - (cached.savedAt ?? 0)) / 1000);
+      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+      return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
+    }
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    return res.json({ score: null, status: 'not_configured', closed: false, label: '설정 필요' });
+  }
 
   try {
     const today = todayStr();
+    const token = await getHantooToken();
 
-    // HANTOO 키 없으면 전체 불가 (VKOSPI + 외국인 모두 한투 의존)
-    let vkospiRes, kospiRes, kosdaqRes;
-    if (hantooReady) {
-      const token = await getHantooToken();
-      [vkospiRes, kospiRes, kosdaqRes] = await Promise.allSettled([
-        fetchVkospiKis(token),
-        fetchForeignNet(token, '0001', today),  // KOSPI
-        fetchForeignNet(token, '1001', today),  // KOSDAQ
-      ]);
-    } else {
-      vkospiRes = { status: 'rejected', reason: 'HANTOO not configured' };
-      kospiRes  = { status: 'rejected', reason: 'HANTOO not configured' };
-      kosdaqRes = { status: 'rejected', reason: 'HANTOO not configured' };
+    const [vkospiRes, kospiRes, kosdaqRes] = await Promise.allSettled([
+      fetchVkospiKis(token),
+      fetchForeignNet(token, '0001', today),  // KOSPI
+      fetchForeignNet(token, '1001', today),  // KOSDAQ
+    ]);
+
+    // vkospiSource 추적: KIS 성공 → 'kis', 실패 후 Naver → 'naver', 모두 실패 → null
+    let vkospiFinal = vkospiRes.status === 'fulfilled' ? vkospiRes.value : null;
+    let vkospiSource = vkospiFinal != null ? 'kis' : null;
+
+    if (vkospiFinal == null) {
+      try {
+        vkospiFinal = await fetchVkospiNaver();
+        vkospiSource = 'naver';
+      } catch (e) {
+        console.warn('[kr-fear-greed] Naver VKOSPI fallback failed:', e.message);
+      }
     }
 
-    const vkospi = vkospiRes.status === 'fulfilled' ? vkospiRes.value : null;
-
-    // 실제로 성공한 외국인 데이터만 합산 (실패는 0으로 대체하지 않음)
     const foreignAvailable = kospiRes.status === 'fulfilled' || kosdaqRes.status === 'fulfilled';
     const foreignNet = foreignAvailable
       ? (kospiRes.status  === 'fulfilled' ? kospiRes.value  : 0)
       + (kosdaqRes.status === 'fulfilled' ? kosdaqRes.value : 0)
       : null;
+    const foreignSource = foreignAvailable ? 'kis' : null;
 
-    // 한투 VKOSPI 실패 시 Naver fallback (장 마감/주말에도 전일 종가 반환)
-    // 외국인 데이터는 Naver fallback 없음 — KIS 7일 날짜 범위 확장으로 주말 대응
-    let vkospiFinal = vkospi;
-    const foreignNetFinal = foreignNet;
-    const foreignAvailableFinal = foreignAvailable;
-
-    if (vkospiFinal == null) {
-      try { vkospiFinal = await fetchVkospiNaver(); } catch (e) { console.warn('[kr-fear-greed] Naver VKOSPI fallback failed:', e.message); }
-    }
-
-    // 모두 실패 = Redis 캐시 → 그것도 없으면 closed
-    if (vkospiFinal == null && !foreignAvailableFinal) {
+    // 모두 실패 → Redis 캐시, 그것도 없으면 error
+    if (vkospiFinal == null && !foreignAvailable) {
       let cached = null;
       try { cached = await getSnap(CACHE_KEY); } catch {}
       if (cached) {
+        const ageSec = Math.round((Date.now() - (cached.savedAt ?? 0)) / 1000);
         res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
-        return res.json({ ...cached, cached: true });
+        return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
       }
       res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
-      return res.json({ score: null, closed: true, label: '데이터 없음' });
+      return res.json({ score: null, status: 'error', closed: true, label: '데이터 없음' });
     }
 
     const vs = vkospiFinal != null ? vkospiToScore(vkospiFinal) : null;
-    const fs = foreignNetFinal != null ? foreignToScore(foreignNetFinal) : null;
+    const fs = foreignNet    != null ? foreignToScore(foreignNet) : null;
 
-    // 합성: VKOSPI 60% + 외국인 40% (한쪽 실패 시 나머지 100%)
     let score;
     if (vs != null && fs != null) {
       score = Math.round(vs * VKOSPI_WEIGHT + fs * FOREIGN_WEIGHT);
@@ -198,8 +203,21 @@ export default async function handler(req, res) {
       score = fs;
     }
 
-    const payload = { score, vkospi: vkospiFinal, vkospiScore: vs, foreignNet: foreignNetFinal, foreignScore: fs };
-    // 성공 시 Redis에 저장 (48시간 — 주말/공휴일 대비)
+    // VKOSPI만 성공한 경우 partial
+    const status = foreignAvailable ? 'ok' : 'partial';
+    const sources = { vkospi: vkospiSource, foreign: foreignSource };
+
+    const payload = {
+      score,
+      status,
+      sources,
+      closed: false,
+      vkospi: vkospiFinal,
+      vkospiScore: vs,
+      foreignNet,
+      foreignScore: fs,
+      savedAt: Date.now(),
+    };
     try { await setSnap(CACHE_KEY, payload, CACHE_TTL); } catch {}
 
     res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=30');
@@ -207,6 +225,6 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('[kr-fear-greed]', e.message);
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
-    res.json({ score: null, closed: true, label: '데이터 없음' });
+    res.json({ score: null, status: 'error', closed: true, label: '데이터 없음' });
   }
 }
