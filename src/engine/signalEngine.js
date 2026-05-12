@@ -309,11 +309,13 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     meta: { consecutiveDays, amount, currentPrice },
     source: 'client',
     confidence: Number.isFinite(consecutiveDays) ? Math.min(0.5 + consecutiveDays * 0.1, 1.0) : null,
-    reasons: [
-      { label: '연속', value: `${consecutiveDays}일` },
-      { label: '금액', value: _formatAmount(amount) },
-      { label: '투자자', value: investorLabel },
-    ],
+    reasons: Number.isFinite(consecutiveDays)
+      ? [
+          { label: '연속', value: `${consecutiveDays}일` },
+          { label: '금액', value: _formatAmount(amount) },
+          { label: '투자자', value: investorLabel },
+        ]
+      : [],
   });
   return addSignal(signal);
 }
@@ -619,11 +621,13 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
     meta: { name, foreignDays, instDays, totalAmt, action, currentPrice },
     source: 'client',
     confidence: Number.isFinite(foreignDays) && Number.isFinite(instDays) ? Math.min(0.5 + Math.min(foreignDays, instDays) * 0.1, 1.0) : null,
-    reasons: [
-      { label: '외국인', value: `${foreignDays}일` },
-      { label: '기관', value: `${instDays}일` },
-      { label: '합산', value: _formatAmount(totalAmt) },
-    ],
+    reasons: Number.isFinite(foreignDays) && Number.isFinite(instDays)
+      ? [
+          { label: '외국인', value: `${foreignDays}일` },
+          { label: '기관', value: `${instDays}일` },
+          { label: '합산', value: _formatAmount(totalAmt) },
+        ]
+      : [],
   }));
 }
 
