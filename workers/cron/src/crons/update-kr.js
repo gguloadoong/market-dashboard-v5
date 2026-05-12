@@ -7,8 +7,9 @@ import { getHantooToken, HANTOO_BASE } from '../hantoo-token.js';
 import KR_STOCK_NAMES from '../kr-stock-names.json';
 
 // KRX ISU_ABBRV가 비거나 symbol과 같으면 정적 테이블로 보완
+// U+FFFD(대체문자) 포함 시 EUC-KR 오인코딩 오염으로 판단 → 정적 테이블 폴백
 function resolveKrName(symbol, apiName) {
-  if (apiName && apiName !== symbol) return apiName;
+  if (apiName && apiName !== symbol && !apiName.includes('�')) return apiName;
   return KR_STOCK_NAMES[symbol] || symbol;
 }
 
