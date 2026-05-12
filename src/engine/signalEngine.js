@@ -48,7 +48,7 @@ function _generateId() {
 // ─── 시그널 CRUD ────────────────────────────────────────────
 
 /** 시그널 객체 생성 (저장소에 추가하지 않음) */
-export function createSignal({ type, symbol, name, market, direction, strength, title, meta }) {
+export function createSignal({ type, symbol, name, market, direction, strength, title, meta, source, confidence, reasons }) {
   const now = Date.now();
   return {
     id: _generateId(),
@@ -60,6 +60,9 @@ export function createSignal({ type, symbol, name, market, direction, strength, 
     strength: Math.max(1, Math.min(5, strength ?? 1)),
     title: title ?? '',
     meta: meta ?? {},
+    source: source ?? 'client',
+    confidence: confidence ?? null,
+    reasons: reasons ?? null,
     timestamp: now,
     expiresAt: now + getTTL(type),
   };
@@ -304,6 +307,13 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     strength,
     title,
     meta: { consecutiveDays, amount, currentPrice },
+    source: 'client',
+    confidence: Math.min(0.5 + consecutiveDays * 0.1, 1.0),
+    reasons: [
+      { label: '연속', value: `${consecutiveDays}일` },
+      { label: '금액', value: _formatAmount(amount) },
+      { label: '투자자', value: investorLabel },
+    ],
   });
   return addSignal(signal);
 }
@@ -342,6 +352,12 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     strength,
     title,
     meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
+    source: 'client',
+    confidence: Math.min(0.4 + (ratio / 20), 1.0),
+    reasons: [
+      { label: '거래량', value: `평소 ${ratio.toFixed(1)}배` },
+      ...(Math.abs(pct) >= 0.5 ? [{ label: '가격', value: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` }] : []),
+    ],
   });
   return addSignal(signal);
 }
@@ -599,6 +615,13 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
     direction, strength,
     title,
     meta: { name, foreignDays, instDays, totalAmt, action, currentPrice },
+    source: 'client',
+    confidence: Math.min(0.5 + Math.min(foreignDays, instDays) * 0.1, 1.0),
+    reasons: [
+      { label: '외국인', value: `${foreignDays}일` },
+      { label: '기관', value: `${instDays}일` },
+      { label: '합산', value: _formatAmount(totalAmt) },
+    ],
   }));
 }
 
