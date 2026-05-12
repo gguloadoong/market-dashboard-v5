@@ -62,7 +62,7 @@ export function createSignal({ type, symbol, name, market, direction, strength, 
     meta: meta ?? {},
     source: source ?? 'client',
     confidence: confidence ?? null,
-    reasons: reasons ?? null,
+    reasons: reasons ?? [],
     timestamp: now,
     expiresAt: now + getTTL(type),
   };
@@ -353,7 +353,7 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     title,
     meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
     source: 'client',
-    confidence: Math.min(0.4 + (ratio / 20), 1.0),
+    confidence: Number.isFinite(ratio) ? Math.min(0.4 + (ratio / 20), 1.0) : null,
     reasons: [
       { label: '거래량', value: `평소 ${ratio.toFixed(1)}배` },
       ...(Math.abs(pct) >= 0.5 ? [{ label: '가격', value: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` }] : []),
