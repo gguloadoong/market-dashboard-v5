@@ -35,21 +35,28 @@ function TemperatureBar({ indices, krwRate, allItems }) {
 
   // 공포탐욕 대표 점수 (가장 먼저 로딩 완료된 것)
   const fgScore = crypto.data?.score ?? us.data?.score ?? kr.data?.score ?? null;
+  const isPending = displayTemp.source === 'pending';
 
   return (
     <div className="space-y-5">
-      {/* 온도 바 — 인라인 수평 (목업 시안) */}
+      {/* 온도 바 — 인라인 수평 */}
       <div className="flex items-center gap-3">
         <span className="text-[13px] font-semibold text-[#4E5968] flex-shrink-0">시장 온도</span>
         <div className="flex-1 h-1.5 rounded-[3px] overflow-hidden" style={{ background: 'rgba(23,100,237,0.10)' }}>
-          <div
-            className="h-full rounded-[3px] transition-all duration-[600ms]"
-            style={{ width: `${gaugeWidth}%`, background: zone.bar }}
-          />
+          {isPending
+            ? <div className="h-full w-full rounded-[3px] bg-[#E5E8EB] animate-pulse" />
+            : <div
+                className="h-full rounded-[3px] transition-all duration-[600ms]"
+                style={{ width: `${gaugeWidth}%`, background: zone.bar }}
+              />
+          }
         </div>
-        <span className="text-[13px] font-bold flex-shrink-0" style={{ color: zone.text }}>
-          {displayTemp.label} {gaugeWidth}%
-        </span>
+        {isPending
+          ? <span className="text-[13px] font-medium flex-shrink-0 text-[#B0B8C1]">파악 중...</span>
+          : <span className="text-[13px] font-bold flex-shrink-0" style={{ color: zone.text }}>
+              {displayTemp.label} {gaugeWidth}%
+            </span>
+        }
         {displayTemp.source === 'blended' && (
           <span className="text-[11px] font-medium flex-shrink-0 text-[#8B95A1]">
             실시간 보정
