@@ -11,6 +11,7 @@ import UnifiedFeedPanel from './components/UnifiedFeedPanel';
 import ChartSidePanel from './components/ChartSidePanel';
 import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
+import DataHealthBadge from './components/DataHealthBadge';
 import GlobalSearch from './components/GlobalSearch';
 import { DEFAULT_KRW_RATE } from './constants/market';
 import SectorRotation from './components/SectorRotation';
@@ -375,6 +376,8 @@ export default function App() {
       <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_360px]">
         <div className={`min-w-0 overflow-hidden ${activeTab === 'news' ? '' : 'p-5 space-y-4'} lg:pb-0 pb-safe-nav`}>
           {activeTab === 'home' ? (
+            <>
+            <DataHealthBadge dataErrors={dataErrors} coinError={coinError} />
             <HomeDashboard
               indices={indices} krStocks={krStocks} usStocks={usStocks}
               coins={coins} etfs={mergedEtfs} krwRate={krwRate} krwRateLoaded={krwRateLoaded}
@@ -382,6 +385,7 @@ export default function App() {
               onTabChange={setActiveTab}
               dataReady={pricesReady && coinsReady}
             />
+            </>
           ) : activeTab === 'sector' ? (
             <SectorRotation krStocks={krStocks} usStocks={usStocks} coins={coins} />
           ) : activeTab === 'news' ? (
