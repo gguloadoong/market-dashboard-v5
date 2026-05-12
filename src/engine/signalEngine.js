@@ -312,7 +312,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     reasons: Number.isFinite(consecutiveDays)
       ? [
           { label: '연속', value: `${consecutiveDays}일` },
-          { label: '금액', value: _formatAmount(amount) },
+          ...(Number.isFinite(amount) ? [{ label: '금액', value: _formatAmount(amount) }] : []),
           ...(investorLabel != null ? [{ label: '투자자', value: investorLabel }] : []),
         ]
       : [],
@@ -355,7 +355,7 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     title,
     meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
     source: 'client',
-    confidence: Number.isFinite(ratio) ? Math.min(0.4 + (ratio / 20), 1.0) : null,
+    confidence: Number.isFinite(ratio) ? Math.min(Math.max(0, 0.4 + (ratio / 20)), 1.0) : null,
     reasons: Number.isFinite(ratio)
       ? [
           { label: '거래량', value: `평소 ${ratio.toFixed(1)}배` },
@@ -625,7 +625,7 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
       ? [
           { label: '외국인', value: `${foreignDays}일` },
           { label: '기관', value: `${instDays}일` },
-          { label: '합산', value: _formatAmount(totalAmt) },
+          ...(Number.isFinite(totalAmt) ? [{ label: '합산', value: _formatAmount(totalAmt) }] : []),
         ]
       : [],
   }));
