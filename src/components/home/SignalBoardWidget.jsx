@@ -350,7 +350,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   }`}
                 >
                   {signal.symbol && (
-                    <TickerLogo item={matchedItem || { symbol: signal.symbol, name: signal.name, _market: signal.market === 'kr' ? 'KR' : signal.market === 'us' ? 'US' : signal.market === 'crypto' ? 'COIN' : '' }} size={24} />
+                    <TickerLogo item={matchedItem || { symbol: signal.symbol, name: signal.name, _market: signal.market === 'kr' ? 'KR' : signal.market === 'us' ? 'US' : signal.market === 'crypto' ? 'COIN' : '', id: signal.market === 'crypto' ? signal.symbol : undefined }} size={24} />
                   )}
                   <span className="text-[14px] font-semibold flex-shrink-0" style={{ color: nameColor }}>
                     {extractName(signal)}
