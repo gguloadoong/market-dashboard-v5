@@ -308,7 +308,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     title,
     meta: { consecutiveDays, amount, currentPrice },
     source: 'client',
-    confidence: Math.min(0.5 + consecutiveDays * 0.1, 1.0),
+    confidence: Number.isFinite(consecutiveDays) ? Math.min(0.5 + consecutiveDays * 0.1, 1.0) : null,
     reasons: [
       { label: '연속', value: `${consecutiveDays}일` },
       { label: '금액', value: _formatAmount(amount) },
@@ -618,7 +618,7 @@ export function createSmartMoneySignal(symbol, name, foreignDays, instDays, tota
     title,
     meta: { name, foreignDays, instDays, totalAmt, action, currentPrice },
     source: 'client',
-    confidence: Math.min(0.5 + Math.min(foreignDays, instDays) * 0.1, 1.0),
+    confidence: Number.isFinite(foreignDays) && Number.isFinite(instDays) ? Math.min(0.5 + Math.min(foreignDays, instDays) * 0.1, 1.0) : null,
     reasons: [
       { label: '외국인', value: `${foreignDays}일` },
       { label: '기관', value: `${instDays}일` },
