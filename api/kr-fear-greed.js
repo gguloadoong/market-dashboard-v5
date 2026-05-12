@@ -140,7 +140,7 @@ export default async function handler(req, res) {
     let cached = null;
     try { cached = await getSnap(CACHE_KEY); } catch {}
     if (cached) {
-      const ageSec = Math.round((Date.now() - (cached.savedAt ?? 0)) / 1000);
+      const ageSec = cached.savedAt ? Math.round((Date.now() - cached.savedAt) / 1000) : null;
       res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
       return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
     }
@@ -183,7 +183,7 @@ export default async function handler(req, res) {
       let cached = null;
       try { cached = await getSnap(CACHE_KEY); } catch {}
       if (cached) {
-        const ageSec = Math.round((Date.now() - (cached.savedAt ?? 0)) / 1000);
+        const ageSec = cached.savedAt ? Math.round((Date.now() - cached.savedAt) / 1000) : null;
         res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
         return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
       }
@@ -203,8 +203,8 @@ export default async function handler(req, res) {
       score = fs;
     }
 
-    // VKOSPI만 성공한 경우 partial
-    const status = foreignAvailable ? 'ok' : 'partial';
+    // 양쪽 모두 성공해야 ok, 한쪽이라도 실패하면 partial
+    const status = (vkospiFinal != null && foreignAvailable) ? 'ok' : 'partial';
     const sources = { vkospi: vkospiSource, foreign: foreignSource };
 
     const payload = {
