@@ -1,5 +1,6 @@
 // 커맨드 센터 위젯 — MarketPulse + Sentiment + HeroSignal + Watchlist + EventTicker 통합
 import { useMemo } from 'react';
+import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
 import { useWatchlistAlert } from '../../hooks/useWatchlistAlert';
 import { useFearGreedScores } from '../../hooks/useFearGreed';
@@ -107,8 +108,9 @@ function MiniSparkline({ data, color, width = 80, height = 28 }) {
   );
 }
 
-function HeroSignalCard({ onItemClick, allItems }) {
+function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
   const topSignals = useTopSignals(3);
+  const { botMap } = useSignalAccuracy();
 
   if (!topSignals.length) {
     return (
@@ -123,6 +125,7 @@ function HeroSignalCard({ onItemClick, allItems }) {
   const [hero, ...rest] = topSignals;
   const heroItem = findItemBySignal(hero, allItems);
   const isBullHero = hero.direction === 'bullish';
+  const heroBotAccuracy = botMap?.get(hero.type)?.accuracy ?? null;
   const heroAccent = isBullHero ? '#F04452' : '#1764ED';
   const heroBg = isBullHero ? 'rgba(240,68,82,0.03)' : 'rgba(23,100,237,0.03)';
   const heroPct = heroItem ? getPct(heroItem) : null;
@@ -177,8 +180,25 @@ function HeroSignalCard({ onItemClick, allItems }) {
           </div>
           <span className="text-[13px] text-[#4E5968] truncate flex-1 min-w-0">{getEasyLabel(hero)}</span>
           <span className="text-[11px] text-[#8B95A1] flex-shrink-0">{TYPE_META[hero.type]?.label || ''}</span>
+          {heroBotAccuracy != null && heroBotAccuracy > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
+              style={{ background: 'rgba(49,130,246,0.08)', color: '#3182F6' }}>
+              적중 {heroBotAccuracy}%
+            </span>
+          )}
         </div>
       </div>
+
+      {/* 브리지 — 봇 성적표 스크롤 유도 */}
+      {onShowScorecard && (
+        <button
+          type="button"
+          onClick={onShowScorecard}
+          className="text-[12px] text-[#3182F6] hover:text-[#1764ED] font-medium flex items-center gap-1 px-1 -mt-1 mb-0.5 transition-colors"
+        >
+          봇 성적표 보기 →
+        </button>
+      )}
 
       {/* 2~3위 시그널 — HotRow 스타일 컴팩트 행 */}
       {rest.map((signal, idx) => {
@@ -406,6 +426,7 @@ export default function CommandCenterWidget({
   popularItems,
   onItemClick,
   toggle,
+  onShowScorecard,
 }) {
   return (
     <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
@@ -415,7 +436,7 @@ export default function CommandCenterWidget({
       {/* 히어로 시그널 + 관심종목 그리드 */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4 mt-4 mb-3.5">
         <div className="min-w-0">
-          <HeroSignalCard onItemClick={onItemClick} allItems={allItems} />
+          <HeroSignalCard onItemClick={onItemClick} allItems={allItems} onShowScorecard={onShowScorecard} />
         </div>
         <div>
           <WatchlistMini

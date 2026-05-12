@@ -146,6 +146,10 @@ export default function HomeDashboard({
   }, [allItems, onItemClick]);
 
   // ─── Pull-to-refresh ──────────────────────────────────────
+  // 봇 성적표 브리지 — HeroSignalCard → SignalBoardWidget 탭 전환 트리거
+  const [scorecardTrigger, setScorecardTrigger] = useState(0);
+  const handleShowScorecard = useCallback(() => setScorecardTrigger(n => n + 1), []);
+
   const [pulling, setPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -216,6 +220,7 @@ export default function HomeDashboard({
         popularItems={popularItems}
         onItemClick={onItemClick}
         toggle={toggle}
+        onShowScorecard={handleShowScorecard}
       />
 
       {/* ─── 2. 주목할 종목 (WHY 카드) ───────────────────── */}
@@ -229,7 +234,7 @@ export default function HomeDashboard({
       )}
 
       {/* ─── 3. 시그널 보드 (시그널 + 세력 포착 통합) ────── */}
-      <SignalBoardWidget onItemClick={handleSignalItemClick} allItems={allItems} allNews={allNews} />
+      <SignalBoardWidget onItemClick={handleSignalItemClick} allItems={allItems} allNews={allNews} scorecardTrigger={scorecardTrigger} />
 
       {/* ─── 3.5. AI 종목토론 (별도 섹션) ──────────────── */}
       <AiDebateSection watchedItems={watchedItems} usStocks={usStocks} krStocks={krStocks} allItems={allItems} />
