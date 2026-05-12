@@ -35,23 +35,23 @@ function toEasyFgLabel(score) {
 }
 
 // ── 공포탐욕 미니 게이지 (서브 컴포넌트) ──
-function FgMiniGauge({ emoji, marketLabel, score, isLoading, isError, closed }) {
+function FgMiniGauge({ emoji, marketLabel, score, isLoading, isError, closed, status }) {
   if (isLoading) return (
     <div className="flex items-center gap-2">
       <span className="text-[10px]">{emoji}</span>
       <div className="h-4 w-16 bg-[#F2F4F6] rounded animate-pulse" />
     </div>
   );
-  if (isError) return (
+  if (status === 'not_configured' || (isError && score == null)) return (
     <div className="flex items-center gap-2">
       <span className="text-[10px]">{emoji}</span>
       <span className="text-[10px] text-[#B0B8C1]">{marketLabel} —</span>
     </div>
   );
-  if (closed) return (
+  if (status === 'error' || (closed && score == null)) return (
     <div className="flex items-center gap-2">
       <span className="text-[10px]">{emoji}</span>
-      <span className="text-[10px] text-[#B0B8C1]">{marketLabel} 휴장</span>
+      <span className="text-[10px] text-[#B0B8C1]">{marketLabel} 데이터 없음</span>
     </div>
   );
 
@@ -63,6 +63,12 @@ function FgMiniGauge({ emoji, marketLabel, score, isLoading, isError, closed }) 
       <span className="text-[10px]">{emoji}</span>
       <span className="text-[11px] font-bold tabular-nums font-mono" style={{ color }}>{score}</span>
       <span className="text-[10px] font-medium" style={{ color }}>{label}</span>
+      {status === 'stale_cache' && (
+        <span className="text-[9px] text-[#B0B8C1]">캐시</span>
+      )}
+      {status === 'partial' && (
+        <span className="text-[9px] text-[#B0B8C1]">일부</span>
+      )}
     </div>
   );
 }
@@ -191,6 +197,7 @@ export default function MarketSentimentWidget({ allItems = [] }) {
               isLoading={kr.isLoading}
               isError={kr.isError}
               closed={kr.data?.closed}
+              status={kr.data?.status}
             />
             <FgMiniGauge
               emoji="🇺🇸"
