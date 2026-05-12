@@ -356,13 +356,13 @@ function WatchlistMini({ watchedItems, popularItems, toggle, onItemClick }) {
                       {badge.label}
                     </span>
                     <TickerLogo item={item} size={20} />
-                    <span className="text-[15px] font-semibold text-[#191F28] truncate">{item.name}</span>
+                    <span className="text-[13px] font-semibold text-[#191F28] truncate">{item.name}</span>
                   </div>
                   <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
                     <span className="text-[13px] font-semibold tabular-nums font-mono" style={{ color }}>
                       {isUp ? '+' : ''}{(Number.isFinite(pct) ? pct : 0).toFixed(2)}%
                     </span>
-                    <span className="text-[15px] font-bold tabular-nums font-mono text-[#191F28]">
+                    <span className="text-[13px] font-bold tabular-nums font-mono text-[#191F28]">
                       {fmt(item.price || item.priceKrw || 0)}
                     </span>
                     {/* + / ✕ 버튼 */}
