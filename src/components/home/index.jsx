@@ -15,6 +15,7 @@ import CommandCenterWidget from './CommandCenterWidget';
 import SignalBoardWidget from './SignalBoardWidget';
 import AiDebateSection from './AiDebateSection';
 import ExploreTabsWidget from './ExploreTabsWidget';
+import SignalLabWidget from './SignalLabWidget';
 
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
@@ -247,6 +248,9 @@ export default function HomeDashboard({
         allItems={allItems}
         onTabChange={onTabChange}
       />
+
+      {/* ─── 4.5. Signal Lab — 과거 시그널 흐름 (#274) ──────── */}
+      <SignalLabWidget />
 
       {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 우측 UnifiedFeedPanel) ── */}
       <div className="lg:hidden">
