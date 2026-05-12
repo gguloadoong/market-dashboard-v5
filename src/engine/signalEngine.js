@@ -354,10 +354,12 @@ export function createVolumeSignal(symbol, name, market, currentVol, avgVol, cha
     meta: { currentVol, avgVol, ratio, changePct: pct, currentPrice },
     source: 'client',
     confidence: Number.isFinite(ratio) ? Math.min(0.4 + (ratio / 20), 1.0) : null,
-    reasons: [
-      { label: '거래량', value: `평소 ${ratio.toFixed(1)}배` },
-      ...(Math.abs(pct) >= 0.5 ? [{ label: '가격', value: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` }] : []),
-    ],
+    reasons: Number.isFinite(ratio)
+      ? [
+          { label: '거래량', value: `평소 ${ratio.toFixed(1)}배` },
+          ...(Math.abs(pct) >= 0.5 ? [{ label: '가격', value: `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` }] : []),
+        ]
+      : [],
   });
   return addSignal(signal);
 }
