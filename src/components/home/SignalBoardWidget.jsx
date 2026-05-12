@@ -398,6 +398,21 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                     <path d="m6 9 6 6 6-6" />
                   </svg>}
                 </button>
+                {/* reasons 태그 — source/confidence/reasons 구조 확장(#275) 적용 시그널에만 표시 */}
+                {signal.reasons?.length > 0 && (
+                  <div className="px-2 pb-1.5 -mt-1 flex flex-wrap gap-1">
+                    {signal.reasons.map((r, i) => (
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F2F4F6] text-[#6B7684] font-medium">
+                        {r.label} {r.value}
+                      </span>
+                    ))}
+                    {signal.confidence != null && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#EDF4FF] text-[#1764ED] font-medium">
+                        신뢰 {Math.round(signal.confidence * 100)}%
+                      </span>
+                    )}
+                  </div>
+                )}
                 {/* 내러티브 컨텍스트 — "왜 발화했는가" (매칭 부족 시 영역 숨김) */}
                 {narrative && !isExpanded && (
                   <div className="px-2 pb-2 -mt-1 text-[11px] text-[#6B7684] dark:text-[#8B95A1] leading-snug">
