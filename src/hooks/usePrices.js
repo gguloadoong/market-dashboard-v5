@@ -12,11 +12,17 @@ import { isKoreanMarketOpen, isUsMarketOpen, isUsPreMarket, isUsAfterMarket } fr
 // US_STOCK_LIST 메타맵 — 모듈 스코프에 1회만 생성 (sector/nameEn fallback)
 const US_META_MAP = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
 
-// KR 종목명 룩업 — API name이 없거나 symbol과 같으면 정적 테이블로 보완
+// EUC-KR 모지바케 감지 — Latin-1 보충 범위 + U+FFFD
+function isKrNameCorrupted(name) {
+  return /[\u0080-\u00FF\uFFFD]/.test(name);
+}
+
+// KR 종목명 룩업 — 정적 테이블 우선, 오염된 API 이름은 무시
 // null 반환 시 call site에서 old.name 등 상위 fallback이 동작할 수 있도록 symbol 반환 제거
 function resolveKrName(symbol, apiName) {
-  if (apiName && apiName !== symbol) return apiName;
-  return KR_STOCK_NAMES[symbol] || null;
+  if (KR_STOCK_NAMES[symbol]) return KR_STOCK_NAMES[symbol];
+  if (apiName && apiName !== symbol && !isKrNameCorrupted(apiName)) return apiName;
+  return null;
 }
 
 // snapshot 없을 때 국장 최소 fallback 심볼 (코스피 시총 상위)
