@@ -6,11 +6,18 @@ import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, getSnapWithFallback, recordCronF
 import { getHantooToken, HANTOO_BASE } from '../hantoo-token.js';
 import KR_STOCK_NAMES from '../kr-stock-names.json';
 
-// KRX ISU_ABBRV가 비거나 symbol과 같으면 정적 테이블로 보완
-// U+FFFD(대체문자) 포함 시 EUC-KR 오인코딩 오염으로 판단 → 정적 테이블 폴백
+// EUC-KR 오염 판정 — U+FFFD(대체문자) 또는 Latin-1 보충 문자(U+0080~U+00FF) 포함 시
+// EUC-KR 바이트가 UTF-8로 잘못 디코딩되면 U+FFFD 또는 ÷/Ó 등 Latin-1 문자로 나타남
+function isKrNameCorrupted(name) {
+  return /[-ÿ�]/.test(name);
+}
+
+// 정적 테이블 우선 — 4238종목 범위 내 종목은 항상 테이블 값 사용 (API 오염 방어)
+// 테이블 미포함 신규 종목: API 이름 유효성 검증 후 사용, 오염 감지 시 symbol 코드 반환
 function resolveKrName(symbol, apiName) {
-  if (apiName && apiName !== symbol && !apiName.includes('�')) return apiName;
-  return KR_STOCK_NAMES[symbol] || symbol;
+  if (KR_STOCK_NAMES[symbol]) return KR_STOCK_NAMES[symbol];
+  if (apiName && apiName !== symbol && !isKrNameCorrupted(apiName)) return apiName;
+  return symbol;
 }
 
 // KST 기준 마지막 거래일 날짜 (YYYYMMDD)
