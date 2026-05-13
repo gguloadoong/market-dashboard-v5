@@ -166,7 +166,7 @@ ${PM_NONCE}: BLOCK — (이유 한 줄)"
   # 실패 시 SKIP fallback (soft gate — claude 미설치/stdin 미지원 환경에서도 배포 차단 안 함)
   PM_TMP=$(mktemp)
   printf '%s' "$PM_PROMPT" > "$PM_TMP"
-  PM_RESULT=$(timeout 120 claude --print < "$PM_TMP" 2>/dev/null || echo "${PM_NONCE}: SKIP")
+  PM_RESULT=$(perl -e 'alarm(120); exec @ARGV' -- claude --print < "$PM_TMP" 2>/dev/null || echo "${PM_NONCE}: SKIP")
   rm -f "$PM_TMP"
   echo "$PM_RESULT" | grep -v "^$" | tail -10 | sed 's/^/    /' || true
 
