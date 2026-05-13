@@ -388,10 +388,10 @@ if [ -n "$LAST_DEPLOYED" ] && git cat-file -e "${LAST_DEPLOYED}^{commit}" 2>/dev
 else
   LOG_BASE="origin/main"
 fi
-# P0/P1 수정이 있었나?
-RECENT_FIX=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep "fix:" || true; } | wc -l | tr -d ' ')
-# 주요 기능 완료 (feat:) 커밋?
-RECENT_FEAT=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep "feat:" || true; } | wc -l | tr -d ' ')
+# P0/P1 수정이 있었나? — fix: 와 fix(scope): 모두 매칭
+RECENT_FIX=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep -E "fix(\([^)]+\))?:" || true; } | wc -l | tr -d ' ')
+# 주요 기능 완료 — feat: 와 feat(scope): 모두 매칭
+RECENT_FEAT=$(git log "${LOG_BASE}..HEAD" --oneline 2>/dev/null | { grep -E "feat(\([^)]+\))?:" || true; } | wc -l | tr -d ' ')
 
 if [ "$RECENT_FIX" -gt 0 ] || [ "$RECENT_FEAT" -gt 0 ]; then
   DEPLOY_CONDITION_MET=1
