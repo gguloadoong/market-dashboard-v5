@@ -1,6 +1,6 @@
 // 시그널 보드 위젯 — SignalSummaryWidget + SeoulForceSection 통합
 // 카운터 3개 (강세/약세/중립) + 시그널 리스트 + 접기/펼치기 + 성적표 탭
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
@@ -21,11 +21,22 @@ const FORCE_TYPES = [
   SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
 ];
 
-export default function SignalBoardWidget({ onItemClick, allItems = [], allNews = [] }) {
+export default function SignalBoardWidget({ onItemClick, allItems = [], allNews = [], scorecardTrigger = 0 }) {
   // 탭 상태: 'live' | 'scorecard'
   const [activeTab, setActiveTab] = useState('live');
   // 모바일 기본 접힘 — 카운터만 노출
   const [expanded, setExpanded] = useState(false);
+
+  const rootRef = useRef(null);
+
+  // HeroSignalCard 브리지에서 scorecardTrigger가 바뀌면 성적표 탭으로 전환 + 스크롤
+  useEffect(() => {
+    if (scorecardTrigger > 0) {
+      setActiveTab('scorecard');
+      setExpanded(true);
+      rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [scorecardTrigger]);
   // 방향 필터 — null=전체, 'bullish', 'bearish', 'neutral'
   const [filterDir, setFilterDir] = useState(null);
   // 인라인 결정 패널 — 펼쳐진 시그널 id (null=모두 닫힘)
@@ -222,7 +233,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   }
 
   return (
-    <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
+    <div ref={rootRef} className="bg-white rounded-2xl px-5 pt-6 pb-4">
       {/* 헤더 + 탭 */}
       {tabHeader}
 
