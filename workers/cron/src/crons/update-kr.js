@@ -9,7 +9,7 @@ import KR_STOCK_NAMES from '../kr-stock-names.json';
 // EUC-KR 오염 판정 — U+FFFD(대체문자) 또는 Latin-1 보충 문자(U+0080~U+00FF) 포함 시
 // EUC-KR 바이트가 UTF-8로 잘못 디코딩되면 U+FFFD 또는 ÷/Ó 등 Latin-1 문자로 나타남
 function isKrNameCorrupted(name) {
-  return /[-ÿ�]/.test(name);
+  return /[\u0080-\u00FF\uFFFD]/.test(name);
 }
 
 // 정적 테이블 우선 — 4238종목 범위 내 종목은 항상 테이블 값 사용 (API 오염 방어)
