@@ -5,7 +5,7 @@
 
 ---
 
-## 우리가 겪은 10가지 문제
+## 우리가 겪은 14가지 문제
 
 ### 1. 자기 평가 편향 (Self-Evaluation Bias)
 
@@ -215,4 +215,112 @@
 
 ---
 
-*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-04-06)*
+### 14. 렌더 루프 내 헬퍼 함수 재선언 (Inline Re-declaration in Render Loop)
+
+**우리 사례** (2026-05-07 코드 리뷰): `SignalInlinePanel.jsx`의 `.map()` 콜백 안에 `hitLabel` 함수가 선언됨. 컴포넌트가 렌더링될 때마다 이 함수 객체가 새로 생성된다. 컴포넌트 바깥 또는 최소한 `map()` 바깥에 정의해야 할 함수를 "필요한 곳 바로 위에" 작성하는 패턴.
+
+**근본 원인**: AI는 "지금 여기 필요한 것을 지금 여기에 정의"하는 방식으로 코드를 생성한다. 함수가 어디서 호출되는지보다 어디서 처음 사용되는지를 기준으로 위치를 결정하기 때문에, 루프·콜백 내부에 헬퍼가 박히는 현상이 반복된다.
+
+**발생 패턴**:
+```jsx
+// AI가 자주 생성하는 패턴 (잘못됨)
+items.map((item) => {
+  const hitLabel = (hit) => hit ? '적중' : '미적중'; // 매 루프마다 재생성
+  return <div>{hitLabel(item.hit)}</div>;
+});
+
+// 올바른 패턴
+const hitLabel = (hit) => hit ? '적중' : '미적중'; // 외부 한 번 정의
+items.map((item) => <div>{hitLabel(item.hit)}</div>);
+```
+
+**영향**:
+- 매 렌더마다 새 함수 객체 생성 → 불필요한 메모리 할당
+- `React.memo` / `useCallback` 최적화 무력화
+- 함수 재사용·단독 테스트 불가
+
+**해결책**:
+- ✅ 코드 리뷰 체크리스트에 "`.map()` 콜백 내 함수 선언 여부" 항목 추가
+- ✅ 순수 헬퍼 함수는 컴포넌트 바깥(모듈 스코프)에 정의
+- ✅ 상태/props 의존 함수는 컴포넌트 상단에 정의 후 콜백에서 참조
+
+---
+
+### 15. 형제 컴포넌트 미동기화 (Sibling Component Desync)
+
+**우리 사례** (2026-05-12 코드 리뷰): `temperature.js`에서 `source: 'pending'` 상태를 올바르게 정의하고 렌더 분기(`animate-pulse`, `"파악 중..."`)까지 구현. 그러나 동일한 `source` 값을 소비하는 `MarketSentimentWidget.jsx:136`은 `source === 'blended' || source === 'fallback'`만 체크하고 `'pending'`을 별도 처리하지 않음.
+
+**근본 원인**: AI는 현재 편집 중인 파일에 집중하여 상태·타입·로직을 올바르게 구현한다. 그러나 "이 값을 다른 컴포넌트도 쓰는지" — 즉, 동일한 데이터 계약을 공유하는 형제 컴포넌트를 능동적으로 탐색하지 않는다. 결과적으로 한 파일에만 방어 로직이 추가되고 형제들은 과거 상태로 남는다.
+
+**발생 패턴**:
+```
+temperature.js         → source: 'pending' | 'blended' | 'fallback'  ✅ 모두 처리
+MarketSentimentWidget  → source === 'blended' || 'fallback'           ❌ 'pending' 누락
+```
+
+**왜 #2(Orphaned), #10(Context Drift)과 다른가**: Orphaned는 호출 연결이 없는 경우, Context Drift는 요구사항이 세션 중 사라지는 경우다. Sibling Desync는 같은 데이터 계약을 공유하는 파일들이 업데이트 시점이 달라 분기되는 구조적 문제다.
+
+**해결책**:
+- ✅ 새 상태값·타입 추가 시 "이 값을 소비하는 다른 컴포넌트" grep 필수 (`grep -r "source ===" src/`)
+- ✅ 공유 데이터 계약(예: `source` 값 목록)을 `constants/`에 열거형으로 정의 — 누락 시 타입 에러로 발견 가능
+- ✅ 코드 리뷰 체크리스트에 "같은 prop/필드를 쓰는 형제 컴포넌트 일괄 확인" 항목 추가
+
+---
+
+### 16. 상태 통합 시 생산자 전수 미감사 (Field Consolidation with Partial Producer Update)
+
+**우리 사례** (2026-05-12 코드 리뷰): `closed: true` 플래그가 "휴장"과 "데이터 없음"을 동시에 의미하는 모호함을 해소하기 위해 `status: 'closed' | 'error' | 'partial' | 'stale_cache'` 단일 필드로 통합. 프런트엔드가 `status` 값 기준으로 분기를 바꾼 것은 올바르다. 그러나 `closed: true`를 반환하는 다른 API 경로(US 공포탐욕 API, 엣지 함수 일부 등)가 여전히 구 포맷을 쓴다면, 프런트가 `status === 'closed'`를 기다리는 동안 `closed: true`가 도착해도 "휴장" 텍스트가 렌더되지 않는 묵음 장애가 발생한다.
+
+**근본 원인**: AI는 "지금 수정 중인 API"의 응답 포맷 교체에 집중한다. 동일한 필드를 내보내는 다른 API 경로·엣지 함수·폴백 로직이 구 포맷을 계속 내보낼 수 있다는 점을 능동적으로 확인하지 않는다. 소비자는 새 포맷을 기다리는데 일부 생산자는 구 포맷을 내보내는 비대칭이 발생한다.
+
+**발생 패턴**:
+```
+producer A (수정됨)  → status: 'closed'   ✅ 프런트가 인식
+producer B (미수정)  → closed: true       ❌ 프런트가 무시 → "휴장" 텍스트 소실
+```
+
+**왜 #15(Sibling Component Desync)와 다른가**: #15는 같은 데이터 계약을 *소비*하는 컴포넌트들이 업데이트 시점이 달라 분기되는 문제다. 이 패턴은 데이터를 *생산*하는 쪽이 불완전하게 이관된 경우로, 방향이 반대다.
+
+**해결책**:
+- ✅ 필드 통합·이름 변경 시 "이 필드를 생산하는 API 경로" grep 전수 확인 (`grep -r '"closed"' api/`)
+- ✅ 구 필드(`closed`) → 신 필드(`status`) 이관 완료 전까지 프런트가 양쪽 포맷 허용하는 호환 레이어 유지
+- ✅ 필드 이관은 별도 PR로 분리 — "프런트 소비자 교체"와 "API 생산자 교체"를 같은 diff에 묶지 않음
+
+---
+
+### 17. 훅 반환값 낙관적 접근 (Hook Init Null Blindspot)
+
+**우리 사례** (2026-05-12 코드 리뷰): `DataHealthBadge` 컴포넌트에서 `useServerSignals()`가 초기 로딩 중이거나 에러 상태일 때 null을 반환할 수 있음에도 `serverMeta.stale`을 옵셔널 체이닝 없이 직접 접근. 정상 구동 후에는 문제 없지만, 첫 렌더 ~ 데이터 도착 구간에서 `TypeError: Cannot read properties of null (reading 'stale')` 발생.
+
+**근본 원인**: AI는 훅이 "정상적으로 동작할 때"의 반환값 구조를 기준으로 소비 코드를 작성한다. `useQuery`, `useEffect`, 커스텀 훅 모두 초기 렌더 시 `null | undefined`를 반환하는 구간이 존재하지만, AI는 이 초기화 구간을 생략하고 happy path만 구현한다.
+
+**발생 패턴**:
+```jsx
+// AI가 자주 생성하는 패턴 (잘못됨)
+const serverMeta = useServerSignals();
+if (serverMeta.stale) issues.push('시그널 업데이트 지연'); // 초기 로딩 중 TypeError
+
+// 올바른 패턴
+const serverMeta = useServerSignals();
+if (serverMeta?.stale) issues.push('시그널 업데이트 지연');
+```
+
+**왜 #5(Silent Failure), #8(Empty State Blindspot)과 다른가**:
+- #5는 에러를 *삼키는* 패턴 (빈 catch, console 미출력)
+- #8은 빈 데이터 상태의 *UI 표현* 누락
+- 이 패턴은 null/undefined 반환값에 직접 프로퍼티 접근해서 *런타임 TypeError를 유발*하는 패턴 — 초기화 구간에만 발생하고 정상 동작 후엔 재현이 안 되어 개발 중 발견이 어렵다.
+
+**영향**:
+- 초기 렌더 ~ 데이터 도착 구간 TypeError → 컴포넌트 트리 크래시
+- React Error Boundary 없으면 화면 전체 흰 화면
+- `null`이 실제 "데이터 없음" 의미일 경우 영구 크래시
+
+**해결책**:
+- ✅ 훅 반환값 사용 시 항상 `?.` 옵셔널 체이닝 또는 초기값 fallback 적용
+- ✅ 코드 리뷰 체크리스트에 "커스텀 훅 반환값 직접 프로퍼티 접근 여부" 항목 추가
+- ✅ TypeScript 사용 시 반환 타입에 `| null` 명시 → 컴파일 타임 강제
+- ⬜ ESLint 규칙으로 훅 반환값의 `?.` 없는 접근 경고 (선택적)
+
+---
+
+*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-05-12)*

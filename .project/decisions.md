@@ -160,3 +160,48 @@
   7. **섹터 이상치**: changePct cap ±50% 적용
 - **원칙**: "디자인 리뉴얼 시 핵심 가치를 전달하는 컴포넌트를 보호한 후 나머지를 정리"
 - **교훈**: ai-coding-pitfalls #12 (Direction Blindness), #13 (Jargon Trap) 등록
+
+## ADR-013: Vercel Git 통합 자동 배포 비활성화
+- **날짜**: 2026-03-28
+- **결정**: vercel.json의 ignoreCommand를 "exit 0"으로 설정 — Vercel Git 통합 자동 배포 완전 비활성화
+- **근거**: PR 머지 시마다 자동 배포되면 QA 미통과 상태가 배포될 위험. 모든 배포는 `npm run deploy`(컨센서스 게이트 통과 후)로만 실행.
+- **규칙**: 이 설정 절대 복원 금지.
+
+## ADR-014: HOME_CONTRACT.md 도입
+- **날짜**: 2026-03-28
+- **결정**: src/components/home/HOME_CONTRACT.md에 홈 레이아웃 계약서 도입
+- **근거**: 홈 컴포넌트 반복 회귀 방지. 삭제된 컴포넌트 목록 관리, 섹션 추가/삭제 규칙 명문화.
+- **규칙**: 홈 컴포넌트 수정 전 반드시 이 파일 먼저 읽기.
+
+## ADR-015: whale_* 시그널 타입 제거
+- **날짜**: 2026-04-10 (이슈 #162)
+- **결정**: WHALE_BUY, WHALE_SELL 등 whale_* 시그널 타입 및 관련 코드 완전 제거
+- **근거**: Whale Alert API 키 미확보 + 데이터 신뢰도 낮음. 레거시 Supabase 레코드 오염 방지.
+- **영향**: README에서 Whale Alert 제거.
+
+## ADR-016: 서버 사전계산 시그널 — Cloudflare Workers KV
+- **날짜**: 2026-04-20 (이슈 #213)
+- **결정**: 60일 캔들 기반 복잡한 시그널(COMPOSITE_SCORE, DOUBLE_BOTTOM, SUPPORT_RESISTANCE_BREAK, RECOVERY_DETECTION)은 CF Workers 크론에서 10분마다 사전계산 → KV 저장 → /api/signals 엔드포인트 경유
+- **근거**: 클라이언트에서 60일 캔들 계산은 성능 비용 너무 큼. 서버 사전계산으로 분리.
+
+## ADR-017: 시그널 객체 source/confidence/reasons 확장
+- **날짜**: 2026-05-01 (이슈 #275)
+- **결정**: 시그널 객체에 source('client'|'server'|'hybrid'), confidence(0~1), reasons([]) 필드 추가
+- **근거**: 시그널 출처와 신뢰도를 UI에서 표시하기 위함. SignalInlinePanel에서 근거 표시.
+
+## ADR-018: VWAP_DEVIATION 시그널 비활성화
+- **날짜**: 2026-04-28 (이슈 #155)
+- **결정**: createVWAPSignal()이 항상 null 반환하도록 하드코딩. 적중률 0% 확인 (453건 판정).
+- **근거**: 실제 거래량 데이터 없이 단순 이동평균으로 VWAP 대체 → 신뢰도 없음.
+- **후속**: 코드에서 상수 및 관련 로직 완전 삭제 예정 (기술부채 등록됨).
+
+## ADR-019: Upstash → Cloudflare Workers KV 이전 (일부)
+- **날짜**: 2026-04-16
+- **결정**: 시그널 사전계산 캐시를 Upstash에서 CF Workers KV로 이전. Upstash는 한투 토큰 캐시와 스냅샷 캐시에만 사용.
+- **근거**: Upstash 무료 티어 초과 (월 8GB/50GB). CF Workers KV는 무료 티어 충분.
+
+## ADR-020: Codex CLI 사용 금지
+- **날짜**: 2026-04-15
+- **결정**: 마켓레이더 v5에서 Codex CLI, omc ask codex, Codex gate 일체 사용 금지
+- **근거**: 코드 정크 73개 유입 사고 발생. 신뢰도 기준 미충족.
+- **대안**: Claude Opus code-reviewer + Gemini gate 조합으로 대체.
