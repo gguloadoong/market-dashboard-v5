@@ -10,7 +10,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-국장 63종목 + 미장 272종목 + ETF(국내·해외 혼합) + 코인 250종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
+국장 63종목 + 미장 NASDAQ 시총 상위 2,700종목 + ETF(국내·해외 혼합) + 코인 Upbit KRW 전 종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
 
 [Live Demo](https://market-dashboard-v5.vercel.app) · [버그 리포트](https://github.com/gguloadoong/market-dashboard-v5/issues) · [기능 요청](https://github.com/gguloadoong/market-dashboard-v5/issues)
 
@@ -67,9 +67,9 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **매수 결
 | 데이터 | 소스 | API 키 |
 |--------|------|:------:|
 | 국내 주식 (63종목) | 한국투자증권 Open API (KIS) | 필요 |
-| 미국 주식 (272종목) | Yahoo Finance v8 → Stooq → Polygon → Naver 4단계 fallback | 일부 선택 |
+| 미국 주식 (NASDAQ 시총 상위 2,700종목) | Yahoo Finance v8 → Stooq → Polygon → Naver 4단계 fallback | 일부 선택 |
 | ETF (국내·해외 혼합) | Yahoo Finance | 불필요 |
-| 코인 가격 KRW (250종목) | Upbit REST + WebSocket | 불필요 |
+| 코인 가격 KRW (Upbit KRW 전 종목, 동적 수집) | Upbit REST + WebSocket | 불필요 |
 | 코인 시총/스파크라인 | CoinGecko | 불필요 |
 | 시장 지수 | 한투 API + Stooq | 필요 |
 | 환율 | Yahoo Finance KRW=X | 불필요 |
