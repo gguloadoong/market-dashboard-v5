@@ -66,7 +66,7 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **매수 결
 
 | 데이터 | 수집 범위 | 소스 | API 키 |
 |--------|-----------|------|:------:|
-| 국내 주식 | KOSPI+KOSDAQ 전종목 (KRX/Naver 수집, UI 표시 63종목) | KRX → Naver 전종목 페이징 → 한투 API fallback | 필요 (fallback) |
+| 국내 주식 | KOSPI+KOSDAQ 전종목 (~4,000종목, KRX/Naver 수집) | KRX → Naver 전종목 페이징 → 한투 API fallback | 필요 (fallback) |
 | 미국 주식 | NASDAQ 시총 상위 2,700종목 (CF Workers 3-shard, UI 표시 272종목) | Yahoo Finance v8 → Stooq → Polygon → Naver 4단계 fallback | 일부 선택 |
 | ETF | 37종목 (국내 KODEX/TIGER + 해외 SPY/QQQ/TQQQ 등) | Yahoo Finance | 불필요 |
 | 코인 가격 KRW | Upbit KRW 전 종목 동적 수집 | Upbit REST (ticker/all) + WebSocket | 불필요 |

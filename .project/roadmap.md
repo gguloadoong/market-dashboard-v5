@@ -113,5 +113,5 @@ GitHub Issues 참고 — `gh issue list --label bug,enhancement`
 주요 후보:
 - 모닝 브리핑 (Cron + PWA Push)
 - 시그널 카드 공유 기능
-- 국장 Cron fallback 63종목 완전 커버 (현재 일부 제한)
+- 국장 한투 fallback 적중률 모니터링 (KRX/Naver primary 실패율 추적)
 - 뉴스 배지 클릭 → 종목 이동 탐색 루프
