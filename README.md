@@ -10,7 +10,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-국장 63종목 + 미장 NASDAQ 시총 상위 2,700종목 + ETF(국내·해외 혼합) + 코인 Upbit KRW 전 종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
+국장 KOSPI+KOSDAQ 전종목 + 미장 NASDAQ 시총 상위 2,700종목 + ETF 37종목 + 코인 Upbit KRW 전 종목을 **하나의 대시보드**에서 실시간으로 모니터링합니다.
 
 [Live Demo](https://market-dashboard-v5.vercel.app) · [버그 리포트](https://github.com/gguloadoong/market-dashboard-v5/issues) · [기능 요청](https://github.com/gguloadoong/market-dashboard-v5/issues)
 
@@ -64,23 +64,23 @@ Market Radar는 흩어져 있는 투자 정보를 한 곳에 모아 **매수 결
 
 ## 데이터 소스
 
-| 데이터 | 소스 | API 키 |
-|--------|------|:------:|
-| 국내 주식 (63종목) | 한국투자증권 Open API (KIS) | 필요 |
-| 미국 주식 (NASDAQ 시총 상위 2,700종목) | Yahoo Finance v8 → Stooq → Polygon → Naver 4단계 fallback | 일부 선택 |
-| ETF (국내·해외 혼합) | Yahoo Finance | 불필요 |
-| 코인 가격 KRW (Upbit KRW 전 종목, 동적 수집) | Upbit REST + WebSocket | 불필요 |
-| 코인 시총/스파크라인 | CoinGecko | 불필요 |
-| 시장 지수 | 한투 API + Stooq | 필요 |
-| 환율 | Yahoo Finance KRW=X | 불필요 |
-| 국내 뉴스 | 한경·매경·연합뉴스·이데일리·머니투데이 RSS | 불필요 |
-| 코인 뉴스 | CoinDesk·Decrypt·CoinTelegraph RSS | 불필요 |
-| 미장 뉴스 | Yahoo Finance·MarketWatch RSS | 불필요 |
-| 공포탐욕지수 | Alternative.me (코인) + CNN Money (미장) + VKOSPI (국장) | 불필요 |
-| AI 요약·토론 | Google Gemini 2.5 Flash | 선택 |
-| 서버 시그널 | Cloudflare Workers 크론 (10분 간격) | — |
+| 데이터 | 수집 범위 | 소스 | API 키 |
+|--------|-----------|------|:------:|
+| 국내 주식 | KOSPI+KOSDAQ 전종목 (KRX/Naver 수집, UI 표시 63종목) | KRX → Naver 전종목 페이징 → 한투 API fallback | 필요 (fallback) |
+| 미국 주식 | NASDAQ 시총 상위 2,700종목 (CF Workers 3-shard, UI 표시 272종목) | Yahoo Finance v8 → Stooq → Polygon → Naver 4단계 fallback | 일부 선택 |
+| ETF | 37종목 (국내 KODEX/TIGER + 해외 SPY/QQQ/TQQQ 등) | Yahoo Finance | 불필요 |
+| 코인 가격 KRW | Upbit KRW 전 종목 동적 수집 | Upbit REST (ticker/all) + WebSocket | 불필요 |
+| 코인 시총/스파크라인 | — | CoinGecko | 불필요 |
+| 시장 지수 | KOSPI/KOSDAQ/S&P500/나스닥/환율 | 한투 API + Stooq | 필요 |
+| 환율 | USD/KRW | Yahoo Finance KRW=X | 불필요 |
+| 국내 뉴스 | — | 한경·매경·연합뉴스·이데일리·머니투데이 RSS | 불필요 |
+| 코인 뉴스 | — | CoinDesk·Decrypt·CoinTelegraph RSS | 불필요 |
+| 미장 뉴스 | — | Yahoo Finance·MarketWatch RSS | 불필요 |
+| 공포탐욕지수 | — | Alternative.me (코인) + CNN Money (미장) + VKOSPI (국장) | 불필요 |
+| AI 요약·토론 | — | Google Gemini 2.5 Flash | 선택 |
+| 서버 시그널 | — | Cloudflare Workers 크론 (5분 가격, 10분 시그널) | — |
 
-> 한투 API 키 없이도 코인·미국 주식 데이터는 정상 동작합니다.
+> 한투 API 키 없이도 코인·미국 주식 데이터는 정상 동작합니다. 국내 주식은 KRX/Naver 전종목 수집이 primary이며, 한투는 fallback입니다.
 
 ---
 
@@ -127,12 +127,15 @@ npm run build
 
 ```
 market-dashboard-v5/
-├── api/                        Vercel Edge Functions
-│   ├── kr-stocks.js             국내 주식 시세 (한투 API)
-│   ├── us-stocks.js             미국 주식 시세 (Yahoo→Stooq→Polygon→Naver 4단계 fallback)
-│   ├── coins.js                 코인 시세 (Upbit + CoinGecko)
-│   ├── signals.js               서버 사전계산 시그널 (Cloudflare Workers KV)
+├── api/                        Vercel Edge Functions (단일 게이트웨이: d.js)
+│   ├── d.js                     단일 API 게이트웨이 (난독화 라우터)
+│   ├── hantoo-price.js          국내 주식 시세 (한투 API fallback)
+│   ├── us-price.js              미국 주식 시세 (Yahoo→Stooq→Polygon→Naver)
+│   ├── upbit-proxy.js           코인 시세 (Upbit ticker/all)
+│   ├── snapshot.js              CF Workers KV 스냅샷 캐시 읽기
+│   ├── signals.js               서버 사전계산 시그널 (CF Workers KV)
 │   ├── signal-accuracy.js       시그널 적중률 (Supabase)
+│   ├── rss.js                   뉴스 RSS 수집
 │   └── ...
 ├── src/
 │   ├── components/home/         홈 대시보드 위젯
@@ -140,7 +143,12 @@ market-dashboard-v5/
 │   ├── hooks/                   커스텀 훅 (useSignals, useDerivativeSignals 등)
 │   └── utils/                   유틸리티 (뉴스 매칭, 시장 시간, 시그널 렌더링)
 ├── workers/cron/                Cloudflare Workers 크론
-│   └── (5분 간격 가격 수집, 10분 간격 시그널 계산)
+│   ├── update-kr.js             국내 KRX+Naver 전종목 수집 → KV 저장 (5분)
+│   ├── update-us.js             NASDAQ 2,700종목 3-shard 수집 → KV 저장 (5분)
+│   ├── update-coins.js          Upbit KRW 전종목 수집 → KV 저장 (5분)
+│   ├── check-signal-accuracy.js 시그널 적중률 기록 (30분)
+│   ├── update-ai-debate.js      AI 종목 토론 사전생성 (21시)
+│   └── watchdog.js              크론 실패 조기 경보 (10분)
 └── scripts/
     ├── pre-deploy-consensus.sh  배포 전 6단계 컨센서스 게이트
     └── create-pr.sh             PR 생성 자동화 (Opus 리뷰 + Gemini gate 포함)
