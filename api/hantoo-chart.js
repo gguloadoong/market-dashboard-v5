@@ -41,6 +41,7 @@ export default async function handler(req, res) {
     url.searchParams.set('FID_INPUT_DATE_1', seoulStr(startDate));
     url.searchParams.set('FID_INPUT_DATE_2', seoulStr(now));
     url.searchParams.set('FID_PERIOD_DIV_CODE', validPeriod);
+    url.searchParams.set('FID_ORG_ADJ_PRC', '0'); // 수정주가 기준 (KIS API 필수 파라미터)
 
     const apiRes = await fetch(url.toString(), {
       headers: {
