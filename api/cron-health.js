@@ -35,7 +35,8 @@ export default async function handler(req, res) {
   try {
     vals = await redis.mget(...keys);
   } catch (e) {
-    return res.status(503).json({ error: 'redis-mget-failed', detail: e?.message });
+    console.error('[cron-health] redis mget 실패:', e?.message);
+    return res.status(503).json({ error: 'redis-mget-failed' });
   }
 
   const crons = {};
@@ -64,7 +65,8 @@ export default async function handler(req, res) {
     crons[name] = { failCount, lastOk, lastError };
   }
 
-  return res.status(anyFailing ? 200 : 200).json({
+  res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  return res.status(200).json({
     ok: !anyFailing,
     ts: Date.now(),
     crons,
