@@ -6,7 +6,7 @@
 
 import { getRedis } from '../price-cache.js';
 
-const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing'];
+const CRON_NAMES = ['coins', 'kr', 'us', 'signal-accuracy', 'briefing', 'compute-signals'];
 const FAIL_THRESHOLD = 3;         // 누적 실패 3회 이상
 const COOLDOWN_SEC = 3600;        // 같은 크론 재알림 쿨다운 1h
 const COINS_STALE_MS = 10 * 60 * 1000; // coins 10분 이상 미갱신 시 스테일 감지
@@ -25,15 +25,15 @@ export async function watchdog(env) {
     return { ok: false, reason: 'no-redis' };
   }
 
-  // 5 크론 × 3 키(failCount / lastError / alertCooldown) + 2(lastOk:coins, stale cooldown) = 17 키
+  // 6 크론 × 3 키(failCount / lastError / alertCooldown) + 2(lastOk:coins, stale cooldown) = 20 키
   const keys = [
     ...CRON_NAMES.flatMap((c) => [
       `cron:fail:${c}`,
       `cron:lastError:${c}`,
       `cron:watchdog:alert:${c}`,
     ]),
-    'cron:lastOk:coins',              // index 15
-    'cron:watchdog:alert:coins:stale', // index 16 — fail alert(cron:watchdog:alert:coins)와 분리된 stale 전용 쿨다운
+    'cron:lastOk:coins',              // index 18
+    'cron:watchdog:alert:coins:stale', // index 19 — fail alert(cron:watchdog:alert:coins)와 분리된 stale 전용 쿨다운
   ];
 
   let vals;
@@ -44,7 +44,7 @@ export async function watchdog(env) {
     return { ok: false, reason: 'mget-failed' };
   }
 
-  const baseLen = CRON_NAMES.length * 3; // 5 × 3 = 15; lastOk=15, staleCooldown=16
+  const baseLen = CRON_NAMES.length * 3; // 6 × 3 = 18; lastOk=18, staleCooldown=19
   const alerts = [];
   for (let i = 0; i < CRON_NAMES.length; i++) {
     const failCount = parseInt(vals[i * 3] || '0', 10);
@@ -75,8 +75,8 @@ export async function watchdog(env) {
   // - lastOk null 이면 (첫 배포 직후) 보수적으로 생략
   // - stale 전용 쿨다운 키(cron:watchdog:alert:coins:stale) 사용 → fail alert cooldown과 충돌 없음
   // - fail alert가 이미 발송 예정이면(alerts에 coins 존재) stale 스킵 — 중복 방지
-  const lastOkRaw = vals[baseLen];       // index 15
-  const staleCooldown = !!vals[baseLen + 1]; // index 16
+  const lastOkRaw = vals[baseLen];       // index 18
+  const staleCooldown = !!vals[baseLen + 1]; // index 19
   if (lastOkRaw !== null && !staleCooldown) {
     const lastOkMs = parseInt(lastOkRaw, 10);
     const ageMs = Number.isFinite(lastOkMs) ? Date.now() - lastOkMs : 0;
