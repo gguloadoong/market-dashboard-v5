@@ -31,6 +31,7 @@
 //   of = order-flow     (주문장 불균형)
 //   sc = social         (소셜 감성)
 //   db = ai-debate      (AI 종목토론)
+//   ch = cron-health    (CF Workers 크론 상태)
 
 export const config = { runtime: 'edge' };
 
@@ -272,6 +273,10 @@ export default async function handler(request) {
         // 가격 스냅샷
         const req = makeEdgeRequest(baseUrl, `/api/snapshot`);
         return snapshotHandler(req);
+      }
+      case 'ch': {
+        // CF Workers 크론 상태 (#298)
+        return proxyToServerless(baseUrl, `/api/cron-health`);
       }
 
       default:
