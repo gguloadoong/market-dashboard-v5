@@ -432,7 +432,7 @@
 > **리서치**: 2026-04-30 (장성민 QA + 김민준 BE + 이지원 Strategy + Analyst Opus)
 > **트리거**: 4/30 프로덕션 QA에서 `/api/d` 502 대규모 발견 — health-check 감시 사각지대 노출 (#258)
 
-### [P3-10] 운영 관측 사각지대 해소 — health-check 감시 보강 (#258 후속)
+### ~~[P3-10] 운영 관측 사각지대 해소 — health-check 감시 보강 (#258 후속)~~ ✅ 완료
 - 출처: Issue #258 — 4/30 QA에서 KIS approval_key 502 + 뉴스핌/머니투데이/이데일리 RSS 502 동시 발생, health-check 자동 이슈 0건 (감시 미포함)
 - 작업 항목:
   1. health-check.js 감시 소스 4건 추가 — `rss_newspim`, `rss_mt`, `rss_edaily`, `kis_approval`
@@ -441,13 +441,13 @@
 - 사이즈: S (1일)
 - 우선순위: P1 (운영 신뢰성)
 
-### [P3-11] KIS approval_key Redis 캐시 이전
+### ~~[P3-11] KIS approval_key Redis 캐시 이전~~ ✅ 완료
 - 출처: 4/30 BE 분석 — 현재 인스턴스 메모리 캐시만 사용 → Vercel cold start마다 KIS API 재호출 → rate-limit + 외부 장애 동시 취약
 - 작업: `api/hantoo-ws-approval.js` Redis 기반 캐시 (TTL 23h, 만료 직전 갱신) + cold start 안전성 확보
 - 사이즈: S (1일)
 - 우선순위: P1 (외부 의존 안정성)
 
-### [P3-12] /api/cron-health 엔드포인트 + flow fallback 발화율 카운터
+### ~~[P3-12] /api/cron-health 엔드포인트 + flow fallback 발화율 카운터~~ ✅ 완료 (PR #299, 2026-05-18)
 - 출처: 4/30 BE 검증 — `cron:fail:compute-signals` Redis 키 존재하지만 외부에서 모니터링 불가
 - 작업: 읽기 전용 헬스 엔드포인트 + flow last-good fallback 발화 빈도 카운터 (Redis INCR + 시간 윈도우)
 - 사이즈: S (1일)
