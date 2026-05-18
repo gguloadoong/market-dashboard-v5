@@ -60,7 +60,9 @@ function computeMarketScores(items) {
 
 function buildSignal(item, score, breakdown) {
   const absScore  = Math.abs(score);
-  const direction = score >= 0 ? 'bullish' : 'bearish';
+  // direction은 실제 가격 방향(changePct)으로 — volumeZ 가중치가 부호를 뒤집는 오라벨 방지 (#300)
+  const changePct = item.changePct || 0;
+  const direction = changePct > 0 ? 'bullish' : changePct < 0 ? 'bearish' : 'neutral';
   const strength  = absScore >= 70 ? 4 : 3;
   const sign      = (item.changePct || 0) >= 0 ? '+' : '';
   const title     = `${direction === 'bullish' ? '▲' : '▼'} ${item.name} ${sign}${(item.changePct || 0).toFixed(1)}%`;
