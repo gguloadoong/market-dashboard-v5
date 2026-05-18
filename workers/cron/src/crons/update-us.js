@@ -302,7 +302,7 @@ export async function updateUs(env, shardId) {
       try { await recordCronFailure('us', `샤드 ${shardId} 전량 실패`); } catch (_) {}
     }
 
-    if (shardItems.length > 0) await recordCronSuccess('us');
+    if (shardItems.length > 0) { try { await recordCronSuccess('us'); } catch (_) {} }
     return {
       ok: shardItems.length > 0,
       shardId,

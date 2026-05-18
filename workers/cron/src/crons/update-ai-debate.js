@@ -115,10 +115,10 @@ export async function updateAiDebate(env) {
     await new Promise(r => setTimeout(r, 4000));
   }
 
-  if (fail > ok) {
+  if (ok === 0 || fail > ok) {
     await recordCronFailure('ai-debate', `ok=${ok} fail=${fail}`);
   } else {
-    await recordCronSuccess('ai-debate');
+    try { await recordCronSuccess('ai-debate'); } catch (_) {}
   }
 
   return { ok, fail, total: TOP_SYMBOLS.length };

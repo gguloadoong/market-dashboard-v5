@@ -441,7 +441,7 @@ export async function updateKr(env) {
     };
   }
 
-  await recordCronSuccess('kr');
+  try { await recordCronSuccess('kr'); } catch (_) {}
   console.info(`[update-kr] ${items.length}개 저장 (source: ${source})`);
 
   return {
