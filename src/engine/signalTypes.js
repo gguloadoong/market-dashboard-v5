@@ -175,7 +175,14 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: {
     easyLabel: '다른 시장이 먼저 움직였어요 🌐',
-    easyDesc: (m) => `${m.leaderName || m.leader} ${m.leaderPct > 0 ? '+' : ''}${m.leaderPct}% → ${m.laggerName || m.lagger} ${m.laggerPct > 0 ? '+' : ''}${m.laggerPct}% — 따라갈 수 있어요`,
+    easyDesc: (m) => {
+      const lp = m?.leaderPct ?? 0;
+      const lagp = m?.laggerPct ?? 0;
+      const lStr = `${m?.leaderName || m?.leader} ${lp > 0 ? '+' : ''}${lp}%`;
+      const lagStr = `${m?.laggerName || m?.lagger} ${lagp > 0 ? '+' : ''}${lagp}%`;
+      const sameDir = typeof m?.sameDir === 'boolean' ? m.sameDir : (Math.sign(lp) === Math.sign(lagp) || lagp === 0);
+      return sameDir ? `${lStr} → ${lagStr} — 따라갈 수 있어요` : `${lStr} → ${lagStr} — 방향 어긋남, 동조화 깨짐`;
+    },
   },
   [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: {
     easyLabel: '가격과 뉴스가 엇갈리고 있어요 🤔',
@@ -214,16 +221,23 @@ export const TYPE_META = {
     easyDesc: (m) => `원/달러 ${m?.rate ?? '?'}원 (${(m?.change ?? 0) > 0 ? '+' : ''}${(m?.change ?? 0).toFixed(1)}%) — ${m?.impact ?? ''}`,
   },
   [SIGNAL_TYPES.CAPITULATION]: {
-    easyLabel: '투매 감지 — 역발상 기회? 🔥',
-    easyDesc: (m) => `${m.name || '종목'} 공포 속 투매 발생 — 과거 패턴상 바닥 근처`,
+    easyLabel: '투매 감지 ⚠️ — 추가 확인 필요',
+    easyDesc: (m) => `${m.name || '종목'} 가격 급락 + 거래량 폭발 — 바닥인지 미확인, 추세 반전 확인 후 판단 권고`,
   },
   [SIGNAL_TYPES.STEALTH_ACTIVITY]: {
     easyLabel: '뉴스 없는 거래 폭발 👀',
     easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 거래 패턴 변화 감지`,
   },
   [SIGNAL_TYPES.BTC_LEADING]: {
-    easyLabel: (m) => `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
-    easyDesc: (m) => `BTC ${(m?.btcChange ?? 0) > 0 ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}% 움직임 — ${m?.alt || '알트코인'} 아직 미반영`,
+    easyLabel: (m) => m?.diverge
+      ? `BTC↔${m?.alt || '알트'} 방향 어긋남 — 추종 기대 보류 ⚠️`
+      : `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
+    easyDesc: (m) => {
+      const btcStr = `BTC ${(m?.btcChange ?? 0) > 0 ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}%`;
+      return m?.diverge
+        ? `${btcStr} 급등락인데 ${m?.alt || '알트'} 반대 방향 — 추종 가능성 낮음`
+        : `${btcStr} 움직임 — ${m?.alt || '알트코인'} 아직 미반영`;
+    },
   },
   [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: {
     easyLabel: (m) => m?.breakType === 'resistance' ? '저항선 뚫고 올라갔어요 🚀' : '지지선 깨졌어요 ⚠️',

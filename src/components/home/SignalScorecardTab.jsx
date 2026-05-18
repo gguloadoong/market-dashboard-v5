@@ -184,8 +184,8 @@ function BotRankingList({ bots }) {
                     {bot.recentSignals.slice(0, 5).map((sig, si) => (
                       <div key={si} className="flex items-center gap-2 text-[11px]">
                         <span className="font-medium text-[#191F28] w-14 truncate">{sig.symbol}</span>
-                        <span style={{ color: sig.direction === 'bullish' ? '#F04452' : '#1764ED' }}>
-                          {sig.direction === 'bullish' ? '▲' : '▼'}
+                        <span style={{ color: sig.direction === 'bullish' ? '#F04452' : sig.direction === 'bearish' ? '#1764ED' : '#FF9500' }}>
+                          {sig.direction === 'bullish' ? '▲' : sig.direction === 'bearish' ? '▼' : '●'}
                         </span>
                         <span className="text-[#8B95A1] flex-1 truncate">
                           {sig.resultPct != null ? `${sig.resultPct > 0 ? '+' : ''}${sig.resultPct}%` : '-'}
