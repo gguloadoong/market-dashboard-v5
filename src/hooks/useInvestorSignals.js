@@ -825,6 +825,9 @@ function detectSectorOutlier(allItems) {
     for (const { item, pct } of entries) {
       const deviation = (pct - avg) / stdDev;
       if (Math.abs(deviation) >= T.MIN_DEVIATION) {
+        // 절대 등락률 최소 + cross-sign 동시 가드 (#300)
+        // Math.sign(0)===0이라 MIN_ABS_PCT 조건이 먼저 막아 0인 경우 안전
+        if (Math.abs(pct) < T.MIN_ABS_PCT || Math.sign(pct) !== Math.sign(deviation)) continue;
         const above = deviation > 0;
         const market = (item._market || 'kr').toLowerCase();
         createSectorOutlierSignal(

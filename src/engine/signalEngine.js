@@ -572,7 +572,9 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
 /** 교차시장 상관관계 시그널 — leader/lagger 괴리 감지 */
 export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct, leaderName, laggerName) {
   const gap = Math.abs(leaderPct - laggerPct);
-  const direction = leaderPct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  // 부호가 다를 때(leader↑ lagger↓) NEUTRAL "괴리 경고" — leader 방향 단독 BULLISH/BEARISH 오라벨 방지 (#300)
+  const sameSign = (leaderPct > 0 && laggerPct > 0) || (leaderPct < 0 && laggerPct < 0);
+  const direction = sameSign ? (leaderPct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH) : DIRECTIONS.NEUTRAL;
   const strength = gap >= THRESHOLDS.CROSS_MARKET.STRONG ? 4 : 3;
   // 사람이 읽을 수 있는 이름 사용 (없으면 심볼 코드 fallback)
   const displayLeader = leaderName || leader;
