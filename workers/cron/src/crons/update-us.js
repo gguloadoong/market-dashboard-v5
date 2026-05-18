@@ -257,8 +257,8 @@ export async function updateUs(env, shardId) {
     let snapOk = false;
     if (shardItems.length > 0) {
       try {
-        await setSnap(shardKey, shardItems, SNAP_TTL.US);
-        snapOk = true;
+        snapOk = await setSnap(shardKey, shardItems, SNAP_TTL.US) === true;
+        if (!snapOk) throw new Error('setSnap returned false');
         console.log(`[update-us] 샤드 ${shardId} 저장: ${shardItems.length}개 → ${shardKey}`);
         // #185: 샤드 0 에서만 hot 계산. 자기 샤드 쓰기 완료 → snap:us:0..2 mget → merge → Top 200.
         //        다른 샤드는 자기 쓰기 직후 이미 redis 에 있으므로 race 없음.
