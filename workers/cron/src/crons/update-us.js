@@ -254,9 +254,11 @@ export async function updateUs(env, shardId) {
 
     // 샤드 전용 키에만 쓰기 — snap:us 공유 키는 절대 건드리지 않음 (race 방지)
     // 빈 배열이면 쓰기 skip (직전 성공분 TTL 내 보존)
+    let snapOk = false;
     if (shardItems.length > 0) {
       try {
         await setSnap(shardKey, shardItems, SNAP_TTL.US);
+        snapOk = true;
         console.log(`[update-us] 샤드 ${shardId} 저장: ${shardItems.length}개 → ${shardKey}`);
         // #185: 샤드 0 에서만 hot 계산. 자기 샤드 쓰기 완료 → snap:us:0..2 mget → merge → Top 200.
         //        다른 샤드는 자기 쓰기 직후 이미 redis 에 있으므로 race 없음.
@@ -302,9 +304,9 @@ export async function updateUs(env, shardId) {
       try { await recordCronFailure('us', `샤드 ${shardId} 전량 실패`); } catch (_) {}
     }
 
-    if (shardItems.length > 0) { try { await recordCronSuccess('us'); } catch (_) {} }
+    if (snapOk) { try { await recordCronSuccess('us'); } catch (_) {} }
     return {
-      ok: shardItems.length > 0,
+      ok: snapOk,
       shardId,
       count: shardItems.length,
       retried: retryResults.length,
