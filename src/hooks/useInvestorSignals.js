@@ -825,11 +825,9 @@ function detectSectorOutlier(allItems) {
     for (const { item, pct } of entries) {
       const deviation = (pct - avg) / stdDev;
       if (Math.abs(deviation) >= T.MIN_DEVIATION) {
-        // 절대 등락률 최소 기준 — ±0.5% 미만 미미한 변동은 "급등/급락" 라벨 부적절 (#300)
-        if (Math.abs(pct) < 0.5) continue;
-        // cross-sign 억제: 절대 등락률과 상대 편차 방향이 다를 때 발화 안 함
-        // 하락 중인데 섹터 대비 덜 빠진 경우("급등" 오라벨) — 서비스 신뢰도 보호 (#300)
-        if ((deviation > 0 && pct < 0) || (deviation < 0 && pct > 0)) continue;
+        // 절대 등락률 최소 + cross-sign 동시 가드 (#300)
+        // Math.sign(0)===0이라 MIN_ABS_PCT 조건이 먼저 막아 0인 경우 안전
+        if (Math.abs(pct) < T.MIN_ABS_PCT || Math.sign(pct) !== Math.sign(deviation)) continue;
         const above = deviation > 0;
         const market = (item._market || 'kr').toLowerCase();
         createSectorOutlierSignal(

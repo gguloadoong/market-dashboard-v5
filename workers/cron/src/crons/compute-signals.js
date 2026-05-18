@@ -64,8 +64,9 @@ function buildSignal(item, score, breakdown) {
   const changePct = item.changePct || 0;
   const direction = changePct > 0 ? 'bullish' : changePct < 0 ? 'bearish' : 'neutral';
   const strength  = absScore >= 70 ? 4 : 3;
-  const sign      = (item.changePct || 0) >= 0 ? '+' : '';
-  const title     = `${direction === 'bullish' ? '▲' : '▼'} ${item.name} ${sign}${(item.changePct || 0).toFixed(1)}%`;
+  const sign      = changePct > 0 ? '+' : '';
+  const arrow     = direction === 'bullish' ? '▲' : direction === 'bearish' ? '▼' : '—';
+  const title     = `${arrow} ${item.name} ${sign}${changePct.toFixed(1)}%`;
 
   return {
     // 안정 키 — timestamp 제외로 동일 종목이 10분마다 "새 카드"로 인식되지 않음
