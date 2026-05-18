@@ -106,6 +106,7 @@ export const THRESHOLDS = {
   SECTOR_OUTLIER: {
     MIN_DEVIATION: 2.0,          // 섹터 평균 대비 최소 2.0σ 이탈 (P1 강화: 1.5→2.0 과도 발화 억제)
     MIN_SECTOR_SIZE: 3,          // 섹터 최소 종목 수
+    MIN_ABS_PCT: 0.5,            // 절대 등락률 최소 — ±0.5% 미만은 "급등/급락" 라벨 부적절 (#300)
   },
   NEWS_CLUSTER: {
     WINDOW_MS: 4 * 3600000,      // 4시간 (원본 유지 — 8h는 집중 아님)

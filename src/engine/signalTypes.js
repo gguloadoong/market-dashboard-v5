@@ -249,11 +249,12 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.COMPOSITE_SCORE]: {
     easyLabel: (m) => {
-      const s = m?.compositeScore ?? 0;
-      if (s >= 70) return '여러 지표 동시 강세 🔥';
-      if (s >= 30) return '오를 분위기 감지 중 📈';
-      if (s <= -70) return '여러 지표 동시 약세 🚨';
-      if (s <= -30) return '내릴 분위기 감지 ⚠️';
+      const s = Math.abs(m?.compositeScore ?? 0);
+      const isUp = m?.direction === 'bullish';
+      const isDown = m?.direction === 'bearish';
+      // score 크기(강도) + direction(방향)으로 라벨 결정 — direction과 easyLabel 모순 방지 (#300)
+      if (s >= 70) return isUp ? '여러 지표 동시 강세 🔥' : isDown ? '여러 지표 동시 약세 🚨' : '방향 탐색 중 👀';
+      if (s >= 30) return isUp ? '오를 분위기 감지 중 📈' : isDown ? '내릴 분위기 감지 ⚠️' : '방향 탐색 중 👀';
       return '방향 탐색 중 👀';
     },
     easyDesc: (m) => {
