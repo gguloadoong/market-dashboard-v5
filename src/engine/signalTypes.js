@@ -120,15 +120,14 @@ export const TYPE_META = {
     },
     easyDesc: (m) => {
       const pct = m?.changePct ?? 0;
-      const name = m?.name || '종목';
-      if (pct <= -1) return `${name} 하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 이상 거래량 감지`;
-      if (pct >= 1) return `${name} 상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
-      return `${name} 거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
+      if (pct <= -1) return `하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 이상 거래량 감지`;
+      if (pct >= 1) return `상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
+      return `거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
     },
   },
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: {
     easyLabel: '시장 심리가 바뀌고 있어요 🔄',
-    easyDesc: (m) => `시장이 ${m.from || '?'}에서 ${m.to || '?'}로 전환 중 — 역발상 기회?`,
+    easyDesc: (m) => `시장이 ${m?.previousZone || '?'}에서 ${m?.currentZone || '?'}로 전환 중 — 역발상 기회?`,
   },
   [SIGNAL_TYPES.PUT_CALL_RATIO]: {
     easyLabel: '하락 보험 변동 📊',
@@ -150,7 +149,11 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.ORDER_FLOW_IMBALANCE]: {
     easyLabel: '매수/매도 힘 균형이 깨졌어요 ⚖️',
-    easyDesc: (m) => `지금 ${m.direction === 'bullish' ? '매수' : '매도'}세가 ${m.pct || '?'}% 더 강해요`,
+    easyDesc: (m) => {
+      const side = (m?.imbalance ?? 0) > 0 ? '매수' : '매도';
+      const pct = Math.abs((m?.imbalance ?? 0) * 100).toFixed(0);
+      return `지금 ${side}세가 ${pct}% 더 강해요`;
+    },
   },
   [SIGNAL_TYPES.VWAP_DEVIATION]: {
     easyLabel: '평균가에서 벗어났어요 📏',
@@ -163,15 +166,19 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.SOCIAL_SENTIMENT]: {
     easyLabel: 'SNS에서 화제 📱',
-    easyDesc: (m) => `소셜에서 ${m.symbol || '종목'} 관련 ${m.direction === 'bullish' ? '긍정' : '부정'} 의견이 ${m.pct || '?'}%`,
+    easyDesc: (m) => {
+      const side = (m?.bullRatio ?? 0) > 0.5 ? '긍정' : '부정';
+      const pct = ((m?.bullRatio ?? 0) * 100).toFixed(0);
+      return `소셜에서 ${side} 의견이 ${pct}% — ${m?.totalMessages ?? '?'}건 분석`;
+    },
   },
   [SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER]: {
     easyLabel: '관련 뉴스가 쏟아지고 있어요 📰',
-    easyDesc: (m) => `${m.name || '종목'} 관련 뉴스 ${m.count || '다수'}건 집중 — 주목`,
+    easyDesc: (m) => `관련 뉴스 ${m?.count || '다수'}건 집중 — 주목`,
   },
   [SIGNAL_TYPES.SECTOR_ROTATION]: {
     easyLabel: '돈이 섹터로 몰리고 있어요 🔄',
-    easyDesc: (m) => `${m.sector || '?'} 섹터 ${m.direction === 'bullish' ? '강세' : '약세'} — 자금 흐름 변화 감지`,
+    easyDesc: (m) => `${m?.sector || '?'} 섹터 ${m?.above ? '강세' : '약세'} — 자금 흐름 변화 감지`,
   },
   [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: {
     easyLabel: '다른 시장이 먼저 움직였어요 🌐',
