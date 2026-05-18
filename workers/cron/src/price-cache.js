@@ -35,8 +35,8 @@ export const SNAP_TTL = {
   COINS: 600,
   ETF: 600,
   // #307: KR cron UTC 11 이후 중단 → hot snap 10분 후 만료 → 국장 탭 빈 화면.
-  // 24h로 연장하여 장 마감 후에도 최신 스냅 유지 (다음 날 장 오픈 전까지).
-  HOT: 86400,
+  // 3일(259200)로 연장 — 주말 공백(금 마감→월 오픈 ~63h) 포함 커버.
+  HOT: 259200,
 };
 
 // #176: 1h → 24h. 미장 quiet window(ET post 20 UTC ~ pre 08 UTC = 11h) 를 커버해
