@@ -175,7 +175,14 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: {
     easyLabel: '다른 시장이 먼저 움직였어요 🌐',
-    easyDesc: (m) => `${m.leaderName || m.leader} ${m.leaderPct > 0 ? '+' : ''}${m.leaderPct}% → ${m.laggerName || m.lagger} ${m.laggerPct > 0 ? '+' : ''}${m.laggerPct}% — 따라갈 수 있어요`,
+    easyDesc: (m) => {
+      const lp = m?.leaderPct ?? 0;
+      const lagp = m?.laggerPct ?? 0;
+      const sameDir = (lp > 0 && lagp >= 0) || (lp < 0 && lagp <= 0);
+      const lStr = `${m?.leaderName || m?.leader} ${lp > 0 ? '+' : ''}${lp}%`;
+      const lagStr = `${m?.laggerName || m?.lagger} ${lagp > 0 ? '+' : ''}${lagp}%`;
+      return sameDir ? `${lStr} → ${lagStr} — 따라갈 수 있어요` : `${lStr} → ${lagStr} — 방향 어긋남, 동조화 깨짐`;
+    },
   },
   [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: {
     easyLabel: '가격과 뉴스가 엇갈리고 있어요 🤔',
@@ -222,8 +229,21 @@ export const TYPE_META = {
     easyDesc: (m) => `${m.name || '종목'} 뉴스 없이 거래량 폭발 — 거래 패턴 변화 감지`,
   },
   [SIGNAL_TYPES.BTC_LEADING]: {
-    easyLabel: (m) => `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`,
-    easyDesc: (m) => `BTC ${(m?.btcChange ?? 0) > 0 ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}% 움직임 — ${m?.alt || '알트코인'} 아직 미반영`,
+    easyLabel: (m) => {
+      const btcUp = (m?.btcChange ?? 0) > 0;
+      const alt = m?.altChange ?? 0;
+      const diverge = Math.abs(alt) > 0.05 && ((btcUp && alt < 0) || (!btcUp && alt > 0));
+      return diverge ? `BTC↔${m?.alt || '알트'} 방향 어긋남 — 추종 기대 보류 ⚠️` : `BTC 선행 — ${m?.alt || '알트코인'} 따라갈 가능성 🎯`;
+    },
+    easyDesc: (m) => {
+      const btcUp = (m?.btcChange ?? 0) > 0;
+      const alt = m?.altChange ?? 0;
+      const diverge = Math.abs(alt) > 0.05 && ((btcUp && alt < 0) || (!btcUp && alt > 0));
+      const btcStr = `BTC ${btcUp ? '+' : ''}${(m?.btcChange ?? 0).toFixed(1)}%`;
+      return diverge
+        ? `${btcStr} 급등락인데 ${m?.alt || '알트'} 반대 방향 — 추종 가능성 낮음`
+        : `${btcStr} 움직임 — ${m?.alt || '알트코인'} 아직 미반영`;
+    },
   },
   [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: {
     easyLabel: (m) => m?.breakType === 'resistance' ? '저항선 뚫고 올라갔어요 🚀' : '지지선 깨졌어요 ⚠️',
