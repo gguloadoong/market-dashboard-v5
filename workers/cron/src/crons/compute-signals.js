@@ -67,7 +67,10 @@ function buildSignal(item, score, breakdown) {
   const strength  = absScore >= 70 ? 4 : 3;
   const sign      = direction === 'bullish' ? '+' : '';  // direction 기준 — neutral 시 +0.1% 모순 방지 (#303)
   const arrow     = direction === 'bullish' ? '▲' : direction === 'bearish' ? '▼' : '—';
-  const title     = `${arrow} ${item.name} ${sign}${changePct.toFixed(1)}%`;
+  // -0.0% 방지: Object.is(-0, r)로 음의 영 감지 후 '0.0' 정규화
+  const r = Number(changePct.toFixed(1));
+  const pctStr = (Object.is(r, -0) || r === 0) ? '0.0' : r.toFixed(1);
+  const title     = `${arrow} ${item.name} ${sign}${pctStr}%`;
 
   return {
     // 안정 키 — timestamp 제외로 동일 종목이 10분마다 "새 카드"로 인식되지 않음

@@ -129,7 +129,7 @@ export default function SignalInlinePanel({
                       })
                     : '-';
                   const dirColor = row.direction === 'bullish' ? '#F04452' : row.direction === 'bearish' ? '#1764ED' : '#FF9500';
-                  const dirArrow = row.direction === 'bullish' ? '▲' : row.direction === 'bearish' ? '▼' : '▶';
+                  const dirArrow = row.direction === 'bullish' ? '▲' : row.direction === 'bearish' ? '▼' : '●';
                   const hit1hLabel = hitLabel(row.hit1h);
                   const hit24hLabel = hitLabel(row.hit24h);
                   return (

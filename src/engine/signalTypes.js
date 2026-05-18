@@ -180,7 +180,8 @@ export const TYPE_META = {
       const lagp = m?.laggerPct ?? 0;
       const lStr = `${m?.leaderName || m?.leader} ${lp > 0 ? '+' : ''}${lp}%`;
       const lagStr = `${m?.laggerName || m?.lagger} ${lagp > 0 ? '+' : ''}${lagp}%`;
-      return m?.sameDir ? `${lStr} → ${lagStr} — 따라갈 수 있어요` : `${lStr} → ${lagStr} — 방향 어긋남, 동조화 깨짐`;
+      const sameDir = typeof m?.sameDir === 'boolean' ? m.sameDir : (Math.sign(lp) === Math.sign(lagp) || lagp === 0);
+      return sameDir ? `${lStr} → ${lagStr} — 따라갈 수 있어요` : `${lStr} → ${lagStr} — 방향 어긋남, 동조화 깨짐`;
     },
   },
   [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: {
