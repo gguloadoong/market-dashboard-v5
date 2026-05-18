@@ -65,7 +65,7 @@ function buildSignal(item, score, breakdown) {
   const changePct = item.changePct || 0;
   const direction = changePct > 0.05 ? 'bullish' : changePct < -0.05 ? 'bearish' : 'neutral';
   const strength  = absScore >= 70 ? 4 : 3;
-  const sign      = changePct > 0 ? '+' : '';
+  const sign      = direction === 'bullish' ? '+' : '';  // direction 기준 — neutral 시 +0.1% 모순 방지 (#303)
   const arrow     = direction === 'bullish' ? '▲' : direction === 'bearish' ? '▼' : '—';
   const title     = `${arrow} ${item.name} ${sign}${changePct.toFixed(1)}%`;
 

@@ -214,8 +214,8 @@ export const TYPE_META = {
     easyDesc: (m) => `원/달러 ${m?.rate ?? '?'}원 (${(m?.change ?? 0) > 0 ? '+' : ''}${(m?.change ?? 0).toFixed(1)}%) — ${m?.impact ?? ''}`,
   },
   [SIGNAL_TYPES.CAPITULATION]: {
-    easyLabel: '투매 감지 — 역발상 기회? 🔥',
-    easyDesc: (m) => `${m.name || '종목'} 공포 속 투매 발생 — 과거 패턴상 바닥 근처`,
+    easyLabel: '투매 감지 ⚠️ — 추가 확인 필요',
+    easyDesc: (m) => `${m.name || '종목'} 가격 급락 + 거래량 폭발 — 바닥인지 미확인, 추세 반전 확인 후 판단 권고`,
   },
   [SIGNAL_TYPES.STEALTH_ACTIVITY]: {
     easyLabel: '뉴스 없는 거래 폭발 👀',

@@ -573,7 +573,8 @@ export function createSocialSentimentSignal(symbol, name, market, bullRatio, tot
 export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct, leaderName, laggerName) {
   const gap = Math.abs(leaderPct - laggerPct);
   // 부호가 다를 때(leader↑ lagger↓) NEUTRAL "괴리 경고" — leader 방향 단독 BULLISH/BEARISH 오라벨 방지 (#300)
-  const sameSign = (leaderPct > 0 && laggerPct > 0) || (leaderPct < 0 && laggerPct < 0);
+  // laggerPct === 0(미반응 대기)도 동조화로 인정 — 선행 포착 타이밍 무효화 방지 (#302)
+  const sameSign = (leaderPct > 0 && laggerPct >= 0) || (leaderPct < 0 && laggerPct <= 0);
   const direction = sameSign ? (leaderPct > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH) : DIRECTIONS.NEUTRAL;
   const strength = gap >= THRESHOLDS.CROSS_MARKET.STRONG ? 4 : 3;
   // 사람이 읽을 수 있는 이름 사용 (없으면 심볼 코드 fallback)
@@ -764,7 +765,7 @@ export function createCapitulationSignal(symbol, name, market, priceDrop, volRat
   return addSignal(createSignal({
     type: SIGNAL_TYPES.CAPITULATION,
     symbol, name, market,
-    direction: DIRECTIONS.BULLISH, // 역발상
+    direction: DIRECTIONS.NEUTRAL, // 바닥 확인 불가 — 역발상 추측 금지 (#302)
     strength,
     title,
     meta: { name, priceDrop, volRatio, fearGreed, hasVolumeAnomaly, hasFearGreed },
@@ -801,7 +802,12 @@ export function createBtcLeadingSignal(alt, btcChange, altChange) {
   const T = THRESHOLDS.BTC_LEADING;
   if (Math.abs(btcChange) < T.BTC_MIN_CHANGE || Math.abs(altChange) >= T.ALT_MAX_CHANGE) return null;
 
-  const direction = btcChange > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
+  // alt이 btc와 명확히 반대 방향으로 움직이면 NEUTRAL — 추종 기대 오라벨 방지 (#303)
+  const altActualSign = altChange > 0.05 ? 1 : altChange < -0.05 ? -1 : 0;
+  const btcSign = btcChange > 0 ? 1 : -1;
+  const direction = (altActualSign !== 0 && altActualSign !== btcSign)
+    ? DIRECTIONS.NEUTRAL
+    : btcChange > 0 ? DIRECTIONS.BULLISH : DIRECTIONS.BEARISH;
   const strength = Math.abs(btcChange) >= 5 ? 4 : 3;
   const title = `BTC ${btcChange > 0 ? '+' : ''}${btcChange.toFixed(1)}% → ${alt} 미반영 (${altChange > 0 ? '+' : ''}${altChange.toFixed(1)}%)`;
 
