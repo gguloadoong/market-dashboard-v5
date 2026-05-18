@@ -4,7 +4,7 @@
 //   3 shards × 900 = 2700 종목 (NASDAQ 시총 상위).
 //   샤드당 900 subrequest (CF Workers Paid Standard 1000 한도 내 안전 마진).
 
-import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure, getRedis } from '../price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, recordCronFailure, recordCronSuccess, getRedis } from '../price-cache.js';
 
 // ── 샤딩 / 배치 설정 ──
 const SYMBOL_LIMIT = 2700;        // 3 shards × 900
@@ -302,6 +302,7 @@ export async function updateUs(env, shardId) {
       try { await recordCronFailure('us', `샤드 ${shardId} 전량 실패`); } catch (_) {}
     }
 
+    if (shardItems.length > 0) await recordCronSuccess('us');
     return {
       ok: shardItems.length > 0,
       shardId,

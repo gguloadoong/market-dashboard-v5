@@ -2,7 +2,7 @@
 // KRX(전종목) → Naver 전종목 페이징 → 한투(주요 61) → Naver 개별(주요 61) 순 fallback
 // Vercel 서버에서 KRX LOGOUT 시 Naver marketValue API로 KOSPI+KOSDAQ ~4000종목 수집
 
-import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, getSnapWithFallback, recordCronFailure } from '../price-cache.js';
+import { SNAP_KEYS, SNAP_TTL, setSnap, getSnap, getSnapWithFallback, recordCronFailure, recordCronSuccess } from '../price-cache.js';
 import { getHantooToken, HANTOO_BASE } from '../hantoo-token.js';
 import KR_STOCK_NAMES from '../kr-stock-names.json';
 
@@ -440,6 +440,9 @@ export async function updateKr(env) {
       source,
     };
   }
+
+  await recordCronSuccess('kr');
+  console.info(`[update-kr] ${items.length}개 저장 (source: ${source})`);
 
   return {
     ok: true,
