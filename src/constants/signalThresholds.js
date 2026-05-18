@@ -85,6 +85,7 @@ export const THRESHOLDS = {
     BTC_MIN_CHANGE: 2,           // BTC 최소 1시간 변동률 2% (완화: 3→2)
     ALT_MAX_CHANGE: 1.5,         // 알트코인 최대 변동률 1.5% (완화: 1→1.5)
     ALT_SYMBOLS: ['ETH', 'SOL', 'XRP', 'DOGE'], // 추적 대상 알트코인
+    ALT_NOISE_PCT: 0.05,         // alt 방향 판정 노이즈 밴드 (±0.05% 미만 = 무방향)
   },
   SUPPORT_RESISTANCE: {
     CLUSTER_PCT: 2,              // 가격 수준 클러스터 범위 2%

@@ -803,7 +803,7 @@ export function createBtcLeadingSignal(alt, btcChange, altChange) {
   if (Math.abs(btcChange) < T.BTC_MIN_CHANGE || Math.abs(altChange) >= T.ALT_MAX_CHANGE) return null;
 
   // alt이 btc와 명확히 반대 방향으로 움직이면 NEUTRAL — 추종 기대 오라벨 방지 (#303)
-  const altActualSign = altChange > 0.05 ? 1 : altChange < -0.05 ? -1 : 0;
+  const altActualSign = altChange > T.ALT_NOISE_PCT ? 1 : altChange < -T.ALT_NOISE_PCT ? -1 : 0;
   const btcSign = btcChange > 0 ? 1 : -1;
   const direction = (altActualSign !== 0 && altActualSign !== btcSign)
     ? DIRECTIONS.NEUTRAL
