@@ -589,7 +589,7 @@ export function createCrossMarketSignal(leader, lagger, leaderPct, laggerPct, le
     direction,
     strength,
     title,
-    meta: { leader, lagger, leaderPct: +leaderPct.toFixed(1), laggerPct: +laggerPct.toFixed(1), gap, leaderName: displayLeader, laggerName: displayLagger },
+    meta: { leader, lagger, leaderPct: +leaderPct.toFixed(1), laggerPct: +laggerPct.toFixed(1), gap, leaderName: displayLeader, laggerName: displayLagger, sameDir: sameSign },
   }));
 }
 
@@ -819,7 +819,7 @@ export function createBtcLeadingSignal(alt, btcChange, altChange) {
     direction,
     strength,
     title,
-    meta: { alt, btcChange, altChange },
+    meta: { alt, btcChange, altChange, diverge: altActualSign !== 0 && altActualSign !== btcSign },
   }));
 }
 
