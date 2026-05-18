@@ -61,8 +61,9 @@ function computeMarketScores(items) {
 function buildSignal(item, score, breakdown) {
   const absScore  = Math.abs(score);
   // direction은 실제 가격 방향(changePct)으로 — volumeZ 가중치가 부호를 뒤집는 오라벨 방지 (#300)
+  // 0.05% 미만은 neutral — toFixed(1) 반올림으로 "+0.0%"가 되는 케이스에서 화살표 모순 방지
   const changePct = item.changePct || 0;
-  const direction = changePct > 0 ? 'bullish' : changePct < 0 ? 'bearish' : 'neutral';
+  const direction = changePct > 0.05 ? 'bullish' : changePct < -0.05 ? 'bearish' : 'neutral';
   const strength  = absScore >= 70 ? 4 : 3;
   const sign      = changePct > 0 ? '+' : '';
   const arrow     = direction === 'bullish' ? '▲' : direction === 'bearish' ? '▼' : '—';
@@ -82,6 +83,7 @@ function buildSignal(item, score, breakdown) {
     expiresAt: Date.now() + COMPOSITE_SCORE_EXPIRE_MS,
     meta: {
       compositeScore: Math.round(score * 10) / 10,
+      direction, // easyLabel 방향 일관성용 (#300 Copilot)
       method: 'cross-section-v1',
       breakdown: {
         momentum: Math.round(breakdown.momentum * 10) / 10,
