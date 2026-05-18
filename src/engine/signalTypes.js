@@ -127,7 +127,7 @@ export const TYPE_META = {
   },
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: {
     easyLabel: '시장 심리가 바뀌고 있어요 🔄',
-    easyDesc: (m) => `시장이 ${m?.previousZone || '?'}에서 ${m?.currentZone || '?'}로 전환 중 — 역발상 기회?`,
+    easyDesc: (m) => `시장이 ${m?.previousZoneKo || m?.previousZone || '?'}에서 ${m?.currentZoneKo || m?.currentZone || '?'}로 전환 중 — 역발상 기회?`,
   },
   [SIGNAL_TYPES.PUT_CALL_RATIO]: {
     easyLabel: '하락 보험 변동 📊',

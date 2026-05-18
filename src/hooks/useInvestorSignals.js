@@ -382,7 +382,7 @@ function detectSectorRotation(allItems, sectorRanksPrevRef) {
         direction: DIRECTIONS.BULLISH,
         strength: avg >= 5 ? 3 : 2,
         title: `${sector} 섹터 +${avg.toFixed(1)}% 강세`,
-        meta: { sector, avg },
+        meta: { sector, avg, above: true },
       });
       addSignal(signal);
     }
@@ -399,7 +399,7 @@ function detectSectorRotation(allItems, sectorRanksPrevRef) {
         direction: DIRECTIONS.BEARISH,
         strength: avg <= -5 ? 3 : 2,
         title: `${sector} 섹터 ${avg.toFixed(1)}% 약세`,
-        meta: { sector, avg },
+        meta: { sector, avg, above: false },
       });
       addSignal(signal);
     }
@@ -424,7 +424,7 @@ function detectSectorRotation(allItems, sectorRanksPrevRef) {
         direction,
         strength,
         title,
-        meta: { sector, prevRank, curRank, diff },
+        meta: { sector, prevRank, curRank, diff, above: diff > 0 },
       });
       addSignal(signal);
     }
