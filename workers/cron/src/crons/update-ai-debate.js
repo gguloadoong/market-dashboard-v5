@@ -4,7 +4,7 @@
 // 22종목 × 2req(Gemini+Redis) = 44 subrequests — CF Workers 50/invocation 한계 내 여유 유지
 // 유저 수 무관 — 하루 22회 고정 (무료 티어 1,500회/일의 1.5%)
 
-import { getRedis, recordCronFailure } from '../price-cache.js';
+import { getRedis, recordCronFailure, recordCronSuccess } from '../price-cache.js';
 
 const DEBATE_TTL = 90000; // 25시간
 
@@ -115,8 +115,10 @@ export async function updateAiDebate(env) {
     await new Promise(r => setTimeout(r, 4000));
   }
 
-  if (fail > ok) {
+  if (ok === 0 || fail > ok) {
     await recordCronFailure('ai-debate', `ok=${ok} fail=${fail}`);
+  } else {
+    try { await recordCronSuccess('ai-debate'); } catch (_) {}
   }
 
   return { ok, fail, total: TOP_SYMBOLS.length };
