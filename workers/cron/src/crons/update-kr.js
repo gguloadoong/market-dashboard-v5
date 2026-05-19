@@ -219,7 +219,7 @@ async function fetchHantooFallback(env) {
         // #321: prdy_vrss_sign이 '3'(보합) fallback으로 부호 손실되는 버그 #317과 동일 패턴 →
         // prdy_ctrt(등락률) 부호 기준으로 결정. prdy_vrss가 signed/unsigned 어느 쪽이든 안전.
         const changePctRaw = parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0;
-        const changeAbsRaw = parseInt(o.prdy_vrss || '0', 10);
+        const changeAbsRaw = parseInt(String(o.prdy_vrss ?? '0').replace(/,/g, ''), 10) || 0;
         const change = changePctRaw < 0 ? -Math.abs(changeAbsRaw) : Math.abs(changeAbsRaw);
         return {
           symbol,
