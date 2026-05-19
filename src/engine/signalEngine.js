@@ -428,7 +428,7 @@ export function createFearGreedSignal(current, previous, market) {
     direction,
     strength,
     title,
-    meta: { current, previous, currentZone, previousZone, currentZoneKo: zoneKo[currentZone] },
+    meta: { current, previous, currentZone, previousZone, currentZoneKo: zoneKo[currentZone], previousZoneKo: zoneKo[previousZone] },
   });
   return addSignal(signal);
 }
