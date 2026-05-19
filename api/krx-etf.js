@@ -38,57 +38,67 @@ function num(s) {
 }
 
 export default async function handler(_req) {
-  if (!AUTH_KEY) {
-    return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
-  }
+  try {
+    if (!AUTH_KEY) {
+      return Response.json({ error: 'KRX_API_KEY not set', etfs: [] }, { status: 500 });
+    }
 
-  // 순차 5 영업일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
-  // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소).
-  // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 3중복 발생.
-  // offset을 최대 2주(14)까지 확장하고 dedup으로 **5 영업일 보장** (Codex P2).
-  let list = [];
-  const uniqueDates = [...new Set(
-    Array.from({ length: 14 }, (_, i) => dateStr(i + 1)),
-  )].slice(0, 5);
-  for (const basDd of uniqueDates) {
-    try {
-      const rows = await fetchEtfForDate(basDd);
-      if (rows.length > 0) { list = rows; break; }
-    } catch { /* 다음 날짜 시도 */ }
-  }
+    // 순차 5 영업일 시도 — 첫 성공 날짜에서 즉시 중단 (최신 우선 + KRX 쿼터 보호)
+    // 각 2s 타임아웃 × 최대 5일 = 최악 10s (게이트웨이 12s 이내, #115 해소).
+    // dateStr()이 주말을 금요일로 collapse → 월요일엔 Fri 3중복 발생.
+    // offset을 최대 2주(14)까지 확장하고 dedup으로 **5 영업일 보장** (Codex P2).
+    let list = [];
+    const uniqueDates = [...new Set(
+      Array.from({ length: 14 }, (_, i) => dateStr(i + 1)),
+    )].slice(0, 5);
+    for (const basDd of uniqueDates) {
+      try {
+        const rows = await fetchEtfForDate(basDd);
+        if (rows.length > 0) { list = rows; break; }
+      } catch (e) {
+        console.error(`[krx-etf] ${basDd} 실패:`, e);
+      }
+    }
 
-  if (!list.length) {
-    return Response.json({ etfs: [] }, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600' },
+    if (!list.length) {
+      return Response.json({ etfs: [] }, {
+        headers: { 'Cache-Control': 'public, s-maxage=3600' },
+      });
+    }
+
+    // KRX 응답 → 프론트 ETF_DATA 포맷으로 변환
+    const etfs = list.map(r => {
+      const price     = num(r.TDD_CLSPRC);
+      const prevClose = price - num(r.CMPPREVDD_PRC);
+      const change    = num(r.CMPPREVDD_PRC);
+      const changePct = prevClose > 0
+        ? parseFloat(((change / prevClose) * 100).toFixed(2))
+        : 0;
+      return {
+        symbol:    (r.ISU_CD  || r.ISU_SRT_CD || '').trim(),
+        name:      (r.ISU_NM  || r.ISU_ABBRV  || '').trim(),
+        market:    'kr',
+        sector:    'ETF',
+        category:  'ETF',
+        price:     parseFloat(price.toFixed(0)),
+        change:    parseFloat(change.toFixed(0)),
+        changePct,
+        volume:    num(r.ACC_TRDVOL),
+        aum:       num(r.MKTCAP),
+      };
+    }).filter(e => e.symbol && e.name && e.price > 0);
+
+    return Response.json({ etfs }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=3600', // 6시간 캐싱
+        'Access-Control-Allow-Origin': '*',
+      },
     });
+  } catch (e) {
+    console.error('[krx-etf] handler 크래시:', e);
+    return Response.json(
+      { error: e?.message || String(e), etfs: [] },
+      { status: 500 },
+    );
   }
-
-  // KRX 응답 → 프론트 ETF_DATA 포맷으로 변환
-  const etfs = list.map(r => {
-    const price     = num(r.TDD_CLSPRC);
-    const prevClose = price - num(r.CMPPREVDD_PRC);
-    const change    = num(r.CMPPREVDD_PRC);
-    const changePct = prevClose > 0
-      ? parseFloat(((change / prevClose) * 100).toFixed(2))
-      : 0;
-    return {
-      symbol:    (r.ISU_CD  || r.ISU_SRT_CD || '').trim(),
-      name:      (r.ISU_NM  || r.ISU_ABBRV  || '').trim(),
-      market:    'kr',
-      sector:    'ETF',
-      category:  'ETF',
-      price:     parseFloat(price.toFixed(0)),
-      change:    parseFloat(change.toFixed(0)),
-      changePct,
-      volume:    num(r.ACC_TRDVOL),
-      aum:       num(r.MKTCAP),
-    };
-  }).filter(e => e.symbol && e.name && e.price > 0);
-
-  return Response.json({ etfs }, {
-    headers: {
-      'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=3600', // 6시간 캐싱
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
 }
