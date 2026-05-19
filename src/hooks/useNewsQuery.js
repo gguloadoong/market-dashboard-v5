@@ -69,6 +69,7 @@ export function useNewsRefresh() {
 
 import { fetchStockDirectNews } from '../api/news';
 import { buildStockKeywords, matchesKeywords } from '../utils/newsAlias';
+import { getNewsImpact } from '../utils/newsSignal';
 
 // 종목별 직접 구글뉴스 검색 훅 — useStockNews 결과 0건일 때 fallback
 export function useStockDirectNews(symbol, name, market, enabled = true) {
@@ -84,6 +85,36 @@ export function useStockDirectNews(symbol, name, market, enabled = true) {
   });
 }
 
+// 강화된 dedup 키 (#324) — 출처 host + 제목 60자 정규화
+// id 단독 사용 X: RSS 파서가 id=guid||link로 거의 모든 항목을 채워, id 우선이면
+// 같은 토픽이 GUID만 달라 중복 노출되는 케이스를 못 막음 (Copilot 채택).
+function dedupKey(item) {
+  const titleKey = (item.title || '')
+    .toLowerCase()
+    .replace(/[\s\-:|·"'"·…[\](){}「」【】]+/g, ' ')
+    .trim()
+    .slice(0, 60);
+  const link = item.link || item.url || '';
+  let host = item.source || '';
+  if (link) {
+    try { host = new URL(link).hostname.replace(/^www\./, ''); } catch { /* keep source */ }
+  }
+  return `${host}|${titleKey}`;
+}
+
+// 코인 뉴스 임팩트 우선 정렬 (#324)
+// - 호재/악재 라벨 있는 뉴스 → 중립('⚪ 중립')·라벨없음 뉴스 순
+// - getNewsImpact는 sort 비교마다 키워드 매칭을 반복 수행하므로 사전 계산 후 캐시 (Gemini 채택)
+function sortByImpactFirst(arr) {
+  const hasImpact = new Map();
+  for (const item of arr) {
+    const impact = getNewsImpact(item.title);
+    // 호재/악재만 1, '⚪ 중립' 또는 null은 0 (Copilot 채택)
+    hasImpact.set(item, impact && impact.label !== '⚪ 중립' ? 1 : 0);
+  }
+  return arr.sort((a, b) => (hasImpact.get(b) || 0) - (hasImpact.get(a) || 0));
+}
+
 // 종목 키워드 기반 뉴스 필터 훅 — ChartSidePanel에서 사용
 // market prop 없으면 symbol/name 패턴으로 자동 추정
 export function useStockNews(symbol, name, market) {
@@ -92,19 +123,31 @@ export function useStockNews(symbol, name, market) {
   const news = useMemo(() => {
     if (!symbol || !allNews.length) return [];
 
-    // market 자동 추정: 6자리 숫자 = KR, id 있으면 COIN, 그 외 US
+    // market 자동 추정: 6자리 숫자 = KR, 그 외 = US
+    // COIN은 자동 추정 X — 호출 측(ChartSidePanel)이 market='COIN' 명시 필요 (Copilot 채택)
     const detectedMarket = market
       || (/^\d{6}$/.test(symbol) ? 'KR' : 'US');
+    const isCoin = detectedMarket === 'COIN';
 
     const keywords = buildStockKeywords(symbol, name, detectedMarket);
     if (!keywords.length) return [];
 
-    return allNews
-      .filter(item => {
-        const text = item.title + ' ' + (item.summary || item.description || '');
-        return matchesKeywords(text, keywords);
-      })
-      .slice(0, 8);
+    // dedup 강화 (#324): 동일 출처+제목 60자 차단
+    const seen = new Set();
+    const matched = [];
+    for (const item of allNews) {
+      const text = item.title + ' ' + (item.summary || item.description || '');
+      if (!matchesKeywords(text, keywords)) continue;
+      const key = dedupKey(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matched.push(item);
+    }
+
+    // 코인은 임팩트 있는 뉴스 우선 정렬 (BTC/ETH 노이즈 감소)
+    if (isCoin) sortByImpactFirst(matched);
+
+    return matched.slice(0, 8);
   }, [symbol, name, market, allNews]);
 
   return { news, isLoading };
@@ -119,6 +162,7 @@ export function useStockAndRelatedNews(symbol, name, market, relatedItems = []) 
     if (!symbol || !allNews.length) return [];
 
     const detectedMarket = market || (/^\d{6}$/.test(symbol) ? 'KR' : 'US');
+    const isCoin = detectedMarket === 'COIN';
     const primaryKeywords = buildStockKeywords(symbol, name, detectedMarket);
     if (!primaryKeywords.length) return [];
 
@@ -138,7 +182,7 @@ export function useStockAndRelatedNews(symbol, name, market, relatedItems = []) 
 
     for (const item of allNews) {
       const text = item.title + ' ' + (item.summary || item.description || '');
-      const key = item.id || item.title?.slice(0, 50);
+      const key = dedupKey(item); // (#324) 강화된 키
       if (seen.has(key)) continue;
 
       if (matchesKeywords(text, primaryKeywords)) {
@@ -150,7 +194,27 @@ export function useStockAndRelatedNews(symbol, name, market, relatedItems = []) 
       }
     }
 
-    // 주 종목 뉴스 우선, 부족분을 관련종목 뉴스로 채움
+    // 코인은 임팩트 있는 뉴스 우선 정렬 (#324)
+    if (isCoin) {
+      sortByImpactFirst(primary);
+      sortByImpactFirst(secondary);
+    }
+
+    // 코인: primary 5건 상한 + secondary 보장 → BTC/ETH 뉴스가 8칸 전부 점거 방지 (#324)
+    // secondary 부족 시 primary 잔여분으로 8칸 보충 (Copilot 채택 — 슬롯 비는 현상 방지)
+    // 그 외 시장: 기존 동작 유지 (주 종목 우선, 부족분 관련종목)
+    if (isCoin && secondary.length > 0) {
+      const primaryCap = Math.min(primary.length, 5);
+      const taken = [
+        ...primary.slice(0, primaryCap),
+        ...secondary.slice(0, 8 - primaryCap),
+      ];
+      // 8칸 미만이면 primary 잔여분으로 채움 (secondary 1~2건만 있을 때 결과 6~7건 → 8건)
+      if (taken.length < 8 && primary.length > primaryCap) {
+        taken.push(...primary.slice(primaryCap, primaryCap + (8 - taken.length)));
+      }
+      return taken.slice(0, 8);
+    }
     return [...primary, ...secondary].slice(0, 8);
   }, [symbol, name, market, allNews, relatedItems]);
 
