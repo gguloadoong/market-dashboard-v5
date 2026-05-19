@@ -43,14 +43,12 @@ async function fetchSinglePrice(symbol, token) {
   // ── 시간외(애프터마켓) 단일가 ────────────────────────────────
   // ovtm_untp_prpr: 시간외 단일가 현재가 (장 마감 후 15:30~18:00 KST)
   // 정규장 중에는 0 또는 미응답 → null 처리
-  const afterHoursPrice   = parseInt(o.ovtm_untp_prpr   || '0', 10) || null;
-  const afterHoursSign    = o.ovtm_untp_prpd_vrss_sign ?? '3';
-  const afterHoursChgAbs  = parseInt(o.ovtm_untp_prpd_vrss || '0', 10);
+  const afterHoursPrice     = parseInt(o.ovtm_untp_prpr   || '0', 10) || null;
+  const afterHoursChgAbs    = parseInt(o.ovtm_untp_prpd_vrss || '0', 10);
+  const afterHoursChangePct = afterHoursPrice ? parseFloat(o.ovtm_untp_prdy_ctrt || '0') : null;
+  // 시간외도 동일 원인 — ovtm_untp_prpd_vrss_sign 대신 ctrt 부호 사용 (#317)
   const afterHoursChange  = afterHoursPrice
-    ? ((afterHoursSign === '4' || afterHoursSign === '5') ? -afterHoursChgAbs : afterHoursChgAbs)
-    : null;
-  const afterHoursChangePct = afterHoursPrice
-    ? parseFloat(o.ovtm_untp_prdy_ctrt || '0')
+    ? (afterHoursChangePct !== null && afterHoursChangePct < 0 ? -afterHoursChgAbs : afterHoursChgAbs)
     : null;
 
   return {
@@ -58,7 +56,7 @@ async function fetchSinglePrice(symbol, token) {
     name:      (o.hts_kor_isnm || '').trim(),
     price,
     change,
-    changePct: parseFloat(o.prdy_ctrt || '0'),
+    changePct: changePctRaw,
     volume:    parseInt(o.acml_vol    || '0', 10),
     // hts_avls: HTS 시가총액 (억원 단위) → 원화로 변환
     marketCap: (parseInt(o.hts_avls   || '0', 10) || 0) * 100_000_000,
