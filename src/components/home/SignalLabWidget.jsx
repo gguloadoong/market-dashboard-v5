@@ -4,7 +4,11 @@ import { useState } from 'react';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import { TYPE_META } from '../../engine/signalTypes';
 
-const WARMUP_THRESHOLD = 30; // 적중률 공개를 위한 최소 발화 횟수
+// 적중률 공개를 위한 최소 발화 횟수
+// TODO(후속): SignalBoardWidget(`totalFired >= 30`), SignalInlinePanel과 함께
+// constants로 승격하여 단일 출처화 (#325 후속 별도 PR — Copilot 채택 메모)
+const WARMUP_THRESHOLD = 30;
+const WARM_VISIBLE_LIMIT = 8; // 활성 시그널 기본 노출 상한 (Gemini 채택 — UX 회귀 방지)
 
 function accColor(pct) {
   if (pct == null) return '#B0B8C1';
@@ -22,17 +26,17 @@ function getLabel(bot) {
   return easyLabel || bot.label || bot.type;
 }
 
-// 단일 봇 행 — 활성/검증중에 따라 우측 표시 분기
-function BotRow({ bot, isWarm }) {
+// 단일 봇 행 — isWarm은 bot.totalFired에서 내부 파생 (Copilot 채택 — 단일 출처)
+function BotRow({ bot }) {
   const label = getLabel(bot);
-  const remaining = Math.max(0, WARMUP_THRESHOLD - bot.totalFired);
+  const isWarm = bot.totalFired >= WARMUP_THRESHOLD;
+  const remaining = WARMUP_THRESHOLD - bot.totalFired;
 
   return (
     <div className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors">
-      {/* 신호 이름 */}
+      {/* 신호 이름 — flex-1 + min-w-0로 유연 truncate (Gemini 채택) */}
       <span
-        className="text-sm font-medium text-gray-800 truncate"
-        style={{ maxWidth: '42%' }}
+        className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate"
         title={label}
       >
         {label}
@@ -46,8 +50,9 @@ function BotRow({ bot, isWarm }) {
       {/* 결과 */}
       <div className="shrink-0 text-right">
         {!isWarm ? (
+          // remaining ≥ 1 (warm 분기에서 걸러지므로 보장) — '검증 중' fallback 불필요 (Gemini 채택)
           <span className="text-xs text-gray-400 whitespace-nowrap">
-            {remaining > 0 ? `${remaining}회 더 누적` : '검증 중'}
+            {remaining}회 더 누적
           </span>
         ) : (
           <span className="text-xs font-medium space-x-1">
@@ -77,6 +82,7 @@ function BotRow({ bot, isWarm }) {
 export default function SignalLabWidget() {
   const { bots, isLoading } = useSignalAccuracy();
   const [coldExpanded, setColdExpanded] = useState(false);
+  const [warmExpanded, setWarmExpanded] = useState(false);
 
   // 발화 1회 이상만 표시 (isMissing/0회 봇은 제외)
   const filtered = (bots || []).filter((b) => b.totalFired >= 1);
@@ -87,6 +93,8 @@ export default function SignalLabWidget() {
     .filter((b) => b.totalFired < WARMUP_THRESHOLD)
     .sort((a, b) => b.totalFired - a.totalFired);
 
+  const warmVisible = warmExpanded ? warm : warm.slice(0, WARM_VISIBLE_LIMIT);
+  const warmHasMore = warm.length > WARM_VISIBLE_LIMIT;
   const isEmpty = !isLoading && warm.length === 0 && cold.length === 0;
 
   return (
@@ -125,10 +133,19 @@ export default function SignalLabWidget() {
                 </span>
               </div>
               <div className="space-y-1">
-                {warm.map((bot) => (
-                  <BotRow key={bot.type} bot={bot} isWarm />
+                {warmVisible.map((bot) => (
+                  <BotRow key={bot.type} bot={bot} />
                 ))}
               </div>
+              {warmHasMore && (
+                <button
+                  type="button"
+                  onClick={() => setWarmExpanded((v) => !v)}
+                  className="mt-2 w-full text-xs text-gray-400 hover:text-gray-600 transition-colors py-1"
+                >
+                  {warmExpanded ? '접기 ∧' : `${warm.length - WARM_VISIBLE_LIMIT}개 더보기 ∨`}
+                </button>
+              )}
             </div>
           )}
 
@@ -156,7 +173,7 @@ export default function SignalLabWidget() {
               {coldExpanded && (
                 <div className="space-y-1 mt-1">
                   {cold.map((bot) => (
-                    <BotRow key={bot.type} bot={bot} isWarm={false} />
+                    <BotRow key={bot.type} bot={bot} />
                   ))}
                 </div>
               )}
