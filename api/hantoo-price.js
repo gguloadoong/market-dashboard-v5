@@ -57,6 +57,7 @@ async function fetchSinglePrice(symbol, token) {
     price,
     change,
     changePct: changePctRaw,
+    __debug: { v: 2, sign: o.prdy_vrss_sign, ctrt: o.prdy_ctrt },
     volume:    parseInt(o.acml_vol    || '0', 10),
     // hts_avls: HTS 시가총액 (억원 단위) → 원화로 변환
     marketCap: (parseInt(o.hts_avls   || '0', 10) || 0) * 100_000_000,
