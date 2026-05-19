@@ -284,7 +284,7 @@ export const US_LOGO_DOMAIN = Object.freeze({
 
   // ─── 핀테크/크립토 ─────────────────────────────────────────
   COIN:  'coinbase.com',
-  MSTR:  'strategy.com', // 구 MicroStrategy → 2024년 'Strategy Inc' 사명 변경 (#326)
+  MSTR:  'microstrategy.com', // MicroStrategy Inc — 2025년부터 브랜드명 'Strategy'로 리브랜딩하나 법인명 및 도메인은 microstrategy.com 유지
   HOOD:  'robinhood.com',
   SQ:    'block.xyz',
   SOFI:  'sofi.com',
