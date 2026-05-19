@@ -34,10 +34,11 @@ async function fetchSinglePrice(symbol, token) {
   const price = parseInt(o.stck_prpr || '0', 10);
   if (!price) throw new Error(`${symbol}: 가격 없음`);
 
-  // prdy_vrss_sign: 1=상한 2=상승 3=보합 4=하한 5=하락 → 하락 계열이면 음수
-  const sign      = o.prdy_vrss_sign ?? '3';
+  // prdy_ctrt(등락률)의 부호로 change 방향 결정 — prdy_vrss_sign이 '3'(보합)으로 fallback되어
+  // 하락 종목도 양수로 반환되는 버그 수정 (#317)
   const changeAbs = parseInt(o.prdy_vrss || '0', 10);
-  const change    = (sign === '4' || sign === '5') ? -changeAbs : changeAbs;
+  const changePctRaw = parseFloat(o.prdy_ctrt || '0');
+  const change    = changePctRaw < 0 ? -changeAbs : changeAbs;
 
   // ── 시간외(애프터마켓) 단일가 ────────────────────────────────
   // ovtm_untp_prpr: 시간외 단일가 현재가 (장 마감 후 15:30~18:00 KST)
