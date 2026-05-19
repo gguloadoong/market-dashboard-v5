@@ -107,6 +107,30 @@
 
 ---
 
+## 시그널 시스템 신뢰도
+
+> 측정 기준 수립: 2026-05-19 architect (Opus) 분석 결과  
+> 현재 전체 신뢰도: **38%** (PR #311 + #315 머지 후 목표 60%+)
+
+| 지표 | 현재 값 | 기준선 | 위반 시 우선순위 |
+|------|---------|--------|----------------|
+| 발화 다양성 (활성 타입 / 29종) | 5% (1종: composite_score만) | 5% 이상 유지 | P1 |
+| 방향 정확도 (bullish/bearish) | 95% | 90% 이상 | P0 |
+| Meta 정합성 (easyDesc 필드 일치율) | 80% → 95% (PR #311+315 후) | 90% 이상 | P0 |
+| 적중률 트래킹 커버리지 (signal_accuracy 타입 수) | 3종 | 3종 이상 | P2 |
+
+**검증 방법:**
+- 방향 정확도: `signal_accuracy` Supabase 뷰 → `accuracy_1h` 열 composite_score 행 확인
+- Meta 정합성: PR 코드리뷰에서 easyDesc ↔ signalEngine.js meta 필드 대조 (architect gate)
+- 발화 다양성: 프로덕션 `/api/snapshot?type=signals` 응답 타입 분포 확인
+
+**알려진 한계 (2026-05-19 기준):**
+- 29종 중 server-side 발화는 `composite_score` 1종뿐 (CF Workers compute-signals.js)
+- 나머지 28종은 client-side 조건 충족 시 발화 → 장 중 트래픽 없으면 0건
+- VWAP 시그널: `[비활성]` — 적중률 0%로 return null 처리 (#155)
+
+---
+
 ## 인프라 헬스
 
 | 항목 | 기준 | 위반 시 우선순위 |
