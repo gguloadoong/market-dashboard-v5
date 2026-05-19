@@ -68,21 +68,29 @@ async function fetchKrxMarket(mktId, trdDd, timeoutMs = 15000) {
 }
 
 // KRX 응답 → 통합 형태로 파싱
+// #321: KRX MDCSTAT01501은 CMPPREVDD_PRC/FLUC_RT를 절대값으로 반환하고
+// 부호는 FLUC_TP_CD(1=상승, 2=상한가, 3=보합, 4=하한가, 5=하락)로 표현 →
+// FLUC_TP_CD 미적용 시 모든 하락 종목이 양수로 표시되는 P0 버그.
+// Math.abs로 절대값화 후 코드 기반 부호 부여 (KRX가 signed/unsigned 어느 쪽이든 안전).
 function parseKrxItems(items, exchange) {
   return items
     .filter((item) => item.ISU_SRT_CD && item.TDD_CLSPRC)
-    .map((item) => ({
-      symbol: item.ISU_SRT_CD,
-      name: resolveKrName(item.ISU_SRT_CD, item.ISU_ABBRV),
-      price: parseNum(item.TDD_CLSPRC),
-      change: parseNum(item.CMPPREVDD_PRC),
-      changePct: parseFloat2(item.FLUC_RT),
-      volume: parseNum(item.ACC_TRDVOL),
-      // MKTCAP은 억 단위(money='1') → 원 단위 변환
-      marketCap: parseNum(item.MKTCAP) * 100000000,
-      market: 'kr',     // 프론트 market === 'kr' 체크와 일치
-      exchange,         // 'kospi' | 'kosdaq' (정렬/배지용)
-    }));
+    .map((item) => {
+      const tpCd = String(item.FLUC_TP_CD ?? '');
+      const sign = (tpCd === '4' || tpCd === '5') ? -1 : 1;
+      return {
+        symbol: item.ISU_SRT_CD,
+        name: resolveKrName(item.ISU_SRT_CD, item.ISU_ABBRV),
+        price: parseNum(item.TDD_CLSPRC),
+        change: sign * Math.abs(parseNum(item.CMPPREVDD_PRC)),
+        changePct: sign * Math.abs(parseFloat2(item.FLUC_RT)),
+        volume: parseNum(item.ACC_TRDVOL),
+        // MKTCAP은 억 단위(money='1') → 원 단위 변환
+        marketCap: parseNum(item.MKTCAP) * 100000000,
+        market: 'kr',     // 프론트 market === 'kr' 체크와 일치
+        exchange,         // 'kospi' | 'kosdaq' (정렬/배지용)
+      };
+    });
 }
 
 // 한투 fallback 종목 정적 이름 맵 — API가 주말에 hts_kor_isnm 빈값 반환 시 보정
@@ -208,15 +216,17 @@ async function fetchHantooFallback(env) {
         if (data.rt_cd !== '0') return null;
         const o = data.output;
         const price = parseInt(o.stck_prpr || '0', 10);
-        const sign = o.prdy_vrss_sign ?? '3';
-        const changeAbs = parseInt(o.prdy_vrss || '0', 10);
-        const change = (sign === '4' || sign === '5') ? -changeAbs : changeAbs;
+        // #321: prdy_vrss_sign이 '3'(보합) fallback으로 부호 손실되는 버그 #317과 동일 패턴 →
+        // prdy_ctrt(등락률) 부호 기준으로 결정. prdy_vrss가 signed/unsigned 어느 쪽이든 안전.
+        const changePctRaw = parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0;
+        const changeAbsRaw = parseInt(String(o.prdy_vrss ?? '0').replace(/,/g, ''), 10) || 0;
+        const change = changePctRaw < 0 ? -Math.abs(changeAbsRaw) : Math.abs(changeAbsRaw);
         return {
           symbol,
           name: (o.hts_kor_isnm || '').trim() || HANTOO_NAME_MAP[symbol] || KR_STOCK_NAMES[symbol] || symbol,
           price,
           change,
-          changePct: parseFloat((o.prdy_ctrt || '0').replace(/,/g, '')) || 0,
+          changePct: changePctRaw,
           volume: parseInt((o.acml_vol || '0').replace(/,/g, ''), 10) || 0,
           marketCap: 0,
           market: 'kr',
