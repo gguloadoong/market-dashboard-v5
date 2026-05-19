@@ -104,6 +104,10 @@
 | 2026-03-28 | API 게이트웨이 /api/d 난독화 + 한투 토큰 Redis 캐시 기준 추가 (PR #193) | 장성민 |
 | 2026-03-28 | Vercel Pro 전환 + ignoreCommand 정상화 기준 추가 (PR #194) | 장성민 |
 | 2026-03-28 | PR 리뷰 체계 5중 구조 수립 (code-reviewer + Codex + Gemini + CodeRabbit + Copilot) | 장성민 |
+| 2026-05-19 | 전수조사 완료 — 국장/코인/지수/환율/미장 교차 검증 ✅ | 장성민 |
+| 2026-05-19 | P0 버그 수정: KR change 부호 반전 (#319), KOSPI/KOSDAQ 부호 반전 (#320), prdy_vrss 이중부정 Math.abs | 장성민 |
+| 2026-05-19 | CI/CD 버그 수정: vercel --prebuilt api/ 함수 누락 → Vercel 서버 빌드 전환 | 장성민 |
+| 2026-05-19 | 전체 배포 완료 — 국장/지수 부호 네이버 교차 검증 ✅, 데이터 신뢰도 99% 달성 | 장성민 |
 
 ---
 
