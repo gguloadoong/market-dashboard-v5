@@ -27,8 +27,6 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - run: npm ci
-
       - run: npm install -g vercel@latest
 
       - name: Pull Vercel Environment
@@ -37,14 +35,10 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Build
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
       - name: Deploy to Production
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        # vercel --prod: Vercel 서버에서 전체 빌드 (frontend + api/ 함수 모두 포함)
+        # --prebuilt 방식은 api/ 서버리스 함수를 누락시키는 버그가 있어 제거
+        run: vercel --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
