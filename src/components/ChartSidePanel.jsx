@@ -1142,7 +1142,7 @@ export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClo
                     {newsBasedItems.length > 0
                       ? '이 뉴스 관련 종목'
                       : isCoinItem(item)
-                      ? `${item.korean_name || item.name || item.symbol} 가격 영향주`
+                      ? `${item.korean_name || item.name || item.symbol} 가격 영향 자산`
                       : '연관 종목'}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
