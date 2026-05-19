@@ -7,6 +7,9 @@
   ],
   "regions": ["icn1"],
   "ignoreCommand": "exit 0",
+  "functions": {
+    "api/krx-etf.js": { "maxDuration": 30 }
+  },
   "crons": [
     { "path": "/api/cron/health-check", "schedule": "0 * * * *" }
   ]
