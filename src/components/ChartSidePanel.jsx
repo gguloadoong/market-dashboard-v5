@@ -1083,11 +1083,13 @@ export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClo
           {/* ── 연관 ETF / 연관 종목 섹션 ──────────────────────── */}
           {relatedItems.length > 0 && (
             <div className="border-t border-[#F2F4F6] pt-4 pb-2 px-5 mb-1">
-              {/* ETF 섹션 — 상단 우선 표시 */}
+              {/* ETF 섹션 — 상단 우선 표시 (#326 코인일 때 '{종목명} 연관 ETF') */}
               {etfItems.length > 0 && (
                 <>
                   <div className="text-[11px] font-semibold text-[#B0B8C1] uppercase tracking-wide mb-2">
-                    연관 ETF
+                    {isCoinItem(item)
+                      ? `${item.korean_name || item.name || item.symbol} 연관 ETF`
+                      : '연관 ETF'}
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     {etfItems.map(({ ticker, item: rel, reason }) => {
@@ -1133,11 +1135,15 @@ export default function ChartSidePanel({ item, krwRate = DEFAULT_KRW_RATE, onClo
                 </>
               )}
 
-              {/* 일반 연관 종목 */}
+              {/* 일반 연관 종목 — 코인일 때 '{종목명} 가격 영향주' 명시 (#326) */}
               {nonEtfItems.length > 0 && (
                 <>
                   <div className="text-[11px] font-semibold text-[#B0B8C1] uppercase tracking-wide mb-2">
-                    {newsBasedItems.length > 0 ? '이 뉴스 관련 종목' : '연관 종목'}
+                    {newsBasedItems.length > 0
+                      ? '이 뉴스 관련 종목'
+                      : isCoinItem(item)
+                      ? `${item.korean_name || item.name || item.symbol} 가격 영향 자산`
+                      : '연관 종목'}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {nonEtfItems.map(({ ticker, item: rel, type, reason: existingReason }) => {
