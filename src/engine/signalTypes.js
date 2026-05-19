@@ -272,10 +272,12 @@ export const TYPE_META = {
       return '방향 탐색 중 👀';
     },
     easyDesc: (m) => {
+      const bd = m?.breakdown;
       const parts = [];
-      if (m?.rsi != null) parts.push(`RSI ${m.rsi}`);
-      if (m?.macd != null) parts.push(`MACD ${m.macd > 0 ? '상승' : '하락'}`);
-      return `복합 분석 점수 ${m?.compositeScore > 0 ? '+' : ''}${m?.compositeScore ?? 0}${parts.length ? ` (${parts.join(', ')})` : ''}`;
+      if (bd?.momentum != null) parts.push(`모멘텀 ${bd.momentum > 0 ? '+' : ''}${Math.round(bd.momentum)}`);
+      if (bd?.volumeZ != null) parts.push(`거래량 ${bd.volumeZ > 0 ? '+' : ''}${Math.round(bd.volumeZ)}`);
+      if (bd?.relMkt != null) parts.push(`시장대비 ${bd.relMkt > 0 ? '+' : ''}${Math.round(bd.relMkt)}`);
+      return `복합 분석 점수 ${(m?.compositeScore ?? 0) > 0 ? '+' : ''}${m?.compositeScore ?? 0}${parts.length ? ` (${parts.join(', ')})` : ''}`;
     },
   },
 };

@@ -306,7 +306,7 @@ export function createInvestorSignal(symbol, name, market, type, consecutiveDays
     direction,
     strength,
     title,
-    meta: { consecutiveDays, amount, currentPrice },
+    meta: { consecutiveDays, amount, currentPrice, name },
     source: 'client',
     confidence: Number.isFinite(consecutiveDays) ? Math.min(Math.max(0, 0.5 + consecutiveDays * 0.1), 1.0) : null,
     reasons: Number.isFinite(consecutiveDays)
