@@ -56,7 +56,7 @@ export default async function handler(_req) {
         const rows = await fetchEtfForDate(basDd);
         if (rows.length > 0) { list = rows; break; }
       } catch (e) {
-        console.error(`[krx-etf] ${basDd} 실패:`, e?.message || e);
+        console.error(`[krx-etf] ${basDd} 실패:`, e);
       }
     }
 
