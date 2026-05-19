@@ -34,11 +34,11 @@ async function fetchSinglePrice(symbol, token) {
   const price = parseInt(o.stck_prpr || '0', 10);
   if (!price) throw new Error(`${symbol}: 가격 없음`);
 
-  // prdy_ctrt(등락률)의 부호로 change 방향 결정 — prdy_vrss_sign이 '3'(보합)으로 fallback되어
-  // 하락 종목도 양수로 반환되는 버그 수정 (#317)
-  const changeAbs = parseInt(o.prdy_vrss || '0', 10);
-  const changePctRaw = parseFloat(o.prdy_ctrt || '0');
-  const change    = changePctRaw < 0 ? -changeAbs : changeAbs;
+  // prdy_ctrt(등락률)의 부호로 change 방향 결정 — prdy_vrss_sign이 '3'(보합)으로 fallback되거나
+  // prdy_vrss 자체가 이미 부호 포함(-7000) 반환 시 이중부정 방지를 위해 Math.abs 사용 (#317)
+  const changePctRaw  = parseFloat(o.prdy_ctrt || '0');
+  const changeAbsRaw  = parseInt(o.prdy_vrss || '0', 10);
+  const change        = changePctRaw < 0 ? -Math.abs(changeAbsRaw) : Math.abs(changeAbsRaw);
 
   // ── 시간외(애프터마켓) 단일가 ────────────────────────────────
   // ovtm_untp_prpr: 시간외 단일가 현재가 (장 마감 후 15:30~18:00 KST)
@@ -57,7 +57,6 @@ async function fetchSinglePrice(symbol, token) {
     price,
     change,
     changePct: changePctRaw,
-    __debug: { v: 2, sign: o.prdy_vrss_sign, ctrt: o.prdy_ctrt },
     volume:    parseInt(o.acml_vol    || '0', 10),
     // hts_avls: HTS 시가총액 (억원 단위) → 원화로 변환
     marketCap: (parseInt(o.hts_avls   || '0', 10) || 0) * 100_000_000,
