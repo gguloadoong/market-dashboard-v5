@@ -36,14 +36,15 @@ async function fetchSingleIndex(code, token) {
   if (!value) throw new Error('지수 값 없음');
 
   // bstp_nmix_prdy_vrss: 전일 대비, bstp_nmix_prdy_ctrt: 전일 대비율
-  const sign   = o.prdy_vrss_sign ?? '3';
-  const absChg = parseFloat(o.bstp_nmix_prdy_vrss || '0');
-  const change = (sign === '4' || sign === '5') ? -absChg : absChg;
+  // prdy_vrss_sign 불응답 버그(#317)와 동일 — bstp_nmix_prdy_ctrt 부호로 방향 결정 (#318)
+  const absChg    = parseFloat(o.bstp_nmix_prdy_vrss || '0');
+  const changePct = parseFloat(o.bstp_nmix_prdy_ctrt || '0');
+  const change    = changePct < 0 ? -Math.abs(absChg) : Math.abs(absChg);
 
   return {
     value:     parseFloat(value.toFixed(2)),
     change:    parseFloat(change.toFixed(2)),
-    changePct: parseFloat(o.bstp_nmix_prdy_ctrt || '0'),
+    changePct,
   };
 }
 
