@@ -120,9 +120,9 @@ export const TYPE_META = {
     },
     easyDesc: (m) => {
       const pct = m?.changePct ?? 0;
-      if (pct <= -1) return `하락 중 거래량 ${m?.ratio || '?'}배 폭발 — 이상 거래량 감지`;
-      if (pct >= 1) return `상승 중 거래량 ${m?.ratio || '?'}배 폭발 — 강한 매수세`;
-      return `거래량이 평소의 ${m?.ratio || '?'}배 — 뭔가 일어나고 있어요`;
+      if (pct <= -1) return `하락 중 거래량 ${m?.ratio?.toFixed(1) || '?'}배 폭발 — 이상 거래량 감지`;
+      if (pct >= 1) return `상승 중 거래량 ${m?.ratio?.toFixed(1) || '?'}배 폭발 — 강한 매수세`;
+      return `거래량이 평소의 ${m?.ratio?.toFixed(1) || '?'}배 — 뭔가 일어나고 있어요`;
     },
   },
   [SIGNAL_TYPES.FEAR_GREED_SHIFT]: {
@@ -167,8 +167,10 @@ export const TYPE_META = {
   [SIGNAL_TYPES.SOCIAL_SENTIMENT]: {
     easyLabel: 'SNS에서 화제 📱',
     easyDesc: (m) => {
-      const side = (m?.bullRatio ?? 0) > 0.5 ? '긍정' : '부정';
-      const pct = ((m?.bullRatio ?? 0) * 100).toFixed(0);
+      const bullRatio = m?.bullRatio ?? 0;
+      const isBull = bullRatio > 0.5;
+      const side = isBull ? '긍정' : '부정';
+      const pct = ((isBull ? bullRatio : 1 - bullRatio) * 100).toFixed(0);
       return `소셜에서 ${side} 의견이 ${pct}% — ${m?.totalMessages ?? '?'}건 분석`;
     },
   },
