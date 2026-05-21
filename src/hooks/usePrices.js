@@ -238,7 +238,7 @@ export function usePrices() {
     let usInFlight = false;
     let krInFlight = false;
 
-    // 장중·프리·애프터마켓은 NORMAL(30s), 완전 마감·주말만 CLOSED(5min)
+    // 장중·프리·애프터마켓은 NORMAL(60s), 완전 마감·주말만 CLOSED(5min)
     const usActive = () => isUsMarketOpen() || isUsPreMarket() || isUsAfterMarket();
 
     const scheduleUs = () => {

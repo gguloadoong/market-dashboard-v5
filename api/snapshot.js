@@ -102,12 +102,13 @@ export default async function handler(request) {
           headers: { 'Access-Control-Allow-Origin': '*', 'ETag': etag },
         });
       }
-      // hot 은 s-maxage=30 — 본 키와 동기화 지연 최소화 (갱신 주기 5분 대비 여유).
+      // #331: hot s-maxage 30→60 — Upstash bandwidth 12.7배 초과 대응.
+      //       cron 갱신 주기 5분 대비 1분 stale은 충분히 안전 (hot 키는 자주 변동).
       return new Response(body, {
         status: 200,
         headers: {
           ...CORS_HEADERS,
-          'Cache-Control': 'public, max-age=0, s-maxage=30',
+          'Cache-Control': 'public, max-age=0, s-maxage=60',
           'ETag': etag,
         },
       });
@@ -146,17 +147,19 @@ export default async function handler(request) {
 
     // Cache-Control 설계 (Upstash bandwidth 보호):
     // - max-age=0: 브라우저 HTTP 캐시 비활성 → 클라이언트 ETag 재검증 경로 보존
-    // - s-maxage=60: Vercel edge CDN 60초 캐싱 → Vercel Function 호출 최소화
+    // - #331: s-maxage 60→120 — Upstash bandwidth 12.7배 초과 대응.
+    //   CDN cache hit률 ~2배 → Redis MGET 호출 ~50% 감소.
+    //   CF Workers cron이 5분 주기로 snap 갱신 → 2분 stale은 5분 cycle 내 안전.
     // - stale-while-revalidate 미사용: 백그라운드 갱신 중 stale 반환 방지
     //   (KR 랭킹/급등 뷰는 refreshKoreanStocks가 fallback/워치리스트만 갱신하고
     //    나머지는 snapshot seed에 의존 → swr로 수분 stale 누적 시 서비스 본질 훼손.
     //    CF Workers check-signal-accuracy의 server-side snapshot 소비도 stale 누적 위험.
-    //    → swr 없이 stale 상한을 60s로 제한.)
+    //    → swr 없이 stale 상한을 120s로 제한.)
     return new Response(body, {
       status: 200,
       headers: {
         ...CORS_HEADERS,
-        'Cache-Control': 'public, max-age=0, s-maxage=60',
+        'Cache-Control': 'public, max-age=0, s-maxage=120',
         'ETag': etag,
       },
     });

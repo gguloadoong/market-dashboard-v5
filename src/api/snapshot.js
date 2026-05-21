@@ -5,7 +5,7 @@
 //   - 기본 tier='full' 유지 → 기존 호출 사이트 회귀 방지
 //   - 캐시/TTL/ETag/inflight 모두 tier 단위 독립
 
-const SNAPSHOT_TTL = 60 * 1000; // 60초 (서버 s-maxage=60/30 과 유사 동기화)
+const SNAPSHOT_TTL = 120 * 1000; // 120초 (#331: 서버 s-maxage=120/60 과 동기화 — Upstash 절감)
 
 // tier 별 독립 상태 — 교차 오염 없음.
 const state = {
