@@ -5,7 +5,12 @@
 //   - 기본 tier='full' 유지 → 기존 호출 사이트 회귀 방지
 //   - 캐시/TTL/ETag/inflight 모두 tier 단위 독립
 
-const SNAPSHOT_TTL = 120 * 1000; // 120초 (#331: 서버 s-maxage=120/60 과 동기화 — Upstash 절감)
+// #331: tier별 TTL 분리 — 서버 s-maxage(hot=60, full=120)와 정합성 유지.
+//        통합 TTL=120s면 hot tier에서 서버 갱신본을 최대 60s 더 늦게 받게 됨.
+const SNAPSHOT_TTL = {
+  hot: 60 * 1000,   // 60초 — 서버 s-maxage=60 동기화 (홈 첫 로드용, freshness 우선)
+  full: 120 * 1000, // 120초 — 서버 s-maxage=120 동기화 (lazy 보강, Upstash 절감)
+};
 
 // tier 별 독립 상태 — 교차 오염 없음.
 const state = {
@@ -21,7 +26,7 @@ export async function fetchSnapshot({ tier = 'full' } = {}) {
   const t = tier === 'hot' ? 'hot' : 'full';
   const st = getState(t);
   const now = Date.now();
-  if (st.cache && now - st.ts < SNAPSHOT_TTL) return st.cache;
+  if (st.cache && now - st.ts < SNAPSHOT_TTL[t]) return st.cache;
 
   // 동일 tier 중복 호출 dedupe (useCoins + usePrices 동시 호출 대비)
   if (st.inflight) return st.inflight;
