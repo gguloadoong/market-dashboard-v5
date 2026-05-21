@@ -101,7 +101,7 @@ ${BOT_TABLE}
 > **🤖 code-reviewer (Claude Opus)**
 > ${OPUS_LINE}
 
-> **✨ Gemini gate (gemini-2.5-pro)**
+> **✨ Gemini gate (gemini-3.1-pro-preview)**
 > ${GEMINI_LINE}
 
 ---

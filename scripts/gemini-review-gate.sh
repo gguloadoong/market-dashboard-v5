@@ -5,7 +5,7 @@ set -euo pipefail
 
 MODE="${1:-strict}"
 BASE_BRANCH="${2:-origin/main}"
-GEMINI_MODEL="gemini-2.5-pro"
+GEMINI_MODEL="gemini-3.1-pro-preview"
 GEMINI_TIMEOUT=${GEMINI_TIMEOUT:-120}
 
 # ── Gemini CLI 확인 ──

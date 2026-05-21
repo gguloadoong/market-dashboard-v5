@@ -185,7 +185,7 @@ REVIEW_BODY="## 독립 리뷰 결과
 ### code-reviewer (Claude Opus)
 ${CODE_REVIEWER_RESULT}
 
-### Gemini gate (${GEMINI_MODEL:-gemini-2.5-pro})
+### Gemini gate (${GEMINI_MODEL:-gemini-3.1-pro-preview})
 - ${GEMINI_STATUS}
 
 ---
