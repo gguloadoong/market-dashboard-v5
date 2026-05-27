@@ -6,7 +6,7 @@ import { useWatchlist } from '../../hooks/useWatchlist';
 import { getPct } from './utils';
 import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
-import NotableMoversSection from './NotableMoversSection';
+import MorphingFocusSection from './MorphingFocusSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import { useNewsSignals } from '../../hooks/useNewsSignals';
@@ -223,12 +223,15 @@ export default function HomeDashboard({
         onShowScorecard={handleShowScorecard}
       />
 
-      {/* ─── 2. 주목할 종목 (WHY 카드) ───────────────────── */}
+      {/* ─── 2. 모핑 포커스 (시간대별 주도주/주목 — NotableMovers 흡수) ─── */}
       {hasData && (
-        <NotableMoversSection
-          allItems={allItems}
+        <MorphingFocusSection
+          krItems={krItems}
+          usItems={usItems}
+          coinItems={coinItems}
           recentNews={recentNews}
           krwRate={krwRate}
+          indices={indices}
           onItemClick={onItemClick}
         />
       )}

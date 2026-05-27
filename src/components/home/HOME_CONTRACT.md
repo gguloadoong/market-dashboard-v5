@@ -19,7 +19,12 @@
    ├── WatchlistMini       — 관심종목 (마켓 배지 KR/US/COIN + 추가 버튼 + 검색 링크)
    │   └── WatchlistAlertStrip — 이상 신호 스트립 (±3% 변동/시그널 발화 시만 표시, inline)
    └── EventStrip          — EventTicker 세로 롤링 (translateY, 3아이템, 9초 순환)
-2. NotableMoversSection    — 주목할 종목 (WHY 카드)
+2. MorphingFocusSection    — 모핑 포커스 (시간대별 주도주/주목 자동 전환 — NotableMovers 흡수)
+   ├── SessionBar          — 세션 인디케이터 (초록 점멸=라이브 / 회색 정지, 텍스트 라벨)
+   ├── FocusLeadCard       — 대장주/주목 1위 풀폭 카드 (등락률 26px + WHY 정량근거 LEAD 칩)
+   ├── CompactMoverRow     — 2~3위 / 무버 컴팩트 행
+   ├── AltThemeChips       — 동반 테마 칩 (LEAD 모드)
+   └── BridgeLine          — 전이구간 브릿지 (국장 모드, 간밤 나스닥 함의 한 줄)
 3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분) — 인라인 결정 패널(SignalInlinePanel) 포함
 4. AiDebateSection         — AI 종목토론 (별도 섹션, 4종목 칩 선택)
 5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터)
@@ -111,7 +116,8 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | 파일 | 역할 | 상태 |
 |------|------|------|
 | `EventTicker.jsx` | 경제 이벤트 롤링 | ✅ 활성 (롤링만. 섹션 X) |
-| `NotableMoversSection.jsx` | 수급 이상 종목 | ✅ 활성 |
+| `MorphingFocusSection.jsx` | 모핑 포커스 (시간대별 주도주/주목 — computeMorphFocus #335) | ✅ 활성 (홈 섹션 2) |
+| `NotableMoversSection.jsx` | 주목할 종목 (WHY 카드) | ⏸ MorphingFocusSection으로 흡수 (직접 렌더 X, 영구삭제 아님 — 자산 보존) |
 | `MarketInvestorSection.jsx` | 외국인/기관 수급 | ✅ 활성 |
 | `HotListSection.jsx` | HotList UI (TopMoversWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
 | `MarketIndexSection.jsx` | 지수 UI (MarketPulseWidget의 서브컴포넌트) | ✅ 활성 (직접 렌더 X) |
