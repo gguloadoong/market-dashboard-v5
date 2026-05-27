@@ -220,7 +220,7 @@ function bucketize(phase) {
 }
 
 // ─── phase → 한국어 라벨 ────────────────────────────────────────
-function buildLabel(market, phase, opts = {}) {
+function buildLabel(phase, opts = {}) {
   switch (phase) {
     case 'open':       return opts.earlyClose ? '거래중(조기종료)' : '거래중';
     case 'dayMarket':  return '데이마켓';
@@ -239,7 +239,7 @@ function buildStatus(market, phase, opts = {}) {
   const dataMode = (market === 'kr' ? KR_SESSION_DATA_MODE : US_SESSION_DATA_MODE)[phase];
   const status   = bucketize(phase);                 // 하위호환 다운캐스트
   const isLive   = dataMode === 'live' || dataMode === 'delayed'; // 녹색 펄스 단일 트리거 (allowlist — 미지/누락 phase는 안전측 false)
-  const label    = buildLabel(market, phase, opts);
+  const label    = buildLabel(phase, opts);
   const color    = isLive ? 'up' : 'neutral';        // 死필드(기존 color) 호환 유지
   return { status, phase, label, color, isLive, dataMode };
 }
