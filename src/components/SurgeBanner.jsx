@@ -39,8 +39,9 @@ const C = {
 // React.memo: coins WS 틱마다 재렌더 방지 — 급등 순위 실제 변경 시에만 업데이트
 const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices = [], onClick }) {
   const { items, hasHot, isIndexMode } = useMemo(() => {
-    const krOpen = getKoreanMarketStatus().status === 'open';
-    const usOpen = getUsMarketStatus().status === 'open';
+    // isLive 기반 — 데이마켓 등 비라이브 세션 종목은 자동 제외(거짓 라이브 방지)
+    const krOpen = getKoreanMarketStatus().isLive;
+    const usOpen = getUsMarketStatus().isLive;
 
     // ELW/ETN/파생상품 필터 — 이름 미해결, 상한가 초과, 또는 파생상품 키워드
     const isDerivative = (s) => {

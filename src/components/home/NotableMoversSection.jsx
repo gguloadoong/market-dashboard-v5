@@ -179,8 +179,9 @@ function NotableCard({ item, newsCount, volumeRank, whyReason, krwRate, onClick 
 const SLOT_MS = 20 * 60 * 1000;
 
 export default function NotableMoversSection({ allItems = [], recentNews = [], krwRate = DEFAULT_KRW_RATE, onItemClick }) {
-  const krOpen = getKoreanMarketStatus().status === 'open';
-  const usOpen = getUsMarketStatus().status === 'open';
+  // isLive 기반 — 데이마켓/프리/애프터 등 비라이브 세션은 _isClosed=true로 -5 페널티 유지(거짓 라이브 방지, 의도적)
+  const krOpen = getKoreanMarketStatus().isLive;
+  const usOpen = getUsMarketStatus().isLive;
 
   // 20분마다 바뀌는 슬롯 — 동점 항목 순환을 위해 사용
   const [timeSlot, setTimeSlot] = useState(Math.floor(Date.now() / SLOT_MS));

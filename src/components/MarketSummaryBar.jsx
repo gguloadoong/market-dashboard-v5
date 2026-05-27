@@ -87,14 +87,14 @@ export default function MarketSummaryBar({ indices = [], krwRate = DEFAULT_KRW_R
       {/* 장 운영 상태 */}
       <div className="flex-shrink-0 flex flex-col justify-center gap-1.5 px-4 py-3 border-r border-[#F2F4F6]">
         <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${kr.status === 'open' ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${kr.isLive ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#8B95A1]">국장</span>
-          <span className={`text-[10px] font-bold ${kr.status === 'open' ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{kr.label}</span>
+          <span className={`text-[10px] font-bold ${kr.isLive ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{kr.label}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${us.status === 'open' ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${us.isLive ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
           <span className="text-[10px] text-[#8B95A1]">미장</span>
-          <span className={`text-[10px] font-bold ${us.status === 'open' ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{us.label}</span>
+          <span className={`text-[10px] font-bold ${us.isLive ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{us.label}</span>
         </div>
       </div>
 
@@ -102,7 +102,7 @@ export default function MarketSummaryBar({ indices = [], krwRate = DEFAULT_KRW_R
       <div className="flex items-center py-2 px-1">
         {displayIndices.map(idx => {
           const market = INDEX_MARKET[idx.id];
-          const isOpen = market === 'kr' ? kr.status === 'open' : market === 'us' ? us.status === 'open' : false;
+          const isOpen = market === 'kr' ? kr.isLive : market === 'us' ? us.isLive : false;
           return <IndexItem key={idx.id} idx={idx} isOpen={isOpen} />;
         })}
       </div>

@@ -6,8 +6,8 @@ import KR_STOCK_NAMES from '../data/krStockNames.json';
 import { fetchSnapshot } from '../api/snapshot';
 import { fetchUsStocksBatch, fetchKoreanStocksBatch } from '../api/stocks';
 import { checkAndAlertBatch } from '../utils/priceAlert';
-import { POLLING } from '../constants/polling';
-import { isKoreanMarketOpen, isUsMarketOpen, isUsPreMarket, isUsAfterMarket } from '../utils/marketHours';
+import { POLLING, POLLABLE_DATA_MODES } from '../constants/polling';
+import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 
 // US_STOCK_LIST 메타맵 — 모듈 스코프에 1회만 생성 (sector/nameEn fallback)
 const US_META_MAP = new Map(US_STOCK_LIST.map(s => [s.symbol, s]));
@@ -238,8 +238,10 @@ export function usePrices() {
     let usInFlight = false;
     let krInFlight = false;
 
-    // 장중·프리·애프터마켓은 NORMAL(60s), 완전 마감·주말만 CLOSED(5min)
-    const usActive = () => isUsMarketOpen() || isUsPreMarket() || isUsAfterMarket();
+    // 폴링 활성 판정은 dataMode 기반 — live/delayed 세션만 NORMAL(60s), lastClose는 CLOSED(5min)
+    // (1차: 신규 세션 전부 lastClose → 거짓 라이브·Upstash 낭비 0)
+    const usActive = () => POLLABLE_DATA_MODES.has(getUsMarketStatus().dataMode);
+    const krActive = () => POLLABLE_DATA_MODES.has(getKoreanMarketStatus().dataMode);
 
     const scheduleUs = () => {
       if (destroyed) return;
@@ -260,8 +262,8 @@ export function usePrices() {
     const scheduleKr = () => {
       if (destroyed) return;
       const myGen = ++krGen;
-      // 한국장: 정규장(09:00~15:30)만 NORMAL, 이후 시간외/주말은 CLOSED
-      const delay = isKoreanMarketOpen() ? POLLING.NORMAL : POLLING.CLOSED;
+      // 한국장: dataMode 기반 — live(정규장)만 NORMAL, lastClose(시간외/NXT/주말)는 CLOSED
+      const delay = krActive() ? POLLING.NORMAL : POLLING.CLOSED;
       krTimerId = setTimeout(async () => {
         if (destroyed || myGen !== krGen) return;
         try {
@@ -276,7 +278,7 @@ export function usePrices() {
 
     // 단일 스냅샷으로 scheduleUs/Kr 및 prev* 초기화 — 경계 시점 이중 읽기 race 방지
     let prevUsActive = usActive();
-    let prevKrActive = isKoreanMarketOpen();
+    let prevKrActive = krActive();
 
     refreshUsStocks();
     refreshKoreanStocks();
@@ -300,7 +302,7 @@ export function usePrices() {
     const transitionCheckerId = setInterval(() => {
       if (destroyed) return;
       const nowUsActive = usActive();
-      const nowKrActive = isKoreanMarketOpen();
+      const nowKrActive = krActive();
       if (!document.hidden) {
         if (!prevUsActive && nowUsActive) {
           clearTimeout(usTimerId);
