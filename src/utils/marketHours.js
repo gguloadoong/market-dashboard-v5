@@ -133,8 +133,7 @@ function isWeekday(d) {
 }
 
 // 국내 주식 (KST 09:00~15:30)
-export function isKoreanMarketOpen() {
-  const kst = nowKST();
+export function isKoreanMarketOpen(kst = nowKST()) {
   if (!isWeekday(kst)) return false;
   if (isKrxHoliday(kst)) return false;
   const h = kst.getHours(), m = kst.getMinutes();
@@ -250,7 +249,7 @@ export function getKoreanMarketStatus() {
   const isHolidayOrWeekend = !isWeekday(kst) || isKrxHoliday(kst);
   let phase;
   if (isHolidayOrWeekend)         phase = 'closed';
-  else if (isKoreanMarketOpen())  phase = 'open';
+  else if (isKoreanMarketOpen(kst)) phase = 'open';   // 단일 스냅샷 kst 주입(경계 흔들림 방지)
   else if (isKrPreAuction(kst))   phase = 'preAuction'; // 08:30~09:00 우선
   else if (isKrPreNxt(kst))       phase = 'preNxt';     // 08:00~08:30 단독
   else if (isKrAfterNxt(kst))     phase = 'afterNxt';
@@ -260,15 +259,16 @@ export function getKoreanMarketStatus() {
 
 export function getUsMarketStatus() {
   const est = nowEST();                               // 단일 스냅샷 — 모든 판정에 주입
-  // 주말 가드는 제거: isUsDayMarket이 일요일 저녁/평일 새벽을 통과해야 하므로
-  // 요일 경계는 각 세션 함수 내부가 담당하고, 최상단 가드는 휴장일만.
+  // 정규/프리/애프터는 평일에만 판정(주말 거짓 라이브 방지 — 명시적 이중 가드).
+  // 데이마켓은 자체 요일 로직(isUsDayMarket)이 일요일밤·평일새벽 경계를 담당하므로 주말 가드 제외.
+  const weekday = isWeekday(est);
   let phase;
-  if (isNyseHoliday(est))         phase = 'closed';
-  else if (isUsMarketOpen(est))   phase = 'open';
-  else if (isUsPreMarket(est))    phase = 'pre';
-  else if (isUsAfterMarket(est))  phase = 'after';
-  else if (isUsDayMarket(est))    phase = 'dayMarket';
-  else                            phase = 'closed';
+  if (isNyseHoliday(est))                    phase = 'closed';
+  else if (weekday && isUsMarketOpen(est))   phase = 'open';
+  else if (weekday && isUsPreMarket(est))    phase = 'pre';
+  else if (weekday && isUsAfterMarket(est))  phase = 'after';
+  else if (isUsDayMarket(est))               phase = 'dayMarket';
+  else                                       phase = 'closed';
   const earlyClose = phase === 'open' && isNyseEarlyClose(est);
   const isHolidayOrWeekend = phase === 'closed' && (isNyseHoliday(est) || !isWeekday(est));
   return buildStatus('us', phase, { earlyClose, isHolidayOrWeekend });

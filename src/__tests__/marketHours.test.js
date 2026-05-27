@@ -341,6 +341,19 @@ describe('marketHours', () => {
       expect(isUsDayMarket()).toBe(false);
       expect(getUsMarketStatus().phase).toBe('closed');
     });
+
+    // 회귀 방지(Gemini gate): 주말 정규시간대 거짓 'open' 방지 — 명시 weekday 가드
+    it('토 12:00 EDT → closed (주말 정규시간 거짓 open/라이브 방지)', () => {
+      vi.setSystemTime(edt(2026, 5, 2, 12, 0));   // 토요일
+      const s = getUsMarketStatus();
+      expect(s.phase).toBe('closed');
+      expect(s.isLive).toBe(false);
+    });
+
+    it('일 12:00 EDT → closed (주말 정규시간, 저녁 데이마켓 진입 전)', () => {
+      vi.setSystemTime(edt(2026, 5, 3, 12, 0));   // 일요일 낮
+      expect(getUsMarketStatus().phase).toBe('closed');
+    });
   });
 
   // ── 3축 통합: phase / status / isLive / dataMode (#333) ──────────
