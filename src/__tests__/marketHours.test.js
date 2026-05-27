@@ -324,6 +324,17 @@ describe('marketHours', () => {
       expect(isUsDayMarket()).toBe(false);
     });
 
+    // 회귀 방지(architect BLOCK): 일요일 저녁 세션은 월요일 새벽까지 연속 — 월 새벽 누락 버그 차단
+    it('월 02:00 EDT → dayMarket (일요일밤→월새벽 연속, day=1 하한)', () => {
+      vi.setSystemTime(edt(2026, 5, 4, 2, 0));
+      expect(isUsDayMarket()).toBe(true);
+    });
+
+    it('금 02:00 EDT → dayMarket (목요일밤→금새벽 연속, day=5 상한)', () => {
+      vi.setSystemTime(edt(2026, 5, 8, 2, 0));
+      expect(isUsDayMarket()).toBe(true);
+    });
+
     it('NYSE 공휴일 22:00 → closed (데이마켓 차단)', () => {
       // 2026-01-01(목) 신년 휴장
       vi.setSystemTime(estTime(2026, 1, 1, 22, 0));

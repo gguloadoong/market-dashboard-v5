@@ -204,8 +204,9 @@ export function isUsDayMarket(est = nowEST()) {
   const isDawn    = minutes < 4 * 60;        // 00:00~03:59
   // 저녁(20~24시): 일~목만 (금·토 밤은 주말 진입이므로 제외)
   if (isEvening) return day >= 0 && day <= 4;
-  // 새벽(0~4시): 화~금만 (목요일밤→금새벽이 마지막. 토·일 새벽은 주말이므로 제외, 월 새벽도 제외)
-  if (isDawn)    return day >= 2 && day <= 5;
+  // 새벽(0~4시): 월~금 (일요일밤→월새벽 시작 ~ 목요일밤→금새벽 마지막. 토·일 새벽만 주말이므로 제외)
+  // 저녁 일~목(0~4)과 짝: 일저녁→월새벽, 목저녁→금새벽으로 자정 연속성 유지
+  if (isDawn)    return day >= 1 && day <= 5;
   return false;
 }
 
@@ -238,7 +239,7 @@ function buildLabel(market, phase, opts = {}) {
 function buildStatus(market, phase, opts = {}) {
   const dataMode = (market === 'kr' ? KR_SESSION_DATA_MODE : US_SESSION_DATA_MODE)[phase];
   const status   = bucketize(phase);                 // 하위호환 다운캐스트
-  const isLive   = dataMode !== 'lastClose';         // 녹색 펄스(거래중 표현) 단일 트리거
+  const isLive   = dataMode === 'live' || dataMode === 'delayed'; // 녹색 펄스 단일 트리거 (allowlist — 미지/누락 phase는 안전측 false)
   const label    = buildLabel(market, phase, opts);
   const color    = isLive ? 'up' : 'neutral';        // 死필드(기존 color) 호환 유지
   return { status, phase, label, color, isLive, dataMode };
