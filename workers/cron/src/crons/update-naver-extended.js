@@ -23,13 +23,15 @@ const NAVER_MOBILE_HEADERS = {
 
 // ── TTL ────────────────────────────────────────────────────────
 // 키는 SNAP_KEYS.US_EXT / KR_EXT 사용 (price-cache.js 중앙 정의).
-const EXT_TTL_ACTIVE = 120;     // 연장세션 구간 (60s 호출 + 60s 여유)
-const EXT_TTL_STALE  = 3600;    // 연장 종료 후 fallback (1h, 현재 미사용)
+const EXT_TTL_ACTIVE = 360;     // 연장세션 구간 (2× cron 주기 + 버퍼)
+// TODO: 연장 종료 후 fallback (1h, 현재 미사용) — 마지막 유효 overPrice 표시 폴백 로직 미구현.
+const EXT_TTL_STALE  = 3600;
 
 // ── Yahoo dash → Naver 원본 변환 (BRK-B → BRK.B), AMEX/NYSE/NASDAQ 매핑 ──
-// update-us.js는 NASDAQ API 응답의 exchange ('NASDAQ'|'NYSE'|'AMEX') 를 snap:us:N 의 각 종목에 저장하지 않는다.
-// 따라서 여기서는 hot 스냅샷에 exchange 가 없을 수 있어 'O'(NASDAQ) 우선 시도 후 'N','A' fallback.
+// #334: update-us.js가 hot snap 항목별 exchange ('NASDAQ'|'NYSE'|'AMEX') 를 저장하므로
+//       1차로 결정적 SFX 1회 fetch (평균 ~200 subreq 절감). 미상이면 SFX_PRIORITY 폴백(레거시 안전망).
 const SFX_PRIORITY = ['O', 'N', 'A'];
+const EXCHANGE_TO_SFX = { NASDAQ: 'O', NYSE: 'N', AMEX: 'A' };
 
 // Naver 미장은 dot 심볼 — Yahoo 는 dash. snap:us 의 symbol 은 yahooSymbol(dash) 로 저장됨.
 // → 그대로 SFX 뒤에 붙이되, BRK-B 같은 dash 그대로 보존이 Naver에 통한다 (실증 결과 confirmed).
@@ -73,35 +75,54 @@ function isKrExtSession(kst = nowKst()) {
 
 // ── 응답 파싱 (US/KR 공통 overMarketPriceInfo) ─────────────────
 // 국내가격은 쉼표포함 문자열 → 쉼표 제거. raw 필드 우선 (쉼표 없음 검증됨).
+// #334 review: overMarketStatus != 'OPEN' 이거나 가격 누락 시 null 대신 명시적 CLOSE 객체 반환
+//   → fresh 머지에서 항상 포함시켜 stale 'OPEN' 잔존 차단(최대 120s 잘못된 배지 방지).
 function parseExtended(json, isKr) {
   const info = json?.overMarketPriceInfo;
   if (!info) return null;
   const sessionType = info.tradingSessionType;     // 'PRE_MARKET' | 'AFTER_MARKET'
   const status      = info.overMarketStatus;       // 'OPEN' | 'CLOSE'
   if (sessionType !== 'PRE_MARKET' && sessionType !== 'AFTER_MARKET') return null;
-  const rawPrice    = info.overPriceRaw ?? info.overPrice;
-  const rawPct      = info.fluctuationsRatioRaw ?? info.fluctuationsRatio;
-  if (rawPrice == null || rawPct == null) return null;
-  const price = parseFloat(String(rawPrice).replace(/,/g, ''));
-  const pct   = parseFloat(String(rawPct).replace(/,/g, ''));
-  if (!Number.isFinite(price) || price <= 0) return null;
-  if (!Number.isFinite(pct)) return null;
   // 국장 NXT 라벨 매핑 (PRE_MARKET → NXT_PRE, AFTER_MARKET → NXT_AFTER)
   const labelSession = isKr
     ? (sessionType === 'PRE_MARKET' ? 'NXT_PRE' : 'NXT_AFTER')
     : sessionType;
+  const rawPrice    = info.overPriceRaw ?? info.overPrice;
+  const rawPct      = info.fluctuationsRatioRaw ?? info.fluctuationsRatio;
+  // CLOSE 또는 가격 누락 → 명시적 CLOSE 객체 (stale OPEN 차단용).
+  if (status !== 'OPEN' || rawPrice == null || rawPct == null) {
+    return {
+      extendedStatus:       'CLOSE',
+      extendedSessionType:  labelSession,
+      extendedAt:           info.localTradedAt || new Date().toISOString(),
+    };
+  }
+  const price = parseFloat(String(rawPrice).replace(/,/g, ''));
+  const pct   = parseFloat(String(rawPct).replace(/,/g, ''));
+  if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(pct)) {
+    return {
+      extendedStatus:       'CLOSE',
+      extendedSessionType:  labelSession,
+      extendedAt:           info.localTradedAt || new Date().toISOString(),
+    };
+  }
   return {
     extendedPrice:        parseFloat(price.toFixed(4)),
     extendedChangePct:    parseFloat(pct.toFixed(2)),
     extendedSessionType:  labelSession,
-    extendedStatus:       status === 'OPEN' ? 'OPEN' : 'CLOSE',
+    extendedStatus:       'OPEN',
     extendedAt:           info.localTradedAt || new Date().toISOString(),
   };
 }
 
-// ── 미장 단일 종목 호출 — SFX 3종 fallback (O→N→A) ────────────────
-async function fetchNaverUsSingle(symbol, timeoutMs = 5000) {
-  for (const sfx of SFX_PRIORITY) {
+// ── 미장 단일 종목 호출 — exchange 결정적 SFX → 미상이면 SFX_PRIORITY 폴백 ───
+async function fetchNaverUsSingle(symbol, timeoutMs = 5000, exchange = null) {
+  const primary = exchange ? EXCHANGE_TO_SFX[exchange] : null;
+  // 결정적 SFX 우선 시도(평균 ~200 subreq 절감), 실패 시에만 나머지 SFX 폴백.
+  const order = primary
+    ? [primary, ...SFX_PRIORITY.filter((s) => s !== primary)]
+    : SFX_PRIORITY;
+  for (const sfx of order) {
     try {
       const res = await fetch(buildUsUrl(symbol, sfx), {
         headers: NAVER_MOBILE_HEADERS,
@@ -117,7 +138,9 @@ async function fetchNaverUsSingle(symbol, timeoutMs = 5000) {
 }
 
 // ── 국장 단일 종목 호출 ─────────────────────────────────────────
-async function fetchNaverKrSingle(symbol, timeoutMs = 5000) {
+// 시그니처 통일: fetchBatch 가 (symbol, undefined, ctx) 로 호출하므로 3번째 인자 무시.
+async function fetchNaverKrSingle(symbol, timeoutMs = 5000, _ctx = null) {
+  void _ctx;
   try {
     const res = await fetch(buildKrUrl(symbol), {
       headers: NAVER_MOBILE_HEADERS,
@@ -132,13 +155,15 @@ async function fetchNaverKrSingle(symbol, timeoutMs = 5000) {
 }
 
 // ── 배치 호출 — 동시성 제한 + stale 폴백 머지 ────────────────────
-const CONCURRENCY = 10;     // 200종목 × 3 SFX 최악 = 600 subreq → 20병렬 안전
+const CONCURRENCY = 20;     // 200종목/20병렬 → 10배치, 30s wall-clock 안전
 
-async function fetchBatch(symbols, fetcher) {
+async function fetchBatch(symbols, fetcher, ctxMap = null) {
   const out = {};
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
     const chunk = symbols.slice(i, i + CONCURRENCY);
-    const settled = await Promise.allSettled(chunk.map((s) => fetcher(s)));
+    const settled = await Promise.allSettled(
+      chunk.map((s) => fetcher(s, undefined, ctxMap ? ctxMap[s] : null))
+    );
     for (let j = 0; j < settled.length; j++) {
       if (settled[j].status === 'fulfilled' && settled[j].value) {
         out[chunk[j]] = settled[j].value;
@@ -167,9 +192,13 @@ async function updateMarket(market) {
     return { market, skipped: true, reason: 'no-hot-snap' };
   }
   const symbols = hot.map((s) => s.symbol).filter(Boolean);
-  const fresh = await fetchBatch(symbols, fetcher);
+  // 미장만 exchange ctx 전달 → 결정적 SFX (NASDAQ='O' / NYSE='N' / AMEX='A').
+  const ctxMap = isKr ? null : Object.fromEntries(
+    hot.map((s) => [s.symbol, s.exchange]).filter(([k, v]) => k && v)
+  );
+  const fresh = await fetchBatch(symbols, fetcher, ctxMap);
 
-  // 기존 ext 와 머지 (네이버 실패/null 종목은 stale 유지)
+  // 기존 ext 와 머지. fresh 가 명시적 CLOSE 도 포함하므로 stale 'OPEN' 잔존 차단됨.
   const prev = (await getSnap(extKey)) || {};
   const merged = { ...prev, ...fresh };
 

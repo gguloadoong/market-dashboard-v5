@@ -57,20 +57,23 @@ async function fetchNasdaqSymbols(limit = 1000) {
   const seen = new Set();
   const symbols = [];
   const mcMap = {};
+  const exchangeMap = {};
   for (const s of allSymbols) {
     if (seen.has(s.symbol)) continue;
     seen.add(s.symbol);
     symbols.push(s.symbol);
     mcMap[s.symbol] = s.marketCap;
+    exchangeMap[s.symbol] = s.exchange;
   }
   return {
     symbols: symbols.slice(0, limit),
     mcMap, // symbol → marketCap (USD)
+    exchangeMap, // #334: symbol → 'NASDAQ'|'NYSE'|'AMEX' — Naver SFX 결정적 매핑용
   };
 }
 
 // Redis에서 종목 리스트 + marketCap 맵 가져오기 (없으면 NASDAQ API 호출 후 캐시)
-// 반환: { symbols: string[], mcMap: Record<symbol, number> }
+// 반환: { symbols: string[], mcMap: Record<symbol, number>, exchangeMap: Record<symbol, 'NASDAQ'|'NYSE'|'AMEX'> }
 async function getSymbolList() {
   const redis = getRedis();
   let legacyArrayCache = null;
@@ -81,7 +84,8 @@ async function getSymbolList() {
       // 임계값 저장(>=100)과 통일해서 정확히 100개일 때도 캐시 재사용.
       if (cached && typeof cached === 'object' && !Array.isArray(cached)
           && Array.isArray(cached.symbols) && cached.symbols.length >= 100) {
-        return { symbols: cached.symbols, mcMap: cached.mcMap || {} };
+        // #334: 구형 캐시(exchangeMap 없음) 도 호환 — 빈 객체로 폴백.
+        return { symbols: cached.symbols, mcMap: cached.mcMap || {}, exchangeMap: cached.exchangeMap || {} };
       }
       // 구형 캐시 (plain array) — rollout 과도기 호환.
       // 여기서 즉시 return 하면 새 형식으로 갱신이 24h(TTL) 지연되므로,
@@ -94,7 +98,7 @@ async function getSymbolList() {
   }
 
   // NASDAQ API에서 수집 (총 30초 타임아웃)
-  let collected = { symbols: [], mcMap: {} };
+  let collected = { symbols: [], mcMap: {}, exchangeMap: {} };
   try {
     collected = await Promise.race([
       fetchNasdaqSymbols(SYMBOL_LIMIT),
@@ -102,7 +106,7 @@ async function getSymbolList() {
     ]);
   } catch (e) {
     console.warn('[update-us] NASDAQ 수집 실패:', e.message);
-    collected = { symbols: [], mcMap: {} };
+    collected = { symbols: [], mcMap: {}, exchangeMap: {} };
   }
   // #104 Opus: 임계값 일관성 — 100 미만이면 의심스러운 수집이라 판단하고
   //           legacy/FALLBACK 중 더 나은 쪽을 사용. 캐시 저장 기준(>=100)과 통일.
@@ -123,12 +127,13 @@ async function getSymbolList() {
   // #104 Codex: 부분 수집한 mcMap 이 있으면 같이 전달해서 legacy 경로도
   //           가능한 범위에서 marketCap 복구 (모두 0 으로 떨어지지 않도록).
   const partialMcMap = collected.mcMap || {};
+  const partialExchangeMap = collected.exchangeMap || {};
   if (legacyArrayCache) {
     console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 구형 array 캐시 사용 (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
-    return { symbols: legacyArrayCache, mcMap: partialMcMap };
+    return { symbols: legacyArrayCache, mcMap: partialMcMap, exchangeMap: partialExchangeMap };
   }
   console.warn(`[update-us] NASDAQ 수집 부족(${collected.symbols.length}) — 하드코딩 FALLBACK_SYMBOLS (부분 mcMap ${Object.keys(partialMcMap).length}건)`);
-  return { symbols: FALLBACK_SYMBOLS, mcMap: partialMcMap };
+  return { symbols: FALLBACK_SYMBOLS, mcMap: partialMcMap, exchangeMap: partialExchangeMap };
 }
 
 // 하드코딩 fallback (기존 122개)
@@ -157,7 +162,8 @@ function nextHost() { return YAHOO_HOSTS[(_hostIdx++) % YAHOO_HOSTS.length]; }
 // v8 chart API 개별 심볼 조회.
 // BRK.A 등 dot 심볼은 Yahoo 포맷(BRK-A)으로 dash 치환 후 요청 (#169 Codex HIGH #1 관행 유지).
 // mcMap 에서 marketCap 을 머지 (v8 응답엔 marketCap 없음).
-async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
+// #334: exchangeMap 으로 'NASDAQ'|'NYSE'|'AMEX' 보존 → Naver 연장세션 SFX 결정적 매핑.
+async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null, exchangeMap = null) {
   // Yahoo v8 은 dot 심볼을 dash 로 요청 (BRK.A → BRK-A)
   const yahooSymbol = symbol.includes('.') ? symbol.replace('.', '-') : symbol;
   const host = nextHost();
@@ -177,9 +183,10 @@ async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
   const prev = Number(meta.chartPreviousClose) || Number(meta.previousClose) || price || 0;
   const volume = Number(meta.regularMarketVolume) || 0;
 
-  // mcMap lookup 은 원본(raw) 또는 dash 치환 심볼 양쪽 키로 시도 — NASDAQ 포맷이 환경별로 다름
+  // mcMap / exchangeMap lookup — 원본(raw) 또는 dash 치환 심볼 양쪽 키로 시도 (NASDAQ 포맷 환경별 차이).
   const mcFromNasdaq = mcMap ? (mcMap[symbol] || mcMap[yahooSymbol]) : 0;
   const marketCap = mcFromNasdaq || 0;
+  const exchange = exchangeMap ? (exchangeMap[symbol] || exchangeMap[yahooSymbol] || null) : null;
 
   return {
     symbol: yahooSymbol,
@@ -190,18 +197,19 @@ async function fetchYahooV8Single(symbol, timeoutMs = 10000, mcMap = null) {
     marketCap,
     name: meta.shortName || meta.longName || yahooSymbol,
     market: 'us',
+    exchange,
   };
 }
 
 // 전 심볼을 CONCURRENCY 병렬 청크로 v8 개별 호출.
 // 성공: results, 실패(HTTP/parse/가격 무효): failed 에 원본 심볼 집계.
-async function fetchBatch(symbols, timeoutMs = 10000, mcMap = null) {
+async function fetchBatch(symbols, timeoutMs = 10000, mcMap = null, exchangeMap = null) {
   const results = [];
   const failed = [];
   for (let i = 0; i < symbols.length; i += CONCURRENCY) {
     const chunk = symbols.slice(i, i + CONCURRENCY);
     const settled = await Promise.allSettled(
-      chunk.map((s) => fetchYahooV8Single(s, timeoutMs, mcMap))
+      chunk.map((s) => fetchYahooV8Single(s, timeoutMs, mcMap, exchangeMap))
     );
     for (let j = 0; j < settled.length; j++) {
       if (settled[j].status === 'fulfilled') {
@@ -224,7 +232,7 @@ export async function updateUs(env, shardId) {
   }
   const redis = getRedis();
   try {
-    const { symbols: allSymbols, mcMap } = await getSymbolList();
+    const { symbols: allSymbols, mcMap, exchangeMap } = await getSymbolList();
     const totalSymbols = Math.min(allSymbols.length, SYMBOL_LIMIT);
     const start = shardId * SHARD_SIZE;
     const end = Math.min(start + SHARD_SIZE, totalSymbols);
@@ -236,7 +244,7 @@ export async function updateUs(env, shardId) {
       return { ok: true, shardId, count: 0 };
     }
 
-    const { results, failed } = await fetchBatch(shardSymbols, 10000, mcMap);
+    const { results, failed } = await fetchBatch(shardSymbols, 10000, mcMap, exchangeMap);
 
     // 실패 재시도 (50% 미만 + 재시도 추가 subrequest 가 1000 한도 넘지 않을 때만)
     let retryResults = [];
@@ -244,7 +252,7 @@ export async function updateUs(env, shardId) {
     const wouldExceedBudget = (shardSymbols.length + failed.length) > 980;  // 샤드 Yahoo + 재시도 합산
     if (failed.length > 0 && failRatio < 0.5 && !wouldExceedBudget) {
       console.log(`[update-us] 샤드 ${shardId} 재시도: ${failed.length}개`);
-      const { results: retried } = await fetchBatch(failed, 12000, mcMap);
+      const { results: retried } = await fetchBatch(failed, 12000, mcMap, exchangeMap);
       retryResults = retried;
     } else if (wouldExceedBudget) {
       console.log(`[update-us] 샤드 ${shardId} 재시도 skip — subrequest 예산 초과 우려 (${shardSymbols.length + failed.length})`);

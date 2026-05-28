@@ -2,7 +2,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   hasLiveExtended,
-  getDisplayPriceCore,
   extendedBadgeLabel,
 } from '../utils/extendedPrice.js';
 
@@ -57,32 +56,6 @@ describe('extendedPrice', () => {
       const item = { extendedPrice: 100, extendedStatus: 'OPEN' };
       const status = { phase: 'open', dataMode: 'delayed' };
       expect(hasLiveExtended(item, status)).toBe(false);
-    });
-  });
-
-  describe('getDisplayPriceCore', () => {
-    it('연장세션 활성 → ext 값 사용', () => {
-      const item = {
-        price: 300,
-        changePct: 0,
-        extendedPrice: 309.07,
-        extendedChangePct: 0.24,
-        extendedStatus: 'OPEN',
-      };
-      const status = { phase: 'pre', dataMode: 'delayed' };
-      const r = getDisplayPriceCore(item, status);
-      expect(r.price).toBe(309.07);
-      expect(r.changePct).toBe(0.24);
-      expect(r.isExtended).toBe(true);
-    });
-
-    it('연장세션 비활성 → 정규 값 사용', () => {
-      const item = { price: 300, changePct: 1.5 };
-      const status = { phase: 'closed', dataMode: 'lastClose' };
-      const r = getDisplayPriceCore(item, status);
-      expect(r.price).toBe(300);
-      expect(r.changePct).toBe(1.5);
-      expect(r.isExtended).toBe(false);
     });
   });
 

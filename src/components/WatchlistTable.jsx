@@ -569,6 +569,10 @@ const RELIABILITY = {
 };
 
 export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFAULT_KRW_RATE, onRowClick, loading = false, initializing = false, dataError = null, onRetry }) {
+  // #334 review: 행마다 getKoreanMarketStatus/getUsMarketStatus 호출 → 와치리스트 50~100행 × 가격 플래시 리렌더마다 반복.
+  //   부모에서 1회 계산해 marketStatus prop 으로 주입 (HotListSection.jsx 패턴과 동일).
+  const krStatus = getKoreanMarketStatus();
+  const usStatus = getUsMarketStatus();
   const [sortKey, setSortKey] = useState('changePct');
   const [sortDir, setSortDir] = useState('desc');
   const [searchInput, setSearchInput] = useState('');       // 즉시 반영 (입력 UI용)
@@ -918,6 +922,13 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFA
                     ? virtualItems.map((vRow) => <SkeletonRow key={vRow.key} />)
                     : virtualItems.map((vRow) => {
                         const item = flatSorted[vRow.index];
+                        // #334 review: 종목별 status 는 부모에서 1회 계산한 값을 분기로 주입 (행별 시계 계산 제거).
+                        //              코인은 ext 무관이라 null. FlashRow 내부 fallback(pickStatusForItem)은 안전망으로 보존.
+                        const rowStatus = isCoinItem(item)
+                          ? null
+                          : item.market === 'kr' ? krStatus
+                          : item.market === 'us' ? usStatus
+                          : null;
                         return (
                           <FlashRow
                             key={item.id || item.symbol}
@@ -934,6 +945,7 @@ export default function WatchlistTable({ items = [], type = 'kr', krwRate = DEFA
                             targetPrice={targetPrices[item.id || item.symbol]?.price ?? null}
                             targetDir={targetPrices[item.id || item.symbol]?.direction ?? 'above'}
                             onTargetChange={handleTargetPriceChange}
+                            marketStatus={rowStatus}
                           />
                         );
                       })

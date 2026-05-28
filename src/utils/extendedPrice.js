@@ -21,23 +21,6 @@ export function hasLiveExtended(item, status) {
   return true;
 }
 
-// 연장세션이면 ext 값으로, 아니면 정규 값으로 — 화면 표시용 가격/등락률 묶음.
-// 반환: { price, changePct, isExtended }
-export function getDisplayPriceCore(item, status) {
-  if (hasLiveExtended(item, status)) {
-    return {
-      price:      Number(item.extendedPrice),
-      changePct:  Number(item.extendedChangePct ?? 0),
-      isExtended: true,
-    };
-  }
-  return {
-    price:      item?.price ?? 0,
-    changePct:  item?.changePct ?? 0,
-    isExtended: false,
-  };
-}
-
 // "참고가" 배지 라벨 — sessionType 별 분기
 export function extendedBadgeLabel(item) {
   switch (item?.extendedSessionType) {
