@@ -214,7 +214,7 @@ function scoreNews(item, recentNews, hotSectors) {
     const kws = buildStockKeywords(item.symbol, item.name, market);
     for (const n of recentNews) {
       if (newsCount >= 3) break;
-      const text = `${n.title || ''} ${n.summary || ''}`;
+      const text = `${n?.title || ''} ${n?.summary || ''}`;
       if (matchesKeywords(text, kws)) newsCount += 1;
     }
   }
@@ -357,7 +357,7 @@ export function clusterThemes(scoredItems, recentNews = [], precomputedHotList =
     const hotSectors = new Set();
     if (Array.isArray(recentNews)) {
       for (const n of recentNews) {
-        for (const s of detectNewsSectors(n.title || '')) hotSectors.add(s);
+        for (const s of detectNewsSectors(n?.title || '')) hotSectors.add(s);
       }
     }
     hotList = [...hotSectors];

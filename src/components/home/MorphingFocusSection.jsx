@@ -138,6 +138,7 @@ function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick }) {
       style={{ background: tintBg(pct) }}
       role="button"
       tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(item); } }}
     >
       {/* 상단: 로고 + 종목명 + (우) 가격/스파크 */}
       <div className="flex items-center gap-2.5 mb-2.5">
@@ -207,6 +208,7 @@ function CompactMoverRow({ item, pct, newsCount, isGap, krwRate, onClick, showTo
       style={showTopBorder ? { borderTop: '1px solid #F2F3F5' } : undefined}
       role="button"
       tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(item); } }}
     >
       <TickerLogo item={item} size={24} />
       <div className="min-w-0 flex-1">
@@ -306,7 +308,7 @@ export default function MorphingFocusSection({
     }),
     // krStatus/usStatus는 매 렌더 새 객체지만 phase만 의존 → phase 문자열로 안정화
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [krItems, usItems, coinItems, recentNews, krwRate, krwRateLoaded, indices, krStatus.phase, usStatus.phase],
+    [krItems, usItems, coinItems, recentNews, krwRate, krwRateLoaded, indices, krStatus?.phase, usStatus?.phase],
   );
 
   const { mode, primaryTheme, altThemes, movers, bridge } = focus;
