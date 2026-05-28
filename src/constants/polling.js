@@ -14,3 +14,7 @@ export const POLLING = {
   SLOW:        60_000 * DEV_MULTIPLIER,  // 60초  — 하위호환 유지 (직접 참조 파일 없앤 후 제거 예정)
   SPARKLINE:  600_000 * DEV_MULTIPLIER,  // 10분  — CoinGecko sparkline (분봉 delta)
 };
+
+// 폴링 대상 dataMode — live/delayed 만 NORMAL 폴링, lastClose는 CLOSED(폴링 안 함)
+// usePrices의 usActive/krActive가 이 집합으로 판정 (거짓 라이브·Upstash 낭비 방지)
+export const POLLABLE_DATA_MODES = new Set(['live', 'delayed']);

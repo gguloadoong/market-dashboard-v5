@@ -85,15 +85,15 @@ export default function Header({
           {/* 장 운영 상태 */}
           <div className="flex items-center gap-3 text-[13px]">
             <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${kr.status === 'open' ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${kr.isLive ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
               <span className="text-[#6B7684]">국장</span>
-              <span className={`font-semibold text-[12px] ${kr.status === 'open' ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{kr.label}</span>
+              <span className={`font-semibold text-[12px] ${kr.isLive ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{kr.label}</span>
             </span>
             <span className="text-[#E5E8EB]">|</span>
             <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${us.status === 'open' ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${us.isLive ? 'bg-[#2AC769] animate-pulse' : 'bg-[#E5E8EB]'}`} />
               <span className="text-[#6B7684]">미장</span>
-              <span className={`font-semibold text-[12px] ${us.status === 'open' ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{us.label}</span>
+              <span className={`font-semibold text-[12px] ${us.isLive ? 'text-[#2AC769]' : 'text-[#B0B8C1]'}`}>{us.label}</span>
             </span>
           </div>
 

@@ -1,4 +1,5 @@
 // 장 운영시간 유틸리티
+import { KR_SESSION_DATA_MODE, US_SESSION_DATA_MODE } from '../constants/sessionDataMode';
 
 // ─── KRX 휴장일 (완전 휴장) ────────────────────────────────────
 // 출처: 한국법령정보센터 공공기관 법정 공휴일 + KRX 거래소 휴장일 기준
@@ -132,8 +133,7 @@ function isWeekday(d) {
 }
 
 // 국내 주식 (KST 09:00~15:30)
-export function isKoreanMarketOpen() {
-  const kst = nowKST();
+export function isKoreanMarketOpen(kst = nowKST()) {
   if (!isWeekday(kst)) return false;
   if (isKrxHoliday(kst)) return false;
   const h = kst.getHours(), m = kst.getMinutes();
@@ -168,25 +168,108 @@ export function isUsAfterMarket(est = nowEST()) {
   return minutes >= afterStart && minutes < 20 * 60;
 }
 
+// ─── 신규 세션 판정 함수 (NXT·동시호가·미장 데이마켓) ───────────
+// 모두 단일 스냅샷 주입 가능 (getXxxMarketStatus에서 동일 시각 재사용 → 경계 흔들림 방지)
+
+// 국장 NXT 프리마켓 (KST 08:00~08:50) — 평일·휴장일 가드
+export function isKrPreNxt(kst = nowKST()) {
+  if (!isWeekday(kst) || isKrxHoliday(kst)) return false;
+  const minutes = kst.getHours() * 60 + kst.getMinutes();
+  return minutes >= 8 * 60 && minutes < 8 * 60 + 50;
+}
+
+// 국장 동시호가 (KST 08:30~09:00) — 기존 getKoreanMarketStatus 인라인 로직을 함수로 추출
+export function isKrPreAuction(kst = nowKST()) {
+  if (!isWeekday(kst) || isKrxHoliday(kst)) return false;
+  const minutes = kst.getHours() * 60 + kst.getMinutes();
+  return minutes >= 8 * 60 + 30 && minutes < 9 * 60;
+}
+
+// 국장 NXT 시간외 (KST 15:30~20:00) — 평일·휴장일 가드
+export function isKrAfterNxt(kst = nowKST()) {
+  if (!isWeekday(kst) || isKrxHoliday(kst)) return false;
+  const minutes = kst.getHours() * 60 + kst.getMinutes();
+  return minutes >= 15 * 60 + 30 && minutes < 20 * 60;
+}
+
+// 미장 데이마켓 (ET 20:00~익일 04:00) — 자정 넘김 + 요일 경계 처리
+// 블루오션 거래 시간: 일요일 저녁 ~ 금요일 저녁(금 밤 제외).
+// 주말 차단은 isWeekday가 아니라 아래 요일 로직이 담당 (일요일 저녁 통과 필요).
+export function isUsDayMarket(est = nowEST()) {
+  if (isNyseHoliday(est)) return false;
+  const day = est.getDay();                 // 0=일 … 6=토
+  const minutes = est.getHours() * 60 + est.getMinutes();
+  const isEvening = minutes >= 20 * 60;      // 20:00~23:59
+  const isDawn    = minutes < 4 * 60;        // 00:00~03:59
+  // 저녁(20~24시): 일~목만 (금·토 밤은 주말 진입이므로 제외)
+  if (isEvening) return day >= 0 && day <= 4;
+  // 새벽(0~4시): 월~금 (일요일밤→월새벽 시작 ~ 목요일밤→금새벽 마지막. 토·일 새벽만 주말이므로 제외)
+  // 저녁 일~목(0~4)과 짝: 일저녁→월새벽, 목저녁→금새벽으로 자정 연속성 유지
+  if (isDawn)    return day >= 1 && day <= 5;
+  return false;
+}
+
+// ─── phase → 하위호환 status 다운캐스트 ─────────────────────────
+// 기존 소비처(status==='open' 단일 기준)가 신규 phase에서도 안전 폴백되도록 버킷화.
+// ⚠️ dataMode가 lastClose인 세션(데이마켓·프리·애프터·NXT 등)은 절대 'open'으로 올리지 않는다(거짓 라이브 방지).
+function bucketize(phase) {
+  if (phase === 'open') return 'open';
+  if (phase === 'pre' || phase === 'preNxt' || phase === 'preAuction') return 'pre';
+  if (phase === 'after' || phase === 'afterNxt' || phase === 'dayMarket') return 'after';
+  return 'closed';
+}
+
+// ─── phase → 한국어 라벨 ────────────────────────────────────────
+function buildLabel(phase, opts = {}) {
+  switch (phase) {
+    case 'open':       return opts.earlyClose ? '거래중(조기종료)' : '거래중';
+    case 'dayMarket':  return '데이마켓';
+    case 'pre':        return '프리마켓';
+    case 'after':      return '애프터';
+    case 'preNxt':     return 'NXT 프리';
+    case 'afterNxt':   return 'NXT 시간외';
+    case 'preAuction': return '동시호가';
+    case 'closed':     return opts.isHolidayOrWeekend ? '휴장' : '장마감';
+    default:           return '장마감';
+  }
+}
+
+// ─── 통합 상태 빌더 — 3축 분리(phase / isLive / dataMode) + 하위호환 status ─────
+function buildStatus(market, phase, opts = {}) {
+  const dataMode = (market === 'kr' ? KR_SESSION_DATA_MODE : US_SESSION_DATA_MODE)[phase];
+  const status   = bucketize(phase);                 // 하위호환 다운캐스트
+  const isLive   = dataMode === 'live' || dataMode === 'delayed'; // 녹색 펄스 단일 트리거 (allowlist — 미지/누락 phase는 안전측 false)
+  const label    = buildLabel(phase, opts);
+  const color    = isLive ? 'up' : 'neutral';        // 死필드(기존 color) 호환 유지
+  return { status, phase, label, color, isLive, dataMode };
+}
+
 export function getKoreanMarketStatus() {
-  const kst = nowKST();
-  if (!isWeekday(kst) || isKrxHoliday(kst)) return { status: 'closed', label: '휴장', color: 'neutral' };
-  if (isKoreanMarketOpen()) return { status: 'open', label: '거래중', color: 'up' };
-  const h = kst.getHours(), m = kst.getMinutes();
-  const minutes = h * 60 + m;
-  if (minutes >= 8 * 60 + 30 && minutes < 9 * 60) return { status: 'pre', label: '동시호가', color: 'neutral' };
-  return { status: 'closed', label: '장마감', color: 'neutral' };
+  const kst = nowKST();                               // 단일 스냅샷 — 모든 판정에 주입
+  const isHolidayOrWeekend = !isWeekday(kst) || isKrxHoliday(kst);
+  let phase;
+  if (isHolidayOrWeekend)         phase = 'closed';
+  else if (isKoreanMarketOpen(kst)) phase = 'open';   // 단일 스냅샷 kst 주입(경계 흔들림 방지)
+  else if (isKrPreAuction(kst))   phase = 'preAuction'; // 08:30~09:00 우선
+  else if (isKrPreNxt(kst))       phase = 'preNxt';     // 08:00~08:30 단독
+  else if (isKrAfterNxt(kst))     phase = 'afterNxt';
+  else                            phase = 'closed';
+  return buildStatus('kr', phase, { isHolidayOrWeekend });
 }
 
 export function getUsMarketStatus() {
-  // 단일 스냅샷으로 모든 판정 — 경계 시점 흔들림 방지
-  const est = nowEST();
-  if (!isWeekday(est) || isNyseHoliday(est)) return { status: 'closed', label: '휴장', color: 'neutral' };
-  if (isUsMarketOpen(est)) {
-    if (isNyseEarlyClose(est)) return { status: 'open', label: '거래중(조기종료)', color: 'up' };
-    return { status: 'open', label: '거래중', color: 'up' };
-  }
-  if (isUsPreMarket(est)) return { status: 'pre', label: '프리마켓', color: 'neutral' };
-  if (isUsAfterMarket(est)) return { status: 'after', label: '애프터', color: 'neutral' };
-  return { status: 'closed', label: '장마감', color: 'neutral' };
+  const est = nowEST();                               // 단일 스냅샷 — 모든 판정에 주입
+  // 정규/프리/애프터는 평일에만 판정(주말 거짓 라이브 방지 — 명시적 이중 가드).
+  // 데이마켓은 자체 요일 로직(isUsDayMarket)이 일요일밤·평일새벽 경계를 담당하므로 주말 가드 제외.
+  const weekday = isWeekday(est);
+  let phase;
+  if (isNyseHoliday(est))                    phase = 'closed';
+  else if (weekday && isUsMarketOpen(est))   phase = 'open';
+  else if (weekday && isUsPreMarket(est))    phase = 'pre';
+  else if (weekday && isUsAfterMarket(est))  phase = 'after';
+  else if (isUsDayMarket(est))               phase = 'dayMarket';
+  else                                       phase = 'closed';
+  const earlyClose = phase === 'open' && isNyseEarlyClose(est);
+  const isHolidayOrWeekend = phase === 'closed' && (isNyseHoliday(est) || !isWeekday(est));
+  return buildStatus('us', phase, { earlyClose, isHolidayOrWeekend });
 }

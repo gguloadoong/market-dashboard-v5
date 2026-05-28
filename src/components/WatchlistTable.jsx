@@ -501,18 +501,25 @@ function SortHeader({ label, sortKey, currentKey, currentDir, onSort, className 
 
 
 // 탭 타입별 장 상태 배지 (사용자에게 데이터 freshness 명시)
+// phase + dataMode 기반 — isLive(라이브 표현) 세션은 배지 생략, lastClose 세션만 freshness 안내
 function MarketStatusBadge({ type }) {
   if (type === 'etf' || type === 'coin') return null;
-  const { status, label } = type === 'kr' ? getKoreanMarketStatus() : getUsMarketStatus();
-  if (status === 'open') return null; // 거래 중이면 배지 불필요
-  const text = type === 'kr'
-    ? `${label} · 전일 종가 기준`
-    : status === 'pre' ? `${label} · 정규장 전`
-    : status === 'after' ? `${label} · 정규장 후`
-    : `${label} · 전일 종가 기준`;
+  const { phase, label, isLive } = type === 'kr' ? getKoreanMarketStatus() : getUsMarketStatus();
+  if (isLive) return null; // 라이브(국장 정규장·미장 정규장)는 배지 불필요
+  // phase별 부가 설명 — 모두 lastClose(전일 종가 기준)이나 세션 성격을 함께 노출
+  let suffix;
+  switch (phase) {
+    case 'pre':        suffix = '정규장 전'; break;       // 미장 프리마켓
+    case 'after':      suffix = '정규장 후'; break;       // 미장 애프터
+    case 'dayMarket':  suffix = '실시간 추적 안됨'; break; // 미장 데이마켓
+    case 'preNxt':     suffix = '정규장 전'; break;       // 국장 NXT 프리
+    case 'preAuction': suffix = '정규장 전'; break;       // 국장 동시호가
+    case 'afterNxt':   suffix = '정규장 후'; break;       // 국장 NXT 시간외
+    default:           suffix = '전일 종가 기준'; break;   // closed
+  }
   return (
     <span className="text-[11px] text-[#8B95A1] bg-[#F2F4F6] px-2 py-1 rounded-lg flex-shrink-0">
-      {text}
+      {label} · {suffix}
     </span>
   );
 }

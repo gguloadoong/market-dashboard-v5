@@ -83,16 +83,22 @@ function SkeletonHotRow({ count = 5 }) {
 }
 
 export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop, usDrop, coinDrop, krwRate, onItemClick }) {
-  const krOpen = getKoreanMarketStatus().status === 'open';
-  const usOpen = getUsMarketStatus().status === 'open';
-  const krLabel = getKoreanMarketStatus().label;
-  const usLabel = getUsMarketStatus().label;
+  // isLive: 녹색 펄스(거래중 표현) 단일 트리거 — 국장 정규장(live)·미장 정규장(delayed) 모두 true
+  const krStatus = getKoreanMarketStatus();
+  const usStatus = getUsMarketStatus();
+  const krOpen = krStatus.isLive;
+  const usOpen = usStatus.isLive;
+  const krLabel = krStatus.label;
+  const usLabel = usStatus.label;
 
-  // 휴장 시 종목 리스트 위에 라벨 표시 (종목은 딤 처리로 유지)
-  const ClosedLabel = ({ label }) => (
+  // 휴장/비라이브 시 종목 리스트 위에 라벨 표시 (종목은 딤 처리로 유지)
+  // dataMode별 부가 텍스트: 데이마켓="실시간 추적 안됨", 그 외 lastClose="종가 기준"
+  const ClosedLabel = ({ label, phase }) => (
     <div className="px-4 pt-2 pb-1 flex items-center gap-1.5">
       <span className="text-[10px] text-[#B0B8C1]">🌙 {label}</span>
-      <span className="text-[10px] text-[#C9CDD2]">· 전일 종가 기준</span>
+      <span className="text-[10px] text-[#C9CDD2]">
+        · {phase === 'dayMarket' ? '실시간 추적 안됨' : '종가 기준'}
+      </span>
     </div>
   );
 
@@ -111,7 +117,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#FFF0F0] text-[#F04452]">TOP 5</span>
           </div>
           <div className="py-1">
-            {!krOpen && <ClosedLabel label={krLabel} />}
+            {!krOpen && <ClosedLabel label={krLabel} phase={krStatus.phase} />}
             {!hasData
               ? <SkeletonHotRow count={5} />
               : krHot.length > 0
@@ -140,7 +146,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#EDF4FF] text-[#3182F6]">TOP 5</span>
           </div>
           <div className="py-1">
-            {!usOpen && <ClosedLabel label={usLabel} />}
+            {!usOpen && <ClosedLabel label={usLabel} phase={usStatus.phase} />}
             {!hasData
               ? <SkeletonHotRow count={5} />
               : usHot.length > 0
@@ -199,7 +205,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#EDF4FF] text-[#1764ED]">TOP 5</span>
           </div>
           <div className="py-1">
-            {!krOpen && <ClosedLabel label={krLabel} />}
+            {!krOpen && <ClosedLabel label={krLabel} phase={krStatus.phase} />}
             {!hasData
               ? <SkeletonHotRow count={5} />
               : krDrop.map((item, i) => (
@@ -226,7 +232,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#EDF4FF] text-[#1764ED]">TOP 5</span>
           </div>
           <div className="py-1">
-            {!usOpen && <ClosedLabel label={usLabel} />}
+            {!usOpen && <ClosedLabel label={usLabel} phase={usStatus.phase} />}
             {!hasData
               ? <SkeletonHotRow count={5} />
               : usDrop.map((item, i) => (
