@@ -292,6 +292,7 @@ export default function MorphingFocusSection({
   coinItems = [],
   recentNews = [],
   krwRate = DEFAULT_KRW_RATE,
+  krwRateLoaded = false,
   indices = [],
   onItemClick,
 }) {
@@ -301,11 +302,11 @@ export default function MorphingFocusSection({
 
   const focus = useMemo(
     () => computeMorphFocus({
-      krItems, usItems, coinItems, recentNews, krwRate, indices, krStatus, usStatus,
+      krItems, usItems, coinItems, recentNews, krwRate, krwRateLoaded, indices, krStatus, usStatus,
     }),
     // krStatus/usStatus는 매 렌더 새 객체지만 phase만 의존 → phase 문자열로 안정화
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [krItems, usItems, coinItems, recentNews, krwRate, indices, krStatus.phase, usStatus.phase],
+    [krItems, usItems, coinItems, recentNews, krwRate, krwRateLoaded, indices, krStatus.phase, usStatus.phase],
   );
 
   const { mode, primaryTheme, altThemes, movers, bridge } = focus;

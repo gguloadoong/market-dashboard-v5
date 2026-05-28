@@ -190,6 +190,31 @@ describe('clusterThemes', () => {
     expect(coldSemi.hot).toBe(false);
     expect(hotSemi.score).toBeGreaterThan(coldSemi.score);
   });
+
+  it('섹터 별칭: item.sector "2차전지" ↔ 뉴스 "배터리"/"전기차" 핫섹터 매칭', () => {
+    // item.sector(krStockList 표준)는 '2차전지', detectNewsSectors는 '배터리'/'전기차' → 별칭 정규화로 매칭.
+    const batteryScored = [
+      { symbol: '373220', name: 'LG에너지솔루션', sector: '2차전지', _leadScore: 80 },
+      { symbol: '006400', name: '삼성SDI', sector: '2차전지', _leadScore: 60 },
+    ];
+    const batteryNews = [{ title: '전기차 배터리 수요 급증 양극재 강세' }]; // → 배터리/전기차/자동차부품
+    const cold = clusterThemes(batteryScored, []);
+    const hot = clusterThemes(batteryScored, batteryNews);
+    const coldBat = cold.themes.find((t) => t.theme === '2차전지');
+    const hotBat = hot.themes.find((t) => t.theme === '2차전지');
+    expect(coldBat.hot).toBe(false);
+    expect(hotBat.hot).toBe(true); // 별칭 정규화 전이면 false였음(버그)
+    expect(hotBat.score).toBeGreaterThan(coldBat.score);
+  });
+
+  it('음수 _leadScore 테마는 핫섹터 부스트로 더 낮아지지 않음(Math.max 가드)', () => {
+    // 휴장 penalty 등으로 sum이 음수면 newsBoost(1.3)가 점수를 더 낮추던 역효과 방지.
+    const negScored = [{ symbol: 'X', name: 'X', sector: '반도체', _leadScore: -20 }];
+    const hotNews = [{ title: 'HBM 반도체 슈퍼사이클' }];
+    const hot = clusterThemes(negScored, hotNews).themes.find((t) => t.theme === '반도체');
+    expect(hot.hot).toBe(true);
+    expect(hot.score).toBe(0); // Math.max(-20,0)=0 → 부스트가 음수를 더 키우지 않음
+  });
 });
 
 // ─── decideMorphMode 5종 ──────────────────────────────────────
@@ -209,6 +234,9 @@ describe('decideMorphMode', () => {
   it('KR preAuction/preNxt(미장 휴장) → KR_GAP', () => {
     expect(decideMorphMode(st('preAuction'), st('closed'))).toBe(MORPH_MODE.KR_GAP);
     expect(decideMorphMode(st('preNxt'), st('closed'))).toBe(MORPH_MODE.KR_GAP);
+  });
+  it('KR afterNxt(NXT 시간외, 미장 휴장) → KR_GAP (미장 after와 대칭)', () => {
+    expect(decideMorphMode(st('afterNxt'), st('closed'))).toBe(MORPH_MODE.KR_GAP);
   });
   it('둘 다 closed → COIN_LEAD', () => {
     expect(decideMorphMode(st('closed'), st('closed'))).toBe(MORPH_MODE.COIN_LEAD);
@@ -243,6 +271,15 @@ describe('buildTransitionBridge', () => {
     expect(b.line).not.toContain('확정');
     expect(b.pair).not.toBeNull();
     expect(b.pair.krSector).toBe('반도체');
+  });
+  it('2차전지 주도 시 CROSS_MARKET 페어 매칭(별칭 키 추가)', () => {
+    const b = buildTransitionBridge({
+      mode: MORPH_MODE.KR_LEAD, indices: idx(2.1),
+      primaryTheme: { theme: '2차전지' },
+    });
+    expect(b.pair).not.toBeNull();
+    expect(b.pair.krSector).toBe('2차전지');
+    expect(b.line).toContain('2차전지');
   });
   it('페어 없으면 지수 한 줄만(테마 단정 회피)', () => {
     const b = buildTransitionBridge({
@@ -327,8 +364,9 @@ describe('computeMorphFocus', () => {
     expect(res.movers[0].symbol).toBe('BBB');
   });
 
-  it('krwRateLoaded=false면 US 거래대금 하한 폴백(과소 컷 방지)로 종목 보존', () => {
+  it('krwRateLoaded=false면 US는 USD raw($) 하한으로 비교 — $50M 초과 종목 보존', () => {
     const usItems = [
+      // USD raw = 100 × 1,000,000 = $100M > MIN_TURNOVER.US_USD($50M) → 보존
       usStock({ symbol: 'CCC', name: 'US Stock', price: 100, volume: 1_000_000, marketCap: 100e9, changePct: 5 }),
     ];
     const res = computeMorphFocus({
@@ -337,9 +375,23 @@ describe('computeMorphFocus', () => {
       krStatus: st('closed'), usStatus: st('open'),
     });
     expect(res.mode).toBe(MORPH_MODE.US_LEAD);
-    // 환율 미로드여도 KR 하한 폴백으로 살아남음(price×volume = 1억 > 50억? no)
-    // → 1e8 < 5e9 이므로 컷됨이 정상. movers/테마 비어도 에러 없이 동작.
-    expect(res._scored.us).toBeDefined();
+    // 환율 미로드 시 turnoverKRW는 0이지만, passesNoiseGate가 USD raw로 직접 비교 → 컷되지 않음.
+    const ccc = res._scored.us.find((s) => s.symbol === 'CCC');
+    expect(ccc).toBeDefined();
+  });
+
+  it('krwRateLoaded=false여도 US USD raw $50M 미달 종목은 컷(폴백이 잡주를 통과시키지 않음)', () => {
+    const usItems = [
+      // USD raw = 10 × 1,000,000 = $10M < $50M → 컷
+      usStock({ symbol: 'TINY', name: 'Tiny US', price: 10, volume: 1_000_000, marketCap: 5e9, changePct: 7 }),
+    ];
+    const res = computeMorphFocus({
+      krItems: [], usItems, coinItems: [],
+      recentNews: [], krwRate: 0, krwRateLoaded: false, indices: [],
+      krStatus: st('closed'), usStatus: st('open'),
+    });
+    expect(res.mode).toBe(MORPH_MODE.US_LEAD);
+    expect(res._scored.us.find((s) => s.symbol === 'TINY')).toBeUndefined();
   });
 
   it('baselineMap 제공 시 surge 점수 반영(w_surge>0 weights)', () => {

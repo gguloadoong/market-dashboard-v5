@@ -231,6 +231,7 @@ export default function HomeDashboard({
           coinItems={coinItems}
           recentNews={recentNews}
           krwRate={krwRate}
+          krwRateLoaded={krwRateLoaded}
           indices={indices}
           onItemClick={onItemClick}
         />

@@ -41,6 +41,42 @@ const PENALTY_CLOSED = 40;  // 휴장 마켓 종목
 const HOT_SECTOR_BOOST = 1.3;
 const BREADTH_DENOM = 5;    // breadth = min(종목수/5, 1)
 
+// 섹터 어휘 정규화 — item.sector(krStockList/usStockList 표준)와
+// detectNewsSectors(newsTopicMap) 어휘가 달라 substring 매칭이 양방향 실패하는 문제 해소.
+//   예) item.sector '2차전지' ↔ 뉴스 '배터리'/'전기차' → 둘 다 includes 실패 → 핫섹터·브릿지 무력화.
+// 같은 캐노니컬 그룹으로 묶어 isHot 비교와 CROSS_MARKET 키 조회 양쪽에 적용한다.
+const SECTOR_ALIASES = {
+  // KR item.sector 어휘
+  '2차전지': 'battery',
+  '자동차': 'auto',
+  // US item.sector 어휘
+  '전기차': 'battery',
+  '소프트웨어': 'software',
+  'AI/소프트웨어': 'software',
+  'IT소프트웨어': 'software',
+  '핀테크': 'fintech',
+  '미디어': 'media',
+  '리츠': 'reit',
+  '산업': 'industrial',
+  // detectNewsSectors(newsTopicMap) 어휘
+  '배터리': 'battery',
+  '자동차부품': 'auto',
+  'AI': 'software',
+};
+
+// 섹터명 → 캐노니컬 키(별칭 없으면 원문 유지). isHot/CROSS_MARKET 비교 정규화용.
+function canonicalSector(sector) {
+  if (!sector) return '';
+  return SECTOR_ALIASES[sector] || sector;
+}
+
+// 두 섹터가 같은 테마인지 — 캐노니컬 일치 또는 (원문) 양방향 substring.
+function sectorMatches(a, b) {
+  if (!a || !b) return false;
+  if (canonicalSector(a) === canonicalSector(b)) return true;
+  return a.includes(b) || b.includes(a);
+}
+
 // 모핑 모드 식별자
 export const MORPH_MODE = {
   KR_LEAD:   'KR_LEAD',
@@ -73,6 +109,7 @@ export function turnoverKRW(item, krwRate = 0) {
 
 // 회전율 = 거래대금 / 시가총액. 코인(marketCap=0)은 null 반환 → 절대 percentile로 대체.
 export function turnoverRatio(item, krwRate = 0) {
+  if (!item) return null; // turnoverKRW와 방어 일관성(null 유입 시 isCoinItem의 .id 접근 방지)
   if (isCoinItem(item)) return null;
   const cap = Number(item?.marketCap);
   if (!Number.isFinite(cap) || cap <= 0) return null;
@@ -100,15 +137,26 @@ function passesNoiseGate(item, ctx) {
   const name = item.name || '';
   if (DERIVATIVE_RE.test(name)) return false;
 
-  const turn = turnoverKRW(item, ctx.krwRate);
   const market = item._market;
-  let minTurn;
-  if (market === 'US') minTurn = MIN_TURNOVER.US_USD * (Number(ctx.krwRate) || 0);
-  else if (isCoinItem(item) || market === 'COIN') minTurn = MIN_TURNOVER.COIN;
-  else minTurn = MIN_TURNOVER.KR;
-  // US 하한은 krwRate 필요 — 환율 미로드 시(0) 하한 비교 불가 → KR 기준으로 폴백(과소 컷 방지).
-  if (market === 'US' && minTurn <= 0) minTurn = MIN_TURNOVER.KR;
-  if (turn < minTurn) return false;
+  const rate = Number(ctx.krwRate) || 0;
+
+  // US 하한은 krwRate로 KRW 환산 비교가 기본. 단 환율 미로드(rate<=0)면
+  // turnoverKRW가 0을 반환해 KRW 비교가 무력화되므로(죽은 폴백), USD raw(price×volume)를
+  // MIN_TURNOVER.US_USD와 직접 비교해 종목을 실제 보존한다.
+  if (market === 'US' && rate <= 0) {
+    const price = Number(item.price);
+    const volume = Number(item.volume);
+    const rawUsd = (Number.isFinite(price) && Number.isFinite(volume) && price > 0 && volume > 0)
+      ? price * volume : 0;
+    if (rawUsd < MIN_TURNOVER.US_USD) return false;
+  } else {
+    const turn = turnoverKRW(item, ctx.krwRate);
+    let minTurn;
+    if (market === 'US') minTurn = MIN_TURNOVER.US_USD * rate;
+    else if (isCoinItem(item) || market === 'COIN') minTurn = MIN_TURNOVER.COIN;
+    else minTurn = MIN_TURNOVER.KR;
+    if (turn < minTurn) return false;
+  }
 
   // 무변동 + 회전율 하위 → 거래대금만 큰 비주류 → 제외
   const pct = getPct(item);
@@ -137,7 +185,7 @@ function scoreNews(item, recentNews, hotSectors) {
   const base = (Math.min(newsCount, 3) / 3) * 70;
   const sector = item.sector || '';
   const inHot = sector && Array.isArray(hotSectors)
-    && hotSectors.some((s) => sector.includes(s) || s.includes(sector));
+    && hotSectors.some((s) => sectorMatches(sector, s));
   return { score: base + (inHot ? 30 : 0), newsCount };
 }
 
@@ -179,6 +227,8 @@ export function scoreLeading(item, ctx = {}) {
   const S_surge = ctx.surgeScoreOf ? ctx.surgeScoreOf(item) : 0;
 
   let penalty = 0;
+  // 통합경로(scoreMarketItems)에선 passesNoiseGate가 파생상품을 선컷하므로 이 분기는 dead path.
+  // scoreLeading 직접 호출(단위 테스트 등) 시 방어용으로 유지.
   if (DERIVATIVE_RE.test(item.name || '')) penalty += PENALTY_DERIV;
   if (ctx.isClosed) penalty += PENALTY_CLOSED;
 
@@ -262,7 +312,7 @@ export function clusterThemes(scoredItems, recentNews = []) {
   }
   const hotList = [...hotSectors];
   const isHot = (sector) =>
-    !!sector && hotList.some((h) => sector.includes(h) || h.includes(sector));
+    !!sector && hotList.some((h) => sectorMatches(sector, h));
 
   // sector별 그룹화. 무섹터는 solo로.
   const groups = new Map();
@@ -281,7 +331,9 @@ export function clusterThemes(scoredItems, recentNews = []) {
     const breadth = Math.min(members.length / BREADTH_DENOM, 1);
     const hot = isHot(sector);
     const newsBoost = hot ? HOT_SECTOR_BOOST : 1;
-    const score = sum * breadth * newsBoost;
+    // 음수 sum(휴장 penalty 등)에 newsBoost(1.3)를 곱하면 핫섹터가 오히려 더 낮아지는 역효과 →
+    // 부스트는 양수 점수에만 적용(Math.max).
+    const score = Math.max(sum, 0) * breadth * newsBoost;
     themes.push({
       theme: sector,
       score,
@@ -312,7 +364,9 @@ export function decideMorphMode(krStatus, usStatus) {
   if (krPhase === 'open') return MORPH_MODE.KR_LEAD;
   if (usPhase === 'open') return MORPH_MODE.US_LEAD;
   if (usPhase === 'pre' || usPhase === 'after' || usPhase === 'dayMarket') return MORPH_MODE.US_GAP;
-  if (krPhase === 'preAuction' || krPhase === 'preNxt') return MORPH_MODE.KR_GAP;
+  // afterNxt(정규장 마감 후 NXT 시간외, marketHours.js:255)도 국장 연장거래 → KR_GAP.
+  // 미장 after를 US_GAP으로 잡는 것과 대칭(afterNxt 누락 시 COIN_LEAD로 오폴백).
+  if (krPhase === 'preAuction' || krPhase === 'preNxt' || krPhase === 'afterNxt') return MORPH_MODE.KR_GAP;
   return MORPH_MODE.COIN_LEAD;
 }
 
@@ -328,12 +382,14 @@ function indexChangePct(indices, id) {
 
 // cross-market 섹터 페어(역인덱싱) — relatedAssets.js NVDA↔삼성/하이닉스 패턴의 소형 테이블.
 //   미장 섹터 → 국장 동조 섹터/대표주 함의. 1차는 반도체 중심 최소 셋(2차에 확장).
+// krSector는 krStockList.js 표준 어휘(예 '2차전지') — UI 라벨/findStocksBySectors 정합.
 const CROSS_MARKET_SECTOR_PAIRS = {
-  반도체: { krSector: '반도체', krLeaders: ['삼성전자', 'SK하이닉스'] },
-  AI:     { krSector: '반도체', krLeaders: ['삼성전자', 'SK하이닉스'] },
-  전기차: { krSector: '배터리', krLeaders: ['LG에너지솔루션', '삼성SDI'] },
-  배터리: { krSector: '배터리', krLeaders: ['LG에너지솔루션', '삼성SDI'] },
-  바이오: { krSector: '바이오', krLeaders: ['삼성바이오로직스', '셀트리온'] },
+  반도체:   { krSector: '반도체', krLeaders: ['삼성전자', 'SK하이닉스'] },
+  AI:       { krSector: '반도체', krLeaders: ['삼성전자', 'SK하이닉스'] },
+  전기차:   { krSector: '2차전지', krLeaders: ['LG에너지솔루션', '삼성SDI'] },
+  배터리:   { krSector: '2차전지', krLeaders: ['LG에너지솔루션', '삼성SDI'] },
+  '2차전지': { krSector: '2차전지', krLeaders: ['LG에너지솔루션', '삼성SDI'] },
+  바이오:   { krSector: '바이오', krLeaders: ['삼성바이오로직스', '셀트리온'] },
 };
 
 /**
@@ -367,11 +423,12 @@ export function buildTransitionBridge({ mode, indices, primaryTheme } = {}) {
   }
 
   // 테마 페어 매칭 — 있으면 국장 동조 함의, 없으면 지수 한 줄만.
+  // 페어 키 조회 — 직접 매칭 우선, 없으면 섹터 별칭 정규화 경유(예 '2차전지' ↔ '배터리'/'전기차').
   const themeName = primaryTheme?.theme || '';
   const pair = themeName
     ? (CROSS_MARKET_SECTOR_PAIRS[themeName]
        || Object.entries(CROSS_MARKET_SECTOR_PAIRS)
-            .find(([k]) => themeName.includes(k) || k.includes(themeName))?.[1])
+            .find(([k]) => sectorMatches(themeName, k))?.[1])
     : null;
 
   const dirWord = nasdaqPct > 0 ? '강세' : '약세';
@@ -501,7 +558,8 @@ export function computeMorphFocus(params = {}) {
     const { themes, soloMovers } = clusterThemes(scored, recentNews);
     result.primaryTheme = themes[0] || null;
     result.altThemes = themes.slice(1, 4);
-    // 무섹터 고득점 종목 → 단일카드 폴백(상위 5).
+    // 무섹터 고득점 종목 → 단일카드 폴백(상위 5). 단 primaryTheme이 있으면 UI는 테마 카드만
+    // 렌더하고 soloMovers는 미표시(테마 중심 의도) — 무섹터 종목 폴백은 primaryTheme 부재 시에만 노출.
     result.movers = soloMovers.slice(0, 5).map(toSoloMover);
   } else if (mode === MORPH_MODE.US_GAP || mode === MORPH_MODE.KR_GAP) {
     // GAP: 시간외 실시간 체결가 없음 → 변동폭(전일종가 갭) 우선, 테마 약화.
