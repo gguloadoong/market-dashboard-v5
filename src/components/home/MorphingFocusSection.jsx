@@ -13,6 +13,7 @@ import { computeMorphFocus, MORPH_MODE } from '../../utils/leadingStocks';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
 import { findRelatedNews } from './utils';
 import { itemKey } from '../../utils/symbolKey';
+import { hasLiveExtended, extendedBadgeLabel } from '../../utils/extendedPrice';
 import TickerLogo from './TickerLogo';
 
 // ─── 색상 토큰 (한국식: 빨강 상승 / 파랑 하락) ───────────────────
@@ -36,14 +37,16 @@ function tintBg(pct) {
 }
 
 // 가격 포맷 — 마켓별 통화/소수 처리 (NotableCard 패턴 차용)
-function formatPrice(item, krwRate) {
+// #334: extActive 시 extendedPrice(raw) 우선
+function formatPrice(item, krwRate, extActive = false) {
   if (!item) return '';
   if (item._market === 'COIN') {
     const krw = item.priceKrw || (item.priceUsd ?? 0) * krwRate;
     return `₩${Math.round(krw).toLocaleString('ko-KR')}`;
   }
-  if (item._market === 'KR') return `₩${Math.round(item.price || 0).toLocaleString('ko-KR')}`;
-  return `$${(item.price ?? 0).toFixed(2)}`;
+  const base = extActive ? Number(item.extendedPrice) : item.price;
+  if (item._market === 'KR') return `₩${Math.round(base || 0).toLocaleString('ko-KR')}`;
+  return `$${(base ?? 0).toFixed(2)}`;
 }
 
 // 미니 스파크라인 path 생성 (NotableCard / MiniSparkline 패턴)
@@ -61,13 +64,21 @@ function sparkPath(spark, w, h) {
 
 // 정량 WHY 한 줄 — 모드별로 단정 강도를 다르게.
 //   LEAD: 실시간 단정 가능 ("거래 회전율 상위 · 뉴스 N건 · +X%")
+//   GAP+extActive: "참고가 ±X% · 뉴스 N건" (네이버 연장세션 실시세, ±수십초 지연)
 //   GAP:  실시간 단정 금지 ("어제 마감 ±X% · 뉴스 N건")
-function buildLeadWhy({ item, pct, newsCount, isGap }) {
+function buildLeadWhy({ item, pct, newsCount, isGap, extActive }) {
   const parts = [];
   if (isGap) {
-    // 시간외 — 실시간 체결가 없음 → "어제 마감" 명시 (단정 회피)
     const sign = pct > 0 ? '+' : '';
-    parts.push(`어제 마감 ${sign}${pct.toFixed(1)}%`);
+    if (extActive) {
+      // #334: 네이버 overMarketPriceInfo 연장세션 실시세 — 단정 가능 (참고가 라벨)
+      const extPct = Number(item?.extendedChangePct ?? pct);
+      const extSign = extPct > 0 ? '+' : '';
+      parts.push(`참고가 ${extSign}${extPct.toFixed(1)}%`);
+    } else {
+      // 시간외 — 실시간 체결가 없음 → "어제 마감" 명시 (단정 회피)
+      parts.push(`어제 마감 ${sign}${pct.toFixed(1)}%`);
+    }
     if (newsCount > 0) parts.push(`뉴스 ${newsCount}건`);
     return parts.join(' · ');
   }
@@ -124,12 +135,16 @@ function SessionBar({ primaryStatus, secondaryStatus, clockLabel }) {
 }
 
 // ─── FocusLeadCard — 대장주 1위 (풀폭) ───────────────────────────
-function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick }) {
-  const color = dirColor(pct);
-  const price = formatPrice(item, krwRate);
+// #334: status 주입 시 연장세션 시 ext 값 우선 + "참고가" 배지
+function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick, status }) {
+  const extActive = hasLiveExtended(item, status);
+  // 연장세션 실시세가 있으면 pct/price 도 ext 로 — 정직 노출
+  const displayPct = extActive ? Number(item?.extendedChangePct ?? pct) : pct;
+  const color = dirColor(displayPct);
+  const price = formatPrice(item, krwRate, extActive);
   const spark = item?.sparkline?.length >= 3 ? item.sparkline : null;
   const path = spark ? sparkPath(spark, 96, 28) : '';
-  const why = buildLeadWhy({ item, pct, newsCount, isGap });
+  const why = buildLeadWhy({ item, pct, newsCount, isGap, extActive });
 
   return (
     <div
@@ -144,8 +159,15 @@ function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick }) {
       <div className="flex items-center gap-2.5 mb-2.5">
         <TickerLogo item={item} size={36} />
         <div className="min-w-0 flex-1">
-          <div className="text-[16px] font-bold text-[#191F28] dark:text-[#E5E8EB] truncate leading-tight">
-            {item.name || item.symbol}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[16px] font-bold text-[#191F28] dark:text-[#E5E8EB] truncate leading-tight">
+              {item.name || item.symbol}
+            </span>
+            {extActive && (
+              <span className="text-[9px] font-bold bg-[#FFF4E6] text-[#FF9500] px-1.5 py-0.5 rounded flex-shrink-0">
+                {extendedBadgeLabel(item)}
+              </span>
+            )}
           </div>
           <div className="text-[11px] font-medium text-[#B0B8C1] dark:text-[#6B7684] font-mono">
             {item.symbol}
@@ -161,7 +183,7 @@ function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick }) {
       {/* 등락률 (1순위 — 가장 크게) + 가격 */}
       <div className="flex items-baseline gap-2.5 mb-2.5">
         <span className="text-[26px] font-bold tabular-nums font-mono leading-none" style={{ color }}>
-          {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+          {displayPct > 0 ? '+' : ''}{displayPct.toFixed(2)}%
         </span>
         {price && (
           <span className="text-[14px] font-semibold tabular-nums font-mono text-[#6B7684] dark:text-[#8B95A1]">
@@ -186,14 +208,25 @@ function FocusLeadCard({ item, pct, newsCount, isGap, krwRate, onClick }) {
 }
 
 // ─── CompactMoverRow — 대장주 2~3위 / GAP·COIN 무버 행 ────────────
-function CompactMoverRow({ item, pct, newsCount, isGap, krwRate, onClick, showTopBorder }) {
-  const color = dirColor(pct);
-  const price = formatPrice(item, krwRate);
+// #334: status 주입 시 ext 라벨/값으로 갱신
+function CompactMoverRow({ item, pct, newsCount, isGap, krwRate, onClick, showTopBorder, status }) {
+  const extActive = hasLiveExtended(item, status);
+  const displayPct = extActive ? Number(item?.extendedChangePct ?? pct) : pct;
+  const color = dirColor(displayPct);
+  const price = formatPrice(item, krwRate, extActive);
   // 행 단위는 근거를 더 짧게 — 뉴스 우선, 없으면 회전율/변동폭
   let reason = '';
   if (isGap) {
-    const sign = pct > 0 ? '+' : '';
-    reason = newsCount > 0 ? `어제 마감 ${sign}${pct.toFixed(1)}% · 뉴스 ${newsCount}건` : `어제 마감 ${sign}${pct.toFixed(1)}%`;
+    const sign = displayPct > 0 ? '+' : '';
+    if (extActive) {
+      reason = newsCount > 0
+        ? `참고가 ${sign}${displayPct.toFixed(1)}% · 뉴스 ${newsCount}건`
+        : `참고가 ${sign}${displayPct.toFixed(1)}%`;
+    } else {
+      reason = newsCount > 0
+        ? `어제 마감 ${sign}${displayPct.toFixed(1)}% · 뉴스 ${newsCount}건`
+        : `어제 마감 ${sign}${displayPct.toFixed(1)}%`;
+    }
   } else if (newsCount > 0) {
     reason = `뉴스 ${newsCount}건`;
   } else {
@@ -225,7 +258,7 @@ function CompactMoverRow({ item, pct, newsCount, isGap, krwRate, onClick, showTo
         </span>
       )}
       <span className="text-[14px] font-bold tabular-nums font-mono flex-shrink-0 w-[64px] text-right" style={{ color }}>
-        {pct > 0 ? '+' : ''}{pct.toFixed(2)}%
+        {displayPct > 0 ? '+' : ''}{displayPct.toFixed(2)}%
       </span>
     </div>
   );
@@ -426,14 +459,14 @@ export default function MorphingFocusSection({
         <SessionBar primaryStatus={primaryStatus} secondaryStatus={secondaryStatus} clockLabel={clockLabel} />
         <FocusLeadCard
           item={lead.item} pct={lead.pct} newsCount={lead.newsCount}
-          isGap krwRate={krwRate} onClick={onItemClick}
+          isGap krwRate={krwRate} onClick={onItemClick} status={primaryStatus}
         />
         {rest.length > 0 && (
           <div className="mt-1">
             {rest.map((m) => (
               <CompactMoverRow
                 key={itemKey(m.item)} item={m.item} pct={m.pct} newsCount={m.newsCount}
-                isGap krwRate={krwRate} onClick={onItemClick} showTopBorder
+                isGap krwRate={krwRate} onClick={onItemClick} showTopBorder status={primaryStatus}
               />
             ))}
           </div>

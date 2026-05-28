@@ -25,6 +25,10 @@ export const SNAP_KEYS = {
   KR_HOT: 'snap:kr:hot',
   US_HOT: 'snap:us:hot',
   COINS_HOT: 'snap:coins:hot',
+  // #334: 네이버 비공식 — 연장세션 시세(overMarketPriceInfo) 보조 dict.
+  //       { symbol -> { extendedPrice, extendedChangePct, extendedSessionType, extendedStatus, extendedAt } }
+  US_EXT: 'snap:us:ext',
+  KR_EXT: 'snap:kr:ext',
 };
 
 // TTL (초) — 크론 5분 주기 × 2 로 통일. jitter/지연 흡수 (#165, #169 Codex P1)
@@ -131,19 +135,40 @@ export async function getUsSnap() {
   }
 }
 
+// #334: 연장세션 ext dict 를 hot 종목에 머지 — 네이버 overMarketPriceInfo 필드만 합성.
+//       ext 가 dict ({symbol: {...}}) 라서 row 단위 spread 만으로 충분.
+function mergeExtended(items, extDict) {
+  if (!Array.isArray(items) || !extDict || typeof extDict !== 'object') return items;
+  return items.map((it) => {
+    const ext = extDict[it?.symbol];
+    if (!ext) return it;
+    return {
+      ...it,
+      extendedPrice:        ext.extendedPrice,
+      extendedChangePct:    ext.extendedChangePct,
+      extendedSessionType:  ext.extendedSessionType,
+      extendedStatus:       ext.extendedStatus,
+      extendedAt:           ext.extendedAt,
+    };
+  });
+}
+
 // #185: hot tier 스냅샷 조회 — 3개 hot 키 mget 병렬 (캐시 미스 시 빈 배열).
 //       `/api/snapshot?tier=hot` 의 읽기 경로. 각 키가 null 이어도 503 아닌 `[]` 로 정상 반환.
+// #334: 연장세션 ext dict (snap:us:ext, snap:kr:ext) 동시 mget → 머지.
 export async function getHotSnaps() {
   if (!redis) return null;
   try {
-    const [kr, us, coins] = await redis.mget(
+    const [kr, us, coins, krExt, usExt] = await redis.mget(
       SNAP_KEYS.KR_HOT,
       SNAP_KEYS.US_HOT,
       SNAP_KEYS.COINS_HOT,
+      SNAP_KEYS.KR_EXT,
+      SNAP_KEYS.US_EXT,
     );
     return {
-      kr: Array.isArray(kr) ? kr : [],
-      us: Array.isArray(us) ? us : [],
+      kr:    mergeExtended(Array.isArray(kr) ? kr : [], krExt),
+      us:    mergeExtended(Array.isArray(us) ? us : [], usExt),
       coins: Array.isArray(coins) ? coins : [],
     };
   } catch (e) {
@@ -154,15 +179,22 @@ export async function getHotSnaps() {
 
 // 전체 마켓 스냅샷 일괄 조회 (백업 fallback 포함)
 // ETF는 cron 없음 — 클라이언트 직접 폴링
+// #334: 연장세션 ext dict 머지 — hot 200 외 풀리스트 종목도 ext 있으면 표시 가능.
 export async function getAllSnaps() {
   if (!redis) return null;
   try {
-    const [kr, us, coins] = await Promise.all([
+    const [kr, us, coins, krExt, usExt] = await Promise.all([
       getSnapWithFallback(SNAP_KEYS.KR),
       getUsSnap(),
       getSnapWithFallback(SNAP_KEYS.COINS),
+      getSnap(SNAP_KEYS.KR_EXT),
+      getSnap(SNAP_KEYS.US_EXT),
     ]);
-    return { kr, us, coins };
+    return {
+      kr:    mergeExtended(kr, krExt),
+      us:    mergeExtended(us, usExt),
+      coins,
+    };
   } catch (e) {
     console.error('[price-cache] getAllSnaps 실패:', e);
     return null;

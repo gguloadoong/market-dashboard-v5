@@ -65,13 +65,24 @@ function fmtLarge(n) {
   return String(Math.round(n));
 }
 import { isCoinItem } from './home/utils';
+import { hasLiveExtended, extendedBadgeLabel } from '../utils/extendedPrice';
 
 function getPct(item) {
   return isCoinItem(item) ? (item.change24h ?? 0) : (item.changePct ?? 0);
 }
 
+// #334: 종목 마켓 기반 status 조회 (정규장이 아니고 연장세션 dataMode='delayed'인지 판정).
+// item 의 market === 'kr' 이면 국장 status, 'us' 면 미장 status. 코인은 ext 무관.
+function pickStatusForItem(item) {
+  if (!item || isCoinItem(item)) return null;
+  if (item.market === 'kr') return getKoreanMarketStatus();
+  if (item.market === 'us') return getUsMarketStatus();
+  return null;
+}
+
 // ─── KRW 가격 표시 ───────────────────────────────────────────
-function fmtKrwPrice(item, krwRate) {
+// #334: extActive 시 extendedPrice (raw USD/KRW) 사용. 환산 로직은 동일.
+function fmtKrwPrice(item, krwRate, extActive = false) {
   if (isCoinItem(item)) {
     const p = item.priceKrw || (item.priceUsd ?? 0) * krwRate;
     if (!p) return '—';
@@ -79,15 +90,27 @@ function fmtKrwPrice(item, krwRate) {
     if (p < 100) return `₩${fmt(p, 2)}`;
     return `₩${fmt(Math.round(p))}`;
   }
-  if (item.market === 'kr') return `₩${fmt(item.price)}`;
+  const basePrice = extActive ? Number(item.extendedPrice) : item.price;
+  if (item.market === 'kr') return `₩${fmt(basePrice)}`;
   if (item.market === 'us') {
-    const krw = Math.round((item.price ?? 0) * krwRate);
+    const krw = Math.round((basePrice ?? 0) * krwRate);
     return `₩${fmt(krw)}`;
   }
-  return `₩${fmt(item.price)}`;
+  return `₩${fmt(basePrice)}`;
 }
-function fmtChangeAmt(item, krwRate) {
+// #334: 연장세션은 change 절대값이 없어 changePct → 가격에서 역산.
+function fmtChangeAmt(item, krwRate, extActive = false) {
   if (isCoinItem(item)) return '';
+  if (extActive) {
+    const p = Number(item.extendedPrice) || 0;
+    const pct = Number(item.extendedChangePct) || 0;
+    const prev = pct !== -100 ? p / (1 + pct / 100) : 0;
+    const amt = p - prev;
+    const sign = amt >= 0 ? '+' : '';
+    if (item.market === 'kr') return `${sign}₩${fmt(Math.abs(Math.round(amt)))}`;
+    if (item.market === 'us') return `${sign}₩${fmt(Math.abs(Math.round(amt * krwRate)))}`;
+    return `${sign}${amt.toFixed(2)}`;
+  }
   const amt = item.change ?? 0;
   const sign = amt >= 0 ? '+' : '';
   if (item.market === 'kr') return `${sign}₩${fmt(Math.abs(amt))}`;
@@ -303,10 +326,14 @@ const LogoAvatar = React.memo(function LogoAvatar({ item, size = 32 }) {
 });
 
 // ─── 행 플래시 애니메이션 ────────────────────────────────────
-const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange, type }) {
+const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, searchTerm, toggle, isWatched, buyPrice, onBuyPriceChange, targetPrice, targetDir, onTargetChange, type, marketStatus }) {
   const rowRef  = useRef(null);
-  const prevPct = useRef(getPct(item));
-  const pct     = getPct(item);
+  // #334: marketStatus 가 부모에서 주입되면 그대로, 없으면 종목별 픽업 (코인=null).
+  const status = marketStatus ?? pickStatusForItem(item);
+  const extActive = hasLiveExtended(item, status);
+  const displayPct = extActive ? Number(item.extendedChangePct ?? 0) : getPct(item);
+  const prevPct = useRef(displayPct);
+  const pct     = displayPct;
   const isUp    = pct > 0;
   const isDown  = pct < 0;
   const isHot   = pct >= 3;
@@ -337,8 +364,9 @@ const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, se
 
   const volume = item.id ? item.volume24h : item.volume;
   const mcap   = item.id ? item.marketCap : (item.aum ?? item.marketCap);
-  // 미장: 달러 가격도 보조 표시
-  const usdPrice = item.market === 'us' && item.price ? `$${fmt(item.price, 2)}` : null;
+  // 미장: 달러 가격도 보조 표시 — #334: 연장세션이면 extendedPrice 우선
+  const usdBase = extActive ? Number(item.extendedPrice) : item.price;
+  const usdPrice = item.market === 'us' && usdBase ? `$${fmt(usdBase, 2)}` : null;
 
   return (
     <TableRow
@@ -390,10 +418,17 @@ const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, se
         </div>
       </TableCell>
 
-      {/* 현재가 (KRW) */}
+      {/* 현재가 (KRW) — #334 연장세션 시 "참고가" 배지 */}
       <TableCell className="px-3 py-3 text-right">
-        <div className="text-[14px] font-semibold text-[#191F28] tabular-nums font-mono">
-          {fmtKrwPrice(item, krwRate)}
+        <div className="flex items-center justify-end gap-1.5">
+          {extActive && (
+            <span className="text-[8px] font-bold bg-[#FFF4E6] text-[#FF9500] px-1 py-px rounded">
+              {extendedBadgeLabel(item)}
+            </span>
+          )}
+          <div className="text-[14px] font-semibold text-[#191F28] tabular-nums font-mono">
+            {fmtKrwPrice(item, krwRate, extActive)}
+          </div>
         </div>
         {usdPrice && (
           <div className="text-[11px] text-[#8B95A1] tabular-nums font-mono mt-0.5">{usdPrice}</div>
@@ -404,7 +439,7 @@ const FlashRow = React.memo(function FlashRow({ item, rank, krwRate, onClick, se
       <TableCell className={`px-3 py-3 text-right text-[13px] tabular-nums font-mono ${
         isUp ? 'text-[#F04452]' : isDown ? 'text-[#1764ED]' : 'text-[#8B95A1]'
       }`}>
-        {fmtChangeAmt(item, krwRate)}
+        {fmtChangeAmt(item, krwRate, extActive)}
       </TableCell>
 
       {/* 등락률 */}

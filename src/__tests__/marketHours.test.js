@@ -398,14 +398,15 @@ describe('marketHours', () => {
       expect(getUsMarketStatus().dataMode).toBe('lastClose');
     });
 
-    it('미장 프리마켓 = lastClose', () => {
+    // #334: 네이버 비공식 overMarketPriceInfo 실증 → 'delayed' 로 플립
+    it('미장 프리마켓 = delayed (#334 네이버 프리 실증)', () => {
       vi.setSystemTime(edt(2026, 4, 27, 7, 0));
-      expect(getUsMarketStatus().dataMode).toBe('lastClose');
+      expect(getUsMarketStatus().dataMode).toBe('delayed');
     });
 
-    it('미장 애프터마켓 = lastClose', () => {
+    it('미장 애프터마켓 = delayed (#334 네이버 애프터 실증)', () => {
       vi.setSystemTime(edt(2026, 4, 27, 18, 0));
-      expect(getUsMarketStatus().dataMode).toBe('lastClose');
+      expect(getUsMarketStatus().dataMode).toBe('delayed');
     });
 
     it('국장 정규장 = live', () => {
@@ -413,9 +414,14 @@ describe('marketHours', () => {
       expect(getKoreanMarketStatus().dataMode).toBe('live');
     });
 
-    it('국장 NXT 프리 = lastClose', () => {
+    it('국장 NXT 프리 = lastClose (#334 NXT 프리 미확인 — 보수)', () => {
       vi.setSystemTime(kst(2026, 4, 27, 8, 0));
       expect(getKoreanMarketStatus().dataMode).toBe('lastClose');
+    });
+
+    it('국장 NXT 시간외 = delayed (#334 네이버 NXT 애프터 실증)', () => {
+      vi.setSystemTime(kst(2026, 4, 27, 18, 0));
+      expect(getKoreanMarketStatus().dataMode).toBe('delayed');
     });
 
     it('국장 동시호가 = lastClose', () => {

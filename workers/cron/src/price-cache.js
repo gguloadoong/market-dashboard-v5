@@ -26,6 +26,10 @@ export const SNAP_KEYS = {
   KR_HOT: 'snap:kr:hot',
   US_HOT: 'snap:us:hot',
   COINS_HOT: 'snap:coins:hot',
+  // #334: 네이버 비공식 연장세션 ext dict (overMarketPriceInfo)
+  //       update-naver-extended cron 이 hot tier 종목만 채움.
+  US_EXT: 'snap:us:ext',
+  KR_EXT: 'snap:kr:ext',
 };
 
 // TTL — 크론 주기(5분)의 2배로 통일. jitter/지연 흡수 버퍼 확보 (#165, #169 Codex P1)
