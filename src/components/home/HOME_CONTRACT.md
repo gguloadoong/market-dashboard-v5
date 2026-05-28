@@ -30,17 +30,14 @@
 5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터)
    ├── TopMoversWidget     — 급등/급락 탭 (KR/US/COIN 서브탭)
    └── SectorMiniContent   — 섹터 탭 (HOT/COLD pill 칩 + drill-down)
-6. NewsFeedWidget          — 투자 뉴스 (lg:hidden — 모바일 전용, 데스크톱은 우측 패널)
+6. NewsFeedWidget          — 투자 뉴스 (lg:hidden — 모바일 전용)
 ```
 
-### 우측 패널 (`src/App.jsx` — 데스크톱 전용)
+### 우측 패널 (`src/App.jsx` — 데스크톱 전용) — **비표시** (사용자 피로감 호소로 제거 — #339)
 
 ```
-UnifiedFeedPanel           — 통합 실시간 피드 (BreakingNewsPanel 교체)
-├── FeedHeader             — "실시간" + LIVE dot
-├── 시그널 피드             — 시그널 timestamp 기준 정렬 (최대 5건, 빨강 태그)
-├── 뉴스 탭 헤더            — 속보/국내/해외/코인
-└── 뉴스 목록               — 파랑 태그, 클러스터링 적용
+UnifiedFeedPanel           — [비활성] 통합 실시간 피드 (사용자 피로감 호소로 제거 — #339)
+                             파일(UnifiedFeedPanel.jsx)은 보존, App.jsx에서 렌더 중단
 ```
 
 ### 모바일 뉴스 탭 (`activeTab === 'news'`)
@@ -66,6 +63,7 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | SectorMiniWidget (독립) | ExploreTabsWidget의 SectorMiniContent로 통합됨 |
 | SignalSummaryWidget (독립) | SignalBoardWidget에 통합됨 |
 | SeoulForceSection (인라인) | SignalBoardWidget에 통합됨 |
+| UnifiedFeedPanel (우측 패널) | 사용자 피로감 호소로 App.jsx 렌더 제거 — #339 (파일 보존, 영구삭제 아님) |
 
 ---
 
