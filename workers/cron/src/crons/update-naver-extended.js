@@ -198,9 +198,18 @@ async function updateMarket(market) {
   );
   const fresh = await fetchBatch(symbols, fetcher, ctxMap);
 
-  // 기존 ext 와 머지. fresh 가 명시적 CLOSE 도 포함하므로 stale 'OPEN' 잔존 차단됨.
+  // 기존 ext 와 머지.
+  // (1) fresh 가 명시적 CLOSE 도 포함 → 세션 종료 stale 'OPEN' 잔존 차단.
+  // (2) 네이버 차단·타임아웃으로 fresh 누락 시 prev 의 stale 항목이 TTL 무한 연장되지 않도록
+  //     extendedAt 나이로 evict (EXT_TTL_ACTIVE×1.5 = 9분 초과 시 제거). 금융 신뢰성 방어.
   const prev = (await getSnap(extKey)) || {};
-  const merged = { ...prev, ...fresh };
+  const evictBefore = Date.now() - EXT_TTL_ACTIVE * 1.5 * 1000;
+  const freshPrev = {};
+  for (const [sym, v] of Object.entries(prev)) {
+    const t = v?.extendedAt ? new Date(v.extendedAt).getTime() : 0;
+    if (Number.isFinite(t) && t >= evictBefore) freshPrev[sym] = v;
+  }
+  const merged = { ...freshPrev, ...fresh };
 
   await setSnap(extKey, merged, EXT_TTL_ACTIVE);
   return {

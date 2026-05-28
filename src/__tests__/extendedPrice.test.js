@@ -7,15 +7,33 @@ import {
 
 describe('extendedPrice', () => {
   describe('hasLiveExtended', () => {
-    it('dataMode=delayed + OPEN + 가격 유효 → true', () => {
+    it('dataMode=delayed + OPEN + 가격 유효 + extendedAt 최근 → true', () => {
       const item = {
         extendedPrice: 309.07,
         extendedChangePct: 0.24,
         extendedStatus: 'OPEN',
         extendedSessionType: 'PRE_MARKET',
+        extendedAt: new Date().toISOString(),
       };
       const status = { phase: 'pre', dataMode: 'delayed' };
       expect(hasLiveExtended(item, status)).toBe(true);
+    });
+
+    // Gemini gate P1 회귀 방지: 네이버 차단/타임아웃으로 stale 데이터가 흘러올 위험 차단
+    it('extendedAt 10분 초과 stale → false (다중 방어 — 백엔드 evict 우회 시에도 차단)', () => {
+      const item = {
+        extendedPrice: 309,
+        extendedStatus: 'OPEN',
+        extendedAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(),  // 11분 전
+      };
+      const status = { phase: 'pre', dataMode: 'delayed' };
+      expect(hasLiveExtended(item, status)).toBe(false);
+    });
+
+    it('extendedAt 누락 → false (최근성 미확인 — 안전측)', () => {
+      const item = { extendedPrice: 309, extendedStatus: 'OPEN' };
+      const status = { phase: 'pre', dataMode: 'delayed' };
+      expect(hasLiveExtended(item, status)).toBe(false);
     });
 
     it('dataMode=live(정규장) → false (정규장은 메인 시세 우선)', () => {

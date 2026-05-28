@@ -18,6 +18,10 @@ export function hasLiveExtended(item, status) {
   const p = Number(item.extendedPrice);
   if (!Number.isFinite(p) || p <= 0) return false;
   if (item.extendedStatus !== 'OPEN') return false;
+  // 최근성 교차검증 — 백엔드 stale 데이터가 흘러올 위험 차단(10분 임계)
+  // 네이버 차단/타임아웃 시 prev 잔존을 백엔드가 evict 하나, 다중 방어로 프론트도 추가 검증
+  const t = item.extendedAt ? new Date(item.extendedAt).getTime() : 0;
+  if (!Number.isFinite(t) || t <= 0 || (Date.now() - t) > 10 * 60 * 1000) return false;
   return true;
 }
 
