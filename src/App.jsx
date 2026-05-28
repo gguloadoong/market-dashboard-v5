@@ -388,7 +388,7 @@ export default function App() {
           ) : activeTab === 'sector' ? (
             <SectorRotation krStocks={krStocks} usStocks={usStocks} coins={coins} />
           ) : activeTab === 'news' ? (
-            <div className="lg:hidden h-[calc(100vh-112px)]">
+            <div className="h-[calc(100vh-112px)]">
               <BreakingNewsPanel onItemClick={handleItemClick} onNewsClick={setSelectedNews} />
             </div>
           ) : (
