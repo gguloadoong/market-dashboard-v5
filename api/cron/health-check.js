@@ -16,7 +16,7 @@ function authorize(req) {
 
 // ─── 단일 소스 헬스 체크 ────────────────────────────────
 async function checkSource(_name, url, options = {}) {
-  const { timeoutMs = 10000, allow401 = false, allow405 = false, method = 'GET' } = options;
+  const { timeoutMs = 10000, allow401 = false, allow403 = false, allow405 = false, method = 'GET' } = options;
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -24,7 +24,7 @@ async function checkSource(_name, url, options = {}) {
     const res = await fetch(url, { method, signal: controller.signal, redirect: 'follow' });
     const latencyMs = Date.now() - start;
     // POST 전용 엔드포인트는 GET 시 405를 반환 — 서버 도달성만 확인 목적이면 정상
-    if (res.ok || (allow401 && res.status === 401) || (allow405 && res.status === 405)) {
+    if (res.ok || (allow401 && res.status === 401) || (allow403 && res.status === 403) || (allow405 && res.status === 405)) {
       return { status: latencyMs < 5000 ? 'ok' : 'slow', latencyMs };
     }
     return { status: 'fail', error: `HTTP ${res.status}`, latencyMs };
@@ -46,6 +46,9 @@ async function runHealthChecks() {
     { key: 'alpaca',    url: 'https://data.alpaca.markets/v2/stocks/AAPL/bars?timeframe=1Day&limit=1',      opts: { timeoutMs: 10000, allow401: true } },
     // 국내 소스
     { key: 'naver_world', url: 'https://finance.naver.com/world/sise.naver?symbol=NASDAQ%3AAAPL',           opts: { timeoutMs: 10000 } },
+    // #334: 네이버 비공식 연장세션 — overMarketPriceInfo (모바일 헤더 없으면 403 가능 → 도달성만 체크)
+    { key: 'naver_us_extended', url: 'https://api.stock.naver.com/stock/AAPL.O/basic',                      opts: { timeoutMs: 8000, allow401: true, allow403: true } },
+    { key: 'naver_kr_extended', url: 'https://m.stock.naver.com/api/stock/005930/basic',                    opts: { timeoutMs: 8000, allow401: true, allow403: true } },
     // RSS (5초 타임아웃)
     { key: 'rss_hankyung', url: 'https://feeds.hankyung.com/economy',        opts: { timeoutMs: 5000 } },
     { key: 'rss_yonhap',   url: 'https://www.yna.co.kr/rss/economy.xml',    opts: { timeoutMs: 5000 } },

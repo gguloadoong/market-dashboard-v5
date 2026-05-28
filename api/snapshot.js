@@ -14,10 +14,17 @@ const CORS_HEADERS = {
 // ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
 // 제거: Coins→highPrice/lowPrice
 // #185: KR exchange(kospi/kosdaq) 보존 — 뱃지 렌더링 회귀 방지.
+// #334: 네이버 연장세션 필드 5종(extendedPrice/extendedChangePct/extendedSessionType/extendedStatus/extendedAt) 패스쓰루.
+//       _price-cache.js mergeExtended 가 hot/all snap 에 머지한 값을 stripStocks 가 잘라내지 않도록 화이트리스트 확장.
 function stripStocks(items) {
   if (!Array.isArray(items)) return items;
-  return items.map(({ symbol, name, price, change, changePct, volume, marketCap, market, exchange }) =>
-    ({ symbol, name, price, change, changePct, volume, marketCap, market, exchange }));
+  return items.map(({
+    symbol, name, price, change, changePct, volume, marketCap, market, exchange,
+    extendedPrice, extendedChangePct, extendedSessionType, extendedStatus, extendedAt,
+  }) => ({
+    symbol, name, price, change, changePct, volume, marketCap, market, exchange,
+    extendedPrice, extendedChangePct, extendedSessionType, extendedStatus, extendedAt,
+  }));
 }
 
 // #335: accTradePrice24h 추가 — 코인 거래대금 복구 (volume24h는 0 고정이라 사용 불가).

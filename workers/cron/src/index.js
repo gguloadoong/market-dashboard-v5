@@ -7,6 +7,7 @@ import { morningBriefing } from './crons/morning-briefing.js';
 import { watchdog } from './crons/watchdog.js';
 import { updateAiDebate } from './crons/update-ai-debate.js';
 import { computeSignals } from './crons/compute-signals.js';
+import { updateNaverExtended } from './crons/update-naver-extended.js';
 
 export default {
   async scheduled(event, env, ctx) {
@@ -37,6 +38,10 @@ export default {
       const utcD = now.getUTCDay();
       const usActive = (utcD >= 1 && utcD <= 6) && (utcH <= 1 || utcH >= 8);
       if (usActive) ctx.waitUntil(updateUs(env, 0));
+      // #334: 네이버 연장세션 프록시 — piggyback (자체 연장세션 가드로 즉시 skip 가능).
+      //       US/KR 동시 호출, 둘 다 비활성 시 즉시 반환 → 추가 subrequest 0.
+      //       hot tier(Top 200) × 연장세션만 호출하므로 대역폭 영향 최소(#331).
+      ctx.waitUntil(updateNaverExtended(env));
     } else if (cron === '3-58/5 * * * *') {
       // 미장 샤드 1
       const now = new Date();
@@ -85,6 +90,7 @@ export default {
       if (path === '/watchdog') return Response.json(await watchdog(env));
       if (path === '/ai-debate') return Response.json(await updateAiDebate(env));
       if (path === '/compute-signals') return Response.json(await computeSignals(env));
+      if (path === '/update-naver-extended') return Response.json(await updateNaverExtended(env));
       return new Response('mdv5-cron worker', { status: 200 });
     } catch (e) {
       return Response.json({ error: e.message }, { status: 500 });

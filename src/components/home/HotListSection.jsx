@@ -2,10 +2,14 @@ import { memo, useState } from 'react';
 import { getPct, fmt, getAvatarBg, getLogoUrls } from './utils';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../../utils/marketHours';
 import { itemKey } from '../../utils/symbolKey';
+import { hasLiveExtended, extendedBadgeLabel } from '../../utils/extendedPrice';
 
 // ─── SECTION 3: HOT 리스트 행 (3열 공통) ─────────────────────
-const HotRow = memo(function HotRow({ item, rank, krwRate, onClick }) {
-  const pct    = getPct(item);
+// status: 연장세션 시 extendedPrice 사용 여부 판정용 (시장별 marketHours status 전달)
+const HotRow = memo(function HotRow({ item, rank, krwRate, onClick, status }) {
+  // #334: 연장세션에는 extendedChangePct 사용, 정규/lastClose 는 기존 getPct
+  const extActive = hasLiveExtended(item, status);
+  const pct    = extActive ? Number(item.extendedChangePct ?? 0) : getPct(item);
   const isUp   = pct > 0;
   const isDown = pct < 0;
   const color  = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
@@ -14,11 +18,13 @@ const HotRow = memo(function HotRow({ item, rank, krwRate, onClick }) {
   const [logoIdx, setLogoIdx] = useState(0);
   const bg = getAvatarBg(item.symbol);
 
+  // #334: 연장세션 가격은 ext.extendedPrice 우선 (US 는 USD, KR 은 KRW raw)
+  const basePrice = extActive ? Number(item.extendedPrice) : item.price;
   const price = item._market === 'COIN'
     ? `₩${fmt(Math.round(item.priceKrw || (item.priceUsd ?? 0) * krwRate))}`
     : item._market === 'KR'
-    ? `₩${fmt(item.price)}`
-    : `₩${fmt(Math.round((item.price ?? 0) * krwRate))}`;
+    ? `₩${fmt(basePrice)}`
+    : `₩${fmt(Math.round((basePrice ?? 0) * krwRate))}`;
 
   return (
     <div
@@ -47,7 +53,14 @@ const HotRow = memo(function HotRow({ item, rank, krwRate, onClick }) {
 
       {/* 종목명 */}
       <div className="flex-1 min-w-0">
-        <div className="text-[12px] font-semibold text-[#191F28] truncate">{item.name}</div>
+        <div className="flex items-center gap-1">
+          <span className="text-[12px] font-semibold text-[#191F28] truncate">{item.name}</span>
+          {extActive && (
+            <span className="text-[8px] font-bold bg-[#FFF4E6] text-[#FF9500] px-1 py-px rounded flex-shrink-0">
+              {extendedBadgeLabel(item)}
+            </span>
+          )}
+        </div>
         <div className="text-[10px] text-[#8B95A1] font-mono truncate">{item.symbol}</div>
       </div>
 
@@ -128,6 +141,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
                       rank={i + 1}
                       krwRate={krwRate}
                       onClick={onItemClick}
+                      status={krStatus}
                     />
                   ))
                 : <div className="px-4 py-6 text-center text-[12px] text-[#B0B8C1]">데이터 로딩 중</div>
@@ -157,6 +171,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
                       rank={i + 1}
                       krwRate={krwRate}
                       onClick={onItemClick}
+                      status={usStatus}
                     />
                   ))
                 : <div className="px-4 py-6 text-center text-[12px] text-[#B0B8C1]">데이터 로딩 중</div>
@@ -215,6 +230,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
                     rank={i + 1}
                     krwRate={krwRate}
                     onClick={onItemClick}
+                    status={krStatus}
                   />
                 ))
             }
@@ -242,6 +258,7 @@ export default function HotListSection({ hasData, krHot, usHot, coinHot, krDrop,
                     rank={i + 1}
                     krwRate={krwRate}
                     onClick={onItemClick}
+                    status={usStatus}
                   />
                 ))
             }
