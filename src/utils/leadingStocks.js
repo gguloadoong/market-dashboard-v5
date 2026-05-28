@@ -45,15 +45,21 @@ const BREADTH_DENOM = 5;    // breadth = min(종목수/5, 1)
 // detectNewsSectors(newsTopicMap) 어휘가 달라 substring 매칭이 양방향 실패하는 문제 해소.
 //   예) item.sector '2차전지' ↔ 뉴스 '배터리'/'전기차' → 둘 다 includes 실패 → 핫섹터·브릿지 무력화.
 // 같은 캐노니컬 그룹으로 묶어 isHot 비교와 CROSS_MARKET 키 조회 양쪽에 적용한다.
+//
+// [W1 수정] newsTopicMap.ai_tech.sectors는 ['AI','IT소프트웨어','반도체']로 '소프트웨어'(범용)를
+// 의도적으로 분리한다. 별칭이 AI/IT소프트웨어/소프트웨어를 모두 software로 통합하면 AI 뉴스 1건이
+// 모든 범용 '소프트웨어' 섹터 종목을 isHot으로 만들어 ×1.3 부스트되는 과대평가 문제 발생.
+// → 'AI'·'IT소프트웨어'·'AI/소프트웨어'는 software_ai(AI 뉴스 직접 영향), '소프트웨어'(범용)는
+// software_generic(별도)로 분리해 newsTopicMap 어휘와 정합.
 const SECTOR_ALIASES = {
   // KR item.sector 어휘
   '2차전지': 'battery',
   '자동차': 'auto',
   // US item.sector 어휘
   '전기차': 'battery',
-  '소프트웨어': 'software',
-  'AI/소프트웨어': 'software',
-  'IT소프트웨어': 'software',
+  '소프트웨어': 'software_generic',     // 범용 SW — AI 뉴스에 자동 휩쓸리지 않음
+  'AI/소프트웨어': 'software_ai',
+  'IT소프트웨어': 'software_ai',
   '핀테크': 'fintech',
   '미디어': 'media',
   '리츠': 'reit',
@@ -61,7 +67,7 @@ const SECTOR_ALIASES = {
   // detectNewsSectors(newsTopicMap) 어휘
   '배터리': 'battery',
   '자동차부품': 'auto',
-  'AI': 'software',
+  'AI': 'software_ai',
 };
 
 // 섹터명 → 캐노니컬 키(별칭 없으면 원문 유지). isHot/CROSS_MARKET 비교 정규화용.
@@ -71,9 +77,14 @@ function canonicalSector(sector) {
 }
 
 // 두 섹터가 같은 테마인지 — 캐노니컬 일치 또는 (원문) 양방향 substring.
+// [W1 보강] 둘 중 하나라도 SECTOR_ALIASES에 명시된 어휘라면 substring 폴백을 끄고
+// 캐노니컬 일치만 인정 — 별칭 정의로 분리한 의도(예 '소프트웨어' vs 'IT소프트웨어')를
+// substring("IT소프트웨어".includes("소프트웨어")=true)가 우회하는 버그 방지.
 function sectorMatches(a, b) {
   if (!a || !b) return false;
   if (canonicalSector(a) === canonicalSector(b)) return true;
+  // 한쪽이라도 별칭 사전에 정의되어 있으면 substring 매칭 비활성(분리 의도 보존).
+  if (SECTOR_ALIASES[a] !== undefined || SECTOR_ALIASES[b] !== undefined) return false;
   return a.includes(b) || b.includes(a);
 }
 
@@ -116,26 +127,47 @@ export function turnoverRatio(item, krwRate = 0) {
   return turnoverKRW(item, krwRate) / cap;
 }
 
-// percentile rank(0~100) — value가 values 중 몇 %ile인지. values 비거나 단일값이면 50 중립.
-function percentileRank(value, values) {
-  if (!Array.isArray(values) || values.length === 0) return 50;
-  if (values.length === 1) return 50;
-  let below = 0;
-  let equal = 0;
-  for (const v of values) {
-    if (v < value) below += 1;
-    else if (v === value) equal += 1;
+// [W3/STYLE perf 수정] percentileRankSorted — 정렬된 모수 + 이진탐색으로 O(log n).
+// 대량 모수(usItems 최대 ~2700, scoreMarketItems가 종목당 2회 percentile 계산) 시
+// 기존 O(n²) → O(n log n). 동점 분산 보정(below + 0.5·equal) / n 동일.
+// sortedValues는 오름차순 정렬되어 있어야 함.
+function lowerBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (arr[mid] < target) lo = mid + 1;
+    else hi = mid;
   }
-  // 중앙값 보정(동점 분산) — (below + 0.5·equal) / n
-  return ((below + 0.5 * equal) / values.length) * 100;
+  return lo;
+}
+function upperBound(arr, target) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (arr[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+function percentileRankSorted(value, sortedValues) {
+  if (!Array.isArray(sortedValues) || sortedValues.length === 0) return 50;
+  if (sortedValues.length === 1) return 50;
+  const below = lowerBound(sortedValues, value);          // value 미만 개수
+  const equal = upperBound(sortedValues, value) - below;  // value와 같은 개수
+  return ((below + 0.5 * equal) / sortedValues.length) * 100;
 }
 
 // 잡주 컷 — 스코어링 전 필터. 통과 시 true.
-// 제외: 거래대금 하한 미달 / 파생상품 / (무변동 & 회전율 percentile<50)
+// 제외: 거래대금 하한 미달 / 파생상품 / 지수 ETF / (무변동 & 회전율 percentile<50)
 function passesNoiseGate(item, ctx) {
   if (!item) return false;
   const name = item.name || '';
   if (DERIVATIVE_RE.test(name)) return false;
+  // [HIGH3 수정] 지수 ETF(SPY/QQQ/KODEX200 등) 배제. 주도주/테마는 개별주여야 함.
+  // index.jsx에서 _isEtf=true로 표시된 항목은 LEAD/GAP/COIN 분기 어디에도 진입 금지.
+  if (item._isEtf) return false;
 
   const market = item._market;
   const rate = Number(ctx.krwRate) || 0;
@@ -159,10 +191,14 @@ function passesNoiseGate(item, ctx) {
   }
 
   // 무변동 + 회전율 하위 → 거래대금만 큰 비주류 → 제외
+  // [W2/STYLE4 수정] 코인은 turnoverRatio가 항상 null → ratioPercentileOf=0 → pct===0(데이터 지연 포함)
+  // 코인이 거래대금 무관하게 컷되는 문제. 코인은 turnoverPercentileOf 기준으로 판정.
   const pct = getPct(item);
   if (pct === 0) {
-    const ratioPct = ctx.ratioPercentileOf ? ctx.ratioPercentileOf(item) : 50;
-    if (ratioPct < 50) return false;
+    const isCoin = isCoinItem(item) || market === 'COIN';
+    const pctileFn = isCoin ? ctx.turnoverPercentileOf : ctx.ratioPercentileOf;
+    const pctile = pctileFn ? pctileFn(item) : 50;
+    if (pctile < 50) return false;
   }
   return true;
 }
@@ -255,6 +291,7 @@ export function scoreMarketItems(items, baseCtx = {}) {
   if (!Array.isArray(items) || items.length === 0) return [];
 
   // 회전율/거래대금 모수 — percentile 계산용(잡주 컷 전 전체 모수로 계산해야 안정적).
+  // [W3/perf 수정] 1회 정렬 후 이진탐색으로 종목당 O(log n) — 대량 모수(usItems ~2700) 대응.
   const ratios = [];
   const turnovers = [];
   for (const it of items) {
@@ -263,15 +300,17 @@ export function scoreMarketItems(items, baseCtx = {}) {
     const t = turnoverKRW(it, baseCtx.krwRate);
     if (Number.isFinite(t) && t > 0) turnovers.push(t);
   }
+  ratios.sort((a, b) => a - b);
+  turnovers.sort((a, b) => a - b);
   const ratioPercentileOf = (it) => {
     const r = turnoverRatio(it, baseCtx.krwRate);
     if (r == null || !Number.isFinite(r)) return 0;
-    return percentileRank(r, ratios);
+    return percentileRankSorted(r, ratios);
   };
   const turnoverPercentileOf = (it) => {
     const t = turnoverKRW(it, baseCtx.krwRate);
     if (!Number.isFinite(t) || t <= 0) return 0;
-    return percentileRank(t, turnovers);
+    return percentileRankSorted(t, turnovers);
   };
 
   const ctx = { ...baseCtx, ratioPercentileOf, turnoverPercentileOf };
@@ -299,18 +338,30 @@ export function scoreMarketItems(items, baseCtx = {}) {
 /**
  * clusterThemes — 정적 item.sector로 묶고, 뉴스 핫섹터로 부스트.
  * 무섹터 고득점 종목은 별도 "단일 종목" 그룹으로 graceful degrade.
+ *
+ * [의도 — W5/STYLE6 명시] 핫섹터는 종목 점수(scoreNews에서 +30, 가중 0.20=실효 +6)와
+ * 테마 점수(여기서 ×1.3) 양쪽에 의도적으로 이중 반영한다.
+ * 종목 단위에선 "뉴스 관련주" 신호, 테마 단위에선 "전체 테마 무게"를 분리해 강화하기 위함.
+ *
  * @param {object[]} scoredItems  scoreMarketItems 결과(_leadScore 보유)
  * @param {object[]} recentNews
+ * @param {string[]} [precomputedHotList] computeMorphFocus에서 미리 계산한 핫섹터 — 중복계산 회피용 옵셔널.
  * @returns {object} { themes:[{theme, score, breadth, hot, leaders, members}], soloMovers:[item], hotSectors:[string] }
  */
-export function clusterThemes(scoredItems, recentNews = []) {
-  const hotSectors = new Set();
-  if (Array.isArray(recentNews)) {
-    for (const n of recentNews) {
-      for (const s of detectNewsSectors(n.title || '')) hotSectors.add(s);
+export function clusterThemes(scoredItems, recentNews = [], precomputedHotList = null) {
+  // [W5 수정] precomputedHotList가 주어지면 detectNewsSectors 중복 계산 회피.
+  let hotList;
+  if (Array.isArray(precomputedHotList)) {
+    hotList = precomputedHotList;
+  } else {
+    const hotSectors = new Set();
+    if (Array.isArray(recentNews)) {
+      for (const n of recentNews) {
+        for (const s of detectNewsSectors(n.title || '')) hotSectors.add(s);
+      }
     }
+    hotList = [...hotSectors];
   }
-  const hotList = [...hotSectors];
   const isHot = (sector) =>
     !!sector && hotList.some((h) => sectorMatches(sector, h));
 
@@ -353,9 +404,16 @@ export function clusterThemes(scoredItems, recentNews = []) {
 /**
  * decideMorphMode — marketHours phase 기반 5모드.
  *   KR open → KR_LEAD / US open → US_LEAD
- *   US pre·after·dayMarket → US_GAP / KR preAuction·preNxt → KR_GAP
- *   둘 다 closed → COIN_LEAD
- * 우선순위: 정규장(LEAD) > 갭(GAP) > 코인. KR LEAD를 US LEAD보다 우선(국내 사용자 기준).
+ *   KR preAuction·preNxt·afterNxt → KR_GAP (한국 활동시간 우선)
+ *   US pre·after·dayMarket → US_GAP (한국 야간)
+ *   그 외(둘 다 closed) → COIN_LEAD
+ *
+ * [B1/HIGH2 수정] 우선순위: LEAD > KR_GAP > US_GAP > COIN.
+ *   marketHours.js상 평일 ET는 pre→open→after→dayMarket로 24h 빈틈없이 커버 →
+ *   평일에는 usPhase가 'closed'가 될 수 없음. KR_GAP을 US_GAP 뒤에 두면
+ *   평일 afterNxt/preNxt/preAuction이 도달불가(미국 휴장일에만 진입).
+ *   "한국 활동시간엔 국장(LEAD/GAP), 한국 야간엔 미장" 의도를 관철하기 위해
+ *   KR_GAP을 US_GAP보다 먼저 평가한다 (LEAD가 KR 우선인 것과 일관).
  */
 export function decideMorphMode(krStatus, usStatus) {
   const krPhase = krStatus?.phase;
@@ -363,10 +421,10 @@ export function decideMorphMode(krStatus, usStatus) {
 
   if (krPhase === 'open') return MORPH_MODE.KR_LEAD;
   if (usPhase === 'open') return MORPH_MODE.US_LEAD;
-  if (usPhase === 'pre' || usPhase === 'after' || usPhase === 'dayMarket') return MORPH_MODE.US_GAP;
-  // afterNxt(정규장 마감 후 NXT 시간외, marketHours.js:255)도 국장 연장거래 → KR_GAP.
-  // 미장 after를 US_GAP으로 잡는 것과 대칭(afterNxt 누락 시 COIN_LEAD로 오폴백).
+  // KR 활동시간(시간외/프리/동시호가) — 한국 사용자 기준 KR_GAP 우선
   if (krPhase === 'preAuction' || krPhase === 'preNxt' || krPhase === 'afterNxt') return MORPH_MODE.KR_GAP;
+  // 한국 야간(KR closed) — US 시간외/프리/데이마켓
+  if (usPhase === 'pre' || usPhase === 'after' || usPhase === 'dayMarket') return MORPH_MODE.US_GAP;
   return MORPH_MODE.COIN_LEAD;
 }
 
@@ -413,9 +471,10 @@ export function buildTransitionBridge({ mode, indices, primaryTheme } = {}) {
   const pctText = `${sign}${nasdaqPct.toFixed(1)}%`;
 
   // 보합/약변동(<0.5%) → 단정 회피. 지수 한 줄만(테마 함의 생략).
+  // [W6 수정] 'NDX'는 NASDAQ-100(^NDX). Composite(^IXIC)와 등락이 갈리는 날 멘트 어긋남 방지 → '나스닥100'.
   if (abs < 0.5) {
     return {
-      line: `간밤 나스닥 보합(${pctText}) — 방향성 제한적`,
+      line: `간밤 나스닥100 보합(${pctText}) — 방향성 제한적`,
       nasdaqPct,
       tone: 'flat',
       pair: null,
@@ -436,7 +495,7 @@ export function buildTransitionBridge({ mode, indices, primaryTheme } = {}) {
     // "주목" 사용(상관≠인과). "확정" 금지.
     const leadersText = pair.krLeaders.slice(0, 2).join('·');
     return {
-      line: `간밤 나스닥 ${pctText} ${dirWord} — 오늘 ${pair.krSector}(${leadersText}) 주목`,
+      line: `간밤 나스닥100 ${pctText} ${dirWord} — 오늘 ${pair.krSector}(${leadersText}) 주목`,
       nasdaqPct,
       tone: nasdaqPct > 0 ? 'up' : 'down',
       pair,
@@ -445,7 +504,7 @@ export function buildTransitionBridge({ mode, indices, primaryTheme } = {}) {
 
   // 페어 없음 → 지수 한 줄만(테마 단정 회피).
   return {
-    line: `간밤 나스닥 ${pctText} ${dirWord} — 오늘 국장 영향 주목`,
+    line: `간밤 나스닥100 ${pctText} ${dirWord} — 오늘 국장 영향 주목`,
     nasdaqPct,
     tone: nasdaqPct > 0 ? 'up' : 'down',
     pair: null,
@@ -500,8 +559,13 @@ export function computeMorphFocus(params = {}) {
     usStatus = null,
     krwRateLoaded = true,
     baselineMap = null,
-    weights = SCORE_WEIGHTS.primary,
+    weights: weightsOverride = null,
   } = params;
+
+  // [W4 수정] baselineMap이 주어지면 surge 가중을 활성화한 SECONDARY로 자동 전환.
+  // 명시 override가 있으면 그것 우선. 기존엔 primary 고정이라 surgeScoreOf 결과가 0으로 사장됐음.
+  const weights = weightsOverride
+    || (baselineMap ? SCORE_WEIGHTS.secondary : SCORE_WEIGHTS.primary);
 
   const mode = decideMorphMode(krStatus, usStatus);
 
@@ -509,18 +573,22 @@ export function computeMorphFocus(params = {}) {
   const krClosed = krStatus?.phase === 'closed';
   const usClosed = usStatus?.phase === 'closed';
 
-  // 핫섹터(뉴스) — scoreNews와 clusterThemes에 공유.
+  // 핫섹터(뉴스) — scoreNews와 clusterThemes에 공유(중복 계산 방지: precomputedHotList).
   const hotSectors = new Set();
   for (const n of (recentNews || [])) {
     for (const s of detectNewsSectors(n.title || '')) hotSectors.add(s);
   }
   const hotList = [...hotSectors];
 
+  // [STYLE5 수정] krwRateLoaded=false면 환율 0으로 캡처(baseCtxFor와 일관).
+  // 환율 미로드 구간에서 US turnover 분모를 부정확하게 산정하는 문제 방지.
+  const effectiveKrwRate = krwRateLoaded ? krwRate : 0;
+
   // baseline → w_surge용 surgeScoreOf. 부재 시 null(점수 0).
   const surgeScoreOf = baselineMap
     ? (item) => {
         const base = baselineMap[item.symbol]?.avg20d;
-        const turn = turnoverKRW(item, krwRate);
+        const turn = turnoverKRW(item, effectiveKrwRate);
         if (!base || base <= 0 || turn <= 0) return 0;
         const ratio = turn / base;
         if (ratio <= 1) return 0;
@@ -529,7 +597,7 @@ export function computeMorphFocus(params = {}) {
     : null;
 
   const baseCtxFor = (market, isClosed) => ({
-    krwRate: krwRateLoaded ? krwRate : 0,
+    krwRate: effectiveKrwRate,
     recentNews,
     hotSectors: hotList,
     isClosed,
@@ -555,7 +623,7 @@ export function computeMorphFocus(params = {}) {
   if (mode === MORPH_MODE.KR_LEAD || mode === MORPH_MODE.US_LEAD) {
     // LEAD: 주도 테마 + 대장주 + 동반 테마.
     const scored = mode === MORPH_MODE.KR_LEAD ? scoredKr : scoredUs;
-    const { themes, soloMovers } = clusterThemes(scored, recentNews);
+    const { themes, soloMovers } = clusterThemes(scored, recentNews, hotList);
     result.primaryTheme = themes[0] || null;
     result.altThemes = themes.slice(1, 4);
     // 무섹터 고득점 종목 → 단일카드 폴백(상위 5). 단 primaryTheme이 있으면 UI는 테마 카드만
@@ -573,16 +641,15 @@ export function computeMorphFocus(params = {}) {
     });
     result.movers = gapSorted.slice(0, 6).map(toSoloMover);
     // 갭 모드에서도 테마가 뚜렷하면 보조 표시(약화).
-    const { themes } = clusterThemes(scored, recentNews);
+    const { themes } = clusterThemes(scored, recentNews, hotList);
     result.primaryTheme = themes[0] || null;
     result.altThemes = themes.slice(1, 3);
   } else {
-    // COIN_LEAD: 거래대금(accTradePrice24h) + move. 코인 테마(암호화폐 단일).
-    const { themes, soloMovers } = clusterThemes(scoredCoin, recentNews);
-    result.primaryTheme = themes[0] || null;
-    result.altThemes = themes.slice(1, 3);
-    // 코인은 대부분 무섹터 → 거래대금 상위가 곧 주도 코인.
-    result.movers = (soloMovers.length ? soloMovers : scoredCoin).slice(0, 6).map(toSoloMover);
+    // COIN_LEAD: 거래대금(accTradePrice24h) + move.
+    // [STYLE6] 코인은 대부분 무섹터(sector 없음) → clusterThemes 결과의 themes/leaders가
+    // 사실상 비어 있고, UI(MorphingFocusSection.jsx isCoin 분기)는 movers만 소비함.
+    // 의도적으로 clusterThemes를 생략하고 거래대금 상위 코인을 그대로 movers로 사용.
+    result.movers = scoredCoin.slice(0, 6).map(toSoloMover);
   }
 
   // ── 전이 브릿지(국장 모드만) ──

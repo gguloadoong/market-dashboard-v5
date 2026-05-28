@@ -337,7 +337,11 @@ export default function MorphingFocusSection({
     secondaryStatus = usStatus;
   }
   try {
-    clockLabel = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    // [STYLE7 수정] KST 고정(timeZone:'Asia/Seoul') — 해외 접속 시 클라이언트 로컬타임존
+    // 으로 부정확하던 문제 보정. 세션 라벨(국장/미장)이 KST 기준이라 시계도 KST로 통일.
+    clockLabel = new Date().toLocaleTimeString('ko-KR', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul',
+    });
   } catch { clockLabel = null; }
 
   // ── LEAD 모드: 주도 테마가 있으면 테마형, 없으면 단일 폴백 ──
