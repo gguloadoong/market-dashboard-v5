@@ -106,10 +106,10 @@ function fmtChangeAmt(item, krwRate, extActive = false) {
     const pct = Number(item.extendedChangePct) || 0;
     const prev = pct !== -100 ? p / (1 + pct / 100) : 0;
     const amt = p - prev;
-    const sign = amt >= 0 ? '+' : '';
+    const sign = amt >= 0 ? '+' : '-';   // Math.abs 후처리하므로 음수 부호 명시
     if (item.market === 'kr') return `${sign}₩${fmt(Math.abs(Math.round(amt)))}`;
     if (item.market === 'us') return `${sign}₩${fmt(Math.abs(Math.round(amt * krwRate)))}`;
-    return `${sign}${amt.toFixed(2)}`;
+    return `${sign}${Math.abs(amt).toFixed(2)}`;
   }
   const amt = item.change ?? 0;
   const sign = amt >= 0 ? '+' : '';

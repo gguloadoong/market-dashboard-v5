@@ -94,7 +94,7 @@ function parseExtended(json, isKr) {
     return {
       extendedStatus:       'CLOSE',
       extendedSessionType:  labelSession,
-      extendedAt:           info.localTradedAt || new Date().toISOString(),
+      extendedAt:           new Date().toISOString(),    // 서버 시각(UTC) — localTradedAt 포맷("2026.05.27 18:00:00")은 Safari/타임존 미스매치 위험
     };
   }
   const price = parseFloat(String(rawPrice).replace(/,/g, ''));
@@ -103,7 +103,7 @@ function parseExtended(json, isKr) {
     return {
       extendedStatus:       'CLOSE',
       extendedSessionType:  labelSession,
-      extendedAt:           info.localTradedAt || new Date().toISOString(),
+      extendedAt:           new Date().toISOString(),    // 서버 시각(UTC) — localTradedAt 포맷("2026.05.27 18:00:00")은 Safari/타임존 미스매치 위험
     };
   }
   return {
@@ -132,6 +132,8 @@ async function fetchNaverUsSingle(symbol, timeoutMs = 5000, exchange = null) {
       const data = await res.json();
       const parsed = parseExtended(data, false);
       if (parsed) return parsed;
+      // 결정적 SFX(primary) 응답 OK인데 연장세션 데이터 없음 → 다른 SFX 시도 무의미(subreq 절감)
+      if (sfx === primary) break;
     } catch (_) { /* 다음 SFX 시도 */ }
   }
   return null;
