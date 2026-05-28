@@ -25,10 +25,13 @@ function loadCoinCache() {
 function saveCoinCache(coins) {
   try {
     // priceKrw/priceUsd/change24h 핵심 필드만 저장 (용량 최적화)
+    // [HIGH1 수정] accTradePrice24h 추가 — #335 MorphingFocusSection이 COIN_LEAD에서 거래대금 기준
+    // 컷(MIN_TURNOVER.COIN=100억)을 적용. 캐시에 빠지면 재방문 시 movers=[]→섹션 빈화면.
     const slim = coins.map(c => ({
       id: c.id, symbol: c.symbol, name: c.name, market: c.market,
       priceKrw: c.priceKrw, priceUsd: c.priceUsd, change24h: c.change24h,
       marketCap: c.marketCap, volume24h: c.volume24h,
+      accTradePrice24h: c.accTradePrice24h,
       image: c.image, sector: c.sector, sparkline: c.sparkline ?? [],
     }));
     localStorage.setItem(COIN_CACHE_KEY, JSON.stringify({ data: slim, ts: Date.now() }));

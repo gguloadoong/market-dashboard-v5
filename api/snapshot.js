@@ -12,7 +12,7 @@ const CORS_HEADERS = {
 };
 
 // ─── 필드 스트리핑 (화면에 사용하는 필드만 전송) ───────────────
-// 제거: Coins→accTradePrice24h/highPrice/lowPrice
+// 제거: Coins→highPrice/lowPrice
 // #185: KR exchange(kospi/kosdaq) 보존 — 뱃지 렌더링 회귀 방지.
 function stripStocks(items) {
   if (!Array.isArray(items)) return items;
@@ -20,10 +20,13 @@ function stripStocks(items) {
     ({ symbol, name, price, change, changePct, volume, marketCap, market, exchange }));
 }
 
+// #335: accTradePrice24h 추가 — 코인 거래대금 복구 (volume24h는 0 고정이라 사용 불가).
+//       소스(update-coins.js)는 t.acc_trade_price_24h로 채우지만 strip에서 버려졌음.
+//       주도주 알고리즘(leadingStocks.js)이 코인 회전율 대체값으로 소비.
 function stripCoins(items) {
   if (!Array.isArray(items)) return items;
-  return items.map(({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }) =>
-    ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h }));
+  return items.map(({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h, accTradePrice24h }) =>
+    ({ id, symbol, name, market, priceKrw, change24h, priceUsd, marketCap, volume24h, accTradePrice24h }));
 }
 
 // ─── ETag: JSON 문자열 해시 (모든 필드 변경 감지, 충돌 불가) ────

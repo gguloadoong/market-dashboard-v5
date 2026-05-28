@@ -50,7 +50,8 @@ const REQUIRED_IMPORTS = [
   'AiDebateSection',
   'ExploreTabsWidget',
   'NewsFeedWidget',
-  'NotableMoversSection',
+  // NotableMoversSection → MorphingFocusSection으로 흡수 (#335, 시간대별 주도주/주목 자동 전환)
+  'MorphingFocusSection',
 ];
 
 describe('홈 레이아웃 — 핵심 위젯 누락 방지', () => {
