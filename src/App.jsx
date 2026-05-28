@@ -7,7 +7,6 @@ import SurgeBanner from './components/SurgeBanner';
 import MarketSummaryBar from './components/MarketSummaryBar';
 import WatchlistTable from './components/WatchlistTable';
 import BreakingNewsPanel from './components/BreakingNewsPanel';
-import UnifiedFeedPanel from './components/UnifiedFeedPanel';
 import ChartSidePanel from './components/ChartSidePanel';
 import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
@@ -373,7 +372,7 @@ export default function App() {
         dark={dark} onDarkToggle={toggleDark}
       />
 
-      <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_360px]">
+      <div className="max-w-[1440px] mx-auto">
         <div className={`min-w-0 overflow-hidden ${activeTab === 'news' ? '' : 'p-5 space-y-4'} lg:pb-0 pb-safe-nav`}>
           {activeTab === 'home' ? (
             <>
@@ -405,9 +404,6 @@ export default function App() {
           )}
         </div>
 
-        <div className="hidden lg:block self-start" style={{ position: 'sticky', top: '84px', height: 'calc(100vh - 84px)' }}>
-          <UnifiedFeedPanel onItemClick={handleItemClick} onNewsClick={setSelectedNews} />
-        </div>
       </div>
 
       {selectedItem && (
