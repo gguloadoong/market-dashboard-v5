@@ -362,10 +362,12 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
             return (
               <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
                 <button
-                  onClick={() => handleToggleExpand(signal)}
+                  onClick={isClickable ? () => handleToggleExpand(signal) : undefined}
                   aria-expanded={isClickable ? isExpanded : undefined}
+                  aria-disabled={isClickable ? undefined : true}
+                  tabIndex={isClickable ? 0 : -1}
                   className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
-                    isClickable ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
+                    isClickable ? 'cursor-pointer hover:bg-[#F2F3F5]' : 'cursor-default'
                   }`}
                 >
                   {isClickable && (

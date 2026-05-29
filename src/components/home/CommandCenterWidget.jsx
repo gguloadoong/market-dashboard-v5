@@ -223,7 +223,11 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
             key={signal.id || `hero-sub-${idx}`}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${subClickable ? 'cursor-pointer hover:bg-[#F7F8FA]' : ''} transition-colors`}
             style={{ borderTop: '1px solid #F2F3F5' }}
-            onClick={() => subClickable && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market })}
+            role={subClickable ? 'button' : undefined}
+            tabIndex={subClickable ? 0 : undefined}
+            aria-disabled={subClickable ? undefined : true}
+            onClick={subClickable ? () => onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market }) : undefined}
+            onKeyDown={subClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market }); } } : undefined}
           >
             {item && <TickerLogo item={item} size={24} />}
             <span className="text-[14px] font-semibold text-[#191F28] truncate flex-1 min-w-0">{extractName(signal)}</span>
