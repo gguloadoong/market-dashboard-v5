@@ -6,7 +6,7 @@ import { useWatchlistAlert } from '../../hooks/useWatchlistAlert';
 import { useFearGreedScores } from '../../hooks/useFearGreed';
 import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
-import { TYPE_META } from '../../engine/signalTypes';
+import { TYPE_META, isMarketIndicatorSignal } from '../../engine/signalTypes';
 import MarketIndexSection from './MarketIndexSection';
 import EventTicker from './EventTicker';
 import TickerLogo from './TickerLogo';
@@ -129,6 +129,8 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
   const heroAccent = isBullHero ? '#F04452' : '#1764ED';
   const heroBg = isBullHero ? 'rgba(240,68,82,0.03)' : 'rgba(23,100,237,0.03)';
   const heroPct = heroItem ? getPct(heroItem) : null;
+  // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
+  const heroClickable = !!hero.symbol && !isMarketIndicatorSignal(hero);
 
   // 히어로 아이템 가격 포맷
   const heroPrice = heroItem
@@ -143,11 +145,11 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
     <div className="flex flex-col gap-2">
       {/* 1위 시그널 — 확장 카드 */}
       <div
-        className={`rounded-[14px] p-5 ${hero.symbol ? 'cursor-pointer hover:brightness-[0.98]' : ''} transition-all`}
+        className={`rounded-[14px] p-5 ${heroClickable ? 'cursor-pointer hover:brightness-[0.98]' : ''} transition-all`}
         style={{ background: heroBg }}
-        onClick={() => hero.symbol && onItemClick?.({ symbol: hero.symbol, name: hero.name || hero.symbol, market: hero.market === 'crypto' ? 'coin' : hero.market })}
-        role={hero.symbol ? 'button' : undefined}
-        tabIndex={hero.symbol ? 0 : undefined}
+        onClick={() => heroClickable && onItemClick?.({ symbol: hero.symbol, name: hero.name || hero.symbol, market: hero.market === 'crypto' ? 'coin' : hero.market })}
+        role={heroClickable ? 'button' : undefined}
+        tabIndex={heroClickable ? 0 : undefined}
       >
         {/* 상단: 로고 + 종목명 + 가격 + 변동률 + 스파크라인 */}
         <div className="flex items-center gap-3 mb-3">
@@ -213,13 +215,15 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
                 ? `₩${fmt(item.price)}`
                 : `$${(item.price ?? 0).toFixed(2)}`)
           : null;
+        // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
+        const subClickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
 
         return (
           <div
             key={signal.id || `hero-sub-${idx}`}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${signal.symbol ? 'cursor-pointer hover:bg-[#F7F8FA]' : ''} transition-colors`}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${subClickable ? 'cursor-pointer hover:bg-[#F7F8FA]' : ''} transition-colors`}
             style={{ borderTop: '1px solid #F2F3F5' }}
-            onClick={() => signal.symbol && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market })}
+            onClick={() => subClickable && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market === 'crypto' ? 'coin' : signal.market })}
           >
             {item && <TickerLogo item={item} size={24} />}
             <span className="text-[14px] font-semibold text-[#191F28] truncate flex-1 min-w-0">{extractName(signal)}</span>

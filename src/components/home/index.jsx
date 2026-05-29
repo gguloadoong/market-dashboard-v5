@@ -11,6 +11,7 @@ import { useInvestorSignals } from '../../hooks/useInvestorSignals';
 import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
 import { useNewsSignals } from '../../hooks/useNewsSignals';
 import { useServerSignals } from '../../hooks/useServerSignals';
+import { isMarketIndicatorSignal } from '../../engine/signalTypes';
 import CommandCenterWidget from './CommandCenterWidget';
 import SignalBoardWidget from './SignalBoardWidget';
 import AiDebateSection from './AiDebateSection';
@@ -123,6 +124,8 @@ export default function HomeDashboard({
   // 시그널 클릭 → allItems에서 full item 조회 후 ChartSidePanel 오픈
   const handleSignalItemClick = useCallback((sigItem) => {
     if (!sigItem?.symbol || !onItemClick) return;
+    // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 차단 (#341, 안전망 — 호출처에서 1차 차단됨)
+    if (isMarketIndicatorSignal(sigItem)) return;
     const marketMap = { crypto: 'COIN', coin: 'COIN', us: 'US', kr: 'KR' };
     const _market = marketMap[(sigItem.market || '').toLowerCase()] ||
                     (sigItem._market || '').toUpperCase() || 'US';

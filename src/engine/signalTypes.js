@@ -36,6 +36,18 @@ export const SIGNAL_TYPES = {
   SECTOR_OUTLIER: 'sector_outlier',
 };
 
+// 시장 지표 시그널 — 종목이 아닌 시장 전체 심리/지표 (#341)
+// symbol 필드에 'crypto'/'us'/'kr' 같은 시장 키가 들어가지만 종목 클릭/카드로 변환 금지.
+// 시그널 보드의 정보성 카드 + 봇 성적표 추적 + 다른 시그널 교차 참조용으로만 사용.
+export const MARKET_INDICATOR_TYPES = new Set([
+  'fear_greed_shift',
+]);
+
+/** 시그널이 시장 지표(종목 아님) 타입인지 검사 — 종목 클릭 핸들러에서 차단용 (#341) */
+export function isMarketIndicatorSignal(signal) {
+  return !!signal && MARKET_INDICATOR_TYPES.has(signal.type);
+}
+
 // 시그널 방향
 export const DIRECTIONS = {
   BULLISH: 'bullish',

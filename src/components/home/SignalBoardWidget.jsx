@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
-import { SIGNAL_TYPES } from '../../engine/signalTypes';
+import { SIGNAL_TYPES, isMarketIndicatorSignal } from '../../engine/signalTypes';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import { buildNarrative } from '../../utils/narrativeBuilder';
 import { matchesKeywords, buildStockKeywords } from '../../utils/newsAlias';
@@ -164,17 +164,22 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   const displayList = expanded ? filteredCombinedList : filteredCombinedList.slice(0, 5);
 
   const handleClick = useCallback((signal) => {
+    // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
+    if (isMarketIndicatorSignal(signal)) return;
     if (signal.symbol && onItemClick) {
       // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
       const market = signal.market === 'crypto' ? 'coin' : signal.market;
       cycleStep('signal_click', { market, signal_type: signal.type });
-      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market });
+      // type 전달 — 상위 핸들러(handleSignalItemClick)의 시장 지표 안전망 작동용 (#341)
+      onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market, type: signal.type });
     }
   }, [onItemClick]);
 
   // 시그널 카드 펼치기/접기 토글 — 펼칠 때만 이벤트 발화 (StrictMode 안전)
   const handleToggleExpand = useCallback((signal) => {
     if (!signal.symbol) return;
+    // 시장 지표 시그널(공포탐욕 등)은 종목 상세 패널이 없으므로 펼치기 차단 (#341)
+    if (isMarketIndicatorSignal(signal)) return;
     const willExpand = expandedId !== signal.id;
     if (willExpand) cycleStep('signal_expand', { market: signal.market, signal_type: signal.type });
     setExpandedId(willExpand ? signal.id : null);
@@ -351,16 +356,19 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
             const isExpanded = expandedId === signal.id;
             const watchedKey = matchedItem?.id || signal.symbol;
             const marketKey = signal.market === 'crypto' ? 'COIN' : signal.market?.toUpperCase();
+            // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭/로고/펼치기 비활성 (#341)
+            const isMarketIndicator = isMarketIndicatorSignal(signal);
+            const isClickable = !!signal.symbol && !isMarketIndicator;
             return (
               <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
                 <button
                   onClick={() => handleToggleExpand(signal)}
-                  aria-expanded={signal.symbol ? isExpanded : undefined}
+                  aria-expanded={isClickable ? isExpanded : undefined}
                   className={`w-full text-left flex items-center gap-3 py-[11px] px-2 rounded-[10px] transition-colors ${
-                    signal.symbol ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
+                    isClickable ? 'cursor-pointer hover:bg-[#F2F3F5]' : ''
                   }`}
                 >
-                  {signal.symbol && (
+                  {isClickable && (
                     <TickerLogo item={matchedItem || { symbol: signal.symbol, name: signal.name, _market: signal.market === 'kr' ? 'KR' : signal.market === 'us' ? 'US' : signal.market === 'crypto' ? 'COIN' : '', id: signal.market === 'crypto' ? signal.symbol : undefined }} size={24} />
                   )}
                   <span className="text-[14px] font-semibold flex-shrink-0" style={{ color: nameColor }}>
@@ -395,8 +403,8 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                       />
                     ))}
                   </div>
-                  {/* 펼치기 chevron — symbol 있는 시그널에만 표시 */}
-                  {signal.symbol && <svg
+                  {/* 펼치기 chevron — symbol 있고 종목 시그널에만 표시 (#341) */}
+                  {isClickable && <svg
                     width="14"
                     height="14"
                     viewBox="0 0 24 24"
