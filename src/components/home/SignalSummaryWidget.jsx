@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
+import { isMarketIndicatorSignal } from '../../engine/signalTypes';
 
 export default function SignalSummaryWidget({ onItemClick }) {
   const [expanded, setExpanded] = useState(false);
@@ -25,6 +26,8 @@ export default function SignalSummaryWidget({ onItemClick }) {
   const scoreLabel = bullPct >= 60 ? '강세 우세' : bullPct <= 40 ? '약세 우세' : '팽팽';
 
   const handleClick = useCallback((signal) => {
+    // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
+    if (isMarketIndicatorSignal(signal)) return;
     if (signal.symbol && onItemClick) {
       // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
       const market = signal.market === 'crypto' ? 'coin' : signal.market;
@@ -94,13 +97,16 @@ export default function SignalSummaryWidget({ onItemClick }) {
             <p className="text-[11px] text-[#B0B8C1]">강세 시그널 없음</p>
           ) : (
             <div className="space-y-1.5">
-              {displayBull.map(signal => (
+              {displayBull.map(signal => {
+                // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 외양 비활성 (#341)
+                const clickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
+                return (
                 <div
                   key={signal.id}
-                  role={signal.symbol ? 'button' : undefined}
-                  tabIndex={signal.symbol ? 0 : undefined}
+                  role={clickable ? 'button' : undefined}
+                  tabIndex={clickable ? 0 : undefined}
                   onClick={() => handleClick(signal)}
-                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${signal.symbol ? 'cursor-pointer hover:bg-[#FFF0F1]' : ''}`}
+                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${clickable ? 'cursor-pointer hover:bg-[#FFF0F1]' : ''}`}
                   style={{ background: '#FFFAFA' }}
                 >
                   <div className="flex-1 min-w-0">
@@ -113,7 +119,8 @@ export default function SignalSummaryWidget({ onItemClick }) {
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -125,13 +132,16 @@ export default function SignalSummaryWidget({ onItemClick }) {
             <p className="text-[11px] text-[#B0B8C1]">약세 시그널 없음</p>
           ) : (
             <div className="space-y-1.5">
-              {displayBear.map(signal => (
+              {displayBear.map(signal => {
+                // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 외양 비활성 (#341)
+                const clickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
+                return (
                 <div
                   key={signal.id}
-                  role={signal.symbol ? 'button' : undefined}
-                  tabIndex={signal.symbol ? 0 : undefined}
+                  role={clickable ? 'button' : undefined}
+                  tabIndex={clickable ? 0 : undefined}
                   onClick={() => handleClick(signal)}
-                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${signal.symbol ? 'cursor-pointer hover:bg-[#EDF4FF]' : ''}`}
+                  className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${clickable ? 'cursor-pointer hover:bg-[#EDF4FF]' : ''}`}
                   style={{ background: '#FAFCFF' }}
                 >
                   <div className="flex-1 min-w-0">
@@ -144,7 +154,8 @@ export default function SignalSummaryWidget({ onItemClick }) {
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
