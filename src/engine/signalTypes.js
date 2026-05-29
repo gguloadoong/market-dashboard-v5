@@ -36,11 +36,18 @@ export const SIGNAL_TYPES = {
   SECTOR_OUTLIER: 'sector_outlier',
 };
 
-// 시장 지표 시그널 — 종목이 아닌 시장 전체 심리/지표 (#341)
+// 시장 지표 시그널 — 종목이 아닌 시장 전체/섹터/거시 단위 지표 (#341)
 // symbol 필드에 'crypto'/'us'/'kr' 같은 시장 키가 들어가지만 종목 클릭/카드로 변환 금지.
 // 시그널 보드의 정보성 카드 + 봇 성적표 추적 + 다른 시그널 교차 참조용으로만 사용.
+// 매직 스트링 대신 SIGNAL_TYPES 참조로 일관 — 리네이밍 시 가드 무력화 방지 (architect BLOCK 반영)
 export const MARKET_INDICATOR_TYPES = new Set([
-  'fear_greed_shift',
+  SIGNAL_TYPES.FEAR_GREED_SHIFT,        // 공포·탐욕 지수 극단값
+  SIGNAL_TYPES.MARKET_MOOD_SHIFT,       // 국장·미장·코인 전체 심리 전환
+  SIGNAL_TYPES.SECTOR_ROTATION,         // 섹터 단위 — 종목 클릭 의미 X
+  SIGNAL_TYPES.PUT_CALL_RATIO,          // 시장 옵션 PCR
+  SIGNAL_TYPES.FUNDING_RATE_EXTREME,    // 코인 펀딩비 극단
+  SIGNAL_TYPES.FX_IMPACT,               // 환율 충격
+  SIGNAL_TYPES.CROSS_MARKET_CORRELATION,// 시장 간 상관성 변화
 ]);
 
 /** 시그널이 시장 지표(종목 아님) 타입인지 검사 — 종목 클릭 핸들러에서 차단용 (#341) */
