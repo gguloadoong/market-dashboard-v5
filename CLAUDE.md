@@ -1,7 +1,8 @@
 # 프로젝트 지침
 
 이 프로젝트는 국장·미장·코인 실시간 시세 모니터링 웹앱이다.
-작업 전 `.project/backlog.md`, `.project/decisions.md`, `.project/quality-baseline.md`를 먼저 읽는다.
+
+**🔁 세션 시작 시 가장 먼저 읽기**: `.project/handoff.md` — 직전 세션 종료 시점의 상황·우선순위·금지 사항·진행 트랙이 압축돼 있다. 그 다음 `.project/backlog.md`, `.project/decisions.md`, `.project/quality-baseline.md` 순으로 작업 전 정독.
 
 **홈 컴포넌트를 건드리는 경우**: `src/components/home/HOME_CONTRACT.md`를 반드시 먼저 읽는다.
 이 파일에 "영구 삭제된 컴포넌트" 목록이 있다. 목록에 있는 컴포넌트는 절대 재추가하지 않는다.
