@@ -6,7 +6,8 @@ import { useWatchlistAlert } from '../../hooks/useWatchlistAlert';
 import { useFearGreedScores } from '../../hooks/useFearGreed';
 import { calcTemperature, calcFallbackTemperature, mergeTemperature } from '../../utils/temperature';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
-import { TYPE_META, isMarketIndicatorSignal } from '../../engine/signalTypes';
+import { TYPE_META } from '../../engine/signalTypes';
+import { resolveStockItem, isStockClickable, shouldRenderStockCard } from '../../utils/signalStockResolver';
 import MarketIndexSection from './MarketIndexSection';
 import EventTicker from './EventTicker';
 import TickerLogo from './TickerLogo';
@@ -80,15 +81,8 @@ function TemperatureBar({ indices, krwRate, allItems }) {
 // HeroSignalCard — D안 하이브리드: 1위 확장 카드 + 2~3위 컴팩트 행
 // ────────────────────────────────────────────────────────
 
-// allItems에서 시그널 symbol로 종목 데이터 매칭
-function findItemBySignal(signal, allItems) {
-  if (!signal?.symbol || !allItems?.length) return null;
-  // symbol 정확 매칭 + _market 우선 비교
-  return allItems.find(i =>
-    (i.symbol === signal.symbol || i.id === signal.symbol) &&
-    (!signal.market || (i._market || '').toLowerCase() === signal.market)
-  ) || allItems.find(i => i.symbol === signal.symbol || i.id === signal.symbol) || null;
-}
+// market 시그널 최대 동시발화 ~10종이 strength 상위 점유해도 stock 시그널 확보 위한 버퍼 — #343 HeroSignalCard 퇴행 방지
+const HERO_SIGNAL_BUFFER = 20;
 
 // 미니 스파크라인 SVG
 function MiniSparkline({ data, color, width = 80, height = 28 }) {
@@ -109,28 +103,41 @@ function MiniSparkline({ data, color, width = 80, height = 28 }) {
 }
 
 function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
-  const topSignals = useTopSignals(3);
+  // HERO_SIGNAL_BUFFER건 받아 종목 검증 통과분만 3건 렌더 — market/종목없음 stock은 카드 자리에서 drop (#343)
+  const rawSignals = useTopSignals(HERO_SIGNAL_BUFFER);
   const { botMap } = useSignalAccuracy();
 
+  // Hero는 종목 카드 전용 자리 — 시장 지표 + 종목 못 찾는 stock은 drop (#343)
+  const topSignals = useMemo(
+    () => rawSignals.filter(s => shouldRenderStockCard(s, allItems)).slice(0, 3),
+    [rawSignals, allItems],
+  );
+
   if (!topSignals.length) {
-    return (
-      <div className="space-y-2.5">
-        <div className="h-16 bg-[#F7F8FA] rounded-[14px] animate-pulse" />
-        <div className="h-14 bg-[#F7F8FA] rounded-[14px] animate-pulse" />
-        <p className="text-[11px] text-[#B0B8C1]">시그널 수집 중...</p>
-      </div>
-    );
+    // rawSignals가 0건 → 진짜 수집 중 (스켈레톤 표시)
+    // rawSignals는 있는데 종목 카드 0건 → market 시그널만 활성인 시간대 — 거짓 "수집 중" 금지 (#343)
+    if (!rawSignals.length) {
+      return (
+        <div className="space-y-2.5">
+          <div className="h-16 bg-[#F7F8FA] rounded-[14px] animate-pulse" />
+          <div className="h-14 bg-[#F7F8FA] rounded-[14px] animate-pulse" />
+          <p className="text-[11px] text-[#B0B8C1]">시그널 수집 중...</p>
+        </div>
+      );
+    }
+    // market 시그널만 있는 시간대 — Hero 영역 미렌더 (null)
+    return null;
   }
 
   const [hero, ...rest] = topSignals;
-  const heroItem = findItemBySignal(hero, allItems);
+  const heroItem = resolveStockItem(hero, allItems);
   const isBullHero = hero.direction === 'bullish';
   const heroBotAccuracy = botMap?.get(hero.type)?.accuracy ?? null;
   const heroAccent = isBullHero ? '#F04452' : '#1764ED';
   const heroBg = isBullHero ? 'rgba(240,68,82,0.03)' : 'rgba(23,100,237,0.03)';
   const heroPct = heroItem ? getPct(heroItem) : null;
-  // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
-  const heroClickable = !!hero.symbol && !isMarketIndicatorSignal(hero);
+  // 시장 지표 시그널(공포탐욕 등) + 종목 못 찾는 stock은 클릭 차단 (#341, #343)
+  const heroClickable = isStockClickable(hero, allItems);
 
   // 히어로 아이템 가격 포맷
   const heroPrice = heroItem
@@ -204,7 +211,7 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
 
       {/* 2~3위 시그널 — HotRow 스타일 컴팩트 행 */}
       {rest.map((signal, idx) => {
-        const item = findItemBySignal(signal, allItems);
+        const item = resolveStockItem(signal, allItems);
         const isBull = signal.direction === 'bullish';
         const accent = isBull ? '#F04452' : '#1764ED';
         const pct = item ? getPct(item) : null;
@@ -215,8 +222,8 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
                 ? `₩${fmt(item.price)}`
                 : `$${(item.price ?? 0).toFixed(2)}`)
           : null;
-        // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
-        const subClickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
+        // 시장 지표 시그널(공포탐욕 등) + 종목 못 찾는 stock은 클릭 차단 (#341, #343)
+        const subClickable = isStockClickable(signal, allItems);
 
         return (
           <div

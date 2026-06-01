@@ -6,7 +6,7 @@ import { useSignals } from '../hooks/useSignals';
 import { extractNewsSignals, getNewsImpact, isBreakingNews, getNewsImpactType } from '../utils/newsSignal';
 import { clusterNews } from '../utils/newsCluster';
 import { extractName, getEasyLabel } from '../utils/signalLabel';
-import { isMarketIndicatorSignal } from '../engine/signalTypes';
+import { isStockClickable } from '../utils/signalStockResolver';
 
 // ─── 피드 타입 태그 색상 ────────────────────────────────────
 const FEED_TAG = {
@@ -94,7 +94,7 @@ function SignalFeedItem({ signal, onItemClick }) {
   // 시장 지표 시그널(FX_IMPACT 'USDKRW', PCR 'SPY', MARKET_MOOD_SHIFT 'MARKET',
   // SECTOR_ROTATION null, CROSS_MARKET_CORRELATION 'leader_lagger', REBALANCING_ALERT 'MARKET' 등)은
   // 종목이 아니므로 ChartSidePanel 라우팅 차단 (#346)
-  const clickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
+  const clickable = isStockClickable(signal);
   // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대 — SignalSummaryWidget.jsx:33 패턴 일관
   const market = signal.market === 'crypto' ? 'coin' : signal.market;
   return (

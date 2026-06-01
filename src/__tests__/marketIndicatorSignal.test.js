@@ -7,6 +7,7 @@ import {
   MARKET_INDICATOR_TYPES,
   isMarketIndicatorSignal,
 } from '../engine/signalTypes.js';
+import { isStockClickable } from '../utils/signalStockResolver.js';
 
 describe('isMarketIndicatorSignal (#341)', () => {
   it('FEAR_GREED_SHIFT 타입은 시장 지표로 식별', () => {
@@ -128,5 +129,7 @@ describe('시그널 클릭 가드 시뮬레이션 (#341)', () => {
       market: 'kr',
     };
     expect(isClickableAsStock(fxSignal)).toBe(false);
+    // #343 — 공통 유틸 isStockClickable(lookup 미제공)도 동일 차단 (UnifiedFeedPanel 실제 사용 형태)
+    expect(isStockClickable(fxSignal)).toBe(false);
   });
 });

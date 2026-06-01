@@ -1,5 +1,5 @@
 // 시그널 엔진 — 시그널 생성/관리/만료/구독
-import { SIGNAL_TYPES, DIRECTIONS, getTTL } from './signalTypes';
+import { SIGNAL_TYPES, DIRECTIONS, getTTL, getSignalKind } from './signalTypes';
 import { THRESHOLDS } from '../constants/signalThresholds';
 
 // ─── 내부 저장소 ────────────────────────────────────────────
@@ -53,6 +53,7 @@ export function createSignal({ type, symbol, name, market, direction, strength, 
   return {
     id: _generateId(),
     type,
+    kind: getSignalKind(type), // 종목/시장 도메인 — 렌더 가드 단일 소스 (#343)
     symbol: symbol ?? null,
     name: name ?? null,
     market: market ?? null,
@@ -951,6 +952,7 @@ export function loadSignals(serverArr) {
     seenIds.add(id);
     _signals.push({
       ...raw,
+      kind: getSignalKind(raw.type), // 서버 kind 무시, type 기준 강제 주입 — 신뢰 원천은 type (#343)
       id,
       timestamp: raw.timestamp || now,
       expiresAt: raw.expiresAt || (now + getTTL(raw.type)),

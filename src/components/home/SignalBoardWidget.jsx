@@ -166,6 +166,8 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   const handleClick = useCallback((signal) => {
     // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭 차단 (#341)
     if (isMarketIndicatorSignal(signal)) return;
+    // matchedItemMap — crypto→COIN 정규화된 O(1) Map 재사용. null이면 가짜 종목 카드 차단 (#343)
+    if (!matchedItemMap.get(signal.id)) return;
     if (signal.symbol && onItemClick) {
       // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대
       const market = signal.market === 'crypto' ? 'coin' : signal.market;
@@ -173,7 +175,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
       // type 전달 — 상위 핸들러(handleSignalItemClick)의 시장 지표 안전망 작동용 (#341)
       onItemClick({ symbol: signal.symbol, name: signal.name || signal.symbol, market, type: signal.type });
     }
-  }, [onItemClick]);
+  }, [onItemClick, matchedItemMap]);
 
   // 시그널 카드 펼치기/접기 토글 — 펼칠 때만 이벤트 발화 (StrictMode 안전)
   const handleToggleExpand = useCallback((signal) => {
@@ -356,9 +358,10 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
             const isExpanded = expandedId === signal.id;
             const watchedKey = matchedItem?.id || signal.symbol;
             const marketKey = signal.market === 'crypto' ? 'COIN' : signal.market?.toUpperCase();
-            // 시장 지표 시그널(공포탐욕 등)은 종목이 아니므로 클릭/로고/펼치기 비활성 (#341)
-            const isMarketIndicator = isMarketIndicatorSignal(signal);
-            const isClickable = !!signal.symbol && !isMarketIndicator;
+            // 시장 지표 시그널 + 종목 풀에 없는 stock은 클릭/로고/펼치기 비활성 (#341, #343)
+            // matchedItemMap(crypto→COIN 정규화, O(1))을 재사용 — 로고와 클릭 판정 소스 일치 보장
+            // (market 시그널은 리스트에 정보 행으로 남기고 클릭/로고만 차단)
+            const isClickable = !!signal.symbol && !isMarketIndicatorSignal(signal) && !!matchedItem;
             return (
               <div key={signal.id} className={idx > 0 ? 'border-t border-[#F2F3F5]' : ''}>
                 <button

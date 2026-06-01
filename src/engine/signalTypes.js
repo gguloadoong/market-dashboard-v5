@@ -36,24 +36,97 @@ export const SIGNAL_TYPES = {
   SECTOR_OUTLIER: 'sector_outlier',
 };
 
-// 시장 지표 시그널 — 종목이 아닌 시장 전체/섹터/거시 단위 지표 (#341)
-// symbol 필드에 'crypto'/'us'/'kr' 같은 시장 키가 들어가지만 종목 클릭/카드로 변환 금지.
-// 시그널 보드의 정보성 카드 + 봇 성적표 추적 + 다른 시그널 교차 참조용으로만 사용.
-// 매직 스트링 대신 SIGNAL_TYPES 참조로 일관 — 리네이밍 시 가드 무력화 방지 (architect BLOCK 반영)
-export const MARKET_INDICATOR_TYPES = new Set([
-  SIGNAL_TYPES.FEAR_GREED_SHIFT,        // 공포·탐욕 지수 극단값
-  SIGNAL_TYPES.MARKET_MOOD_SHIFT,       // 국장·미장·코인 전체 심리 전환
-  SIGNAL_TYPES.SECTOR_ROTATION,         // 섹터 단위 — 종목 클릭 의미 X
-  SIGNAL_TYPES.PUT_CALL_RATIO,          // 시장 옵션 PCR
-  SIGNAL_TYPES.FUNDING_RATE_EXTREME,    // 코인 펀딩비 극단
-  SIGNAL_TYPES.FX_IMPACT,               // 환율 충격
-  SIGNAL_TYPES.CROSS_MARKET_CORRELATION,// 시장 간 상관성 변화
-  SIGNAL_TYPES.REBALANCING_ALERT,       // 월말/분기말 기관 리밸런싱 — symbol='MARKET' 가짜 종목 카드 방지 (#346)
-]);
+// ── 시그널 도메인(kind) 단일 소스 — type → 'stock' | 'market' (#343) ──
+// 모든 시그널 타입은 종목(stock)이거나 시장 지표(market) 중 하나로 분류된다.
+// stock: 개별 종목 단위 — 종목 카드/클릭/차트 라우팅 대상.
+// market: 시장 전체/섹터/거시 단위 — symbol 필드에 'crypto'/'MARKET'/'USDKRW' 등이 들어가지만
+//         종목 클릭/카드 변환 금지. 시그널 보드 정보 행 + 봇 성적표 추적 + 교차 참조용.
+// createSignal/loadSignals가 이 맵으로 signal.kind를 자동 주입한다 (단일 소스).
+export const SIGNAL_KIND = {
+  // ── stock (개별 종목) ──
+  [SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY]: 'stock',
+  [SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL]: 'stock',
+  [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY]: 'stock',
+  [SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL]: 'stock',
+  [SIGNAL_TYPES.VOLUME_ANOMALY]: 'stock',
+  [SIGNAL_TYPES.NEWS_SENTIMENT_CLUSTER]: 'stock',   // 종목 단위 생성
+  [SIGNAL_TYPES.ORDER_FLOW_IMBALANCE]: 'stock',
+  [SIGNAL_TYPES.VWAP_DEVIATION]: 'stock',
+  [SIGNAL_TYPES.SOCIAL_SENTIMENT]: 'stock',
+  [SIGNAL_TYPES.SENTIMENT_DIVERGENCE]: 'stock',
+  [SIGNAL_TYPES.SMART_MONEY_FLOW]: 'stock',
+  [SIGNAL_TYPES.MOMENTUM_DIVERGENCE]: 'stock',
+  [SIGNAL_TYPES.VOLUME_PRICE_DIVERGENCE]: 'stock',
+  [SIGNAL_TYPES.COMPOSITE_SCORE]: 'stock',          // 종목 복합 점수
+  [SIGNAL_TYPES.GAP_ANALYSIS]: 'stock',
+  [SIGNAL_TYPES.CAPITULATION]: 'stock',
+  [SIGNAL_TYPES.STEALTH_ACTIVITY]: 'stock',
+  [SIGNAL_TYPES.BTC_LEADING]: 'stock',
+  [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: 'stock',
+  [SIGNAL_TYPES.DOUBLE_BOTTOM]: 'stock',
+  [SIGNAL_TYPES.RECOVERY_DETECTION]: 'stock',
+  [SIGNAL_TYPES.SECTOR_OUTLIER]: 'stock',           // 개별 종목의 섹터 이탈 (vs SECTOR_ROTATION)
+  // ── market (시장 지표) — 기존 #341/#346 분류 유지 ──
+  [SIGNAL_TYPES.FEAR_GREED_SHIFT]: 'market',        // 공포·탐욕 지수 극단값
+  [SIGNAL_TYPES.MARKET_MOOD_SHIFT]: 'market',       // 국장·미장·코인 전체 심리 전환
+  [SIGNAL_TYPES.SECTOR_ROTATION]: 'market',         // 섹터 단위 — 종목 클릭 의미 X
+  [SIGNAL_TYPES.PUT_CALL_RATIO]: 'market',          // 시장 옵션 PCR
+  [SIGNAL_TYPES.FUNDING_RATE_EXTREME]: 'market',    // 코인 펀딩비 극단
+  [SIGNAL_TYPES.FX_IMPACT]: 'market',               // 환율 충격
+  [SIGNAL_TYPES.CROSS_MARKET_CORRELATION]: 'market',// 시장 간 상관성 변화
+  [SIGNAL_TYPES.REBALANCING_ALERT]: 'market',       // 월말/분기말 기관 리밸런싱 — symbol='MARKET' 가짜 종목 카드 방지 (#346)
+};
 
-/** 시그널이 시장 지표(종목 아님) 타입인지 검사 — 종목 클릭 핸들러에서 차단용 (#341) */
+// SIGNAL_KIND 완전성 런타임 검증 (#343)
+// ⚠️ `vite build`는 이 IIFE를 실행하지 않아 누락을 잡지 못한다.
+// 발견/차단 경로:
+//   ① npm run test (vitest) — signalTypes import 순간 throw → 테스트 실패.
+//      개발 중 + `npm run ship`(lint && test && build && gate) 체인에서 차단된다.
+//      ⚠️ 단 배포 게이트 pre-deploy-consensus.sh(L95-100)는 test 실패를 "경고만" 하고
+//      배포를 막지 않는다 → 자동 배포 차단은 보장되지 않음 (게이트 강화는 별도 이슈). [Copilot PR#348 반영]
+//   ② 런타임 모듈 로드 시 즉시 크래시 (fail-fast) — "가짜 종목 카드 = 신뢰 위반 = P0"
+//      철학상 의도적 설계. 누락된 채로 서비스가 뜨는 상황을 원천 차단한다.
+// 신규 시그널 타입 추가 시 SIGNAL_KIND에 등록 필수.
+(function assertSignalKindComplete() {
+  const missing = [];
+  const invalid = [];
+  for (const type of Object.values(SIGNAL_TYPES)) {
+    const kind = SIGNAL_KIND[type];
+    if (kind === undefined) missing.push(type);
+    else if (kind !== 'stock' && kind !== 'market') invalid.push(`${type}=${kind}`);
+  }
+  if (missing.length || invalid.length) {
+    throw new Error(
+      `[#343] SIGNAL_KIND 불완전 — 모든 시그널 타입은 'stock' 또는 'market'으로 분류돼야 합니다.\n` +
+      (missing.length ? `  누락: ${missing.join(', ')}\n` : '') +
+      (invalid.length ? `  잘못된 값: ${invalid.join(', ')}\n` : '') +
+      `  해결: src/engine/signalTypes.js의 SIGNAL_KIND 맵에 위 타입을 추가하세요.`,
+    );
+  }
+})();
+
+/** 시그널 타입의 도메인(kind) 조회 — 미등록 타입은 'stock' 기본 (#343) */
+export function getSignalKind(type) {
+  return SIGNAL_KIND[type] === 'market' ? 'market' : 'stock';
+}
+
+// 시장 지표 시그널 타입 집합 — SIGNAL_KIND에서 파생 (수동 관리 종료, 하위호환 export 유지) (#343)
+// 종목이 아닌 시장 전체/섹터/거시 단위 지표 (#341). 종목 클릭/카드로 변환 금지.
+export const MARKET_INDICATOR_TYPES = new Set(
+  Object.entries(SIGNAL_KIND)
+    .filter(([, kind]) => kind === 'market')
+    .map(([type]) => type),
+);
+
+/**
+ * 시그널이 시장 지표(종목 아님)인지 검사 — 종목 클릭 핸들러에서 차단용 (#341, #343)
+ * kind 필드가 있으면 우선 사용(signal.kind==='market'), 없으면 type 기반 레거시 fallback.
+ */
 export function isMarketIndicatorSignal(signal) {
-  return !!signal && MARKET_INDICATOR_TYPES.has(signal.type);
+  if (!signal) return false;
+  if (signal.kind === 'market') return true;
+  if (signal.kind === 'stock') return false;
+  return MARKET_INDICATOR_TYPES.has(signal.type);
 }
 
 // 시그널 방향
