@@ -209,9 +209,9 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 ```
 1. gh issue create → Issue 생성 (라벨: ai-generated + 작업 성격)
 2. git checkout -b feature/#이슈번호-설명
-3. 작업 완료 후 커밋 & 푸시
+3. 작업 완료 후 커밋 (push 불필요 — npm run pr이 자동 push)
 4. npm run review:code   ← Claude Opus 독립 리뷰 (artifact 저장 필수)
-5. npm run pr "PR 제목"  ← 빌드 + artifact 검증 + Gemini gate + PR 생성 + 봇 폴링
+5. npm run pr "PR 제목"  ← 자동 push + 빌드 + 게이트 검증 + Gemini gate + PR 생성 (비공개 단계: 봇 폴링 생략)
 ```
 
 **`gh pr create` 직접 호출 금지. 반드시 `npm run pr`을 사용한다.**
@@ -234,28 +234,34 @@ QA는 스크린샷 한두 장으로 끝내지 않는다. 반드시 **브라우�
 ```
 # 1단계: npm run review:code (Claude Opus)
 → .tmp/code-review-{BRANCH}.md artifact 저장
-→ VERDICT: BLOCK → 수정 후 재실행
+→ VERDICT: BLOCK → HIGH/CRITICAL은 수정 후 재실행.
+   STYLE·이미 사전검토된 항목·논쟁적 지적은 PR 코멘트에 1회 기록 후 진행
+   (review:code 비결정성 → 무한 재실행 방지, B 경량화 2026-06-01)
 → VERDICT: PASS → 다음 단계
 
-# 2단계: Gemini gate (create-pr.sh 자동 실행, gemini-2.5-pro)
-→ npm run review:gate
+# 2단계: Gemini gate (create-pr.sh 자동 실행, gemini-3.1-pro-preview)
 → PASS → PR 생성
 → BLOCK → 지적 수정 후 재실행 (또는 SKIP_GEMINI_REVIEW=1 + 사유 기록)
 ```
 
-### PR 생성 후 봇 리뷰 (필수 응답)
+**사소 수정 게이트 스킵 (B 경량화):** 주석·문서·로그 메시지 등 **코드 로직 무변경** 수정은
+architect/review:code 재실행을 생략한다. 게이트는 로직(분기/스코어링/필터/계산) 변경 시에만 적용.
 
-**필수 조건: Copilot 도착 + Gemini·CodeRabbit 중 1명**
+### PR 생성 후 봇 리뷰 (B 경량화 — 비공개 단계)
 
-```
-봇 리뷰 채택/기각 기준:
-- PR 전 code-reviewer (Opus) + Gemini gate 결과를 1차 기준으로 삼는다
+**🔒 비공개 단계(사용자 0명): `npm run pr`이 봇 폴링을 생략한다.** PR 생성 후 봇을 기다리지 않고 종료.
+봇 리뷰(Copilot/Gemini/CodeRabbit)는 PR에서 **사후 참고**하되 머지를 차단하지 않는다 —
+사전 게이트(architect + review:code + Gemini gate) PASS면 머지 가능.
+- 봇이 사후에 critical/보안 문제 지적 시 → 머지 후라도 후속 수정
+- 런칭/외부 노출 단계 진입 시: `WAIT_BOTS=1 npm run pr`로 봇 게이트(Copilot + 1) 재활성화
+
+**봇 리뷰 확인 시 채택/기각 기준:**
+- PR 전 code-reviewer(Opus) + Gemini gate 결과를 1차 기준으로 삼는다
 - 봇이 이미 사전 검토된 항목을 수정하자고 하면 → 사유 명시 후 기각 (원복 방지)
 - 봇이 사전 검토에서 놓친 새로운 버그/보안 문제 → 우선 채택
 - HIGH/CRITICAL → 채택 강권, 기각 시 반드시 반론 근거 기록
-```
 
-**리뷰 종합 코멘트 필수 → 머지**
+**리뷰 종합 코멘트 작성 → 머지**
 
 ### 리뷰 종합 코멘트 (자동화)
 
@@ -275,7 +281,7 @@ npm run review:summary   # Opus + Gemini gate 재실행 → PR 코멘트 자동 
 
 ### 최종 검토
 > 🤖 code-reviewer (Claude Opus): PASS/BLOCK
-> ✨ Gemini gate (gemini-2.5-pro): PASS/BLOCK
+> ✨ Gemini gate (gemini-3.1-pro-preview): PASS/BLOCK
 ```
 
 ### 기획 리뷰

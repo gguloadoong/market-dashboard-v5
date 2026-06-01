@@ -153,6 +153,10 @@ fi
 echo ""
 echo -e "${GREEN}[pr] === 4/5 PR 생성 ===${NC}"
 
+# 자동 push — PR 생성 전 원격 브랜치 보장 (push 누락 방지, B 경량화 2026-06-01)
+echo -e "${GREEN}[pr] 원격 push (origin/${BRANCH})...${NC}"
+git push -u origin "$BRANCH" 2>&1 | tail -3 || { echo -e "${RED}[pr] push 실패 — amend 등 non-fast-forward면 'git push --force-with-lease origin ${BRANCH}' 수동 실행 후 재시도${NC}"; exit 1; }
+
 # ── 이슈 자동 연결 ──────────────────────────────────────────────────────────
 # 브랜치명에서 이슈번호 추출 (feature/#36-설명 → 36)
 ISSUE_NUM=$(echo "$BRANCH" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
@@ -208,9 +212,19 @@ echo ""
 echo -e "${GREEN}[pr] === 4.5/5 프로젝트 문서 현행화 ===${NC}"
 bash scripts/update-project-docs.sh 2>/dev/null || true  # 실패해도 PR 흐름 차단 안 함
 
-# ─── 5/5 봇 리뷰 폴링 (Copilot 필수 + 1 other) ──────────────────────────
+# ─── 5/5 봇 리뷰 (비공개 단계: 폴링 생략, WAIT_BOTS=1로 활성화) ──────────────
+# B 경량화(2026-06-01): 사용자 0명 비공개 단계에선 봇 폴링(최대 15분 블로킹) 생략.
+# 봇 리뷰는 PR에서 사후 참고(머지 차단 안 함) — 사전 게이트(architect+review:code+Gemini)로 머지.
+# 런칭/외부 노출 단계 진입 시 WAIT_BOTS=1 npm run pr 로 봇 게이트 재활성화.
 echo ""
-echo -e "${GREEN}[pr] === 5/5 봇 리뷰 폴링 (최대 15분) ===${NC}"
+if [ "${WAIT_BOTS:-0}" != "1" ]; then
+  echo -e "${GREEN}[pr] === 5/5 봇 리뷰 — 비공개 단계 폴링 생략 (B 경량화) ===${NC}"
+  echo -e "${YELLOW}[pr] 봇 리뷰는 PR에서 참고만 (머지 차단 안 함). 사전 게이트 PASS로 머지 가능.${NC}"
+  echo -e "${YELLOW}[pr] 런칭 후 봇 필수화: WAIT_BOTS=1 npm run pr${NC}"
+  echo -e "${GREEN}[pr] PR: $PR_URL${NC}"
+  exit 0
+fi
+echo -e "${GREEN}[pr] === 5/5 봇 리뷰 폴링 (최대 15분, WAIT_BOTS=1) ===${NC}"
 echo -e "${YELLOW}[pr] 필수 조건: Copilot 도착 + Gemini·CodeRabbit 중 1명${NC}"
 echo -e "${YELLOW}[pr] PR 전 검토 결과 참고: .tmp/code-review-${SAFE_BRANCH}.md${NC}"
 
