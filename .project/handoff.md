@@ -30,22 +30,19 @@
 | `#338 (#334)` 네이버 비공식 프록시 | 미장 프리/애프터 + NXT 참고가 | 배포 완료 (5-28) |
 | `#340 (#339)` 우측 실시간 피드 패널 제거 | 대표 피로감 호소 | 배포 완료 (5-30) |
 | `#342 (#341)` 공포탐욕 가짜 종목 카드 차단 | P0 신뢰 7종 필터 | 배포 완료 (5-30) |
-| **`#347 (#346)` 가짜 종목 잔존 2건 fix** | REBALANCING_ALERT + UnifiedFeedPanel 가드 + a11y | **main 머지·배포 미룸 (6-01)** |
+| `#347 (#346)` 가짜 종목 잔존 2건 fix | REBALANCING_ALERT + UnifiedFeedPanel 가드 + a11y | main 머지·배포 대기 (6-01) |
+| **`#348 (#343)` 시그널 kind 도메인 분리** | SIGNAL_KIND 단일소스+IIFE 완전성검증+종목풀 런타임 검증 drop | **main 머지·배포 미룸 (6-01)** |
 
-Production HEAD: `8515985` (5-30) · main HEAD: `26ae14b` (6-01, 미배포)
+Production HEAD: `8515985` (5-30) · main HEAD: `9b73c00` (6-01, #347+#343 누적·미배포)
 
 ## 🟡 진행 중·대기 트랙
 
 ### 트랙 1 — 데이터 신뢰 (P0/P1 묶음 배포 대상)
 - ✅ `#346/#347` P0 가짜 종목 잔존 fix (main 머지, 배포 대기)
-- 🔄 **`#343` P1 시그널 도메인 분리 단기 fix** (다음 권고 P0 작업)
-  - `signalTypes.js`에 `kind: 'stock' | 'market'` 필드 필수화
-  - 종목 카드 렌더 4곳에서 `signal.symbol` 종목 풀 lookup, 미존재 시 drop
-  - `useFearGreed.js:129` `kind: 'market'` 명시
-  - architect 게이트 필수 (`src/engine/`)
-  - executor(opus) 1.5~2일
-- 🟡 `#344` P1 us-price marketCap=0 (미국 주도주 회전율 정확도)
+- ✅ `#343/#348` P1 시그널 kind 도메인 분리 (main 머지 `9b73c00`, 배포 대기) — `SIGNAL_KIND`(type→stock|market) 단일소스 + 로드타임 IIFE 완전성검증 + `resolveStockItem` 종목풀 런타임검증(crypto→coin 정규화). 봇리뷰 5건(Copilot 채택1/기각4) + 자체 review:code HIGH 3건(crypto정규화·매칭이중화·거짓로딩) 수정. test 232 passed
+- 🔄 **`#344` P1 us-price marketCap=0** (다음 권고 작업 — 미국 주도주 회전율 정확도)
 - 🟡 `#345` P2 묶음 6건 (NaN/null 처리, news boundary, FUNDING_RATE 코인 클릭 차단 등)
+- 🟠 신규 부채 (2026-06-01 발견): ① Codex pre-push 훅 잔존(ADR-020 위반, `SKIP_CODEX_REVIEW=1` 우회 중) ② UnifiedFeedPanel(비활성) 재활성 시 풀검증+type 전달 ③ pre-deploy-consensus.sh가 test 실패를 경고만(게이트화 필요) — 별도 정리 이슈 후보
 
 ### 트랙 2 — 디자인 방향 (보류)
 영감 4개 보존 위치: `.project/inspirations-discovery-2026-05.md`
