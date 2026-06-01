@@ -71,12 +71,12 @@ function timeShort(ts) {
 
 // ─── 3컬럼 피드 항목 (시간 | 태그 | 내용) ────────────────────
 // clickable=false 시 종목 카드 라우팅 불가 시그널(시장 지표 등) — 호버/커서 비활성 + aria-disabled (#346)
-function FeedItem3Col({ time, tagLabel, tagColor, text, onClick, ariaDisabled = false, clickable = true }) {
+// `disabled` 속성 사용 X: UA stylesheet의 GrayText/opacity가 텍스트 색상을 덮어쓰는 부작용 방지 (Gemini 지적 #347)
+function FeedItem3Col({ time, tagLabel, tagColor, text, onClick, clickable = true }) {
   return (
     <button
-      onClick={onClick}
-      disabled={ariaDisabled}
-      aria-disabled={ariaDisabled || undefined}
+      onClick={clickable ? onClick : undefined}
+      aria-disabled={!clickable || undefined}
       tabIndex={clickable ? 0 : -1}
       className={`w-full grid items-baseline gap-1.5 px-5 py-2.5 transition-colors -mx-0 rounded-lg ${clickable ? 'cursor-pointer hover:bg-[#F2F3F5]' : 'cursor-default'}`}
       style={{ gridTemplateColumns: '36px 44px 1fr' }}
@@ -106,7 +106,6 @@ function SignalFeedItem({ signal, onItemClick }) {
       onClick={clickable
         ? () => onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market })
         : undefined}
-      ariaDisabled={!clickable}
       clickable={clickable}
     />
   );
