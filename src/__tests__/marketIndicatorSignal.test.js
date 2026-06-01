@@ -22,6 +22,30 @@ describe('isMarketIndicatorSignal (#341)', () => {
     expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.CAPITULATION, symbol: 'TSLA' })).toBe(false);
   });
 
+  // #346 — REBALANCING_ALERT 시장지표 가드 추가
+  it('REBALANCING_ALERT 타입은 시장 지표로 식별 (symbol="MARKET")', () => {
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.REBALANCING_ALERT, symbol: 'MARKET' })).toBe(true);
+  });
+
+  it('MARKET_INDICATOR_TYPES Set에 rebalancing_alert 포함 (#346)', () => {
+    expect(MARKET_INDICATOR_TYPES.has('rebalancing_alert')).toBe(true);
+  });
+
+  // #346 — FX_IMPACT, PCR, MARKET_MOOD_SHIFT, CROSS_MARKET_CORRELATION도 회귀 가드
+  it('FX_IMPACT 타입은 시장 지표 (symbol="USDKRW") (#346)', () => {
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FX_IMPACT, symbol: 'USDKRW' })).toBe(true);
+  });
+
+  it('PUT_CALL_RATIO 타입은 시장 지표 (symbol="SPY") (#346)', () => {
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.PUT_CALL_RATIO, symbol: 'SPY' })).toBe(true);
+  });
+
+  it('MARKET_MOOD_SHIFT/CROSS_MARKET_CORRELATION/SECTOR_ROTATION 모두 시장 지표 (#346)', () => {
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.MARKET_MOOD_SHIFT, symbol: 'MARKET' })).toBe(true);
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.CROSS_MARKET_CORRELATION, symbol: 'BTC_KOSPI' })).toBe(true);
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.SECTOR_ROTATION, symbol: null })).toBe(true);
+  });
+
   it('null/undefined/타입 누락 시 false 반환 (안전)', () => {
     expect(isMarketIndicatorSignal(null)).toBe(false);
     expect(isMarketIndicatorSignal(undefined)).toBe(false);
@@ -76,5 +100,33 @@ describe('시그널 클릭 가드 시뮬레이션 (#341)', () => {
       strength: 2,
     };
     expect(isClickableAsStock(noSymbolSignal)).toBe(false);
+  });
+
+  // #346 — REBALANCING_ALERT는 createRebalancingSignal에서 symbol:'MARKET'으로 생성됨.
+  // signalEngine.js:715-723. 종목 카드 클릭 시 'MARKET' 가짜 종목 카드 → 빈 차트 사고.
+  it('REBALANCING_ALERT(symbol="MARKET")는 종목 클릭 불가 (#346)', () => {
+    const rebalancingSignal = {
+      id: 'sig_test_rebal',
+      type: SIGNAL_TYPES.REBALANCING_ALERT,
+      symbol: 'MARKET',
+      name: '기관 리밸런싱',
+      market: 'kr',
+      direction: 'bearish',
+      strength: 3,
+      title: '월말 D-2 — 기관 리밸런싱 매물 출회 가능',
+    };
+    expect(isClickableAsStock(rebalancingSignal)).toBe(false);
+  });
+
+  // #346 — UnifiedFeedPanel 시그널 항목 가드 (이전 누락분 회귀)
+  it('FX_IMPACT(symbol="USDKRW")는 종목 클릭 불가 — UnifiedFeedPanel 패턴 (#346)', () => {
+    const fxSignal = {
+      id: 'sig_test_fx',
+      type: SIGNAL_TYPES.FX_IMPACT,
+      symbol: 'USDKRW',
+      name: '원/달러 환율',
+      market: 'kr',
+    };
+    expect(isClickableAsStock(fxSignal)).toBe(false);
   });
 });
