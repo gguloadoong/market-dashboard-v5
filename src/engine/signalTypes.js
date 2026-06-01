@@ -48,6 +48,7 @@ export const MARKET_INDICATOR_TYPES = new Set([
   SIGNAL_TYPES.FUNDING_RATE_EXTREME,    // 코인 펀딩비 극단
   SIGNAL_TYPES.FX_IMPACT,               // 환율 충격
   SIGNAL_TYPES.CROSS_MARKET_CORRELATION,// 시장 간 상관성 변화
+  SIGNAL_TYPES.REBALANCING_ALERT,       // 월말/분기말 기관 리밸런싱 — symbol='MARKET' 가짜 종목 카드 방지 (#346)
 ]);
 
 /** 시그널이 시장 지표(종목 아님) 타입인지 검사 — 종목 클릭 핸들러에서 차단용 (#341) */

@@ -6,6 +6,7 @@ import { useSignals } from '../hooks/useSignals';
 import { extractNewsSignals, getNewsImpact, isBreakingNews, getNewsImpactType } from '../utils/newsSignal';
 import { clusterNews } from '../utils/newsCluster';
 import { extractName, getEasyLabel } from '../utils/signalLabel';
+import { isMarketIndicatorSignal } from '../engine/signalTypes';
 
 // ─── 피드 타입 태그 색상 ────────────────────────────────────
 const FEED_TAG = {
@@ -69,11 +70,15 @@ function timeShort(ts) {
 }
 
 // ─── 3컬럼 피드 항목 (시간 | 태그 | 내용) ────────────────────
-function FeedItem3Col({ time, tagLabel, tagColor, text, onClick }) {
+// clickable=false 시 종목 카드 라우팅 불가 시그널(시장 지표 등) — 호버/커서 비활성 + aria-disabled (#346)
+// `disabled` 속성 사용 X: UA stylesheet의 GrayText/opacity가 텍스트 색상을 덮어쓰는 부작용 방지 (Gemini 지적 #347)
+function FeedItem3Col({ time, tagLabel, tagColor, text, onClick, clickable = true }) {
   return (
     <button
-      onClick={onClick}
-      className="w-full grid items-baseline gap-1.5 px-5 py-2.5 cursor-pointer hover:bg-[#F2F3F5] transition-colors -mx-0 rounded-lg"
+      onClick={clickable ? onClick : undefined}
+      aria-disabled={!clickable || undefined}
+      tabIndex={clickable ? 0 : -1}
+      className={`w-full grid items-baseline gap-1.5 px-5 py-2.5 transition-colors -mx-0 rounded-lg ${clickable ? 'cursor-pointer hover:bg-[#F2F3F5]' : 'cursor-default'}`}
       style={{ gridTemplateColumns: '36px 44px 1fr' }}
     >
       <span className="text-[11px] text-[#B0B8C1] font-mono tabular-nums flex-shrink-0">{time}</span>
@@ -86,13 +91,22 @@ function FeedItem3Col({ time, tagLabel, tagColor, text, onClick }) {
 // ─── 시그널 항목 (3컬럼) ────────────────────────────────────
 function SignalFeedItem({ signal, onItemClick }) {
   const tag = FEED_TAG.signal;
+  // 시장 지표 시그널(FX_IMPACT 'USDKRW', PCR 'SPY', MARKET_MOOD_SHIFT 'MARKET',
+  // SECTOR_ROTATION null, CROSS_MARKET_CORRELATION 'leader_lagger', REBALANCING_ALERT 'MARKET' 등)은
+  // 종목이 아니므로 ChartSidePanel 라우팅 차단 (#346)
+  const clickable = !!signal.symbol && !isMarketIndicatorSignal(signal);
+  // market 정규화: 시그널 엔진은 'crypto'를 사용하지만 ChartSidePanel은 'coin' 기대 — SignalSummaryWidget.jsx:33 패턴 일관
+  const market = signal.market === 'crypto' ? 'coin' : signal.market;
   return (
     <FeedItem3Col
       time={timeShort(signal.timestamp || signal.createdAt)}
       tagLabel={tag.label}
       tagColor={tag.color}
       text={`${extractName(signal)} ${getEasyLabel(signal)}`}
-      onClick={() => signal.symbol && onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market: signal.market })}
+      onClick={clickable
+        ? () => onItemClick?.({ symbol: signal.symbol, name: signal.name || signal.symbol, market })
+        : undefined}
+      clickable={clickable}
     />
   );
 }
