@@ -14,7 +14,7 @@ export default function DataHealthBadge({ dataErrors = {}, coinError = false }) 
     issues.push('미국 시세 일부 지연');
   }
   if (coinError) issues.push('코인 시세 일부 지연');
-  if (serverMeta.stale) issues.push('시그널 업데이트 지연');
+  if (serverMeta.stale) issues.push('시그널 업데이트 지연 — 최신 아님');
 
   if (!issues.length) return null;
 

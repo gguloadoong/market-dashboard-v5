@@ -23,9 +23,13 @@ function getPrice(item, krwRate) {
     if (p < 100) return `₩${fmt(p, 2)}`;
     return `₩${fmt(Math.round(p))}`;
   }
-  if (item.market === 'kr') return `₩${fmt(item.price)}`;
-  if (item.market === 'us') return `₩${fmt(Math.round((item.price ?? 0) * krwRate))}`;
-  return `₩${fmt(item.price)}`;
+  if (item.market === 'kr') return Number.isFinite(item.price) ? `₩${fmt(item.price)}` : '—';
+  if (item.market === 'us') {
+    return Number.isFinite(item.price) && Number.isFinite(krwRate)
+      ? `₩${fmt(Math.round(item.price * krwRate))}`
+      : '—';
+  }
+  return Number.isFinite(item.price) ? `₩${fmt(item.price)}` : '—';
 }
 
 const MARKET_LABEL = { kr: '국내', us: '미장', coin: '코인', etf: 'ETF' };

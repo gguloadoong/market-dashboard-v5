@@ -292,18 +292,14 @@ function escapeRe(s) {
 
 // ─── 뉴스 매칭 신뢰도 등급 ─────────────────────────────────
 // DIRECT: 심볼/종목명 직접 언급, SECTOR: 섹터 키워드 매칭, WEAK: 약한 매칭
+// substring(includes) 대신 matchesKeywords(단어 경계)를 재사용 — 짧은 심볼(arm, op 등)이
+// 다른 단어의 부분 문자열로 잘못 DIRECT 승격되는 오분류 차단 (#345)
 export function getMatchConfidence(title, keywords, symbol) {
   const t = (title || '').toLowerCase();
-  // DIRECT: 심볼 또는 주요 키워드(처음 2개) 직접 매칭
-  if (
-    (symbol && t.includes(symbol.toLowerCase())) ||
-    keywords.slice(0, 2).some(k => t.includes(k.toLowerCase()))
-  ) {
-    return 'DIRECT';
-  }
-  // SECTOR: 나머지 키워드(섹터/별칭) 매칭
-  if (keywords.slice(2).some(k => t.includes(k.toLowerCase()))) {
-    return 'SECTOR';
-  }
+  // DIRECT: 심볼 또는 주요 키워드(처음 2개) 단어 경계 매칭
+  const directKeys = [...(symbol ? [symbol.toLowerCase()] : []), ...keywords.slice(0, 2)];
+  if (matchesKeywords(t, directKeys)) return 'DIRECT';
+  // SECTOR: 나머지 키워드(섹터/별칭) 단어 경계 매칭
+  if (matchesKeywords(t, keywords.slice(2))) return 'SECTOR';
   return 'WEAK';
 }

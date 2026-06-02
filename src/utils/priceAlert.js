@@ -127,11 +127,11 @@ export function checkAndAlert(item, type) {
 
   let priceStr = '';
   if (type === 'kr') {
-    priceStr = `₩${(item.price ?? 0).toLocaleString()}`;
-  } else if (type === 'coin' && item.priceKrw) {
+    priceStr = Number.isFinite(item.price) ? `₩${item.price.toLocaleString()}` : '—';
+  } else if (type === 'coin' && Number.isFinite(item.priceKrw)) {
     priceStr = `₩${Math.round(item.priceKrw).toLocaleString()}`;
   } else {
-    priceStr = `$${(item.price ?? 0).toLocaleString()}`;
+    priceStr = Number.isFinite(item.price) ? `$${item.price.toLocaleString()}` : '—';
   }
 
   sendAlert(
@@ -152,13 +152,16 @@ export function checkAndAlertBatch(items, type, krwRate = 1400) {
   const watched = items.filter(i => _watchlistIds.has(i.id) || _watchlistIds.has(i.symbol));
   watched.forEach(item => {
     checkAndAlert(item, type);
-    // 목표가 알림: 현재가를 KRW로 변환 후 체크
+    // 목표가 알림: 현재가를 KRW로 변환 후 체크 — 유효 가격일 때만 발화 (₩0 거짓 알람 차단)
+    const priceUsd = item.priceUsd;
     const currentKrwPrice = item.id
-      ? (item.priceKrw || (item.priceUsd ?? 0) * krwRate)
+      ? (item.priceKrw ?? (Number.isFinite(priceUsd) ? priceUsd * krwRate : NaN))
       : item.market === 'us'
-        ? (item.price ?? 0) * krwRate
-        : (item.price ?? 0);
-    checkTargetAlertForItem(item, type, currentKrwPrice);
+        ? (Number.isFinite(item.price) ? item.price * krwRate : NaN)
+        : item.price;
+    if (Number.isFinite(currentKrwPrice) && currentKrwPrice > 0) {
+      checkTargetAlertForItem(item, type, currentKrwPrice);
+    }
   });
 }
 
