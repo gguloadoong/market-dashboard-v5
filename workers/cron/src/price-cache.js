@@ -109,17 +109,14 @@ export async function recordCronFailure(cronName, errorMessage) {
   try {
     const countKey = `cron:fail:${cronName}`;
     const errorKey = `cron:lastError:${cronName}`;
-    // incr: 원자적 증가 (키 미존재 시 0→1 자동), get+parse+set 3단계 제거
-    const newCount = await _redis.incr(countKey);
-    // expire: incr은 TTL을 리셋하지 않으므로 별도 부여
-    await Promise.all([
-      _redis.expire(countKey, 3600),
-      _redis.set(errorKey, JSON.stringify({
-        error: String(errorMessage).slice(0, 200),
-        ts: Date.now(),
-        count: newCount,
-      }), { ex: 3600 }),
-    ]);
+    // incr+expire를 트랜잭션으로 묶어 원자화 (incr 직후 중단 시 TTL 유실 → 카운터 영구 잔존 방지).
+    // 매 실패마다 expire를 갱신해 슬라이딩 윈도우(1h) 유지. get+parse+set 3단계는 제거됨.
+    const [newCount] = await _redis.multi().incr(countKey).expire(countKey, 3600).exec();
+    await _redis.set(errorKey, JSON.stringify({
+      error: String(errorMessage).slice(0, 200),
+      ts: Date.now(),
+      count: newCount,
+    }), { ex: 3600 });
   } catch (e) { console.error(`[price-cache] recordCronFailure 실패:`, e); }
 }
 
