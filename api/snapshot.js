@@ -164,6 +164,8 @@ export default async function handler(request) {
     //   (총 stale 상한 180s) → CF Workers cron 5분(300s) 주기 대비 짧아 '수분 누적' 아님.
     //   ETag 재검증 유지 → 데이터 변경 시 304 아닌 200 반환. SWR을 s-maxage의 절반으로
     //   제한해 백그라운드 갱신 1건만 Redis MGET 호출 → bandwidth 추가 절감.
+    //   ※ full tier의 서버측 소비자(check-signal-accuracy cron)는 정확도를 위해
+    //     ?fresh=<ts> + cache:no-store로 CDN/SWR을 우회하므로 SWR staleness 영향 없음.
     return new Response(body, {
       status: 200,
       headers: {

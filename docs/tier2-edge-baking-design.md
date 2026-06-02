@@ -96,25 +96,33 @@ DAU 1000명, 5분 폴링 기준: 현재 ~288,000 req/일 -> Vercel/Upstash 부�
 
 | 기준 | R2 | Workers KV |
 |------|-----|------------|
-| **Value 크기 한계** | 최대 5GB/객체 | **25KB/값 (치명적)** |
-| full tier 페이로드 | ~400KB raw JSON -> 적합 | **25KB 초과 -> 불가** |
-| hot tier 페이로드 | ~60KB raw JSON -> 적합 | **25KB 초과 -> 불가** |
-| Write 무료 한도 | Class A 100만/월 | 1,000/일 (초과 $5/M) |
+| **Value 크기 한계** | 최대 ~5GB/객체 | **25 MiB/값** (둘 다 수용 가능) |
+| full tier 페이로드 (~400KB) | 적합 | 적합 (25 MiB 내 여유) |
+| hot tier 페이로드 (~60KB) | 적합 | 적합 (25 MiB 내 여유) |
+| **Write 무료 한도** | Class A 100만/월 (~33k/일) | **1,000/일** (초과 $5/M) |
 | Read 무료 한도 | Class B 1,000만/월 | 10만/일 |
-| Write 지연 | ~수십ms (S3 호환) | ~수십ms (eventually consistent) |
+| Write 지연 | ~수십ms (S3 호환) | ~수십ms |
 | Read 지연 (캐시 miss) | ~50-100ms (리전 의존) | ~10-50ms (엣지 복제) |
 | Read 지연 (Cache API hit) | **~1ms** | **~1ms** |
-| 일관성 | 강한 일관성 (단일 리전) | **최종 일관성 (60s 전파)** |
+| **일관성** | **강한 일관성 (read-after-write)** | 최종 일관성 (~60s 전파) |
 | 비용 (Paid) | $0.015/GB 저장 + ops | $5/M write, $0.50/M read |
 
-### KV가 불가한 핵심 이유
+### R2를 선택한 핵심 이유 (KV도 크기는 수용 가능)
 
-`api/_price-cache.js:159-177`의 `getHotSnaps()`가 반환하는 hot tier 데이터:
-- KR hot: ~200개 x ~120B/종목 = ~24KB
-- US hot: ~200개 x ~130B/종목 = ~26KB
-- COINS hot: ~200개 x ~100B/종목 = ~20KB
+> **정정(2026-06-02 리뷰 반영)**: Workers KV 값 크기 한계는 **25 KB가 아니라 25 MiB**다.
+> 따라서 hot(~60KB)·full(~400KB) 모두 KV에 단일 값으로 저장 가능하며, "크기 때문에 KV 불가"는
+> 사실이 아니다. 분할 저장도 불필요. 그럼에도 R2를 택하는 근거는 아래 셋이다.
 
-개별 마켓 hot도 KV 25KB를 간당간당 넘고, full tier는 KR ~4000종목 + US ~2700종목 + COINS ~200종목으로 확실히 초과. KV를 쓰려면 페이로드를 분할 저장 + 읽기 시 재조립해야 하는데, 이는 R2 단일 객체 저장 대비 복잡도만 증가.
+1. **Write 무료 한도** — KV 무료 티어는 **1,000 writes/일**. 본 프로젝트 크론 쓰기량
+   (coins 288 + kr 144 + us 3샤드 360 + hot/signals/`:prev` 백업 등)은 일 1,000건을 쉽게 초과 →
+   KV는 유료 전환($5/M write) 필요. R2 Class A 무료 100만/월(~33k/일)은 충분.
+2. **강한 일관성 + 즉시 무효화** — R2는 read-after-write 강한 일관성. KV는 최종 일관성으로
+   쓰기가 전 엣지에 전파되는 데 최대 ~60s. 시세 스냅샷처럼 신선도 민감한 데이터는
+   R2 + CF Cache API(크론이 쓰기 직후 purge) 조합이 결정적이고 더 빠른 갱신을 제공.
+3. **Egress 무료 + 넉넉한 read 티어** — R2는 인터넷 egress 무료, Class B read 1,000만/월.
+
+(참고: `api/_price-cache.js:159-177` `getHotSnaps()` hot tier 크기 — KR ~24KB / US ~26KB /
+COINS ~20KB, full tier는 KR·US·COINS 합산 ~400KB. 모두 KV 25 MiB·R2 한계 내.)
 
 ### R2의 읽기 지연 우려 해소
 
