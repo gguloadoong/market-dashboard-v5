@@ -114,7 +114,7 @@ export default function MarketSummaryBar({ indices = [], krwRate = DEFAULT_KRW_R
           <span className="text-[10px] text-[#8B95A1] font-medium">USD/KRW</span>
         </div>
         <div className="text-[17px] font-bold text-[#191F28] tabular-nums font-mono">
-          ₩{' '}{(krwRate || 0).toLocaleString('ko-KR')}
+          ₩{' '}{Number.isFinite(krwRate) ? krwRate.toLocaleString('ko-KR') : '—'}
         </div>
       </div>
     </div>

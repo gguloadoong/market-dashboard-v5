@@ -45,11 +45,16 @@ function RelatedRow({ item, krwRate, onItemClick }) {
   const isDown = pct < 0;
   const color = isUp ? '#F04452' : isDown ? '#1764ED' : '#8B95A1';
 
+  const coinKrw = Number.isFinite(item.priceKrw)
+    ? item.priceKrw
+    : Number.isFinite(item.priceUsd)
+      ? item.priceUsd * (krwRate || DEFAULT_KRW_RATE)
+      : NaN;
   const price = isCoin
-    ? `₩${fmt(Math.round(item.priceKrw || (item.priceUsd ?? 0) * (krwRate || DEFAULT_KRW_RATE)))}`
+    ? (Number.isFinite(coinKrw) ? `₩${fmt(Math.round(coinKrw))}` : '—')
     : item._market === 'KR' || item.market === 'kr'
       ? `₩${fmt(item.price)}`
-      : `$${(item.price ?? 0).toFixed(2)}`;
+      : Number.isFinite(item.price) ? `$${item.price.toFixed(2)}` : '—';
 
   const mktBadge = isCoin
     ? { label: 'COIN', bg: '#FFF4E6', color: '#FF9500' }

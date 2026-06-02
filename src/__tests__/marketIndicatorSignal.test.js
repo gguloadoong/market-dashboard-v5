@@ -7,7 +7,7 @@ import {
   MARKET_INDICATOR_TYPES,
   isMarketIndicatorSignal,
 } from '../engine/signalTypes.js';
-import { isStockClickable } from '../utils/signalStockResolver.js';
+import { isStockClickable, shouldRenderStockCard } from '../utils/signalStockResolver.js';
 
 describe('isMarketIndicatorSignal (#341)', () => {
   it('FEAR_GREED_SHIFT 타입은 시장 지표로 식별', () => {
@@ -131,5 +131,40 @@ describe('시그널 클릭 가드 시뮬레이션 (#341)', () => {
     expect(isClickableAsStock(fxSignal)).toBe(false);
     // #343 — 공통 유틸 isStockClickable(lookup 미제공)도 동일 차단 (UnifiedFeedPanel 실제 사용 형태)
     expect(isStockClickable(fxSignal)).toBe(false);
+  });
+});
+
+// #345 — FUNDING_RATE_EXTREME 클릭 예외: 시장 지표지만 코인 종목(BTC)으로 라우팅 가능.
+// signalTypes.js의 kind는 'market' 유지(가짜 종목 카드 방지) — isStockClickable만 화이트셋 예외.
+describe('FUNDING_RATE_EXTREME 클릭 예외 (#345)', () => {
+  const fundingSignal = {
+    id: 'sig_test_funding',
+    type: SIGNAL_TYPES.FUNDING_RATE_EXTREME,
+    symbol: 'BTC',
+    name: 'BTC 펀딩비',
+    market: 'crypto',
+    direction: 'bearish',
+    strength: 4,
+  };
+
+  it('실제 BTC 종목이 풀에 있으면 클릭 가능 (crypto→coin 정규화)', () => {
+    expect(isStockClickable(fundingSignal, [{ symbol: 'BTC', _market: 'COIN' }])).toBe(true);
+  });
+
+  it('종목 풀이 비어 있으면 클릭 불가 (lookup 실패)', () => {
+    expect(isStockClickable(fundingSignal, [])).toBe(false);
+  });
+
+  it('lookup 미제공(allItems 없음)이면 보수적 차단', () => {
+    expect(isStockClickable(fundingSignal)).toBe(false);
+  });
+
+  it('펀딩비는 종목 카드 렌더는 여전히 차단 (클릭만 허용, 카드 X)', () => {
+    expect(shouldRenderStockCard(fundingSignal, [{ symbol: 'BTC', _market: 'COIN' }])).toBe(false);
+  });
+
+  it('FX_IMPACT는 화이트셋 아님 — 종목 풀 있어도 클릭 불가 (불변)', () => {
+    const fxSignal = { type: SIGNAL_TYPES.FX_IMPACT, symbol: 'USDKRW', market: 'kr' };
+    expect(isStockClickable(fxSignal, [{ symbol: 'USDKRW', _market: 'KR' }])).toBe(false);
   });
 });

@@ -179,10 +179,11 @@ export default function App() {
     clearTimeout(titleTimerRef.current);
     titleTimerRef.current = setTimeout(() => {
       const all = [
-        ...krStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct ?? 0 })),
-        ...usStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct ?? 0 })),
-        ...coins.map(c =>   ({ name: c.name  || c.symbol, pct: c.change24h ?? 0 })),
-      ].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+        ...krStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
+        ...usStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
+        ...coins.map(c =>   ({ name: c.name  || c.symbol, pct: c.change24h })),
+      ].filter(x => Number.isFinite(x.pct))
+       .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
       const top = all[0];
       if (top?.pct >= 3)       document.title = `⚡ ${top.name} +${top.pct.toFixed(1)}% — 마켓레이더`;
       else if (top?.pct <= -3) document.title = `📉 ${top.name} ${top.pct.toFixed(1)}% — 마켓레이더`;
