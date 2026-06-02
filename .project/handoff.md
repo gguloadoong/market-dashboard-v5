@@ -33,16 +33,17 @@
 | `#347 (#346)` 가짜 종목 잔존 2건 fix | REBALANCING_ALERT + UnifiedFeedPanel 가드 + a11y | main 머지·배포 대기 (6-01) |
 | **`#348 (#343)` 시그널 kind 도메인 분리** | SIGNAL_KIND 단일소스+IIFE 완전성검증+종목풀 런타임 검증 drop | **main 머지·배포 미룸 (6-01)** |
 
-Production HEAD: `8515985` (5-30) · main HEAD: `803dd56` (#347+#343+#344 누적·미배포)
+Production HEAD: `096691b` (6-02 **배포 완료** — Vercel + CF Workers, #343~#345 + #346/#347 + #350 Upstash) · main HEAD: `096691b` (동기화)
 
 ## 🟡 진행 중·대기 트랙
 
-### 트랙 1 — 데이터 신뢰 (P0/P1 묶음 배포 대상)
-- ✅ `#346/#347` P0 가짜 종목 잔존 fix (main 머지, 배포 대기)
-- ✅ `#343/#348` P1 시그널 kind 도메인 분리 (main 머지 `9b73c00`, 배포 대기) — `SIGNAL_KIND`(type→stock|market) 단일소스 + 로드타임 IIFE 완전성검증 + `resolveStockItem` 종목풀 런타임검증(crypto→coin 정규화). 봇리뷰 5건(Copilot 채택1/기각4) + 자체 review:code HIGH 3건(crypto정규화·매칭이중화·거짓로딩) 수정. test 232 passed
-- ✅ `#344/#349` US marketCap 폴링 머지 가드 (main 머지 `803dd56`, 배포 대기) — **진단 정정**: 원인은 us-price가 아니라 usePrices 머지가 스냅샷 marketCap(update-us NASDAQ 수집)을 0으로 덮음. 1줄 가드. **P1→P3 강등**(내부 스코어링 입력, 화면 비노출, Phase 12 주도주 본질은 디자인 트랙)
-- 🔄 **`#345` P2 묶음 6건** (다음 작업 — NaN/null 처리, news boundary, FUNDING_RATE 코인 클릭 차단 등)
-- 🟠 신규 부채 (2026-06-01 발견): ① Codex pre-push 훅 잔존(ADR-020 위반, `SKIP_CODEX_REVIEW=1` 우회 중) ② UnifiedFeedPanel(비활성) 재활성 시 풀검증+type 전달 ③ pre-deploy-consensus.sh가 test 실패를 경고만(게이트화 필요) — 별도 정리 이슈 후보
+### 트랙 1 — 데이터 신뢰 ✅ **완결 · 배포 완료** (2026-06-02 `096691b`)
+- ✅ `#346/#347` P0 가짜 종목 잔존 fix — **배포 완료**
+- ✅ `#343/#348` 시그널 kind 도메인 분리 (SIGNAL_KIND 단일소스 + IIFE 완전성검증 + 종목풀 런타임검증, crypto→coin 정규화) — **배포 완료**
+- ✅ `#344/#349` US marketCap 폴링 머지 가드 (진단정정: usePrices 머지가 스냅샷값을 0으로 덮음, 1줄 가드, P3 강등) — **배포 완료**
+- ✅ `#345/#352` 정합성 P2 6건 (finite 4건 + newsAlias boundary + FUNDING 클릭예외, test 243) — **배포 완료**
+- 🟠 잔여 부채 (정리 이슈 후보): ① Codex pre-push 훅 잔존(ADR-020 위반, `SKIP_CODEX_REVIEW=1` 우회) ② UnifiedFeedPanel(비활성) 재활성 시 풀검증+type ③ pre-deploy-consensus.sh test 실패 경고만(게이트화) ④ usePrices marketCap는 스냅샷 의존(스냅샷 장애 시 0)
+- **➡️ 다음 작업**: 데이터 신뢰 트랙 완결됨. 잔여 부채 정리 또는 **트랙 2(디자인 방향, 보류 중) 재개는 대표 지시 시**
 
 ### 트랙 2 — 디자인 방향 (보류)
 영감 4개 보존 위치: `.project/inspirations-discovery-2026-05.md`
