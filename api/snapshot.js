@@ -118,7 +118,7 @@ export default async function handler(request) {
         status: 200,
         headers: {
           ...CORS_HEADERS,
-          'Cache-Control': 'public, max-age=0, s-maxage=60',
+          'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=30',
           'ETag': etag,
         },
       });
@@ -160,16 +160,15 @@ export default async function handler(request) {
     // - #331: s-maxage 60→120 — Upstash bandwidth 12.7배 초과 대응.
     //   CDN cache hit률 ~2배 → Redis MGET 호출 ~50% 감소.
     //   CF Workers cron이 5분 주기로 snap 갱신 → 2분 stale은 5분 cycle 내 안전.
-    // - stale-while-revalidate 미사용: 백그라운드 갱신 중 stale 반환 방지
-    //   (KR 랭킹/급등 뷰는 refreshKoreanStocks가 fallback/워치리스트만 갱신하고
-    //    나머지는 snapshot seed에 의존 → swr로 수분 stale 누적 시 서비스 본질 훼손.
-    //    CF Workers check-signal-accuracy의 server-side snapshot 소비도 stale 누적 위험.
-    //    → swr 없이 stale 상한을 120s로 제한.)
+    // - stale-while-revalidate=60 추가 (#350): s-maxage=120 만료 직후 최대 60s만 stale
+    //   (총 stale 상한 180s) → CF Workers cron 5분(300s) 주기 대비 짧아 '수분 누적' 아님.
+    //   ETag 재검증 유지 → 데이터 변경 시 304 아닌 200 반환. SWR을 s-maxage의 절반으로
+    //   제한해 백그라운드 갱신 1건만 Redis MGET 호출 → bandwidth 추가 절감.
     return new Response(body, {
       status: 200,
       headers: {
         ...CORS_HEADERS,
-        'Cache-Control': 'public, max-age=0, s-maxage=120',
+        'Cache-Control': 'public, max-age=0, s-maxage=120, stale-while-revalidate=60',
         'ETag': etag,
       },
     });

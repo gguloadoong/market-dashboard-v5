@@ -29,7 +29,7 @@ export default async function handler() {
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=300',
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
         'Access-Control-Allow-Origin': '*',
       },
     });

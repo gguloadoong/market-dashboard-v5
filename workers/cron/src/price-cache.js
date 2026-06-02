@@ -88,9 +88,12 @@ export async function setSnap(key, data, ex) {
           await _redis.expire(counterKey, BACKUP_TTL * 3);
         }
         if (counter % BACKUP_INTERVAL === 0) {
-          const existing = await _redis.get(key);
-          if (existing !== null) {
-            await _redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+          // COPY는 서버 측 복제 — payload 네트워크 왕복 0
+          // 원본 키가 없으면 NOT_COPIED 반환 (에러 아님)
+          const copyResult = await _redis.copy(key, `${key}:prev`, { replace: true });
+          if (copyResult === 'COPIED') {
+            // :prev TTL 별도 부여 — COPY는 원본 TTL을 복사하므로 백업 전용 TTL 필요
+            await _redis.expire(`${key}:prev`, BACKUP_TTL);
           }
         }
       } catch (e) { console.warn('[price-cache] :prev 백업 실패', key, e?.message); }
@@ -106,13 +109,15 @@ export async function recordCronFailure(cronName, errorMessage) {
   try {
     const countKey = `cron:fail:${cronName}`;
     const errorKey = `cron:lastError:${cronName}`;
-    const prev = parseInt(await _redis.get(countKey) || '0', 10);
+    // incr: 원자적 증가 (키 미존재 시 0→1 자동), get+parse+set 3단계 제거
+    const newCount = await _redis.incr(countKey);
+    // expire: incr은 TTL을 리셋하지 않으므로 별도 부여
     await Promise.all([
-      _redis.set(countKey, prev + 1, { ex: 3600 }),
+      _redis.expire(countKey, 3600),
       _redis.set(errorKey, JSON.stringify({
         error: String(errorMessage).slice(0, 200),
         ts: Date.now(),
-        count: prev + 1,
+        count: newCount,
       }), { ex: 3600 }),
     ]);
   } catch (e) { console.error(`[price-cache] recordCronFailure 실패:`, e); }

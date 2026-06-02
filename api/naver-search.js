@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         market:   item.typeCode,   // 'KOSPI' | 'KOSDAQ'
         category: item.category,   // 'stock' | 'etf'
       }));
-    res.setHeader('Cache-Control', 's-maxage=300');
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
     res.json({ items });
   } catch (e) {
     res.json({ items: [], error: e.message });

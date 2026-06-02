@@ -58,7 +58,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify(data), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': `public, s-maxage=${isIntraday ? 30 : 60}`,
+        'Cache-Control': `public, s-maxage=${isIntraday ? 30 : 60}, stale-while-revalidate=${isIntraday ? 15 : 30}`,
         'Access-Control-Allow-Origin': '*',
       },
     });
