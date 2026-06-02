@@ -64,7 +64,10 @@ async function updateEvaluationBatch(supabaseUrl, supabaseKey, signalRpcSecret, 
 async function getCurrentPrices() {
   try {
     const base = 'https://market-dashboard-v5.vercel.app';
-    const res = await fetch(`${base}/api/snapshot`, {
+    // 정확도 평가는 '현재가'가 정확해야 하므로 CDN 캐시(s-maxage/SWR) 우회 —
+    // 매 실행 고유 쿼리 + no-store로 항상 최신 full 스냅샷 fetch (#350).
+    const res = await fetch(`${base}/api/snapshot?fresh=${Date.now()}`, {
+      cache: 'no-store',
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return {};

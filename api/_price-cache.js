@@ -76,13 +76,21 @@ export async function setSnap(key, data, ex) {
   if (!redis) return false;
   try {
     // 백업은 best-effort — 실패해도 본 데이터 저장은 진행
-    try {
-      const existing = await redis.get(key);
-      if (existing !== null) {
-        await redis.set(`${key}:prev`, existing, { ex: BACKUP_TTL });
+    // 백업 대상: :prev 폴백으로 읽히는 키만. snap:* (getSnapWithFallback/US 샤드 폴백)
+    // + signals:latest (compute-signals가 쓰고 api/signals.js의 getSnapWithFallback가 읽음).
+    // ta:* 등 폴백 없이 getSnap으로만 읽는 키는 백업 불필요. (#350)
+    // ※ workers/cron/src/price-cache.js의 isBackupKey와 동기화 유지할 것.
+    const isBackupKey = typeof key === 'string'
+      && (key.startsWith('snap:') || key === 'signals:latest');
+    if (isBackupKey) {
+      try {
+        const copyResult = await redis.copy(key, `${key}:prev`, { replace: true });
+        if (copyResult === 'COPIED') {
+          await redis.expire(`${key}:prev`, BACKUP_TTL);
+        }
+      } catch (backupErr) {
+        console.warn(`[price-cache] 백업 저장 실패 (${key}:prev):`, backupErr.message);
       }
-    } catch (backupErr) {
-      console.warn(`[price-cache] 백업 저장 실패 (${key}:prev):`, backupErr.message);
     }
     await redis.set(key, data, { ex });
     // ETag는 snapshot API가 실제 데이터 내용에서 직접 계산 — 별도 ts 키 불필요
@@ -209,16 +217,14 @@ export async function recordCronFailure(cronName, errorMessage) {
   try {
     const countKey = `cron:fail:${cronName}`;
     const errorKey = `cron:lastError:${cronName}`;
-    // 카운터: get→+1→set — TTL이 set에 포함되어 누락 불가 (동시 실패 시 카운터 부정확 가능, 모니터링 용도 허용)
-    const prev = parseInt(await redis.get(countKey) || '0', 10);
-    await Promise.all([
-      redis.set(countKey, prev + 1, { ex: 3600 }),
-      redis.set(errorKey, JSON.stringify({
-        error: String(errorMessage).slice(0, 200),
-        ts: Date.now(),
-        count: prev + 1,
-      }), { ex: 3600 }),
-    ]);
+    // 카운터: incr+expire를 트랜잭션으로 묶어 원자화 (incr 직후 중단 시 TTL 유실 방지).
+    // 매 실패마다 expire 갱신해 슬라이딩 윈도우(1h) 유지. 동시 실패 race·get+parse 제거.
+    const [newCount] = await redis.multi().incr(countKey).expire(countKey, 3600).exec();
+    await redis.set(errorKey, JSON.stringify({
+      error: String(errorMessage).slice(0, 200),
+      ts: Date.now(),
+      count: newCount,
+    }), { ex: 3600 });
   } catch (e) {
     console.error(`[price-cache] recordCronFailure 실패 (${cronName}):`, e);
   }

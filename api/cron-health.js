@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     crons[name] = { failCount, lastOk, lastError };
   }
 
-  res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=60');
   return res.status(200).json({
     ok: !anyFailing,
     ts: Date.now(),
