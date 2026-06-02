@@ -79,6 +79,7 @@ export async function setSnap(key, data, ex) {
     // 백업 대상: :prev 폴백으로 읽히는 키만. snap:* (getSnapWithFallback/US 샤드 폴백)
     // + signals:latest (compute-signals가 쓰고 api/signals.js의 getSnapWithFallback가 읽음).
     // ta:* 등 폴백 없이 getSnap으로만 읽는 키는 백업 불필요. (#350)
+    // ※ workers/cron/src/price-cache.js의 isBackupKey와 동기화 유지할 것.
     const isBackupKey = typeof key === 'string'
       && (key.startsWith('snap:') || key === 'signals:latest');
     if (isBackupKey) {

@@ -74,20 +74,29 @@ const BACKUP_INTERVAL = 5; // 크론 5분 × 5회 = 25분 주기 (BACKUP_TTL 360
 export async function setSnap(key, data, ex) {
   if (!_redis) return false;
   try {
-    // snap:* 전체 백업 — 메인 키(getSnapWithFallback) + 미국 샤드 키(api/_price-cache.js:getUsSnap)
-    // 둘 다 :prev fallback을 실제 읽음. cron:fail:* 등 기타 키는 스킵.
-    const isBackupKey = typeof key === 'string' && key.startsWith('snap:');
+    // 백업 대상: :prev fallback으로 읽히는 키. (api/_price-cache.js의 isBackupKey와 동기화 유지)
+    //  - snap:* — 메인 키(getSnapWithFallback) + 미국 샤드(api/_price-cache.js:getUsSnap)
+    //  - signals:latest — 본 워커 compute-signals가 쓰고 api/signals.js:getSnapWithFallback가 읽음.
+    // cron:fail:* 등 기타 키는 스킵.
+    const isSnapKey = typeof key === 'string' && key.startsWith('snap:');
+    const isSignalsKey = key === 'signals:latest';
+    const isBackupKey = isSnapKey || isSignalsKey;
 
     if (isBackupKey) {
       try {
-        // 총 subrequest: incr(1) + set 메인(1) + 20%[get+set:prev = 2] = 평균 2.4/호출
-        const counterKey = `setSnap:counter:${key}`;
-        const counter = await _redis.incr(counterKey);
-        if (counter === 1) {
-          // 최초 생성 시 TTL 부여 → 좀비 counter 키 누적 방지 (3시간)
-          await _redis.expire(counterKey, BACKUP_TTL * 3);
+        // signals:latest는 10분 주기로만 쓰여 counter 우회·매 호출 백업(cold-start 갭 제거).
+        // snap:* 샤드는 5분 주기로 빈번 → BACKUP_INTERVAL로 throttle (subrequest 절감).
+        let shouldBackup = true;
+        if (isSnapKey) {
+          const counterKey = `setSnap:counter:${key}`;
+          const counter = await _redis.incr(counterKey);
+          if (counter === 1) {
+            // 최초 생성 시 TTL 부여 → 좀비 counter 키 누적 방지 (3시간)
+            await _redis.expire(counterKey, BACKUP_TTL * 3);
+          }
+          shouldBackup = (counter % BACKUP_INTERVAL === 0);
         }
-        if (counter % BACKUP_INTERVAL === 0) {
+        if (shouldBackup) {
           // COPY는 서버 측 복제 — payload 네트워크 왕복 0
           // 원본 키가 없으면 NOT_COPIED 반환 (에러 아님)
           const copyResult = await _redis.copy(key, `${key}:prev`, { replace: true });
