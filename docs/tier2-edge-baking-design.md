@@ -267,7 +267,7 @@ OPTIONS /snapshot         -> CORS preflight
 
 ```javascript
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return corsPreflightResponse();
@@ -317,9 +317,9 @@ export default {
       },
     });
 
-    // Cache에 적재 (비동기, 응답 지연 없음)
-    // ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    // -- fetch handler에서는 waitUntil 불가, event.waitUntil 패턴 사용
+    // Cache에 적재 (비동기, 응답 지연 없음) — 모듈 워커는 fetch(request, env, ctx)의
+    // ctx.waitUntil로 응답 반환 후 백그라운드 작업 수행 가능.
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
 
     return response;
   }

@@ -76,8 +76,11 @@ export async function setSnap(key, data, ex) {
   if (!redis) return false;
   try {
     // 백업은 best-effort — 실패해도 본 데이터 저장은 진행
-    // snap:* 키만 백업 — ta:* 등 비-스냅샷 키는 백업 불필요 (workers 버전과 정합성)
-    const isBackupKey = typeof key === 'string' && key.startsWith('snap:');
+    // 백업 대상: :prev 폴백으로 읽히는 키만. snap:* (getSnapWithFallback/US 샤드 폴백)
+    // + signals:latest (compute-signals가 쓰고 api/signals.js의 getSnapWithFallback가 읽음).
+    // ta:* 등 폴백 없이 getSnap으로만 읽는 키는 백업 불필요. (#350)
+    const isBackupKey = typeof key === 'string'
+      && (key.startsWith('snap:') || key === 'signals:latest');
     if (isBackupKey) {
       try {
         const copyResult = await redis.copy(key, `${key}:prev`, { replace: true });
