@@ -96,8 +96,8 @@ Production HEAD: `8515985` (5-30) · main HEAD: `803dd56` (#347+#343+#344 누적
 2. `MEMORY.md` 인덱스 + 관련 메모리 (특히 `feedback_watchlist_secondary`, `project_phase12_situational_focus`, `project_pre_launch_deploy_policy`)
 3. `.project/backlog.md`, `.project/decisions.md`, `.project/quality-baseline.md`
 4. 디자인 트랙은 대표 재개 지시 시까지 보류
-5. **다음 권고 작업**: `#343` P1 시그널 도메인 분리 단기 fix
-6. 배포는 데이터 신뢰 트랙(#343 + #344 + #345 일부) 모두 완료 후 1회
+5. **다음 권고 작업**: `#345` P2 정합성 6건 묶음 (데이터 신뢰 트랙 마지막). #343·#344 완료됨
+6. #345 완료 → 데이터 신뢰 트랙(#343+#344+#345) 완결 → 배포 제안(트리거+대표 확인). 현재 미배포 8커밋 누적
 
 ## 🔎 데이터 정합성 점검 결과 (2026-06-01)
 
@@ -107,7 +107,7 @@ executor 정밀 점검으로 9개 결함 발견·분류:
 |------|------|------|------|
 | P0 | 1-A | REBALANCING_ALERT 'MARKET' 가짜 종목 | ✅ #346/#347 fix |
 | P0 | 1-B | UnifiedFeedPanel 가드 누락 (FX_IMPACT 'USDKRW' 등) | ✅ #346/#347 fix |
-| P1 | 2-D | us-price marketCap=0 하드코딩 | 🟡 #344 |
+| P1 | 2-D | us-price marketCap=0 (실제 원인: usePrices 머지가 스냅샷값 덮음) | ✅ #344/#349 |
 | P2 | 2-A | App.jsx 탭 정렬 `?? 0` | 🟡 #345 |
 | P2 | 2-B | MarketSummaryBar/NewsSidePanel ₩0/$0 노출 | 🟡 #345 |
 | P2 | 2-C | priceAlert ₩0 발화 | 🟡 #345 |
@@ -117,12 +117,12 @@ executor 정밀 점검으로 9개 결함 발견·분류:
 
 세부는 #344, #345 GitHub Issue 본문 참조.
 
-## 🔄 작업 진행 워크플로 (이 단계 한정)
+## 🔄 작업 진행 워크플로 (B 경량화 적용 — 2026-06-01, 상세는 CLAUDE.md PR 절차)
 
-1. 이슈 → 브랜치(`feature/#N-설명`) → 커밋(`feat:`/`fix:`)
-2. `npm run review:code` (Opus 독립 리뷰)
-3. 알고리즘 파일 변경 시 `npm run architect` 필수
-4. `npm run pr "제목"` (Gemini gate + PR + 봇 폴링)
-5. 봇 리뷰 응답(채택/기각 명시) + 리뷰 종합 코멘트
-6. **머지** (자율)
+1. 이슈 → 브랜치(`feature/#N-설명` or `fix/#N-설명`) → 커밋 (push 불필요 — `npm run pr`이 자동 push)
+2. `npm run review:code` (Opus 1회) — BLOCK 시 HIGH/CRITICAL만 수정, STYLE·논쟁·사전검토 항목은 1회 기록 후 진행(비결정성 무한루프 방지)
+3. 알고리즘 파일(`.algo-files`) 변경 시**만** `npm run architect` 필수 (그 외 스킵)
+4. `npm run pr "제목"` — 자동 push + 빌드 + 게이트 + Gemini gate + PR 생성 (비공개 단계: **봇 폴링 생략**, 봇은 사후 참고)
+5. 사전 게이트(architect+review:code+Gemini) PASS면 **머지**(자율). 봇 안 기다림 — 런칭 시 `WAIT_BOTS=1 npm run pr`
+6. 사소 수정(주석/문서, 코드 로직 무변경)은 게이트 재실행 **스킵**
 7. **배포는 트리거 충족 + 대표 확인 시에만** (P0/P1 머지만으로 자동 제안 금지)
