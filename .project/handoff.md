@@ -43,7 +43,7 @@ Production HEAD: `096691b` (6-02 **배포 완료** — Vercel + CF Workers, #343
 - ✅ `#344/#349` US marketCap 폴링 머지 가드 (진단정정: usePrices 머지가 스냅샷값을 0으로 덮음, 1줄 가드, P3 강등) — **배포 완료**
 - ✅ `#345/#352` 정합성 P2 6건 (finite 4건 + newsAlias boundary + FUNDING 클릭예외, test 243) — **배포 완료**
 - 🟠 잔여 부채 (정리 이슈 후보): ① Codex pre-push 훅 잔존(ADR-020 위반, `SKIP_CODEX_REVIEW=1` 우회) ② UnifiedFeedPanel(비활성) 재활성 시 풀검증+type ③ pre-deploy-consensus.sh test 실패 경고만(게이트화) ④ usePrices marketCap는 스냅샷 의존(스냅샷 장애 시 0)
-- **➡️ 다음 작업**: 데이터 신뢰 트랙 완결됨. 잔여 부채 정리 또는 **트랙 2(디자인 방향, 보류 중) 재개는 대표 지시 시**
+- **➡️ 다음 작업 = 트랙 2 디자인 시작** (대표 지시 받음 2026-06-05) — 아래 "다음 세션 권고 시작 순서" 참조. 잔여 부채는 디자인 사이클 사이에
 
 ### 트랙 2 — 디자인 방향 (보류)
 영감 4개 보존 위치: `.project/inspirations-discovery-2026-05.md`
@@ -96,9 +96,13 @@ Production HEAD: `096691b` (6-02 **배포 완료** — Vercel + CF Workers, #343
 1. **이 핸드오프 정독** (지금)
 2. `MEMORY.md` 인덱스 + 관련 메모리 (특히 `feedback_watchlist_secondary`, `project_phase12_situational_focus`, `project_pre_launch_deploy_policy`)
 3. `.project/backlog.md`, `.project/decisions.md`, `.project/quality-baseline.md`
-4. 디자인 트랙은 대표 재개 지시 시까지 보류
-5. **다음 권고 작업**: `#345` P2 정합성 6건 묶음 (데이터 신뢰 트랙 마지막). #343·#344 완료됨
-6. #345 완료 → 데이터 신뢰 트랙(#343+#344+#345) 완결 → 배포 제안(트리거+대표 확인). 현재 미배포 8커밋 누적
+4. 데이터 신뢰 트랙(#343·#344·#345) ✅ **완결·배포 완료** (`096691b`, 2026-06-02). 프로덕션 QA 통과(데이터 신뢰 검증 OK, UI 인터랙션은 MCP 1s timeout으로 미검증 — 다음 기회에)
+5. **다음 권고 작업 = 트랙 2 디자인 시작** (대표 지시 받음 2026-06-05). 진행 순서:
+   - ① `.project/inspirations-discovery-2026-05.md` 정독 (영감 4개: 🎙️라디오DJ / 🚨응급실 / 📖매거진 / 🗺️게임미니맵)
+   - ② `designer`(opus) 에이전트로 영감 4개 평가 → 방향 1개 선택
+   - ③ **텍스트 시안 먼저 대표 확인** (`feedback_ui_mockup_before_impl` — UI 변경 전 시안 필수)
+   - ④ 확인 후 구현
+6. ⚠️ 디자인 가드 (위 "Phase 12 사후평가" 정독 필수): 단어게임(흡수/통합/모핑)·카드 동질화 6개·referent 기생(토스/Robinhood/Coinbase)·watchlist-first **금지**. `.project/wireframes/`는 Phase 8 **기각안**이니 참고만, 재사용 금지
 
 ## 🔎 데이터 정합성 점검 결과 (2026-06-01)
 
