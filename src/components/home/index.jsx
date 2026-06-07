@@ -264,7 +264,7 @@ export default function HomeDashboard({
       {/* ─── 4.5. Signal Lab — 과거 시그널 흐름 (#274) ──────── */}
       <SignalLabWidget />
 
-      {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 우측 UnifiedFeedPanel) ── */}
+      {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 App.jsx 우측 뉴스 레일 #353) ── */}
       <div className="lg:hidden">
         <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
       </div>
