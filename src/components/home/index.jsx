@@ -3,7 +3,7 @@ import { useState, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
-import { getPct } from './utils';
+import { getPct, isNoiseInstrument } from './utils';
 import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import MorphingFocusSection from './MorphingFocusSection';
@@ -33,8 +33,11 @@ export default function HomeDashboard({
     ...etfs.filter(e => e.market === 'kr').map(e => ({ ...e, _market: 'KR', _isEtf: true })),
   ], [krStocks, etfs]);
   // US 우선주/워런트/시리즈 주 2차 방어 — 서버 필터 실패 대비 (#183)
+  // isNoiseInstrument: name 기반 워런트/권리/트랜치 컷 (#355) — ticker 휴리스틱이 못 잡는 RVMDW 류 제거
   const usItems   = useMemo(() => [
-    ...usStocks.filter(s => !isPreferredOrSpecial(s.symbol)).map(s => ({ ...s, _market: 'US' })),
+    ...usStocks
+      .filter(s => !isPreferredOrSpecial(s.symbol) && !isNoiseInstrument(s))
+      .map(s => ({ ...s, _market: 'US' })),
     ...etfs.filter(e => e.market === 'us').map(e => ({ ...e, _market: 'US', _isEtf: true })),
   ], [usStocks, etfs]);
   const coinItems = useMemo(() => coins.map(c => ({ ...c, _market: 'COIN' })), [coins]);

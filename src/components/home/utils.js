@@ -80,6 +80,18 @@ export const TYPE_BADGE = {
 // ─── 파생상품(ELW/ETN/레버리지) 판별 ──────────────────
 export const DERIVATIVE_RE = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage|ETN|ELW|선물/i;
 
+// 미장 워런트/권리/트랜치/유닛 판별 — name 기반 (#355).
+// ticker 휴리스틱(symbolKey.WARRANT_RE)은 NEWS/JEWELS 오탐 회피로 구분자 없는 끝자리 W를 못 잡는다.
+// update-us 크론이 Yahoo shortName(="...Warrant"/"...Rights"/"...Units")을 그대로 name에 싣기 때문에
+// name 토큰이 결정적. 보통주(NEWS/JEWELS/Warranty Group)는 단어경계(\b)로 오탐 0.
+export const US_NONCOMMON_RE = /\b(warrants?|warr|rights?|units?|tranche|subscription receipts?)\b/i;
+
+// 워런트·권리·파생 통합 잡주 판별 — usItems 1차 필터 + leadingStocks.passesNoiseGate 공용 단일 지점.
+export function isNoiseInstrument(item) {
+  const name = item?.name || '';
+  return DERIVATIVE_RE.test(name) || US_NONCOMMON_RE.test(name);
+}
+
 // ─── 로고 아바타 (로고 실패 시 컬러 이니셜) ──────────────────
 export const PALETTE = ['#3182F6','#F04452','#FF9500','#2AC769','#8B5CF6','#EC4899','#14B8A6','#F59E0B'];
 export function getAvatarBg(symbol) {
