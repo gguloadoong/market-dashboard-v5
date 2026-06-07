@@ -10,6 +10,7 @@ import BreakingNewsPanel from './components/BreakingNewsPanel';
 import ChartSidePanel from './components/ChartSidePanel';
 import NewsSidePanel from './components/NewsSidePanel';
 import HomeDashboard from './components/home';
+import NewsFeedWidget from './components/home/widgets/NewsFeedWidget';
 import DataHealthBadge from './components/DataHealthBadge';
 import GlobalSearch from './components/GlobalSearch';
 import { DEFAULT_KRW_RATE } from './constants/market';
@@ -20,6 +21,7 @@ import { fetchKoreanStocksBatch, fetchEtfPricesBatch } from './api/stocks';
 import { requestNotificationPermission, getNotificationPermission, setAlertWatchlistIds } from './utils/priceAlert';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useNewsAlerts } from './hooks/useNewsAlerts';
+import { useAllNewsQuery } from './hooks/useNewsQuery';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useKrxEtf } from './hooks/useKrxEtf';
 import { useKisWebSocket } from './hooks/useKisWebSocket';
@@ -227,6 +229,17 @@ export default function App() {
   }, [watchlist, krStocks, usStocks, coins]);
   useNewsAlerts(watchedItemsForAlert);
 
+  // ── 데스크톱 우측 뉴스 레일 (#353) ───────────────────────────
+  // #340이 우측 UnifiedFeedPanel(뉴스 포함)을 제거하면서 데스크톱 뉴스가 증발했다.
+  // 정적 뉴스(NewsFeedWidget 상위 5건)를 우측 레일로 복원 — #339가 없앤 '자동 스트리밍 피로감'과는 별개.
+  // allItems는 뉴스↔종목 뱃지 매칭용(없어도 graceful degrade) — 경량 합본으로 충분.
+  const { data: allNews = [] } = useAllNewsQuery();
+  const newsRailItems = useMemo(() => [
+    ...krStocks.map(s => ({ ...s, _market: 'KR' })),
+    ...usStocks.map(s => ({ ...s, _market: 'US' })),
+    ...coins.map(c => ({ ...c, _market: 'COIN' })),
+  ], [krStocks, usStocks, coins]);
+
   // ── 모바일 백버튼 처리 (History API) ──────────────────────────
   // 패널/검색이 열릴 때 history entry 추가 → 뒤로가기 시 앱 닫힘 방지
   // closingViaUI: X 버튼으로 닫을 때 history.back()에 의한 popstate 중복 처리 방지
@@ -373,7 +386,7 @@ export default function App() {
         dark={dark} onDarkToggle={toggleDark}
       />
 
-      <div className="max-w-[1440px] mx-auto">
+      <div className={`max-w-[1440px] mx-auto ${activeTab === 'news' ? '' : 'lg:grid lg:grid-cols-[1fr_360px]'}`}>
         <div className={`min-w-0 overflow-hidden ${activeTab === 'news' ? '' : 'p-5 space-y-4'} lg:pb-0 pb-safe-nav`}>
           {activeTab === 'home' ? (
             <>
@@ -405,6 +418,17 @@ export default function App() {
           )}
         </div>
 
+        {/* 데스크톱 우측 뉴스 레일 (#353) — 뉴스 탭 제외 전 탭에서 표시. #340 회귀 복원 */}
+        {activeTab !== 'news' && (
+          <aside className="hidden lg:block self-start sticky top-[84px] pt-5 pr-5 pb-5">
+            <NewsFeedWidget
+              allNews={allNews}
+              onNewsClick={setSelectedNews}
+              onItemClick={handleItemClick}
+              allItems={newsRailItems}
+            />
+          </aside>
+        )}
       </div>
 
       {selectedItem && (
