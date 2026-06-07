@@ -26,7 +26,9 @@ export default async function handler(req, res) {
   }
 
   // Naver Finance 모바일 — 투자자 일별 순매수 추이
-  const url = `https://m.stock.naver.com/api/stock/${symbol}/investors?periodType=DAILY&count=${days}`;
+  // (#355) 구 /investors 엔드포인트 폐기(404) → /trend 로 마이그레이션.
+  // 신 엔드포인트는 순매수 *수량(주)*을 반환(foreignerPureBuyQuant 등) → 종가를 곱해 순매수 금액(원) 근사.
+  const url = `https://m.stock.naver.com/api/stock/${symbol}/trend?periodType=DAILY&count=${days}`;
 
   try {
     const resp = await fetch(url, {
@@ -44,11 +46,22 @@ export default async function handler(req, res) {
     const list = Array.isArray(json) ? json : (json.list ?? json.investorList ?? json.investors ?? []);
 
     const data = list.slice(0, days).map(row => {
-      const foreign     = toNum(row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt ?? 0);
-      const institution = toNum(row.instNetAmt ?? row.institutionNetAmt ?? 0);
-      const individual  = toNum(row.indvNetAmt ?? row.individualNetAmt ?? 0);
+      // 신 /trend: 순매수 *수량(주)* → 종가를 곱해 순매수 금액(원) 근사(소비처 억/조 표기 의미 보존).
+      //   부호는 수량·금액 동일 → 연속 매수매도 streak 판정 무영향.
+      // 구 /investors: 이미 금액(원) → 폴백 시 종가 곱 없이 그대로 사용.
+      const close = toNum(row.closePrice);
+      const toAmt = (qtyVal, oldAmtVal) => {
+        if (qtyVal !== null && qtyVal !== undefined && qtyVal !== '') {
+          const q = toNum(qtyVal);
+          return close > 0 ? q * close : q; // 종가 미상 시 수량 그대로(부호 보존)
+        }
+        return toNum(oldAmtVal);
+      };
+      const foreign     = toAmt(row.foreignerPureBuyQuant,  row.frgnNetAmt ?? row.frgNetAmt ?? row.foreignNetAmt);
+      const institution = toAmt(row.organPureBuyQuant,      row.instNetAmt ?? row.institutionNetAmt);
+      const individual  = toAmt(row.individualPureBuyQuant,  row.indvNetAmt ?? row.individualNetAmt);
       return {
-        date:           row.stcTrdDd ?? row.bizday ?? row.date ?? '',
+        date:           row.bizdate ?? row.stcTrdDd ?? row.bizday ?? row.date ?? '',
         foreign,
         institution,
         individual,

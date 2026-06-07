@@ -13,7 +13,7 @@
 //   - 스냅샷 무섹터 → sector는 클라 정적맵 주입분만 존재 → 무섹터 주도주는 단일카드 폴백.
 //   - baseline(20영업일 평균 거래대금) 없음 → 1차는 회전율로 대체, 2차에 KV 도입(w_surge).
 
-import { DERIVATIVE_RE, getPct, isCoinItem } from '../components/home/utils';
+import { DERIVATIVE_RE, US_NONCOMMON_RE, getPct, isCoinItem } from '../components/home/utils';
 import { buildStockKeywords, matchesKeywords } from './newsAlias';
 import { detectNewsSectors } from './newsTopicMap';
 
@@ -164,7 +164,8 @@ function percentileRankSorted(value, sortedValues) {
 function passesNoiseGate(item, ctx) {
   if (!item) return false;
   const name = item.name || '';
-  if (DERIVATIVE_RE.test(name)) return false;
+  // 파생상품 + 미장 워런트/권리/트랜치 잡주 컷 (#355) — usItems 1차 필터와 이중 방어
+  if (DERIVATIVE_RE.test(name) || US_NONCOMMON_RE.test(name)) return false;
   // [HIGH3 수정] 지수 ETF(SPY/QQQ/KODEX200 등) 배제. 주도주/테마는 개별주여야 함.
   // index.jsx에서 _isEtf=true로 표시된 항목은 LEAD/GAP/COIN 분기 어디에도 진입 금지.
   if (item._isEtf) return false;

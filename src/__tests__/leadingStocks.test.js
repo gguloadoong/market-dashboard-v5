@@ -114,6 +114,31 @@ describe('MIN_TURNOVER 잡주 컷', () => {
     expect(scored.find((s) => s.symbol === 'INV')).toBeUndefined();
     expect(scored.find((s) => s.symbol === 'NORM')).toBeDefined();
   });
+  // (#355) 미장 워런트/권리/트랜치/유닛 name 기반 컷 — RVMDW/CORZW 류 급등 도배 차단
+  it('미장 워런트/권리/유닛(name)은 거래대금 충족해도 제외', () => {
+    // 거래대금 통과(default price 100 × volume 1M = $100M > $50M)하지만 name으로 컷
+    const warr1 = usStock({ symbol: 'CORZW', name: 'Core Scientific, Inc. Warrant', changePct: 108 });
+    const warr2 = usStock({ symbol: 'RVMDW', name: 'Revolution Medicines, Inc. Warrant', changePct: 189 });
+    const units = usStock({ symbol: 'XYZU', name: 'XYZ Acquisition Units', changePct: 44 });
+    const rights = usStock({ symbol: 'ABCR', name: 'ABC Holdings Rights', changePct: 30 });
+    const normal = usStock({ symbol: 'AAPL', name: 'Apple', changePct: 3 });
+    const scored = scoreMarketItems([warr1, warr2, units, rights, normal], { krwRate: KRW, recentNews: [] });
+    expect(scored.find((s) => s.symbol === 'CORZW')).toBeUndefined();
+    expect(scored.find((s) => s.symbol === 'RVMDW')).toBeUndefined();
+    expect(scored.find((s) => s.symbol === 'XYZU')).toBeUndefined();
+    expect(scored.find((s) => s.symbol === 'ABCR')).toBeUndefined();
+    expect(scored.find((s) => s.symbol === 'AAPL')).toBeDefined();
+  });
+  it('보통주 오탐 가드 — News/Jewels/Warranty는 보존', () => {
+    // 단어경계(\b) 덕분에 "News"·"Jewels"·"Warranty"는 워런트 토큰으로 오탐되지 않음
+    const news = usStock({ symbol: 'NWS', name: 'News Corp', changePct: 4 });
+    const jewels = usStock({ symbol: 'JWL', name: 'Jewels International', changePct: 6 });
+    const warranty = usStock({ symbol: 'WGI', name: 'Warranty Group Inc', changePct: 5 });
+    const scored = scoreMarketItems([news, jewels, warranty], { krwRate: KRW, recentNews: [] });
+    expect(scored.find((s) => s.symbol === 'NWS')).toBeDefined();
+    expect(scored.find((s) => s.symbol === 'JWL')).toBeDefined();
+    expect(scored.find((s) => s.symbol === 'WGI')).toBeDefined();
+  });
   it('COIN 100억 미달 제외 / 충족 통과', () => {
     const small = coin({ symbol: 'SMALL', accTradePrice24h: 5e9, change24h: 10 }); // 50억
     const big = coin({ symbol: 'BTC', accTradePrice24h: 5e11, change24h: 5 });     // 5000억
