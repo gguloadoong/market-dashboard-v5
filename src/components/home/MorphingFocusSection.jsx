@@ -15,6 +15,7 @@ import { findRelatedNews } from './utils';
 import { itemKey } from '../../utils/symbolKey';
 import { hasLiveExtended, extendedBadgeLabel } from '../../utils/extendedPrice';
 import TickerLogo from './TickerLogo';
+import RegimeBadge from './RegimeBadge';
 
 // ─── 색상 토큰 (한국식: 빨강 상승 / 파랑 하락) ───────────────────
 const UP = '#F04452';
@@ -299,10 +300,12 @@ function BridgeLine({ bridge }) {
 }
 
 // ─── 헤더 (모드별 타이틀 + 서브) ─────────────────────────────────
-function SectionHeader({ title, subtitle, themeDir }) {
+function SectionHeader({ title, subtitle, themeDir, indices }) {
   return (
     <div className="mb-3">
-      <h2 className="text-[19px] font-bold text-[#191F28] dark:text-[#E5E8EB] tracking-tight flex items-center gap-1.5">
+      <h2 className="text-[19px] font-bold text-[#191F28] dark:text-[#E5E8EB] tracking-tight flex items-center gap-1.5 flex-wrap">
+        {/* 시장 레짐 배지 — 하락장/혼조/상승장 맥락 (#358). null 가드는 RegimeBadge 내부 단일 처리 */}
+        <RegimeBadge indices={indices} showAvg={false} />
         {title}
         {themeDir != null && (
           <span className="text-[15px]" style={{ color: themeDir >= 0 ? UP : DOWN }}>
@@ -394,6 +397,7 @@ export default function MorphingFocusSection({
             title={`지금 주도 테마 ─ ${primaryTheme.theme}`}
             subtitle={mode === MORPH_MODE.KR_LEAD ? '국내 장중 · 거래 쏠림 기준' : '미국 장중 · 거래 쏠림 기준'}
             themeDir={themeDir}
+            indices={indices}
           />
           <SessionBar primaryStatus={primaryStatus} secondaryStatus={secondaryStatus} clockLabel={clockLabel} />
           <FocusLeadCard
@@ -422,7 +426,7 @@ export default function MorphingFocusSection({
       const rest = movers.slice(1, 4);
       return (
         <Shell>
-          <SectionHeader title="주목할 종목" subtitle="지금 시장에서 눈여겨볼 움직임" />
+          <SectionHeader title="주목할 종목" subtitle="지금 시장에서 눈여겨볼 움직임" indices={indices} />
           <SessionBar primaryStatus={primaryStatus} secondaryStatus={secondaryStatus} clockLabel={clockLabel} />
           <FocusLeadCard
             item={lead} pct={movers[0].pct} newsCount={movers[0].newsCount}
@@ -455,7 +459,7 @@ export default function MorphingFocusSection({
       : (krStatus.label || '시간외');
     return (
       <Shell>
-        <SectionHeader title={`지금 주목 · ${sessionWord}`} subtitle="정규장 밖 — 어제 마감 대비 움직임" />
+        <SectionHeader title={`지금 주목 · ${sessionWord}`} subtitle="정규장 밖 — 어제 마감 대비 움직임" indices={indices} />
         <SessionBar primaryStatus={primaryStatus} secondaryStatus={secondaryStatus} clockLabel={clockLabel} />
         <FocusLeadCard
           item={lead.item} pct={lead.pct} newsCount={lead.newsCount}
@@ -483,7 +487,7 @@ export default function MorphingFocusSection({
     const rest = movers.slice(1, 5);
     return (
       <Shell>
-        <SectionHeader title="지금은 코인 시간" subtitle="증시 마감 · 24시간 거래대금 기준" />
+        <SectionHeader title="지금은 코인 시간" subtitle="증시 마감 · 24시간 거래대금 기준" indices={indices} />
         <SessionBar primaryStatus={primaryStatus} secondaryStatus={secondaryStatus} clockLabel={clockLabel} />
         <FocusLeadCard
           item={lead.item} pct={lead.pct} newsCount={lead.newsCount}

@@ -11,6 +11,7 @@ import { resolveStockItem, isStockClickable, shouldRenderStockCard } from '../..
 import MarketIndexSection from './MarketIndexSection';
 import EventTicker from './EventTicker';
 import TickerLogo from './TickerLogo';
+import RegimeBadge from './RegimeBadge';
 import { getPct, fmt } from './utils';
 
 // ── 게이지 존 스타일 (5단계) — MarketSentimentWidget에서 재사용 ──
@@ -44,6 +45,8 @@ function TemperatureBar({ indices, krwRate, allItems }) {
       {/* 온도 바 — 인라인 수평 */}
       <div className="flex items-center gap-3">
         <span className="text-[13px] font-semibold text-[#4E5968] flex-shrink-0">시장 온도</span>
+        {/* 시장 레짐 배지 — 지수 평균으로 하락장/혼조/상승장 맥락 (#358) */}
+        <RegimeBadge indices={indices} />
         <div className="flex-1 h-1.5 rounded-[3px] overflow-hidden" style={{ background: 'rgba(23,100,237,0.10)' }}>
           {isPending
             ? <div className="h-full w-full rounded-[3px] bg-[#E5E8EB] animate-pulse" />
