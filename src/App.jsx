@@ -86,6 +86,12 @@ export default function App() {
     krSymbolsRef, usSymbolsRef, refreshUsStocks, refreshKoreanStocks,
     pricesReady,
   } = usePrices();
+  // 미장 워런트/우선주 정화 — 탭 타이틀·미국 탭·SurgeBanner에서 워런트(+189% 등) 노출 차단 (#360)
+  // 홈 급등/포커스는 HomeDashboard usItems에서 별도 필터됨. 여기선 그 외 표시 경로를 정화.
+  const usStocksVisible = useMemo(
+    () => usStocks.filter(s => !isPreferredOrSpecial(s.symbol) && !isNoiseInstrument(s)),
+    [usStocks],
+  );
   // 탭별 초기 로딩 플래그 — 각 데이터 소스 독립
   const tabInitializing = { kr: !pricesReady, us: !pricesReady, coin: !coinsReady, etf: false };
 
@@ -184,7 +190,7 @@ export default function App() {
     titleTimerRef.current = setTimeout(() => {
       const all = [
         ...krStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
-        ...usStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
+        ...usStocksVisible.map(s => ({ name: s.name || s.symbol, pct: s.changePct })), // 워런트 정화본 (#360)
         ...coins.map(c =>   ({ name: c.name  || c.symbol, pct: c.change24h })),
       ].filter(x => Number.isFinite(x.pct))
        .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
@@ -194,7 +200,7 @@ export default function App() {
       else                     document.title = '마켓레이더';
     }, 1000);
     return () => clearTimeout(titleTimerRef.current);
-  }, [krStocks, usStocks, coins]);
+  }, [krStocks, usStocksVisible, coins]);
 
   // `/` 키 → 검색
   useEffect(() => {
@@ -348,12 +354,6 @@ export default function App() {
   // 탭별 데이터
   const etfItems       = useMemo(() => mergedEtfs.map(e => ({ ...e, marketCap: e.aum })), [mergedEtfs]);
   const activeCoinData = activeTab === 'coin' ? coins : undefined;
-  // 미장 워런트/우선주 정화 — 미국 탭·SurgeBanner에 워런트(+189% 등) 노출 차단 (#360)
-  // 홈 급등/포커스는 HomeDashboard usItems에서 별도 필터되므로 여기선 탭/배너 경로만 정화.
-  const usStocksVisible = useMemo(
-    () => usStocks.filter(s => !isPreferredOrSpecial(s.symbol) && !isNoiseInstrument(s)),
-    [usStocks],
-  );
   const tabItems       = useMemo(() => {
     switch (activeTab) {
       case 'home': return [];
