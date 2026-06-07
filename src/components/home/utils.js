@@ -81,15 +81,27 @@ export const TYPE_BADGE = {
 export const DERIVATIVE_RE = /인버스|레버리지|2x|곱버스|bear|bull|inverse|leverage|ETN|ELW|선물/i;
 
 // 미장 워런트/권리/트랜치/유닛 판별 — name 기반 (#355).
-// ticker 휴리스틱(symbolKey.WARRANT_RE)은 NEWS/JEWELS 오탐 회피로 구분자 없는 끝자리 W를 못 잡는다.
-// update-us 크론이 Yahoo shortName(="...Warrant"/"...Rights"/"...Units")을 그대로 name에 싣기 때문에
-// name 토큰이 결정적. 보통주(NEWS/JEWELS/Warranty Group)는 단어경계(\b)로 오탐 0.
+// 보통주(NEWS/JEWELS/Warranty Group)는 단어경계(\b)로 오탐 0.
 export const US_NONCOMMON_RE = /\b(warrants?|warr|rights?|units?|tranche|subscription receipts?)\b/i;
+
+// 미장 워런트/트랜치 판별 — 티커 규약 기반 (#360).
+// #355는 name에 "Warrant"가 실린다고 가정했으나, 실제 스냅샷 name은 기초기업명과 동일
+// (예: CORZW name="Core Scientific, Inc." — 기초주 CORZ와 동명) → name 필터로 구분 불가.
+// Nasdaq 5번째 글자 규약: [4글자 기초]+W(워런트) / +Z(when-distributed·트랜치).
+//   CORZW/RVMDW/NNAVW/KYIVW(W) + CORZZ(Z) 매치. SNOW(4글자)·NEWS/JEWELS(S로 끝)는 미스 → 오탐 0.
+// 국장(숫자 심볼)·코인(isCoinItem)은 아래 가드로 제외.
+export const US_WARRANT_TICKER_RE = /^[A-Z]{4}[WZ]$/;
 
 // 워런트·권리·파생 통합 잡주 판별 — usItems 1차 필터 + leadingStocks.passesNoiseGate 공용 단일 지점.
 export function isNoiseInstrument(item) {
   const name = item?.name || '';
-  return DERIVATIVE_RE.test(name) || US_NONCOMMON_RE.test(name);
+  if (DERIVATIVE_RE.test(name) || US_NONCOMMON_RE.test(name)) return true;
+  // 티커 규약 — 코인 제외(코인은 id 보유 → isCoinItem true). 국장은 숫자 심볼이라 패턴 불일치.
+  if (!isCoinItem(item)) {
+    const sym = (item?.symbol || '').toUpperCase();
+    if (US_WARRANT_TICKER_RE.test(sym)) return true;
+  }
+  return false;
 }
 
 // ─── 로고 아바타 (로고 실패 시 컬러 이니셜) ──────────────────

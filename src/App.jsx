@@ -15,6 +15,8 @@ import DataHealthBadge from './components/DataHealthBadge';
 import GlobalSearch from './components/GlobalSearch';
 import { DEFAULT_KRW_RATE } from './constants/market';
 import SectorRotation from './components/SectorRotation';
+import { isPreferredOrSpecial } from './utils/symbolKey';
+import { isNoiseInstrument } from './components/home/utils';
 
 import { ETF_LIST } from './data/etfList';
 import { fetchKoreanStocksBatch, fetchEtfPricesBatch } from './api/stocks';
@@ -346,17 +348,23 @@ export default function App() {
   // 탭별 데이터
   const etfItems       = useMemo(() => mergedEtfs.map(e => ({ ...e, marketCap: e.aum })), [mergedEtfs]);
   const activeCoinData = activeTab === 'coin' ? coins : undefined;
+  // 미장 워런트/우선주 정화 — 미국 탭·SurgeBanner에 워런트(+189% 등) 노출 차단 (#360)
+  // 홈 급등/포커스는 HomeDashboard usItems에서 별도 필터되므로 여기선 탭/배너 경로만 정화.
+  const usStocksVisible = useMemo(
+    () => usStocks.filter(s => !isPreferredOrSpecial(s.symbol) && !isNoiseInstrument(s)),
+    [usStocks],
+  );
   const tabItems       = useMemo(() => {
     switch (activeTab) {
       case 'home': return [];
       case 'kr':   return krStocks;
-      case 'us':   return usStocks;
+      case 'us':   return usStocksVisible;
       case 'coin': return activeCoinData ?? [];
       case 'etf':  return etfItems;
       default:     return krStocks;
     }
-  }, [activeTab, krStocks, usStocks, activeCoinData, etfItems]);
-  const allStocks = useMemo(() => [...krStocks, ...usStocks], [krStocks, usStocks]);
+  }, [activeTab, krStocks, usStocksVisible, activeCoinData, etfItems]);
+  const allStocks = useMemo(() => [...krStocks, ...usStocksVisible], [krStocks, usStocksVisible]);
   const allData   = useMemo(() => ({ krStocks, usStocks, coins, etfs: mergedEtfs }), [krStocks, usStocks, coins, mergedEtfs]);
 
   return (
