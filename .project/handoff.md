@@ -31,10 +31,12 @@
 | Phase | 내용 | 상태 |
 |-------|------|------|
 | **1 측정 교정** | `signal_accuracy_v2` fair-hit 노이즈밴드 + (type,market,direction) 슬라이스 + 30일창제거 + last_30d_fired | ✅ **완료·머지** (#364/PR#365 `282394a`, Supabase 뷰 적용·검증) |
-| **2 사망 제거** | 27종 6-슬롯 원자 제거(공유 THRESHOLDS·KEEP3·taCalculator 보존, IIFE/test 가드) | ⬜ 다음 |
-| **0/3 인프라 재건** | ⚠️핵심·최대공수 — 서버(CF Workers/Vercel 크론) double_bottom·SRB 발화 + Supabase 직접 기록(현재 loadSignals가 _recordForAccuracy 스킵, TODO #215). 이게 있어야 LIVE 성적표 성립 | ⬜ |
-| **4 캐릭터 레이어** | 시장조건부 라우팅(흐름타기/거꾸로/바닥다지기/벽뚫기/교차레이더), 발화 무변경 파생집계 | ⬜ |
-| **5 성적표 재설계** | 5캐릭터 카드 + 정직성 가드. UI라 **텍스트 시안 선확인** 필수 | ⬜ |
+| **2 사망 제거** | 26종 6-슬롯 원자 제거(−2474줄, KEEP4+공유 THRESHOLDS·taCalculator 보존). composite는 라이브 브릿지로 보류 | ✅ **완료·머지** (#366/PR#367 `a4c37b8`, test 246·build 0·architect/review/gemini 3게이트 PASS, SIGNAL_TYPES 30→4) |
+| **5 성적표 시안** | 4캐릭터(🌊흐름타기 라이브64% / ⛏️바닥다지기·🧱벽뚫기 부활예정66~94% / 🎯종합 측정중) 텍스트 시안 | 🟡 **대표 확인 대기** (디스코드 공유 2026-06-08). 확인 후 UI 구현 |
+| **4 캐릭터 레이어** | signalCharacters.js + api/signal-accuracy v2 슬라이스 노출 + useSignalCharacters 파생집계(발화 무변경). 시장조건부 라우팅 | ⬜ 다음 (non-UI, 시안 무관 착수 가능) |
+| **0/3 인프라 재건** | ⚠️핵심·최대공수(수주) — 서버 double_bottom·SRB 발화 + Supabase 직접 기록(loadSignals _recordForAccuracy 스킵 TODO #215, CF Workers 50 subrequest 한도). LIVE 패턴 성적표 전제 | ⬜ |
+
+**캐릭터 확정(v2 실측 근거)**: 🌊흐름타기=volume_anomaly kr-bullish 1h **64%(n997, 라이브)** / ⛏️바닥다지기=double_bottom 24h us66%·kr94%(사망·부활) / 🧱벽뚫기=SRB 24h us64%·kr74%(사망·부활) / 🎯종합=composite(라이브·미측정). us volume 1h는 표본부족(n13)이라 비노출. fader(국장 하락 fade 56%)는 모뎀이라 보류.
 
 **제거맵·측정스펙·캐릭터설계·critique 전문**: 워크플로우 산출 `/private/tmp/.../tasks/wfsm3bfxg.output` 또는 설계문서 참조.
 **critique must_fix(반영)**: ①패턴 사망=인프라재건 ②서버시그널 미기록 ③뷰 슬라이스(Phase1 흡수) ④역전수학 비엄밀(재측정 완료, fade는 56% 모뎀).
