@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
-import { SIGNAL_TYPES, isMarketIndicatorSignal } from '../../engine/signalTypes';
+import { isMarketIndicatorSignal } from '../../engine/signalTypes';
 import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
 import { buildNarrative } from '../../utils/narrativeBuilder';
 import { matchesKeywords, buildStockKeywords } from '../../utils/newsAlias';
@@ -13,13 +13,6 @@ import { useWatchlist } from '../../hooks/useWatchlist';
 import TickerLogo from './TickerLogo';
 import SignalScorecardTab from './SignalScorecardTab';
 import SignalInlinePanel from './SignalInlinePanel';
-
-const FORCE_TYPES = [
-  SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY,
-  SIGNAL_TYPES.FOREIGN_CONSECUTIVE_SELL,
-  SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_BUY,
-  SIGNAL_TYPES.INSTITUTIONAL_CONSECUTIVE_SELL,
-];
 
 export default function SignalBoardWidget({ onItemClick, allItems = [], allNews = [], scorecardTrigger = 0 }) {
   // 탭 상태: 'live' | 'scorecard'
@@ -124,12 +117,6 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
       bullCount: bull.length, bearCount: bear.length, neutralCount: neutral.length,
     };
   }, [allSignals]);
-
-  // 세력 포착 시그널 (강도 3 이상)
-  const forceSignals = useMemo(
-    () => allSignals.filter(s => FORCE_TYPES.includes(s.type) && s.strength >= 3),
-    [allSignals],
-  );
 
   // 적중률 높은 시그널 — totalFired >= 30 && accuracy >= 60인 현재 발화 시그널, 최대 2건
   const highAccuracySignals = useMemo(() => {
@@ -303,40 +290,6 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                     >
                       {acc}%↑
                     </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* 세력 포착 (있을 때만) */}
-        {forceSignals.length > 0 && (
-          <div className="mb-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[11px] font-bold text-[#191F28]">세력 포착</span>
-              <span className="text-[10px] text-[#B0B8C1]">외국인·기관 연속 매수매도</span>
-            </div>
-            <div className="space-y-1.5">
-              {forceSignals.slice(0, 3).map(sig => {
-                const isBull = sig.direction === 'bullish';
-                const typeLabel = sig.type.includes('foreign') ? '외국인' : '기관';
-                const dirLabel = isBull ? '연속 매수' : '연속 매도';
-                return (
-                  <button
-                    key={sig.symbol + sig.type + (sig.timestamp || '')}
-                    onClick={() => handleClick(sig)}
-                    className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-left"
-                    style={{ background: isBull ? '#F0FFF6' : '#FFF0F1' }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold" style={{ color: isBull ? '#2AC769' : '#F04452' }}>
-                        {typeLabel}
-                      </span>
-                      <span className="text-[12px] font-bold text-[#191F28]">{sig.name}</span>
-                      <span className="text-[11px] text-[#8B95A1]">{dirLabel} {sig.meta?.consecutiveDays || sig.strength}일+</span>
-                    </div>
-                    <span className="text-[10px] text-[#B0B8C1]">차트 →</span>
                   </button>
                 );
               })}

@@ -1,6 +1,8 @@
 // #343 — 시그널 도메인(kind) 분리 회귀 테스트
 // 모든 시그널 타입이 'stock'|'market'으로 분류되고, createSignal/loadSignals가
 // type 기준으로 kind를 자동 주입하며, isMarketIndicatorSignal이 kind를 우선 사용하는지 검증.
+// #366: 죽은 시그널 26종 제거로 잔존 타입은 4종(volume_anomaly/composite_score/
+//       support_resistance_break/double_bottom) — 전부 stock kind, market kind 0종.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SIGNAL_TYPES,
@@ -14,8 +16,8 @@ import { createSignal, loadSignals, getActiveSignals, _resetStore } from '../eng
 describe('SIGNAL_KIND 완전성 (#343)', () => {
   it('모든 SIGNAL_TYPES가 stock|market으로 분류됨 (누락 0)', () => {
     const types = Object.values(SIGNAL_TYPES);
-    // 현 시점 30종(stock 22 + market 8) — 신규 타입 추가 시 IIFE가 로드 단계에서 throw
-    expect(types.length).toBe(30);
+    // #366: 잔존 4종(stock 4 + market 0) — 신규 타입 추가 시 IIFE가 로드 단계에서 throw
+    expect(types.length).toBe(4);
     const missing = types.filter(type => !['stock', 'market'].includes(SIGNAL_KIND[type]));
     expect(missing).toEqual([]);
   });
@@ -30,16 +32,9 @@ describe('SIGNAL_KIND 완전성 (#343)', () => {
 describe('getSignalKind (#343)', () => {
   it('종목 타입은 stock', () => {
     expect(getSignalKind(SIGNAL_TYPES.VOLUME_ANOMALY)).toBe('stock');
-    expect(getSignalKind(SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY)).toBe('stock');
     expect(getSignalKind(SIGNAL_TYPES.COMPOSITE_SCORE)).toBe('stock');
-    expect(getSignalKind(SIGNAL_TYPES.SECTOR_OUTLIER)).toBe('stock');
-  });
-
-  it('시장 지표 타입은 market', () => {
-    expect(getSignalKind(SIGNAL_TYPES.FEAR_GREED_SHIFT)).toBe('market');
-    expect(getSignalKind(SIGNAL_TYPES.SECTOR_ROTATION)).toBe('market');
-    expect(getSignalKind(SIGNAL_TYPES.REBALANCING_ALERT)).toBe('market');
-    expect(getSignalKind(SIGNAL_TYPES.FX_IMPACT)).toBe('market');
+    expect(getSignalKind(SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK)).toBe('stock');
+    expect(getSignalKind(SIGNAL_TYPES.DOUBLE_BOTTOM)).toBe('stock');
   });
 
   it('미등록 타입은 stock 기본', () => {
@@ -49,30 +44,14 @@ describe('getSignalKind (#343)', () => {
 });
 
 describe('createSignal kind 자동 주입 (#343)', () => {
-  it('FEAR_GREED_SHIFT → kind:market 자동 주입', () => {
-    const sig = createSignal({ type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'crypto', market: 'crypto' });
-    expect(sig.kind).toBe('market');
-  });
-
   it('VOLUME_ANOMALY → kind:stock 자동 주입', () => {
     const sig = createSignal({ type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'AAPL', market: 'us' });
     expect(sig.kind).toBe('stock');
   });
-});
 
-describe('useFearGreed 간접 — FEAR_GREED_SHIFT createSignal kind (#343)', () => {
-  // useFearGreed.js는 createSignal({ type: FEAR_GREED_SHIFT, ... })로 시그널 생성 → A안 자동 주입
-  it('공포탐욕 시그널은 createSignal 경유 시 kind:market', () => {
-    const fg = createSignal({
-      type: SIGNAL_TYPES.FEAR_GREED_SHIFT,
-      symbol: 'us',
-      name: 'us 공포탐욕',
-      market: 'us',
-      direction: 'bullish',
-      strength: 5,
-    });
-    expect(fg.kind).toBe('market');
-    expect(isMarketIndicatorSignal(fg)).toBe(true);
+  it('COMPOSITE_SCORE → kind:stock 자동 주입', () => {
+    const sig = createSignal({ type: SIGNAL_TYPES.COMPOSITE_SCORE, symbol: '005930', market: 'kr' });
+    expect(sig.kind).toBe('stock');
   });
 });
 
@@ -102,31 +81,19 @@ describe('isMarketIndicatorSignal kind 우선 + 레거시 fallback (#343)', () =
     expect(isMarketIndicatorSignal({ kind: 'market', type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'AAPL' })).toBe(true);
   });
 
-  it('kind:stock이면 type 무관하게 false (FEAR_GREED_SHIFT여도)', () => {
-    expect(isMarketIndicatorSignal({ kind: 'stock', type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'crypto' })).toBe(false);
+  it('kind:stock이면 type 무관하게 false', () => {
+    expect(isMarketIndicatorSignal({ kind: 'stock', type: SIGNAL_TYPES.COMPOSITE_SCORE, symbol: 'crypto' })).toBe(false);
   });
 
-  it('kind 없으면 type 기반 레거시 fallback', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FEAR_GREED_SHIFT })).toBe(true);
+  it('kind 없고 잔존 타입은 전부 stock → false', () => {
     expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.VOLUME_ANOMALY })).toBe(false);
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.DOUBLE_BOTTOM })).toBe(false);
   });
 });
 
-describe('MARKET_INDICATOR_TYPES 파생 일치 (#343)', () => {
-  it('기존 8종 market 타입 전부 포함', () => {
-    const expected = [
-      SIGNAL_TYPES.FEAR_GREED_SHIFT,
-      SIGNAL_TYPES.MARKET_MOOD_SHIFT,
-      SIGNAL_TYPES.SECTOR_ROTATION,
-      SIGNAL_TYPES.PUT_CALL_RATIO,
-      SIGNAL_TYPES.FUNDING_RATE_EXTREME,
-      SIGNAL_TYPES.FX_IMPACT,
-      SIGNAL_TYPES.CROSS_MARKET_CORRELATION,
-      SIGNAL_TYPES.REBALANCING_ALERT,
-    ];
-    expect(MARKET_INDICATOR_TYPES.size).toBe(8);
-    for (const type of expected) {
-      expect(MARKET_INDICATOR_TYPES.has(type)).toBe(true);
-    }
+describe('MARKET_INDICATOR_TYPES 파생 일치 (#343, #366)', () => {
+  it('잔존 4종은 전부 stock → market 타입 0종', () => {
+    // #366: 죽은 시그널 제거로 market kind 타입이 모두 사라짐.
+    expect(MARKET_INDICATOR_TYPES.size).toBe(0);
   });
 });

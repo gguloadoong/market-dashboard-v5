@@ -12,7 +12,6 @@ const SIGNAL_TYPES = {
   COMPOSITE_SCORE: 'composite_score',
   SUPPORT_RESISTANCE_BREAK: 'support_resistance_break',
   DOUBLE_BOTTOM: 'double_bottom',
-  RECOVERY_DETECTION: 'recovery_detection',
 };
 
 const DIRECTIONS = {
@@ -25,7 +24,6 @@ const SIGNAL_TTL = {
   [SIGNAL_TYPES.COMPOSITE_SCORE]: 15 * 60000,
   [SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK]: 4 * 3600000,
   [SIGNAL_TYPES.DOUBLE_BOTTOM]: 8 * 3600000,
-  [SIGNAL_TYPES.RECOVERY_DETECTION]: 6 * 3600000,
 };
 
 // ─── 종목 목록 (확장) ──────────────────────────────────────
@@ -345,48 +343,6 @@ function detectDoubleBottom(candles, priceTolerance = 3, necklineMinPct = 5) {
   return null;
 }
 
-function bbForRecovery(closes, period = 20) {
-  if (closes.length < period) return null;
-  const slice = closes.slice(-period);
-  const mid = slice.reduce((a, b) => a + b, 0) / period;
-  const std = Math.sqrt(slice.reduce((a, b) => a + (b - mid) ** 2, 0) / period);
-  return { upper: mid + 2 * std, lower: mid - 2 * std };
-}
-
-function detectRecovery(closes, volumes, drawdownDays = 5) {
-  if (!closes || closes.length < 25 || !volumes || volumes.length < 25) return null;
-
-  const current = closes[closes.length - 1];
-  const pastIdx = Math.max(0, closes.length - 1 - drawdownDays);
-  const peak = Math.max(...closes.slice(pastIdx, closes.length - 1));
-  const drawdown = ((current - peak) / peak) * 100;
-  if (drawdown > -10) return null;
-
-  const recentBB = bbForRecovery(closes);
-  const prevCloses = closes.slice(0, -5);
-  const prevBB = bbForRecovery(prevCloses);
-  if (!recentBB || !prevBB) return null;
-
-  const recentBW = recentBB.upper - recentBB.lower;
-  const prevBW = prevBB.upper - prevBB.lower;
-  const bbShrink = prevBW > 0 ? recentBW / prevBW : 1;
-
-  const recentVol = volumes.slice(-3).reduce((a, b) => a + b, 0) / 3;
-  const avgVol = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
-  const volRatio = avgVol > 0 ? recentVol / avgVol : 0;
-  const volNormalized = volRatio <= 1.5;
-
-  if (bbShrink <= 0.7 && volNormalized) {
-    return {
-      drawdown: +drawdown.toFixed(1),
-      bbShrink: +bbShrink.toFixed(2),
-      volRatio: +volRatio.toFixed(2),
-      volNormalized,
-    };
-  }
-  return null;
-}
-
 // ─── 복합 점수 계산 (compositeScorer.js 와 동기화 필수) ──
 const WEIGHT = { ta: 0.40, flow: 0.35, sentiment: 0.25 };
 
@@ -539,33 +495,6 @@ function buildDBSignal(target, db, currentPrice) {
       bottom2: db.bottom2,
       neckline: db.neckline,
       broken: db.broken,
-      currentPrice,
-    },
-  };
-}
-
-function buildRecoverySignal(target, rec, currentPrice) {
-  if (!rec) return null;
-  const now = Date.now();
-  const market = target.market;
-  const strength = Math.abs(rec.drawdown) >= 15 ? 4 : 3;
-  const title = `${target.name} ${Math.abs(rec.drawdown).toFixed(1)}% 급락 후 안정화 — BB 축소 ${(rec.bbShrink * 100).toFixed(0)}%`;
-  return {
-    id: generateId(SIGNAL_TYPES.RECOVERY_DETECTION, target.symbol),
-    type: SIGNAL_TYPES.RECOVERY_DETECTION,
-    symbol: target.symbol,
-    name: target.name,
-    market,
-    direction: DIRECTIONS.BULLISH,
-    strength,
-    title,
-    timestamp: now,
-    expiresAt: now + SIGNAL_TTL[SIGNAL_TYPES.RECOVERY_DETECTION],
-    meta: {
-      name: target.name,
-      drawdown: rec.drawdown,
-      bbShrink: rec.bbShrink,
-      volRatio: rec.volRatio,
       currentPrice,
     },
   };
@@ -829,7 +758,6 @@ export default async function handler(req, res) {
 
         // 패턴 감지
         const srCandles = candles.filter(c => c.close != null);
-        const recCandles = candles.filter(c => c.close != null && c.volume != null);
 
         if (srCandles.length >= 10) {
           const sr = findSupportResistance(srCandles);
@@ -840,13 +768,6 @@ export default async function handler(req, res) {
           const db = detectDoubleBottom(srCandles);
           const dbSig = buildDBSignal(target, db, currentPrice);
           if (dbSig) signals.push(dbSig);
-        }
-        if (recCandles.length >= 25) {
-          const recCloses = recCandles.map(c => c.close);
-          const recVols = recCandles.map(c => c.volume);
-          const rec = detectRecovery(recCloses, recVols);
-          const recSig = buildRecoverySignal(target, rec, currentPrice);
-          if (recSig) signals.push(recSig);
         }
       } catch (e) {
         failed.push(target.symbol);

@@ -108,9 +108,9 @@ export default function HomeDashboard({
   const usDrop  = useMemo(() => [...usItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [usItems]);
   const coinDrop= useMemo(() => [...coinItems].sort((a, b) => getPct(a) - getPct(b)).slice(0, 5), [coinItems]);
 
-  // 투자자 시그널 스캔 (15분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
-  // krwRate 주입 — fx_impact 시그널 발화용 (#113)
-  useInvestorSignals(stockItems, krwRate, krwRateLoaded);
+  // 거래량 이상치 시그널 스캔 (15분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
+  // (#366: fx_impact 등 죽은 시그널 제거 — krwRate 주입 불필요)
+  useInvestorSignals(stockItems);
 
   // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
   const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);

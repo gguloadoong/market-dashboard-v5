@@ -26,14 +26,14 @@ describe('resolveStockItem (#343)', () => {
   });
 
   it('코인 id 매칭 반환 — crypto→coin 정규화로 1차 정확매칭', () => {
-    const sig = { type: SIGNAL_TYPES.BTC_LEADING, symbol: 'BTC', market: 'crypto' };
+    const sig = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'BTC', market: 'crypto' };
     // crypto→coin 정규화 후 1차 매칭: (i._market||'').toLowerCase()==='coin' 통과
     expect(resolveStockItem(sig, ALL_ITEMS)?.id).toBe('BTC');
   });
 
   it('crypto 정규화 — 동일 ticker 코인/주식 둘 다 존재 시 _market:COIN 종목을 정확히 집음 (#343)', () => {
     // market:'crypto' 시그널 → 정규화 없으면 배열 앞 US주식 APE를 잘못 집음
-    const sig = { type: SIGNAL_TYPES.BTC_LEADING, symbol: 'APE', market: 'crypto' };
+    const sig = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'APE', market: 'crypto' };
     const found = resolveStockItem(sig, APE_ITEMS);
     expect(found?._market).toBe('COIN');  // 코인을 정확히 집어야 함
     expect(found?.id).toBe('APE');
@@ -51,11 +51,12 @@ describe('resolveStockItem (#343)', () => {
 });
 
 describe('isStockClickable (#343)', () => {
-  it('market 시그널은 allItems 무관하게 false', () => {
-    const fg = { type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'crypto', market: 'crypto', kind: 'market' };
-    expect(isStockClickable(fg, ALL_ITEMS)).toBe(false);
-    expect(isStockClickable(fg, [])).toBe(false);
-    expect(isStockClickable(fg)).toBe(false);
+  it('market 시그널(kind:market)은 allItems 무관하게 false', () => {
+    // #366: market-kind 타입이 모두 제거됨 — kind 필드로 합성 검증
+    const mkt = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'MARKET', market: 'kr', kind: 'market' };
+    expect(isStockClickable(mkt, ALL_ITEMS)).toBe(false);
+    expect(isStockClickable(mkt, [])).toBe(false);
+    expect(isStockClickable(mkt)).toBe(false);
   });
 
   it('stock + 종목 존재 → true', () => {
@@ -74,14 +75,14 @@ describe('isStockClickable (#343)', () => {
   });
 
   it('symbol 없으면 false', () => {
-    expect(isStockClickable({ type: SIGNAL_TYPES.MARKET_MOOD_SHIFT })).toBe(false);
+    expect(isStockClickable({ type: SIGNAL_TYPES.VOLUME_ANOMALY })).toBe(false);
   });
 });
 
 describe('shouldRenderStockCard (#343)', () => {
-  it('market 시그널은 false', () => {
-    const fg = { type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'crypto', market: 'crypto', kind: 'market' };
-    expect(shouldRenderStockCard(fg, ALL_ITEMS)).toBe(false);
+  it('market 시그널(kind:market)은 false', () => {
+    const mkt = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'MARKET', market: 'kr', kind: 'market' };
+    expect(shouldRenderStockCard(mkt, ALL_ITEMS)).toBe(false);
   });
 
   it('stock + 종목 없음 → false', () => {

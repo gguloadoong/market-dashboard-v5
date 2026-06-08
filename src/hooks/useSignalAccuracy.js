@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BOT_CATEGORIES } from '../constants/signalBotCategories';
 
 // 제거된 레거시 시그널 타입 — Supabase 과거 레코드 차단 (#162 whale 제거 후속)
-// 향후 Supabase 뷰 마이그레이션으로 whale_* 레코드 정리 완료 시 이 Set 제거
+// 향후 Supabase 뷰 마이그레이션으로 레거시 레코드 정리 완료 시 이 Set 제거
 const LEGACY_SIGNAL_TYPES = new Set([
   // 제거된 whale 시그널 (#162)
   'whale_exchange_inflow',
@@ -12,6 +12,17 @@ const LEGACY_SIGNAL_TYPES = new Set([
   'whale_large_single',
   // trading-signal-bot 모델 타입 — v5 공용 signal_history 분리 전(~2026-04-17) 레코드
   'DNA', 'QUANT', 'SENSE', 'WALL_ST', 'SHARK', 'CONSENSUS',
+  // 제거된 죽은 시그널 26종 (#366, signal-overhaul-2026-06-08) — 과거 레코드 영문 라벨 노출 차단
+  'vwap_deviation', 'news_sentiment_cluster',
+  'foreign_consecutive_buy', 'foreign_consecutive_sell',
+  'institutional_consecutive_buy', 'institutional_consecutive_sell',
+  'smart_money_flow', 'social_sentiment', 'order_flow_imbalance',
+  'put_call_ratio', 'sentiment_divergence', 'volume_price_divergence',
+  'sector_outlier', 'stealth_activity', 'momentum_divergence',
+  'market_mood_shift', 'fear_greed_shift', 'sector_rotation',
+  'funding_rate_extreme', 'cross_market_correlation', 'gap_analysis',
+  'rebalancing_alert', 'fx_impact', 'btc_leading',
+  'capitulation', 'recovery_detection',
 ]);
 
 // BOT_CATEGORIES에서 전체 봇 타입 동적 추출 — 단일 소스 (중복 정의 제거)
