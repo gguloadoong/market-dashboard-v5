@@ -5,36 +5,10 @@ import { BOT_CATEGORIES } from '../../constants/signalBotCategories';
 
 // ── 봇 한국어 이름 매핑 (사용자 친화 명칭) ──
 const SIGNAL_BOT_NAMES = {
-  foreign_consecutive_buy:       '외국인 연속 매수',
-  foreign_consecutive_sell:      '외국인 연속 매도',
-  institutional_consecutive_buy: '기관 연속 매수',
-  institutional_consecutive_sell:'기관 연속 매도',
   volume_anomaly:                '거래량 폭발',
-  fear_greed_shift:              '공포·탐욕 전환',
-  news_sentiment_cluster:        '뉴스 집중 포착',
-  sector_rotation:               '주도 섹터 교체',
-  put_call_ratio:                '옵션 경보',
-  funding_rate_extreme:          '코인 레버리지 과열',
-  order_flow_imbalance:          '매수·매도 불균형',
-  vwap_deviation:                'VWAP 이탈',
-  social_sentiment:              '소셜 반응',
-  cross_market_correlation:      '연동 자산 괴리',
-  sentiment_divergence:          '뉴스·가격 불일치',
-  smart_money_flow:              '스마트머니 감지',
-  momentum_divergence:           '추세 전환',
-  volume_price_divergence:       '거래량·가격 괴리',
-  market_mood_shift:             '시장 분위기 전환',
   composite_score:               '종합 매수·매도 신호',
-  gap_analysis:                  '갭 출발',
-  rebalancing_alert:             '리밸런싱 경보',
-  fx_impact:                     '환율 충격',
-  capitulation:                  '투매 감지',
-  stealth_activity:              '뉴스 없는 거래 폭발',
-  btc_leading:                   'BTC 선행 신호',
   support_resistance_break:      '지지·저항 돌파',
   double_bottom:                 '이중바닥 패턴',
-  recovery_detection:            '반등 감지',
-  sector_outlier:                '섹터 이탈 종목',
 };
 
 // ── 카테고리 분류 (src/constants/signalBotCategories.js 단일 소스) ──

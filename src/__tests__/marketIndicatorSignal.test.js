@@ -1,6 +1,7 @@
-// #341 — 시장 지표 시그널(공포탐욕 등) 가짜 종목 카드 차단 회귀 테스트
-// 시그널 풀에 종목이 아닌 시장 지표 시그널(symbol='crypto', type='fear_greed_shift')이
-// 들어가도 종목 카드 클릭 가드(isMarketIndicatorSignal)가 차단하는지 검증.
+// #341 — 시장 지표 시그널 가짜 종목 카드 차단 회귀 테스트
+// #366: 죽은 시그널 26종 제거로 모든 market-kind 시그널 타입이 사라짐(잔존 4종 전부 stock).
+//   따라서 타입 기반 market 식별 케이스는 합성 kind 객체(kind:'market')로 대체하고,
+//   잔존 KEEP 타입은 stock으로 클릭 가능함을 검증한다.
 import { describe, it, expect } from 'vitest';
 import {
   SIGNAL_TYPES,
@@ -9,42 +10,20 @@ import {
 } from '../engine/signalTypes.js';
 import { isStockClickable, shouldRenderStockCard } from '../utils/signalStockResolver.js';
 
-describe('isMarketIndicatorSignal (#341)', () => {
-  it('FEAR_GREED_SHIFT 타입은 시장 지표로 식별', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'crypto' })).toBe(true);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'us' })).toBe(true);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FEAR_GREED_SHIFT, symbol: 'kr' })).toBe(true);
-  });
-
-  it('종목 시그널(VOLUME_ANOMALY, FOREIGN_CONSECUTIVE_BUY 등)은 시장 지표 아님', () => {
+describe('isMarketIndicatorSignal (#341, #366)', () => {
+  it('잔존 KEEP 타입(VOLUME_ANOMALY/COMPOSITE_SCORE/SRB/DOUBLE_BOTTOM)은 시장 지표 아님', () => {
     expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'AAPL' })).toBe(false);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FOREIGN_CONSECUTIVE_BUY, symbol: '005930' })).toBe(false);
     expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.COMPOSITE_SCORE, symbol: 'BTC' })).toBe(false);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.CAPITULATION, symbol: 'TSLA' })).toBe(false);
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK, symbol: '005930' })).toBe(false);
+    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.DOUBLE_BOTTOM, symbol: 'TSLA' })).toBe(false);
   });
 
-  // #346 — REBALANCING_ALERT 시장지표 가드 추가
-  it('REBALANCING_ALERT 타입은 시장 지표로 식별 (symbol="MARKET")', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.REBALANCING_ALERT, symbol: 'MARKET' })).toBe(true);
+  it('kind:market 합성 객체는 type 무관하게 시장 지표로 식별', () => {
+    expect(isMarketIndicatorSignal({ kind: 'market', type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'MARKET' })).toBe(true);
   });
 
-  it('MARKET_INDICATOR_TYPES Set에 rebalancing_alert 포함 (#346)', () => {
-    expect(MARKET_INDICATOR_TYPES.has('rebalancing_alert')).toBe(true);
-  });
-
-  // #346 — FX_IMPACT, PCR, MARKET_MOOD_SHIFT, CROSS_MARKET_CORRELATION도 회귀 가드
-  it('FX_IMPACT 타입은 시장 지표 (symbol="USDKRW") (#346)', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.FX_IMPACT, symbol: 'USDKRW' })).toBe(true);
-  });
-
-  it('PUT_CALL_RATIO 타입은 시장 지표 (symbol="SPY") (#346)', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.PUT_CALL_RATIO, symbol: 'SPY' })).toBe(true);
-  });
-
-  it('MARKET_MOOD_SHIFT/CROSS_MARKET_CORRELATION/SECTOR_ROTATION 모두 시장 지표 (#346)', () => {
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.MARKET_MOOD_SHIFT, symbol: 'MARKET' })).toBe(true);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.CROSS_MARKET_CORRELATION, symbol: 'BTC_KOSPI' })).toBe(true);
-    expect(isMarketIndicatorSignal({ type: SIGNAL_TYPES.SECTOR_ROTATION, symbol: null })).toBe(true);
+  it('MARKET_INDICATOR_TYPES Set은 비어 있음 (#366 — market 타입 0종)', () => {
+    expect(MARKET_INDICATOR_TYPES.size).toBe(0);
   });
 
   it('null/undefined/타입 누락 시 false 반환 (안전)', () => {
@@ -53,31 +32,25 @@ describe('isMarketIndicatorSignal (#341)', () => {
     expect(isMarketIndicatorSignal({})).toBe(false);
     expect(isMarketIndicatorSignal({ symbol: 'crypto' })).toBe(false);
   });
-
-  it('MARKET_INDICATOR_TYPES Set에 fear_greed_shift 포함', () => {
-    expect(MARKET_INDICATOR_TYPES.has('fear_greed_shift')).toBe(true);
-  });
 });
 
 describe('시그널 클릭 가드 시뮬레이션 (#341)', () => {
-  // 종목 카드 렌더 컴포넌트(SignalBoardWidget/SignalSummaryWidget/CommandCenterWidget HeroSignalCard)의
-  // 클릭 가능 여부 판정 로직 — `signal.symbol && !isMarketIndicatorSignal(signal)`
+  // 종목 카드 렌더 컴포넌트의 클릭 가능 여부 판정 — `signal.symbol && !isMarketIndicatorSignal(signal)`
   function isClickableAsStock(signal) {
     return !!signal?.symbol && !isMarketIndicatorSignal(signal);
   }
 
-  it('공포탐욕 시그널은 종목 클릭 불가 (symbol="crypto"여도 차단)', () => {
-    const fearGreedSignal = {
-      id: 'sig_test_fg',
-      type: SIGNAL_TYPES.FEAR_GREED_SHIFT,
-      symbol: 'crypto',
-      name: 'crypto 공포탐욕',
-      market: 'crypto',
+  it('kind:market 합성 시그널은 종목 클릭 불가 (symbol 있어도 차단)', () => {
+    const marketSignal = {
+      id: 'sig_test_mkt',
+      kind: 'market',
+      type: SIGNAL_TYPES.VOLUME_ANOMALY,
+      symbol: 'MARKET',
+      name: '시장 지표',
       direction: 'bullish',
       strength: 5,
-      title: 'crypto 극단적 공포 극단값 (23) — 역발상 기회',
     };
-    expect(isClickableAsStock(fearGreedSignal)).toBe(false);
+    expect(isClickableAsStock(marketSignal)).toBe(false);
   });
 
   it('실제 종목 시그널은 클릭 가능', () => {
@@ -95,76 +68,28 @@ describe('시그널 클릭 가드 시뮬레이션 (#341)', () => {
 
   it('symbol 없는 시그널은 클릭 불가 (기존 동작 유지)', () => {
     const noSymbolSignal = {
-      id: 'sig_test_mood',
-      type: SIGNAL_TYPES.MARKET_MOOD_SHIFT,
+      id: 'sig_test_nosym',
+      type: SIGNAL_TYPES.VOLUME_ANOMALY,
       direction: 'neutral',
       strength: 2,
     };
     expect(isClickableAsStock(noSymbolSignal)).toBe(false);
   });
-
-  // #346 — REBALANCING_ALERT는 createRebalancingSignal에서 symbol:'MARKET'으로 생성됨.
-  // signalEngine.js:715-723. 종목 카드 클릭 시 'MARKET' 가짜 종목 카드 → 빈 차트 사고.
-  it('REBALANCING_ALERT(symbol="MARKET")는 종목 클릭 불가 (#346)', () => {
-    const rebalancingSignal = {
-      id: 'sig_test_rebal',
-      type: SIGNAL_TYPES.REBALANCING_ALERT,
-      symbol: 'MARKET',
-      name: '기관 리밸런싱',
-      market: 'kr',
-      direction: 'bearish',
-      strength: 3,
-      title: '월말 D-2 — 기관 리밸런싱 매물 출회 가능',
-    };
-    expect(isClickableAsStock(rebalancingSignal)).toBe(false);
-  });
-
-  // #346 — UnifiedFeedPanel 시그널 항목 가드 (이전 누락분 회귀)
-  it('FX_IMPACT(symbol="USDKRW")는 종목 클릭 불가 — UnifiedFeedPanel 패턴 (#346)', () => {
-    const fxSignal = {
-      id: 'sig_test_fx',
-      type: SIGNAL_TYPES.FX_IMPACT,
-      symbol: 'USDKRW',
-      name: '원/달러 환율',
-      market: 'kr',
-    };
-    expect(isClickableAsStock(fxSignal)).toBe(false);
-    // #343 — 공통 유틸 isStockClickable(lookup 미제공)도 동일 차단 (UnifiedFeedPanel 실제 사용 형태)
-    expect(isStockClickable(fxSignal)).toBe(false);
-  });
 });
 
-// #345 — FUNDING_RATE_EXTREME 클릭 예외: 시장 지표지만 코인 종목(BTC)으로 라우팅 가능.
-// signalTypes.js의 kind는 'market' 유지(가짜 종목 카드 방지) — isStockClickable만 화이트셋 예외.
-describe('FUNDING_RATE_EXTREME 클릭 예외 (#345)', () => {
-  const fundingSignal = {
-    id: 'sig_test_funding',
-    type: SIGNAL_TYPES.FUNDING_RATE_EXTREME,
-    symbol: 'BTC',
-    name: 'BTC 펀딩비',
-    market: 'crypto',
-    direction: 'bearish',
-    strength: 4,
-  };
-
-  it('실제 BTC 종목이 풀에 있으면 클릭 가능 (crypto→coin 정규화)', () => {
-    expect(isStockClickable(fundingSignal, [{ symbol: 'BTC', _market: 'COIN' }])).toBe(true);
+describe('signalStockResolver 가드 — 잔존 KEEP 타입 (#343, #366)', () => {
+  it('VOLUME_ANOMALY는 종목 풀에 있으면 클릭 가능', () => {
+    const sig = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'BTC', market: 'crypto' };
+    expect(isStockClickable(sig, [{ symbol: 'BTC', _market: 'COIN' }])).toBe(true);
   });
 
-  it('종목 풀이 비어 있으면 클릭 불가 (lookup 실패)', () => {
-    expect(isStockClickable(fundingSignal, [])).toBe(false);
+  it('VOLUME_ANOMALY는 종목 풀 비면 클릭 불가 (lookup 실패)', () => {
+    const sig = { type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'BTC', market: 'crypto' };
+    expect(isStockClickable(sig, [])).toBe(false);
   });
 
-  it('lookup 미제공(allItems 없음)이면 보수적 차단', () => {
-    expect(isStockClickable(fundingSignal)).toBe(false);
-  });
-
-  it('펀딩비는 종목 카드 렌더는 여전히 차단 (클릭만 허용, 카드 X)', () => {
-    expect(shouldRenderStockCard(fundingSignal, [{ symbol: 'BTC', _market: 'COIN' }])).toBe(false);
-  });
-
-  it('FX_IMPACT는 화이트셋 아님 — 종목 풀 있어도 클릭 불가 (불변)', () => {
-    const fxSignal = { type: SIGNAL_TYPES.FX_IMPACT, symbol: 'USDKRW', market: 'kr' };
-    expect(isStockClickable(fxSignal, [{ symbol: 'USDKRW', _market: 'KR' }])).toBe(false);
+  it('kind:market 합성 시그널은 종목 풀 있어도 카드 렌더 차단', () => {
+    const sig = { kind: 'market', type: SIGNAL_TYPES.VOLUME_ANOMALY, symbol: 'MARKET', market: 'kr' };
+    expect(shouldRenderStockCard(sig, [{ symbol: 'MARKET', _market: 'KR' }])).toBe(false);
   });
 });
