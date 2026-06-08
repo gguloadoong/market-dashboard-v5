@@ -357,4 +357,69 @@ const dataMode = TABLE[phase] ?? 'lastClose';
 
 ---
 
-*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-05-27)*
+### 19. 카테고리별 분모 비대칭 — 단일 지표가 비교 가능성을 위장 (Asymmetric Denominator Behind a Uniform Metric)
+
+**우리 사례** (2026-06-08 코드 리뷰, #364 `signal_accuracy_v2` fair-hit 뷰): `fair_hit` CASE에서 `direction='neutral'`은 stale(무변동 동결 스냅샷)을 제외하지 않고 곧장 **적중(true)**으로 집계한다. 반면 directional 시그널은 stale를 NULL로 빼서 분모(`eval`)에서 제외한다. 결과적으로 같은 뷰의 **같은 컬럼**(`fair_acc_1h`)인데 분모 의미가 방향별로 다르다 — neutral 승률은 *stale 포함 상한치*, directional 승률은 *stale 제외 실측치*. 주석에 "런칭 근거엔 방향성만 사용"이라 적혀 있으나 **뷰 스키마는 이를 강제하지 못한다.** Phase 5 성적표/API/훅이 neutral fair_acc를 directional과 같은 줄에 나란히 표시·정렬하면 즉시 오인된다.
+
+**근본 원인**: AI는 각 분기(neutral, bullish, bearish)를 *그 분기 자체의 정의 안에서는* 정확하게 계산한다(neutral의 "맞음"=무변동, directional의 "맞음"=밴드 돌파). 그러나 이 분기들이 *하나의 컬럼·하나의 라벨로 합쳐져 나란히 비교될 때* 분모/모집단이 달라 사과-오렌지 비교가 된다는 점 — 즉 "지표 간 비교 가능성"이라는 계약 — 을 모델링하지 않는다. 비교 금지 규칙을 스키마/타입/코드가 아니라 **산문 주석에만** 의존한다.
+
+**왜 #7·#16·#18과 다른가**:
+- #7(매직넘버 불일치)은 *같은 값*이 파일마다 다른 상수로 박힌 것 — 여기선 값이 아니라 *계산 의미(분모)*가 카테고리별로 다르다.
+- #16(생산자 부분 이관)은 같은 필드를 일부 생산자만 신포맷으로 바꾼 *비의도적* 비대칭 — 여기선 단일 생산자가 *의도적으로* 분기별 다른 계산을 하고, 그것을 하나로 노출한다.
+- #18(암묵적 불변식)은 *현재 정합·미래 취약* — 여기선 *현재 이미* 비대칭이고, 위험은 미래 진화가 아니라 *지금 consumer가 두 값을 비교 가능하다고 오인*하는 것이다(시간축 반대).
+
+**발생 패턴**:
+```sql
+-- neutral: stale를 적중으로 → 분모에 포함
+WHEN direction = 'neutral'              AND ABS(change) < band THEN true
+-- directional: stale를 제외 → 분모에서 NULL
+WHEN direction IN ('bullish','bearish') AND ABS(change) < band THEN NULL
+-- → fair_acc_1h 한 컬럼에 분모 의미가 둘. 같은 라벨로 노출되면 비교 가능처럼 보인다.
+```
+
+**영향**:
+- 성적표/대시보드에서 neutral 승률이 directional보다 부풀려져 "더 정확한 시그널"로 오독
+- 정렬·랭킹·임계 비교 시 stale 포함 카테고리가 부당하게 상위 → 잘못된 시그널 우선순위
+- 계약이 주석에만 있어 후속 Phase 개발자가 가드를 누락하기 쉬움
+
+**해결책**:
+- ✅ 비교 불가 값은 스키마/타입에서 분리하거나(예: `directional_acc` vs `neutral_acc` 별도 컬럼), 라벨에 비교 불가성을 못박는다("중립=비방향, 참고치")
+- ✅ 소비자(카드 렌더러/훅/성적표)에 가드 — neutral fair_acc를 directional과 동일 선상에 표시·정렬·비교 금지
+- ✅ 리뷰 체크리스트: "이 두 숫자를 사용자가 나란히 보면 같은 의미로 받아들이는가? 분모/모집단이 같은가?"
+- ✅ 산문 주석으로만 강제되는 계약은 *미강제*로 간주 — 코드/스키마/타입 레벨로 끌어올린다
+
+---
+
+### 20. 중복 억제 지시문 — 설정이 이미 무시하는데 또 억제 (Redundant Suppression Directive)
+
+**우리 사례** (2026-06-08 코드 리뷰, #366 죽은 시그널 26종 제거): no-op 훅 3곳(`useDerivativeSignals.js:5`, `useNewsSignals.js:5`, `useInvestorSignals.js:117`)에 `// eslint-disable-next-line no-unused-vars`(및 `react-hooks/exhaustive-deps`)를 달았다. 그러나 해당 파라미터는 이미 `_args`/`_allNews`/`_allItems`처럼 언더스코어 프리픽스라 ESLint 설정의 `argsIgnorePattern: '^_'`가 자동으로 무시한다(`eslint.config.js` 3개 블록 전부). 즉 억제 지시문 자체가 죽은 코드이며, flat config의 `reportUnusedDisableDirectives`(ESLint 9 기본 `warn`)가 **새 경고("Unused eslint-disable directive")를 도리어 발생**시킨다. AI의 방어 본능이 막으려던 바로 그 문제(린트 경고)를 스스로 만들어낸 것.
+
+**근본 원인**: AI는 "이 관용구면 린터를 잠재운다"는 자기완결적 억제 패턴(`eslint-disable`, `@ts-ignore`, `# noqa`, `@SuppressWarnings`)을 *국소적으로* 적용한다. 그러나 *프로젝트의 린트 설정*(`argsIgnorePattern`, `varsIgnorePattern`, 이미 off된 룰)을 읽고 "이 억제가 정말 필요한가"를 확인하지 않는다. 두 개의 겹치는 안전장치(언더스코어 네이밍 + disable 지시문)를 벨트앤서스펜더로 동시에 적용하고, 그 중복 자체가 메타 룰("미사용 지시문 금지")을 도리어 위반한다.
+
+**왜 #18(암묵적 불변식)과 다른가**: #18은 *부족한* 방어(안전 기본값·계약 주석 누락)를 senior가 *추가*해야 하는 under-defensive 패턴이다. 이건 정반대로 *과잉* 방어 — 불필요한 억제를 AI가 추가하고, 그 과잉이 새 경고를 만든다(over-defensive). 부족이 아니라 잉여가 문제다.
+
+**발생 패턴**:
+```js
+// AI가 자주 생성하는 패턴 (잘못됨 — 이중 억제)
+// eslint-disable-next-line no-unused-vars
+export function useDerivativeSignals(_args) { return []; }
+// _args는 이미 argsIgnorePattern('^_')로 무시됨 → disable 줄은 죽은 코드 + 새 경고 유발
+
+// 올바른 패턴 — 언더스코어 네이밍 하나로 충분, disable 줄 삭제
+export function useDerivativeSignals(_args) { return []; }
+```
+
+**영향**:
+- "에러 0" 베이스라인은 유지되나 "경고 0" 캠페인 취지를 역행 (정리 시 경고까지 0)
+- 죽은 억제 지시문이 누적되면 "어떤 룰이 실제로 필요한지" 신호가 희석됨
+- 후속 개발자가 "이 disable엔 이유가 있겠지" 하고 보존 → 영구 잔존
+
+**해결책**:
+- ✅ 억제 지시문 추가 전 프로젝트 린트 설정 확인(`argsIgnorePattern`/`varsIgnorePattern`/이미 off된 룰) — 설정이 처리하면 지시문 불요
+- ✅ ESLint `reportUnusedDisableDirectives`(flat config 기본 활성) 유지 → 죽은 억제 자동 검출
+- ✅ 억제는 최후수단 — 네이밍 컨벤션(`_` 프리픽스)으로 해결 가능하면 그쪽 우선
+- ✅ 리뷰 체크리스트: "이 suppress/ignore/disable이 정말 필요한가, 아니면 설정·네이밍이 이미 처리하는가?"
+
+---
+
+*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-06-08)*
