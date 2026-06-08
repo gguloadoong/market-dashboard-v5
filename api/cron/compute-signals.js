@@ -427,17 +427,17 @@ const PATTERN_TYPES = new Set([
 ]);
 const COOLDOWN_TTL = 86400; // 24h — 패턴 horizon(SR 4h, DB 8h)의 상위 바운드
 
-async function recordPatternSignals(signals, host) {
+async function recordPatternSignals(signals, req) {
   const patterns = signals.filter(s => PATTERN_TYPES.has(s.type));
   if (!patterns.length) return { recorded: 0, skipped: 0, total: 0 };
 
   // KV 쿨다운 필터 — NX(set-if-not-exists)로 원자적 중복 차단
+  // 키에 날짜를 넣지 않고 TTL만으로 24h 롤링 쿨다운 (UTC 자정 경계 이슈 방지)
   const toRecord = [];
   let skipped = 0;
 
   for (const sig of patterns) {
-    const dateKey = new Date().toISOString().slice(0, 10);
-    const cooldownKey = `sig:fired:${sig.type}:${sig.symbol}:${dateKey}`;
+    const cooldownKey = `sig:fired:${sig.type}:${sig.symbol}`;
 
     if (!redis) {
       // Redis 미연결 시 쿨다운 없이 기록 (graceful degradation)
@@ -446,12 +446,12 @@ async function recordPatternSignals(signals, host) {
     }
 
     try {
-      // SET NX EX — 키가 없으면 세팅+true, 이미 있으면 null
-      const set = await redis.set(cooldownKey, 1, { nx: true, ex: COOLDOWN_TTL });
-      if (set) {
-        toRecord.push(sig);
-      } else {
+      // GET으로 먼저 확인 — SET NX는 POST 성공 후에만 소비
+      const exists = await redis.get(cooldownKey);
+      if (exists) {
         skipped++;
+      } else {
+        toRecord.push(sig);
       }
     } catch (e) {
       // 쿨다운 체크 실패 시 기록 진행 (안전 방향)
@@ -465,20 +465,33 @@ async function recordPatternSignals(signals, host) {
   }
 
   // POST 페이로드 — /api/signal-accuracy가 정규화 처리
-  const batch = toRecord.map(sig => ({
+  // 수신측 50건 캡에 맞춰 발신도 50건 제한
+  const batch = toRecord.slice(0, 50).map(sig => ({
     type: sig.type,
     symbol: sig.symbol,
     market: sig.market || 'unknown',
     direction: sig.direction || 'neutral',
-    strength: sig.strength || 3,
+    strength: sig.strength || 1,
     title: sig.title || '',
     priceAtFire: sig.meta?.currentPrice ?? null,
     meta: sig.meta || {},
   }));
 
   try {
-    const protocol = host?.includes('localhost') ? 'http' : 'https';
-    const url = `${protocol}://${host}/api/signal-accuracy`;
+    // 신뢰 가능한 고정 출처 — Host 헤더(클라이언트 조작 가능)를 쓰지 않음
+    // VERCEL_URL: Vercel 플랫폼이 주입하는 배포 URL (preview/production 모두)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : null;
+
+    if (!baseUrl) {
+      console.warn('[compute-signals] VERCEL_URL 미설정 — 패턴 기록 스킵');
+      return { recorded: 0, skipped, total: patterns.length, error: 'no base url' };
+    }
+
+    const url = `${baseUrl}/api/signal-accuracy`;
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
@@ -496,6 +509,16 @@ async function recordPatternSignals(signals, host) {
     }
 
     const result = await resp.json().catch(() => ({}));
+
+    // POST 성공 후에만 쿨다운 SET — 실패 시 다음 크론에서 재시도 가능
+    if (redis) {
+      await Promise.allSettled(
+        toRecord.slice(0, 50).map(sig =>
+          redis.set(`sig:fired:${sig.type}:${sig.symbol}`, 1, { ex: COOLDOWN_TTL }).catch(() => {})
+        )
+      );
+    }
+
     console.info(`[compute-signals] 패턴 기록 완료: inserted=${result.inserted ?? 0}, skipped_db=${result.skipped ?? 0}, cooldown_skipped=${skipped}`);
     return { recorded: result.inserted ?? 0, skipped, total: patterns.length };
   } catch (e) {
@@ -891,8 +914,7 @@ export default async function handler(req, res) {
   // signals:latest KV 쓰기와 독립 — 기록 실패해도 KV/응답에 영향 없음
   let patternResult = { recorded: 0, skipped: 0, total: 0 };
   try {
-    const host = req.headers['host'] || req.headers['x-forwarded-host'] || '';
-    patternResult = await recordPatternSignals(signals, host);
+    patternResult = await recordPatternSignals(signals, req);
   } catch (e) {
     console.error('[compute-signals] 패턴 기록 전체 실패:', e?.message);
   }
