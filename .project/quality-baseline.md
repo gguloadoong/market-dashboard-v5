@@ -113,25 +113,27 @@
 
 ## 시그널 시스템 신뢰도
 
-> 측정 기준 수립: 2026-05-19 architect (Opus) 분석 결과  
-> 현재 전체 신뢰도: **38%** (PR #311 + #315 머지 후 목표 60%+)
+> **재정의: 2026-06-08 시그널 전면 개편 (대표 /goal, #364·#366·#368·#370)**
+> 기존 "38%"는 측정 artifact였음(방향만 맞으면 +0.01%도 적중, stale 오답, raw 1h 헤드라인).
+> `signal_accuracy_v2` fair-hit(노이즈밴드·비용 제외) 도입 후 **공정 적중률** 기준으로 측정.
 
 | 지표 | 현재 값 | 기준선 | 위반 시 우선순위 |
 |------|---------|--------|----------------|
-| 발화 다양성 (활성 타입 / 29종) | 5% (1종: composite_score만) | 5% 이상 유지 | P1 |
-| 방향 정확도 (bullish/bearish) | 95% | 90% 이상 | P0 |
-| Meta 정합성 (easyDesc 필드 일치율) | 80% → 95% (PR #311+315 후) | 90% 이상 | P0 |
-| 적중률 트래킹 커버리지 (signal_accuracy 타입 수) | 3종 | 3종 이상 | P2 |
+| 시그널 타입 수 (KEEP) | 4종 (volume_anomaly·double_bottom·SRB·composite) | 5종 미만 유지 | P1 |
+| 시그널 캐릭터 수 | 4 (5개 미만) | 5 미만 (signalCharacters.js throw 가드) | P0 |
+| 라이브 캐릭터 공정 적중률 (흐름타기 1h) | **64%** (n997, kr·bullish) | 50% 이상 | P0 |
+| 성적표 정직성 | measuring 적중률 숨김 + revive '30일미발화' 표기 | 50% 미만/미측정 노출 금지 | P0 |
+| 측정 방식 | fair-hit 노이즈밴드(시장·horizon별) + #158 sanity(500%) | raw 적중률 회귀 금지 | P0 |
 
 **검증 방법:**
-- 방향 정확도: `signal_accuracy` Supabase 뷰 → `accuracy_1h` 열 composite_score 행 확인
-- Meta 정합성: PR 코드리뷰에서 easyDesc ↔ signalEngine.js meta 필드 대조 (architect gate)
-- 발화 다양성: 프로덕션 `/api/snapshot?type=signals` 응답 타입 분포 확인
+- 공정 적중률: `signal_accuracy_v2` 뷰 → `fair_acc_1h/24h` × (signal_type, market, direction) 슬라이스
+- 캐릭터 집계: `useSignalCharacters` (eval 가중 fair_acc, status별 처리), `src/__tests__/signalCharacters.test.js`
+- 캐릭터 수 가드: `signalCharacters.js` 모듈 로드 throw (≥5 시)
 
-**알려진 한계 (2026-05-19 기준):**
-- 29종 중 server-side 발화는 `composite_score` 1종뿐 (CF Workers compute-signals.js)
-- 나머지 28종은 client-side 조건 충족 시 발화 → 장 중 트래픽 없으면 0건
-- VWAP 시그널: `[비활성]` — 적중률 0%로 return null 처리 (#155)
+**알려진 한계 / 남은 작업 (2026-06-08):**
+- 패턴(double_bottom·SRB)은 공정 24h 64~94%이나 **서버 미발화**(last_30d_fired=0) → 성적표 '부활 예정' 표기. **LIVE 발화는 Phase 0/3 인프라 재건 필요**(서버 발화+Supabase 기록, loadSignals `_recordForAccuracy` TODO #215, CF Workers 50 subrequest 한도) — 수주 공수.
+- composite_score: 라이브 브릿지(미측정 → 'measuring'). Phase3 캐릭터 서버발화 대체 후 제거.
+- 모든 변경 main 머지 완료, **미배포**(배포는 대표 확인 시).
 
 ---
 
