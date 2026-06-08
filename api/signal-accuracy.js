@@ -50,6 +50,21 @@ async function fetchAccuracyView() {
   return res.json();
 }
 
+// signal_accuracy_v2 — fair-hit (type,market,direction) 슬라이스 (#368 캐릭터 레이어용).
+// 실패해도 기존 accuracy 응답은 유지되도록 호출부에서 catch → [] 처리(추가적·비파괴).
+async function fetchSlicesV2() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/signal_accuracy_v2?select=*`, {
+    headers: supabaseHeaders(),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) {
+    const err = new Error(`signal_accuracy_v2 fetch failed: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
 export default async function handler(req) {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(
@@ -144,9 +159,12 @@ export default async function handler(req) {
   //      → 프론트의 useSignalAccuracy 는 accuracy 만 보므로 UX 는 그대로 유지되고,
   //        모니터링/로그는 _error 필드로 실패를 감지할 수 있다.
   try {
-    const accuracy = await fetchAccuracyView();
+    const [accuracy, slices] = await Promise.all([
+      fetchAccuracyView(),
+      fetchSlicesV2().catch(() => []), // v2 실패해도 기존 accuracy 응답 유지 (#368 추가적)
+    ]);
     return new Response(
-      JSON.stringify({ accuracy: accuracy || [], ts: new Date().toISOString() }),
+      JSON.stringify({ accuracy: accuracy || [], slices: slices || [], ts: new Date().toISOString() }),
       {
         headers: {
           'Content-Type': 'application/json',
