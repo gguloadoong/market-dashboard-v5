@@ -2,7 +2,7 @@
 // Vercel Cron이 10분마다 호출: */10 * * * *
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
-import { getSnap, setSnap, recordCronFailure } from '../_price-cache.js';
+import { getSnap, setSnap, recordCronFailure, redis } from '../_price-cache.js';
 import { timingSafeEqual } from 'crypto';
 
 export const config = { runtime: 'nodejs', maxDuration: 120 };
@@ -415,6 +415,95 @@ function calculateCompositeScore(ta, flow, sentiment) {
   };
 }
 
+
+// ─── 패턴 시그널 signal_history 기록 (#373) ────────────────
+// 패턴(SR/DB)만 필터 → KV 쿨다운 NX(하루 1발화/종목) → /api/signal-accuracy POST
+// - signals:latest KV는 건드리지 않음 (CF Worker 소유권 보호, ADR-016)
+// - record_signal_batch RPC가 INSERT-only(dedup 없음)라 크론 쪽에서 선제 차단
+// - priceAtFire = currentPrice(candle 마지막 종가) — 패턴 판정과 동일 소스
+const PATTERN_TYPES = new Set([
+  SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
+  SIGNAL_TYPES.DOUBLE_BOTTOM,
+]);
+const COOLDOWN_TTL = 86400; // 24h — 패턴 horizon(SR 4h, DB 8h)의 상위 바운드
+
+async function recordPatternSignals(signals, host) {
+  const patterns = signals.filter(s => PATTERN_TYPES.has(s.type));
+  if (!patterns.length) return { recorded: 0, skipped: 0, total: 0 };
+
+  // KV 쿨다운 필터 — NX(set-if-not-exists)로 원자적 중복 차단
+  const toRecord = [];
+  let skipped = 0;
+
+  for (const sig of patterns) {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const cooldownKey = `sig:fired:${sig.type}:${sig.symbol}:${dateKey}`;
+
+    if (!redis) {
+      // Redis 미연결 시 쿨다운 없이 기록 (graceful degradation)
+      toRecord.push(sig);
+      continue;
+    }
+
+    try {
+      // SET NX EX — 키가 없으면 세팅+true, 이미 있으면 null
+      const set = await redis.set(cooldownKey, 1, { nx: true, ex: COOLDOWN_TTL });
+      if (set) {
+        toRecord.push(sig);
+      } else {
+        skipped++;
+      }
+    } catch (e) {
+      // 쿨다운 체크 실패 시 기록 진행 (안전 방향)
+      console.warn(`[compute-signals] 쿨다운 체크 실패 (${cooldownKey}):`, e?.message);
+      toRecord.push(sig);
+    }
+  }
+
+  if (!toRecord.length) {
+    return { recorded: 0, skipped, total: patterns.length };
+  }
+
+  // POST 페이로드 — /api/signal-accuracy가 정규화 처리
+  const batch = toRecord.map(sig => ({
+    type: sig.type,
+    symbol: sig.symbol,
+    market: sig.market || 'unknown',
+    direction: sig.direction || 'neutral',
+    strength: sig.strength || 3,
+    title: sig.title || '',
+    priceAtFire: sig.meta?.currentPrice ?? null,
+    meta: sig.meta || {},
+  }));
+
+  try {
+    const protocol = host?.includes('localhost') ? 'http' : 'https';
+    const url = `${protocol}://${host}/api/signal-accuracy`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-cron-secret': process.env.CRON_SECRET || '',
+      },
+      body: JSON.stringify(batch),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => '');
+      console.error(`[compute-signals] 패턴 기록 POST 실패: ${resp.status} ${detail.slice(0, 200)}`);
+      return { recorded: 0, skipped, total: patterns.length, error: `HTTP ${resp.status}` };
+    }
+
+    const result = await resp.json().catch(() => ({}));
+    console.info(`[compute-signals] 패턴 기록 완료: inserted=${result.inserted ?? 0}, skipped_db=${result.skipped ?? 0}, cooldown_skipped=${skipped}`);
+    return { recorded: result.inserted ?? 0, skipped, total: patterns.length };
+  } catch (e) {
+    console.error('[compute-signals] 패턴 기록 POST 예외:', e?.message);
+    return { recorded: 0, skipped, total: patterns.length, error: e?.message };
+  }
+}
+
 // ─── 시그널 ID 생성 ──────────────────────────────────────
 function generateId(type, symbol) {
   const dateKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -798,6 +887,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: false, skipped: true, failRate, durationMs });
   }
 
+  // ── 패턴 시그널 signal_history 기록 (#373) ──
+  // signals:latest KV 쓰기와 독립 — 기록 실패해도 KV/응답에 영향 없음
+  let patternResult = { recorded: 0, skipped: 0, total: 0 };
+  try {
+    const host = req.headers['host'] || req.headers['x-forwarded-host'] || '';
+    patternResult = await recordPatternSignals(signals, host);
+  } catch (e) {
+    console.error('[compute-signals] 패턴 기록 전체 실패:', e?.message);
+  }
+
+  // ── signals:latest KV 쓰기 (기존 — CF Worker도 같은 키를 쓰므로 향후 분리 예정) ──
   try {
     await setSnap('signals:latest', payload, 1200);
   } catch (e) {
@@ -805,5 +905,10 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'kv write failed', message: e?.message });
   }
 
-  return res.status(200).json({ ok: true, count: signals.length, durationMs });
+  return res.status(200).json({
+    ok: true,
+    count: signals.length,
+    durationMs,
+    patterns: patternResult,
+  });
 }
