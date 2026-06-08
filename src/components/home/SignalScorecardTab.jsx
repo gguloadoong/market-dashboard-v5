@@ -1,239 +1,121 @@
-// 시그널 봇 성적표 탭 — 적중률 기반 봇 랭킹
-import { useState, useMemo } from 'react';
-import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
-import { BOT_CATEGORIES } from '../../constants/signalBotCategories';
+// 시그널 성적표 탭 — 4캐릭터 정직 트랙레코드 (Issue #370)
+// 공정 적중률(signal_accuracy_v2 fair-hit) 기준. 발화 무변경, 순수 노출.
+import { useSignalCharacters } from '../../hooks/useSignalCharacters';
+import { CHARACTER_STATUS } from '../../constants/signalCharacters';
 
-// ── 봇 한국어 이름 매핑 (사용자 친화 명칭) ──
+// ── 봇 한국어 이름 (CommandCenterWidget 등 외부 의존 — export 유지) ──
 const SIGNAL_BOT_NAMES = {
-  volume_anomaly:                '거래량 폭발',
-  composite_score:               '종합 매수·매도 신호',
-  support_resistance_break:      '지지·저항 돌파',
-  double_bottom:                 '이중바닥 패턴',
+  volume_anomaly:           '거래량 폭발',
+  composite_score:          '종합 매수·매도 신호',
+  support_resistance_break: '지지·저항 돌파',
+  double_bottom:            '이중바닥 패턴',
 };
 
-// ── 카테고리 분류 (src/constants/signalBotCategories.js 단일 소스) ──
-
-// 타입 → 카테고리 역매핑
-const TYPE_TO_CATEGORY = {};
-for (const [cat, types] of Object.entries(BOT_CATEGORIES)) {
-  for (const t of types) TYPE_TO_CATEGORY[t] = cat;
-}
-
-// 카테고리별 한국어 + 개수
-const CATEGORY_CHIPS = [
-  { key: 'all', label: '전체' },
-  { key: 'event', label: '이벤트', count: BOT_CATEGORIES.event.length },
-  { key: 'quant', label: '퀀트', count: BOT_CATEGORIES.quant.length },
-  { key: 'pattern', label: '패턴', count: BOT_CATEGORIES.pattern.length },
-];
-
-// 적중률 → 색상
+// 적중률 → 색상 (ADR-002: 한국 색관습은 가격 방향용 — 적중률은 성과 색이라 green=좋음 유지)
 function accuracyColor(pct) {
   if (pct >= 70) return '#2AC769';
   if (pct >= 50) return '#FF9500';
   return '#F04452';
 }
 
-// ── 요약 바 ──
-function ScorecardSummary({ accuracy, isLoading }) {
-  const color = accuracyColor(accuracy);
+// status별 배지 (정직성 가드)
+function statusBadge(status) {
+  if (status === CHARACTER_STATUS.LIVE) return { label: '● 라이브', bg: '#2AC769' };
+  if (status === CHARACTER_STATUS.REVIVE) return { label: '부활 예정', bg: '#FF9500' };
+  return { label: '측정 준비 중', bg: '#B0B8C1' }; // measuring
+}
+
+// ── 캐릭터 카드 ──
+function CharacterCard({ char }) {
+  const showAcc = char.accuracy != null; // measuring → null (적중률 숨김)
+  const accColor = showAcc ? accuracyColor(char.accuracy) : '#B0B8C1';
+  const badge = statusBadge(char.status);
+  const dormant = char.status === CHARACTER_STATUS.REVIVE && char.last30dFired === 0;
+
   return (
-    <div className="mb-5">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-semibold text-[#4E5968]">전체 평균 적중률</span>
-        <span className="text-[15px] font-bold" style={{ color }}>
-          {isLoading ? '--' : `${accuracy}%`}
-        </span>
+    <div className="flex items-center gap-3 py-3.5 border-t border-[#F2F4F6] first:border-t-0">
+      <span className="text-[24px] flex-shrink-0 leading-none">{char.emoji}</span>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[15px] font-bold text-[#191F28]">{char.name}</span>
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white flex-shrink-0"
+            style={{ background: badge.bg }}
+          >
+            {badge.label}
+          </span>
+        </div>
+        <p className="text-[12px] text-[#8B95A1] mt-0.5 leading-snug">{char.thesis}</p>
+        {char.sampleN > 0 && (
+          <p className="text-[10px] text-[#B0B8C1] mt-1">
+            표본 {char.sampleN.toLocaleString()}건 · {char.horizon} 기준
+            {dormant ? ' · 30일 미발화(서버 재가동 예정)' : ''}
+          </p>
+        )}
       </div>
-      <div className="h-2 rounded-full bg-[#F2F4F6] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${isLoading ? 0 : accuracy}%`, background: color }}
-        />
+
+      <div className="text-right flex-shrink-0 w-14">
+        {showAcc ? (
+          <>
+            <div className="text-[20px] font-extrabold leading-none" style={{ color: accColor }}>
+              {char.accuracy}%
+            </div>
+            <div className="text-[10px] text-[#8B95A1] mt-1">적중률</div>
+          </>
+        ) : (
+          <div className="text-[12px] text-[#B0B8C1] font-medium">수집 중</div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── 봇 랭킹 리스트 ──
-function BotRankingList({ bots }) {
-  const [expandedIdx, setExpandedIdx] = useState(null);
+// status 정렬 우선순위
+const STATUS_RANK = {
+  [CHARACTER_STATUS.LIVE]: 0,
+  [CHARACTER_STATUS.REVIVE]: 1,
+  [CHARACTER_STATUS.MEASURING]: 2,
+};
 
-  if (bots.length === 0) {
+// ── 메인 성적표 탭 ──
+export default function SignalScorecardTab() {
+  const { characters, isLoading } = useSignalCharacters();
+
+  // 로딩 가드를 정렬보다 먼저 — 로딩 중 불필요 연산·undefined 정렬 크래시 방지 (Gemini gate)
+  if (isLoading) {
     return (
-      <div className="py-8 text-center">
-        <div className="space-y-2 mb-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-[#F7F8FA] rounded-[10px] animate-pulse" />
+      <div className="py-6">
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-16 bg-[#F7F8FA] rounded-[10px] animate-pulse" />
           ))}
         </div>
-        <p className="text-[13px] text-[#8B95A1]">시그널 데이터 수집 중...</p>
+        <p className="text-[13px] text-[#8B95A1] text-center mt-4">시그널 성적 불러오는 중...</p>
       </div>
     );
   }
 
+  // 정렬: 라이브 → 부활 예정 → 측정 중, 동급은 적중률 내림차순
+  // characters는 항상 배열(SIGNAL_CHARACTERS.map)이나 방어적으로 ?? [] 가드
+  const sorted = [...(characters ?? [])].sort((a, b) => {
+    const ra = STATUS_RANK[a.status] ?? 3;
+    const rb = STATUS_RANK[b.status] ?? 3;
+    if (ra !== rb) return ra - rb;
+    return (b.accuracy ?? -1) - (a.accuracy ?? -1);
+  });
+
   return (
     <div>
-      {bots.map((bot, idx) => {
-        const isExpanded = expandedIdx === idx;
-        const isMissing = bot.isMissing === true;
-        const isCold = !isMissing && bot.totalFired < 30;
-        const name = SIGNAL_BOT_NAMES[bot.type] || bot.type;
-        const color = accuracyColor(bot.accuracy);
-        const streak = (bot.recentResults || []).slice(-10);
-
-        return (
-          <div key={bot.type}>
-            {/* 봇 카드 행 */}
-            <button
-              onClick={() => setExpandedIdx(isExpanded ? null : idx)}
-              className={`w-full flex items-center gap-3 py-3 text-left ${
-                idx > 0 ? 'border-t border-[#F2F4F6]' : ''
-              }`}
-            >
-              <span className="text-[14px] font-bold text-[#B0B8C1] w-5 text-right flex-shrink-0">
-                {idx + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[14px] font-semibold truncate ${isCold ? 'text-[#8B95A1]' : 'text-[#191F28]'}`}>
-                    {name}
-                  </span>
-                  <span
-                    className="text-[11px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                    style={{
-                      color: '#fff',
-                      background: isMissing ? '#D1D5DB' : isCold ? '#B0B8C1' : color,
-                      opacity: isMissing ? 0.8 : isCold ? 0.7 : 1,
-                    }}
-                  >
-                    {isMissing ? '집계 중' : isCold ? '데이터 누적 중' : `${bot.accuracy}%`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 mt-1">
-                  {streak.map((hit, i) => (
-                    <span
-                      key={i}
-                      className="w-[6px] h-[6px] rounded-full flex-shrink-0"
-                      style={{ background: hit ? '#2AC769' : '#F04452' }}
-                    />
-                  ))}
-                  <span className="text-[10px] text-[#B0B8C1] ml-1">{bot.totalFired}회</span>
-                </div>
-              </div>
-              <span
-                className="text-[11px] font-mono flex-shrink-0"
-                style={{ color: bot.trend >= 0 ? '#2AC769' : '#F04452' }}
-              >
-                {bot.trend > 0 ? '+' : ''}{bot.trend}%
-              </span>
-            </button>
-
-            {/* 확장 상세 */}
-            {isExpanded && (
-              <div className="pb-3 pl-8 pr-2">
-                {/* 1h / 4h / 24h 적중률 */}
-                <div className="flex gap-4 mb-3">
-                  {[
-                    { label: '1시간', val: bot.accuracy1h },
-                    { label: '4시간', val: bot.accuracy4h },
-                    { label: '24시간', val: bot.accuracy24h },
-                  ].map(({ label, val }) => (
-                    <div key={label} className="flex-1 text-center">
-                      <div className="text-[10px] text-[#8B95A1] mb-0.5">{label}</div>
-                      <div
-                        className="text-[13px] font-bold"
-                        style={{ color: val != null ? accuracyColor(val) : '#B0B8C1' }}
-                      >
-                        {val != null ? `${val}%` : '-'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 최근 5건 시그널 */}
-                {bot.recentSignals.length > 0 && (
-                  <div className="space-y-1">
-                    <div className="text-[10px] text-[#8B95A1] mb-1">최근 시그널</div>
-                    {bot.recentSignals.slice(0, 5).map((sig, si) => (
-                      <div key={si} className="flex items-center gap-2 text-[11px]">
-                        <span className="font-medium text-[#191F28] w-14 truncate">{sig.symbol}</span>
-                        <span style={{ color: sig.direction === 'bullish' ? '#F04452' : sig.direction === 'bearish' ? '#1764ED' : '#FF9500' }}>
-                          {sig.direction === 'bullish' ? '▲' : sig.direction === 'bearish' ? '▼' : '●'}
-                        </span>
-                        <span className="text-[#8B95A1] flex-1 truncate">
-                          {sig.resultPct != null ? `${sig.resultPct > 0 ? '+' : ''}${sig.resultPct}%` : '-'}
-                        </span>
-                        <span
-                          className="w-[6px] h-[6px] rounded-full flex-shrink-0"
-                          style={{ background: sig.hit ? '#2AC769' : '#F04452' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <p className="text-[11px] text-[#8B95A1] mb-2">
+        공정 적중률 — 미세변동·거래비용 제외 후 측정. 못 넘는 신호는 띄우지 않습니다.
+      </p>
+      {sorted.map((char) => (
+        <CharacterCard key={char.id} char={char} />
+      ))}
     </div>
   );
 }
 
-// ── 메인 성적표 탭 ──
-export default function SignalScorecardTab() {
-  const { bots, overallAccuracy, isLoading } = useSignalAccuracy();
-  const [category, setCategory] = useState('all');
-
-  // 카테고리 필터 + 정렬 (레거시는 hook에서 이미 차단됨)
-  // 정렬 우선순위: ① 발화 있는 봇(totalFired≥30) — 적중률 내림차순
-  //               ② cold 봇(totalFired 1~29) — 적중률 내림차순
-  //               ③ 집계 중 봇(isMissing or totalFired===0) — 이름순
-  const filteredBots = useMemo(() => {
-    const filtered = category === 'all'
-      ? bots
-      : bots.filter((b) => TYPE_TO_CATEGORY[b.type] === category);
-    return [...filtered].sort((a, b) => {
-      const rankA = a.isMissing || a.totalFired === 0 ? 2 : a.totalFired < 30 ? 1 : 0;
-      const rankB = b.isMissing || b.totalFired === 0 ? 2 : b.totalFired < 30 ? 1 : 0;
-      if (rankA !== rankB) return rankA - rankB;
-      if (rankA === 0) return b.accuracy - a.accuracy;
-      if (rankA === 1) return b.accuracy - a.accuracy;
-      return (a.type < b.type ? -1 : 1);
-    });
-  }, [bots, category]);
-
-  return (
-    <div>
-      {/* 요약 바 */}
-      <ScorecardSummary accuracy={overallAccuracy} isLoading={isLoading} />
-
-      {/* 카테고리 칩 */}
-      <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide -mx-1 px-1">
-        {CATEGORY_CHIPS.map((chip) => {
-          const isActive = category === chip.key;
-          return (
-            <button
-              key={chip.key}
-              onClick={() => setCategory(chip.key)}
-              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-                isActive
-                  ? 'bg-[#191F28] text-white'
-                  : 'bg-[#F2F4F6] text-[#8B95A1]'
-              }`}
-            >
-              {chip.label}{chip.count != null ? `(${chip.count})` : ''}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 봇 랭킹 */}
-      <BotRankingList bots={filteredBots} />
-    </div>
-  );
-}
-
-// 외부에서 접근 가능하도록 이름 매핑 export
+// 외부에서 접근 가능하도록 이름 매핑 export (CommandCenterWidget 의존)
 export { SIGNAL_BOT_NAMES };
