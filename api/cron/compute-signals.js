@@ -1,5 +1,6 @@
-// api/cron/compute-signals.js — 서버 사전 계산 시그널 cron
-// Vercel Cron이 10분마다 호출: */10 * * * *
+// api/cron/compute-signals.js — 서버 사전 계산 시그널 cron (패턴 발화·기록)
+// Vercel Cron 4시간마다 호출(20 */4 * * *). 패턴(SR/DB)을 signal_history 기록(#373) +
+// signals:patterns KV 기록. signals:latest(라이브 피드)는 CF Worker 소유 → 충돌 회피 위해 별도 키(#372).
 // ⚠️ src/engine/ ESM import 불가 (Edge runtime 호환) — 로직 인라인 복사
 // ⚠️ 수정 시 src/engine/taCalculator.js / src/engine/compositeScorer.js 와 동기화 필수
 import { getSnap, setSnap, recordCronFailure, redis } from '../_price-cache.js';
@@ -919,9 +920,11 @@ export default async function handler(req, res) {
     console.error('[compute-signals] 패턴 기록 전체 실패:', e?.message);
   }
 
-  // ── signals:latest KV 쓰기 (기존 — CF Worker도 같은 키를 쓰므로 향후 분리 예정) ──
+  // ── signals:patterns KV 쓰기 — signals:latest(CF Worker 소유 라이브 피드)와 분리해 충돌 회피 (#372) ──
+  // 프론트는 아직 signals:patterns 미구독(무영향). 향후 패턴 피드 머지 시 사용.
   try {
-    await setSnap('signals:latest', payload, 1200);
+    // TTL 18000s(5h) — 크론 주기 4h(20 */4)보다 길게 설정해 캐시 공백 방지 (Gemini gate P1)
+    await setSnap('signals:patterns', payload, 18000);
   } catch (e) {
     await recordCronFailure('compute-signals', e?.message || String(e));
     return res.status(500).json({ error: 'kv write failed', message: e?.message });
