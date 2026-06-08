@@ -43,8 +43,14 @@
 프로덕션 Playwright QA 통과(브라우저 종료 ✓): 성적표 4캐릭터 렌더(흐름타기 64% 라이브 / 바닥다지기 74.3%·벽뚫기 73.3% 부활예정 / 종합 수집중), `/api/signal-accuracy` slices 28건, 탭전환·종목클릭→차트패널(P0)·다크모드·모바일 전부 PASS, 신규 시그널발 에러 0.
 **QA 발견 2건**: ① `/api/d` 가격게이트웨이 500/502 다수(내 변경 무관, 기존 인프라 — 별건 점검 필요. snapshot API 정상) ② 성적표 teaser '검증 중 1종'(SignalBoardWidget 구 useSignalAccuracy 잔존) → #372 부수로 정합화.
 
-### ⬜ 남은 트랙 = Phase 0/3 (Issue #372) — 대표 /goal "남은트랙까지 다 하고"
-패턴(바닥다지기·벽뚫기) '부활예정' → 라이브: 서버 발화+signal_history 기록 재건. **조사 완료**(CF Worker=composite만 10분 / Vercel route=패턴 계산하나 미스케줄·미기록 TODO#215). **아키텍처 결정 4건**(Vercel vs CF 소유권·`signals:latest` 충돌·기록경로·스케줄)이 걸린 프로덕션 인프라 트랙(수일~주) → **architect(opus) 선행 후 단계 구현, 배포 신중**. 상세 #372.
+### 🟡 남은 트랙 = Phase 0/3 (Issue #372) — 패턴 라이브화 [PR1·PR2 배포 / 검증·PR3 후속]
+패턴(바닥다지기·벽뚫기) '부활예정' → 라이브: 서버 발화+signal_history 기록 재건.
+- ✅ **PR1(#374)** recordPatternSignals — SR/DB 필터 → KV 쿨다운(24h) → /api/signal-accuracy POST(x-cron-secret). 머지.
+- ✅ **PR2(#375)** Vercel 크론 `20 */4 * * *` 활성화 + KV `signals:patterns` 분리(CF Worker `signals:latest` 불변). **머지·배포(45b137b)**. 첫 발화 16:20 UTC(KST 01:20).
+- ⬜ **검증(시간게이트)**: 크론 발화 후 signal_history에 패턴 기록 유입 확인(쿼리는 #372 코멘트). 패턴은 형성 시에만 잡혀 수일 누적.
+- ⬜ **PR3(검증 후)**: 성적표 status 동적 전환(measuring 유지, 그외 fired30>0?live:revive). 현재 signalCharacters.js 패턴 status=hardcoded 'revive' → 기록 들어와도 '부활예정' 고정. **품질 검증 전 'live' 표시 금지**.
+- ⬜ 부수: SignalBoardWidget teaser '검증 중 1종' 정합화.
+- ⚠️ 배포 도구: pre-deploy-consensus PM 게이트가 중첩 `claude --print` 행 → claude PATH 제외로 SKIP 후 배포(하드게이트 통과). 게이트 claude 타임아웃 보강 후속.
 
 **제거맵·측정스펙·캐릭터설계·critique 전문**: 워크플로우 산출 `/private/tmp/.../tasks/wfsm3bfxg.output` 또는 설계문서 참조.
 **critique must_fix(반영)**: ①패턴 사망=인프라재건 ②서버시그널 미기록 ③뷰 슬라이스(Phase1 흡수) ④역전수학 비엄밀(재측정 완료, fade는 56% 모뎀).

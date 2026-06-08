@@ -499,6 +499,86 @@ export const SIGNAL_CHARACTERS = [ /* ... */ ];
 - ✅ JS 인덱스 가드 → CSS 위치 셀렉터 치환 시 자문: "이 요소가 부모의 실제 첫/마지막 자식인가? 다른 형제가 끼어 있지 않나?"
 - ✅ 리뷰 체크리스트: "`first:`/`last:`/`nth-child`가 붙은 요소 위·아래에 같은 부모의 다른 형제(헤더·구분선)가 있는가?" → 있으면 죽은 셀렉터 의심.
 
+### 23. 1차 산출물을 부차 side-effect 뒤에 배치 — 크리티컬 경로 순서 맹점 (Primary Output Sequenced Behind a Secondary Side-Effect)
+
+**우리 사례** (2026-06-08 코드 리뷰, #373 패턴 시그널 서버 발화·기록 배선): `handler`에서 새로 추가한 `recordPatternSignals`(최대 10s fetch 타임아웃 + redis I/O)가 핵심 산출물인 `setSnap('signals:latest')` **앞에** 배치됐다. 다운스트림(signal_history POST)이 느리면 1차 산출물인 `signals:latest` 기록이 최대 10초 지연된다. `maxDuration 120s`라 한계 위반은 아니고 try/catch로 실패 격리도 됐지만, **소비자가 실제로 기다리는 1차 산출물이 옵션성·느린·실패 가능 후속 작업에 가로막힌다.** 새 기능(발화+기록 배선)을 추가하며 그 호출을 핸들러 상단("시그널 계산 직후")에 끼워, 기존의 크리티컬 write를 뒤로 밀어버린 것. VERDICT는 PASS([PERF] 비차단)였으나, 1차 경로의 latency/risk가 부차 작업에 종속되는 구조적 순서 결함 1건.
+
+**근본 원인**: AI는 새 side-effect를 추가할 때 *서사적 읽기 순서*("시그널을 계산했으니 이제 발화하고 기록한다")로 코드를 배치한다. 그러나 핸들러 안에서 *무엇이 1차 deliverable인가*(다운스트림이 폴링하는 `signals:latest`), 그리고 *그 deliverable이 내구적으로 flush된 뒤에 옵션성 작업이 와야 한다*는 크리티컬 경로 순서를 모델링하지 않는다. 결과적으로 새로 끼운 느린/실패 가능 작업이 1차 산출물의 commit point보다 앞서, 지연·위험을 1차 경로에 전가한다.
+
+**발생 패턴**:
+```js
+// AI가 자주 생성 (잘못됨 — 1차 산출물이 옵션성 작업 뒤)
+export default async function handler(req, res) {
+  const signals = computeSignals();
+  await recordPatternSignals(signals);      // 최대 10s, 실패 가능 — 새로 추가한 부차 작업
+  await setSnap('signals:latest', signals); // 1차 산출물이 10s 지연/차단됨
+}
+
+// 올바른 패턴 — 1차 산출물 먼저 flush, 부차 작업은 나중
+export default async function handler(req, res) {
+  const signals = computeSignals();
+  await setSnap('signals:latest', signals); // 1차 deliverable 먼저 내구적 기록
+  await recordPatternSignals(signals);      // 옵션성·느린 작업은 뒤 (try/catch로 격리)
+}
+```
+
+**영향**:
+- 다운스트림이 기다리는 1차 산출물이 옵션성 후속 작업의 지연/타임아웃만큼 늦게 게시됨
+- 부차 작업이 (격리됐더라도) 길어지면 함수 전체 `maxDuration`을 잠식 → 극단적으로 1차 write까지 도달 못 함
+- "둘 다 await하니 결국 다 된다"는 착시 — *순서*가 1차 경로의 latency/risk를 결정한다는 점을 가림
+
+**왜 #14·#21과 다른가**:
+- #14(렌더 루프 내 재선언)는 배치가 *실행 빈도*(매 루프)를, #21(모듈 로드 가드)은 배치가 *실행 시점·폭발 반경*을 오판한 것이다.
+- 이 패턴은 배치가 *크리티컬 경로상의 순서*(1차 deliverable의 flush 시점 대비 부차 작업 위치)를 오판한 것 — 같은 "배치 맹점" 가족이나 오판한 축이 빈도/시점/반경이 아니라 *deliverable 대비 시퀀싱*이다.
+
+**해결책**:
+- ✅ 핸들러에서 "다운스트림이 실제로 기다리는 1차 산출물"을 먼저 식별하고, 그 write를 *부차·옵션성 side-effect보다 앞에* 둔다.
+- ✅ 새 side-effect(기록·알림·집계)는 1차 산출물 commit 이후로 배치하고 try/catch로 격리 (1차 경로 무영향 보장).
+- ✅ 느린(외부 fetch·타임아웃) 작업이 크리티컬 write 앞에 있으면 의심 — 순서 뒤집기 또는 fire-and-forget(`void p.catch(...)`) 고려.
+- ✅ 리뷰 체크리스트: "이 핸들러의 1차 deliverable은 무엇이고, 그보다 앞에 느리거나 실패할 수 있는 작업이 끼어 있는가?"
+
+---
+
+### 24. 리소스 한도 미설정 → 플랫폼 강제 종료가 핸들러 내부 안전망을 선점 (Platform Hard-Kill Preempts In-Handler Safety Net)
+
+**우리 사례** (2026-06-08 코드 리뷰, #372 패턴 시그널 크론 스케줄 활성화): `compute-signals.js`는 `TARGETS` 전 종목 fetch + TA 계산을 수행하는 무거운 핸들러인데, `vercel.json`의 `functions` 블록엔 `api/krx-etf.js`만 `maxDuration: 30`이 있고 **이 핸들러는 누락 → Vercel 기본 타임아웃 적용**. 동시에 핸들러 내부엔 `failRate>0.5` 가드(909줄 → `recordCronFailure`), `recordPatternSignals` try/catch(917줄), `setSnap` try/catch(925줄 → `recordCronFailure`) 등 **실패를 기록·복구하는 안전망이 모두 핸들러 *안*에** 있다. 이번이 스케줄로 도는 최초의 프로덕션 가동인데, 작업이 기본 duration을 초과하면 Vercel이 함수를 **강제 종료** → 이 안전망들이 *실행되기 전에* 죽어 `recordCronFailure`조차 못 남긴다. 즉 타임아웃 실패가 *관측 불가능한 실패*가 된다. (현재 `signals:patterns` 소비자가 없어 사용자 영향 0이라 비차단이었으나, 피드 머지 전 반드시 검증 필요.)
+
+**근본 원인**: AI는 에러 핸들링을 *언어/애플리케이션 레벨*(try/catch, 가드 return, 실패 기록 호출)에서 구현하고 "런타임이 함수를 끝까지 실행시켜 준다"고 가정한다. 그러나 *플랫폼 자체의 종료 권한* — 타임아웃(`maxDuration`), OOM, SIGKILL은 try/catch *위에서* 프로세스를 중단시킨다 — 을 모델링하지 않는다. 실행을 한도 안에 묶어줄 리소스 설정(`maxDuration`)마저 누락되면, *실패를 관측·기록하려던 코드*(`recordCronFailure`, `catch`→log)가 가장 먼저 파괴된다. 결과적으로 타임아웃 실패는 로그·메트릭 어디에도 남지 않는 *보이지 않는 실패*가 된다.
+
+**발생 패턴**:
+```js
+// vercel.json — 무거운 cron 핸들러에 maxDuration 미설정 → 기본 타임아웃 적용
+"functions": { "api/krx-etf.js": { "maxDuration": 30 } },   // compute-signals 누락
+"crons": [{ "path": "/api/cron/compute-signals", "schedule": "20 */4 * * *" }]
+
+// 핸들러 내부 — 모든 실패 기록이 "함수가 끝까지 산다"고 가정
+if (failRate > 0.5) { await recordCronFailure(...); return ...; } // 타임아웃이 먼저 SIGKILL → 미실행
+try { await setSnap(...); }
+catch (e) { await recordCronFailure(...); }                       // 동일 — 프로세스가 죽으면 기록도 못 함
+
+// 올바른 패턴 — 무거운 핸들러의 실행 한도를 플랫폼 레벨에서 명시
+"functions": {
+  "api/krx-etf.js": { "maxDuration": 30 },
+  "api/cron/compute-signals.js": { "maxDuration": 60 }           // 내부 안전망이 돌 시간 확보
+}
+```
+
+**영향**:
+- 타임아웃/OOM 시 `recordCronFailure`·`catch`·`failRate` 가드가 *실행 전* 강제 종료 → 실패가 로그·메트릭 어디에도 안 남음(관측 불가 실패)
+- "try/catch로 격리했으니 안전"이라는 착시 — 언어 레벨 방어는 플랫폼 레벨 kill 위에서 무력
+- 무거운 작업(전 종목 fetch + TA)이 *첫 프로덕션 스케줄 가동*에서만 한도에 닿아, 로컬·빌드에선 절대 재현 안 됨
+
+**왜 #5·#9·#21과 다른가**:
+- #5(조용한 실패)는 `catch`가 에러를 *삼키는* 것 — 여기선 `catch`가 정상이고 *실행 자체가 선점*당해 못 돈다(삼킴 vs 선점).
+- #9(인프라 회피)는 인프라 작업을 *아예 미룸/생략* — 여기선 인프라(cron)는 배선됐고 *리소스 한도 한 줄*이 누락돼 앱 레벨 안전망과 충돌한다.
+- #21(모듈 로드 가드)은 *코드*의 실행 시점(import vs 호출)·폭발 반경 오판 — 여기선 *플랫폼*이 try/catch 위에서 프로세스를 죽이는, 언어 레벨 위의 종료 권한을 모델링 못 한 것이다.
+
+**해결책**:
+- ✅ 무거운/외부 I/O 핸들러는 `vercel.json` `functions`에 `maxDuration` 명시 — 내부 가드·기록 코드가 돌 시간 확보
+- ✅ 첫 프로덕션 가동 후 실제 `durationMs` 로그 확인, 기본값에 근접하면 상향
+- ✅ 실패 기록은 핸들러 *밖*(cron invoker 응답 코드·플랫폼 로그)에도 남겨, 프로세스가 죽어도 흔적이 남도록 이중화
+- ✅ 리뷰 체크리스트: "이 핸들러가 플랫폼 타임아웃/OOM으로 강제 종료되면, 실패를 기록할 코드도 같이 죽는가? 실행 한도는 플랫폼 레벨에서 보장되는가?"
+
 ---
 
 *이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-06-08)*
