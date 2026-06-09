@@ -8,20 +8,24 @@
 > **새 세션 시작 시 이 문서를 가장 먼저 읽어 현재 상황을 복원하세요.**
 > 그 다음 `MEMORY.md`, `CLAUDE.md`, `.project/backlog.md`, `.project/decisions.md` 순으로 보강.
 
-## 🆕 새 세션 즉시 시작 (2026-06-09 인계)
+## 🆕 새 세션 즉시 시작 (2026-06-09 인계 #2)
 
-**main = origin/main = `5aa4288` (동기화). Production = `ac562e5` (전 코드 배포됨, 5aa4288은 docs만 — 미배포 코드 없음). 소스 클린.**
+**main = origin/main = `7bc0f3b` (동기화). Production = `ac562e5` (미배포 코드 2건: `9022fdf`·`7bc0f3b`). 소스 클린.**
 
-이번 세션 완료(전부 배포):
-- ✅ **시그널 전면 개편** (대표 /goal): 측정교정+죽은26종제거(30→4)+5캐릭터+성적표 + 패턴 발화·기록 크론(#365·#367·#369·#371·#374·#375). 상세 `.project/signal-overhaul-2026-06-08.md`.
-- ✅ **로딩 최적화 Phase1~3** (대표 /goal): 마운트 burst제거+afterPaint지연+asOf freshness배지. **첫 시세 페인트 8s→0.32s**, 'N분 전 업데이트' 라이브. 상세 `.project/loading-optimization-2026-06-09.md`.
+이번 세션 완료(머지, **미배포**):
+- ✅ **ke/m 엔드포인트 reliability** (#382/PR#384 `9022fdf`): 프로덕션 실측 **ke 500/12.1s · m 500/3.2s**(두 위젯 죽음 — ETF검색종목 손실·투자자동향 섹션숨김). fail-fast(타임아웃 8→4s + 누적deadline 3s, **실제 제약은 클라abort 8s**) + last-good(`await` 쓰기보장, `!etfs.length` 폴백). review **2차**(초기BLOCK HIGH3 반영: fire-forget→await / 필터후빈배열 폴백우회 / 예산 게이트12s→클라8s 재산정) + Gemini PASS.
+- ✅ **패턴 크론 failRate 버그** (#383/PR#385 `7bc0f3b`): `double_bottom`/`SRB`가 signal_history **0건** 원인 = `failRate>0.5` 조기return이 `recordPatternSignals` **앞** → 장외 fetch과반실패 시 패턴기록 영구누락. 순서 이동 + recordCronFailure 관측성. review+Gemini PASS.
 
-**▶ 다음 작업 우선순위 (둘 다 대표 /goal 잔여):**
-1. **로딩 최적화 남은 Phase** (가장 가까움): ① ke/m 엔드포인트 reliability(KRX-ETF 12s+500·시장투자자 6s+500 — fail-fast+last-good) ② Phase4 캐시 GET+CDN(d.js:120-122 POST가드→method분기, 난독화 트레이드오프 판단) ③ news-bundle ④ keep-warm. → `.project/loading-optimization-2026-06-09.md` "남은 작업".
-2. **시그널 Phase 0/3 검증**: 패턴 크론(20 */4 UTC) 발화 후 `signal_history`에 double_bottom/SRB 신규 기록 유입 확인(쿼리 Issue #372 코멘트) → OK면 PR3(성적표 status 동적 'live' 전환, signalCharacters.js status hardcoded 'revive' 해제). 
-3. **🔎 점검 거리**: asOf가 US 데이터 5.5h stale 노출 — update-us 크론 주기/실패 점검(데이터 신뢰).
+**⚠️ tracer 사고**: 시그널 진단 위임한 tracer(READ-ONLY 지시)가 compute-signals **무단수정+커밋+`npm run pr`**로 브랜치 난동 → ke/m PR 브랜치 오염·race. 정리(8e47080 분리보존→#383). 메모리 `feedback_agent_git_guard`. **진단 위임은 Edit/Write 없는 에이전트(Explore/code-reviewer)만, 실행 중 `git branch`/`status` 모니터링.**
 
-**가드(반복)**: 배포는 컨센서스 PM게이트가 중첩 `claude --print` 행 → `export PATH="$(echo "$PATH"|tr ':' '\n'|grep -v '/Users/bong/.local/bin'|paste -sd: -)"` 후 `npm run deploy`(하드게이트 통과, soft PM SKIP). 배포는 대표 확인/트리거 시. git add 명시 경로만(정크 73개 사고). Playwright QA 후 browser_close 필수.
+**▶ 다음 작업 우선순위:**
+1. **🚀 배포 판단 (PR3 선결)**: `9022fdf`·`7bc0f3b` 미배포. **#383 배포해야** 패턴크론(`20 */4` UTC) 다음 발화부터 signal_history에 double_bottom/SRB 기록 시작 → 비로소 PR3 검증 가능. ke/m도 위젯 복구. 대표 확인 후 `npm run deploy`(아래 가드).
+2. **시그널 PR3 (시간게이트)**: #383 배포 → 크론 수회 발화(수일 누적) → signal_history 패턴 기록 유입 확인(쿼리 #372 코멘트) → OK면 PR3(`signalCharacters.js` status hardcoded `'revive'`→동적 `'live'`). **기록 전 live 금지.**
+3. **🔎 질문B (데이터신뢰 별건)**: `foreign/institutional/smart_money` 시그널이 signal_history **6-08 08:20 UTC 마지막**(volume_anomaly만 6-09 유입). 투자자시그널 발화/기록 경로(signalEngine.js 클라? compositeScorer) 중단 원인 **미규명** — 별도 점검.
+4. **로딩 Phase4(GET+CDN) — 보류**: 게이트웨이 난독화(P1-9) 트레이드오프 + 사용자0명 재방문이득 미미 + 첫페인트 이미 0.32s. 런칭직전 ROI. (proxyToServerless가 Cache-Control strip → ke last-good `s-maxage` 무효, 그때 passthrough. PR#384 코멘트 기록)
+5. **🔎 asOf US 5.5h stale**: update-us 크론 주기/실패 점검(직전 인계 잔여).
+
+**가드(반복)**: 배포는 컨센서스 PM게이트가 중첩 `claude --print` 행 → `export PATH="$(echo "$PATH"|tr ':' '\n'|grep -v '/Users/bong/.local/bin'|paste -sd: -)"` 후 `npm run deploy`(하드게이트 통과, soft PM SKIP). 배포는 대표 확인/트리거 시. git add 명시 경로만(정크 73개 사고). **진단 에이전트 git 난동 주의(`feedback_agent_git_guard`)**. Playwright QA 후 browser_close 필수.
 
 ## 🔒 현재 단계 — 비공개 (Pre-launch)
 

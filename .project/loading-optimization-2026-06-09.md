@@ -65,8 +65,13 @@ useAfterIdle 공유 훅 신설. KRX-ETF(12s)·시장투자자(6s)·F&G 3쿼리�
 | 데이터 렌더 | — | 종목/지수/코인 ✓ |
 → **화면 0.3초 페인트 달성**(goal 1·3). 무거운 콜은 idle로.
 
-### ⬜ 남은 작업 (다음 트랙)
-1. **ke/m 엔드포인트 reliability** — KRX-ETF(t=ke) 3영업일×8s=최대24s→게이트웨이12s타임아웃→500. 시장투자자(t=m) 6s+500. 지연됐으나 위젯 자체 hang+실패. **fail-fast(시도/타임아웃 축소 → graceful 빈배열 200) + last-good 캐시**. api/krx-etf.js, api/hantoo-market-investor.js.
-2. **Phase 3 asOf freshness (goal 2)** — 스냅샷 데이터 생성시각 노출. **최소판: snapshot API가 `cron:lastOk:*`(이미 존재) 읽어 asOf:{kr,us,coins} 반환 → 크론 무변경**. UI는 `<RelativeTime asOf/>` 격리 컴포넌트(자체 setInterval, 상위 리렌더 비전파 — critique must_fix)로 'N초 전'. 장마감 '확정종가' 라벨은 marketHours(algo gate) 후속.
-3. **Phase 4 캐시 GET+CDN** — d.js:120-122 POST-only 가드→method 분기, 비민감 타입(i/f/fk/ke/r) GET+s-maxage. 재방문 네트워크 0.
-4. **Phase 5 뉴스 news-bundle**(L), **Phase 6 keep-warm**(런칭 직전).
+### ✅ ke/m reliability 완료 (#382/PR#384 `9022fdf`, 머지·미배포)
+프로덕션 실측 **ke 500/12.1s · m 500/3.2s**(두 위젯 죽음) → fail-fast + last-good.
+- **krx-etf.js**: 타임아웃 8→4s + 누적 deadline 3s(실제 제약은 클라 `fetchKrxEtf(8000)` abort, 게이트12s 아님). `await setSnap`(fire-forget 시 컨텍스트 동결로 드롭). 폴백 조건 `!list.length`→`!etfs.length`(스키마 드리프트로 필터후 빈배열 6h 고착 방지). 500→200.
+- **hantoo-market-investor.js**: `await setSnap`(26h) + Naver 타임아웃 5→4s(한투4+Naver4=8s<클라10s). 동시장애 시 last-good 200, 없으면 `error:'unavailable'` 200.
+- review **2차**(초기 BLOCK HIGH3 반영) + Gemini PASS. 측정 후(배포 후) curl 재검증 예정.
+
+### ⬜ 남은 작업
+1. **Phase 4 캐시 GET+CDN — 보류(런칭직전)**: 게이트웨이 난독화(P1-9) 트레이드오프 + **사용자 0명이라 재방문 CDN 이득 미미** + 첫페인트 이미 0.32s. ROI 낮음. ⚠️ `proxyToServerless`(d.js:75-81)가 Cache-Control **strip** → ke last-good `s-maxage=600`·m `s-maxage=30` 무효(클라 staleTime만). Phase4 착수 시 passthrough 1줄로 활성화. (PR#384 코멘트 기록)
+2. **Phase 5 news-bundle**(L) / **Phase 6 keep-warm**(런칭 직전).
+3. **🔎 asOf US 5.5h stale**: update-us 크론 주기/실패 점검(데이터 신뢰).
