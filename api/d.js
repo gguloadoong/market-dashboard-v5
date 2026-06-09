@@ -35,6 +35,9 @@
 
 export const config = { runtime: 'edge' };
 
+// #386 Phase4: GET 허용(CDN 캐시) 비민감 타입 화이트리스트
+const GET_CACHEABLE = new Set(['i', 'f', 'fk', 'ke', 'r']);
+
 // ─── Edge Function 핸들러 import ──────────────────────────────
 import usPriceHandler from './us-price.js';
 import marketIndicesHandler from './market-indices.js';
@@ -72,13 +75,15 @@ async function proxyToServerless(baseUrl, path, timeoutMs = 12000) {
     signal: AbortSignal.timeout(timeoutMs),
   });
   const body = await res.text();
-  return new Response(body, {
-    status: res.status,
-    headers: {
-      'Content-Type': res.headers.get('Content-Type') || 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    },
-  });
+  const headers = {
+    'Content-Type': res.headers.get('Content-Type') || 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  };
+  // #386 Phase4: Cache-Control passthrough — fk/ke 등 GET 캐시가능 타입의 s-maxage가
+  // CDN에 전달되게 (POST 타입은 CDN 미캐시라 헤더 전달돼도 무영향)
+  const cc = res.headers.get('Cache-Control');
+  if (cc) headers['Cache-Control'] = cc;
+  return new Response(body, { status: res.status, headers });
 }
 
 // POST body로 serverless 엔드포인트 프록시
@@ -110,27 +115,38 @@ export default async function handler(request) {
     return new Response(null, {
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Max-Age': '86400',
       },
     });
   }
 
-  // POST만 허용
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'POST only' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
-  }
-
+  // #386 Phase4: method 분기 — 비민감·캐시가능 타입(i/f/fk/ke/r)은 GET(CDN s-maxage 캐시),
+  // 민감 타입(가격/한투/차트)은 POST 유지(난독화). GET 화이트리스트 외 GET은 405.
   let body;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'invalid json' }), {
-      status: 400,
+  if (request.method === 'GET') {
+    const url = new URL(request.url);
+    const tParam = url.searchParams.get('t');
+    if (!GET_CACHEABLE.has(tParam)) {
+      return new Response(JSON.stringify({ error: 'GET allows cacheable types only' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+    body = Object.fromEntries(url.searchParams);
+  } else if (request.method === 'POST') {
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'invalid json' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+  } else {
+    return new Response(JSON.stringify({ error: 'method not allowed' }), {
+      status: 405,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }

@@ -141,10 +141,10 @@ export default async function handler(req, res) {
     try { cached = await getSnap(CACHE_KEY); } catch {}
     if (cached) {
       const ageSec = cached.savedAt ? Math.round((Date.now() - cached.savedAt) / 1000) : null;
-      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
       return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
     }
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
     return res.json({ score: null, status: 'not_configured', closed: false, label: '설정 필요' });
   }
 
@@ -184,10 +184,10 @@ export default async function handler(req, res) {
       try { cached = await getSnap(CACHE_KEY); } catch {}
       if (cached) {
         const ageSec = cached.savedAt ? Math.round((Date.now() - cached.savedAt) / 1000) : null;
-        res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
         return res.json({ ...cached, status: 'stale_cache', cached: true, ageSec });
       }
-      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
       return res.json({ score: null, status: 'error', closed: true, label: '데이터 없음' });
     }
 
@@ -224,7 +224,7 @@ export default async function handler(req, res) {
     res.json(payload);
   } catch (e) {
     console.error('[kr-fear-greed]', e.message);
-    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
     res.json({ score: null, status: 'error', closed: true, label: '데이터 없음' });
   }
 }
