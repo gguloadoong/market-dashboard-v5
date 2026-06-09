@@ -904,20 +904,28 @@ export default async function handler(req, res) {
     },
   };
 
-  // 과반 실패 시 기존 캐시 유지 — 외부 API 장애로 빈 시그널 노출 방지
-  const failRate = failed.length / TARGETS.length;
-  if (failRate > 0.5) {
-    await recordCronFailure('compute-signals', `fetch fail rate ${(failRate * 100).toFixed(0)}% — KV write skipped`);
-    return res.status(200).json({ ok: false, skipped: true, failRate, durationMs });
-  }
-
   // ── 패턴 시그널 signal_history 기록 (#373) ──
-  // signals:latest KV 쓰기와 독립 — 기록 실패해도 KV/응답에 영향 없음
+  // failRate 체크보다 먼저 실행 — 패턴은 이미 계산된 signals[]에서 필터하므로
+  // fetch 실패율과 무관. failRate>0.5 조기 return 뒤에 두면 장외 시간대에
+  // 항상 누락되는 버그(#372 fix)
   let patternResult = { recorded: 0, skipped: 0, total: 0 };
   try {
     patternResult = await recordPatternSignals(signals, req);
+    if (patternResult.error) {
+      // POST 실패(401/5xx 등) — cron 실패로 기록해 관측성 확보
+      await recordCronFailure('compute-signals', `pattern POST failed: ${patternResult.error}`).catch(() => {});
+    }
   } catch (e) {
     console.error('[compute-signals] 패턴 기록 전체 실패:', e?.message);
+    await recordCronFailure('compute-signals', `pattern record exception: ${e?.message}`).catch(() => {});
+  }
+
+  // 과반 실패 시 기존 캐시 유지 — 외부 API 장애로 빈 시그널 노출 방지
+  // 패턴 기록은 위에서 먼저 처리했으므로 여기서 return해도 누락 없음
+  const failRate = failed.length / TARGETS.length;
+  if (failRate > 0.5) {
+    await recordCronFailure('compute-signals', `fetch fail rate ${(failRate * 100).toFixed(0)}% — KV write skipped`);
+    return res.status(200).json({ ok: false, skipped: true, failRate, durationMs, patterns: patternResult });
   }
 
   // ── signals:patterns KV 쓰기 — signals:latest(CF Worker 소유 라이브 피드)와 분리해 충돌 회피 (#372) ──
