@@ -428,7 +428,14 @@ const PATTERN_TYPES = new Set([
 ]);
 const COOLDOWN_TTL = 86400; // 24h — 패턴 horizon(SR 4h, DB 8h)의 상위 바운드
 
-async function recordPatternSignals(signals, req) {
+// #390: 패턴 기록 경로 — self-HTTP-POST(VERCEL_URL deployment 인증벽/origin 불일치) 대신
+// Supabase RPC 직접 호출. signal-accuracy.js(Edge)가 같은 프로젝트 env로 정상 동작 중이므로
+// 동일 env 셋 접근 가능 — 새 키 발급 불요.
+const SB_URL    = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SB_KEY    = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const SB_SECRET = process.env.SIGNAL_RPC_SECRET;
+
+async function recordPatternSignals(signals) {
   const patterns = signals.filter(s => PATTERN_TYPES.has(s.type));
   if (!patterns.length) return { recorded: 0, skipped: 0, total: 0 };
 
@@ -465,53 +472,53 @@ async function recordPatternSignals(signals, req) {
     return { recorded: 0, skipped, total: patterns.length };
   }
 
-  // POST 페이로드 — /api/signal-accuracy가 정규화 처리
-  // 수신측 50건 캡에 맞춰 발신도 50건 제한
-  const batch = toRecord.slice(0, 50).map(sig => ({
-    type: sig.type,
-    symbol: sig.symbol,
-    market: sig.market || 'unknown',
-    direction: sig.direction || 'neutral',
-    strength: sig.strength || 1,
-    title: sig.title || '',
-    priceAtFire: sig.meta?.currentPrice ?? null,
-    meta: sig.meta || {},
-  }));
+  // env 가드 — 미설정 시 명시적 error로 관측(요약 postError 노출)
+  if (!SB_URL || !SB_KEY || !SB_SECRET) {
+    return { recorded: 0, skipped, total: patterns.length, error: 'supabase env missing' };
+  }
+
+  // batch 정규화 — signal-accuracy.js와 동일(price_at_fire finite-guard). RPC가 서버측 재검증.
+  const rows = toRecord.slice(0, 50).map(sig => {
+    const p = sig.meta?.currentPrice;
+    const pn = p == null ? null : Number(p);
+    return {
+      signal_type: sig.type,
+      symbol: sig.symbol,
+      market: sig.market || 'unknown',
+      direction: sig.direction || 'neutral',
+      strength: sig.strength || 1,
+      title: sig.title || '',
+      price_at_fire: Number.isFinite(pn) ? pn : null,
+      meta: sig.meta || {},
+    };
+  });
 
   try {
-    // 신뢰 가능한 고정 출처 — Host 헤더(클라이언트 조작 가능)를 쓰지 않음
-    // VERCEL_URL: Vercel 플랫폼이 주입하는 배포 URL (preview/production 모두)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : null;
-
-    if (!baseUrl) {
-      console.warn('[compute-signals] VERCEL_URL 미설정 — 패턴 기록 스킵');
-      return { recorded: 0, skipped, total: patterns.length, error: 'no base url' };
-    }
-
-    const url = `${baseUrl}/api/signal-accuracy`;
-    const resp = await fetch(url, {
+    // #390: Supabase RPC 직접 호출 — signal-accuracy.js와 동일 경로. self-POST 취약점 제거.
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/record_signal_batch`, {
       method: 'POST',
       headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
         'Content-Type': 'application/json',
-        'x-cron-secret': process.env.CRON_SECRET || '',
       },
-      body: JSON.stringify(batch),
-      signal: AbortSignal.timeout(10000),
+      body: JSON.stringify({ p_secret: SB_SECRET, signals: rows }),
+      signal: AbortSignal.timeout(8000),
     });
 
-    if (!resp.ok) {
-      const detail = await resp.text().catch(() => '');
-      console.error(`[compute-signals] 패턴 기록 POST 실패: ${resp.status} ${detail.slice(0, 200)}`);
-      return { recorded: 0, skipped, total: patterns.length, error: `HTTP ${resp.status}` };
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error(`[pattern-cron] RPC 실패: ${res.status} ${detail.slice(0, 160)}`);
+      return { recorded: 0, skipped, total: patterns.length, error: `rpc ${res.status}` };
     }
 
-    const result = await resp.json().catch(() => ({}));
+    // 인증벽 HTML 등 비정상 응답 방어 — inserted 숫자 아니면 error 승격(#390 핵심)
+    const out = await res.json().catch(() => null);
+    if (!out || typeof out.inserted !== 'number') {
+      return { recorded: 0, skipped, total: patterns.length, error: 'bad rpc shape' };
+    }
 
-    // POST 성공 후에만 쿨다운 SET — 실패 시 다음 크론에서 재시도 가능
+    // RPC 성공 후에만 쿨다운 SET — 실패 시 다음 크론에서 재시도 가능
     if (redis) {
       await Promise.allSettled(
         toRecord.slice(0, 50).map(sig =>
@@ -520,10 +527,10 @@ async function recordPatternSignals(signals, req) {
       );
     }
 
-    console.info(`[compute-signals] 패턴 기록 완료: inserted=${result.inserted ?? 0}, skipped_db=${result.skipped ?? 0}, cooldown_skipped=${skipped}`);
-    return { recorded: result.inserted ?? 0, skipped, total: patterns.length };
+    console.info(`[pattern-cron] 패턴 기록: inserted=${out.inserted}, skipped_db=${out.skipped ?? 0}, cooldown_skipped=${skipped}`);
+    return { recorded: out.inserted, skipped, total: patterns.length };
   } catch (e) {
-    console.error('[compute-signals] 패턴 기록 POST 예외:', e?.message);
+    console.error('[pattern-cron] RPC 예외:', e?.message);
     return { recorded: 0, skipped, total: patterns.length, error: e?.message };
   }
 }
@@ -793,6 +800,8 @@ export default async function handler(req, res) {
     }
   }
 
+  // #390: top-level 가드 — 도달 전 크래시도 recordCronFailure로 가시화(평탄 들여쓰기 의도).
+  try {
   const startedAt = Date.now();
   const signals = [];
   const failed = [];
@@ -910,21 +919,44 @@ export default async function handler(req, res) {
   // 항상 누락되는 버그(#372 fix)
   let patternResult = { recorded: 0, skipped: 0, total: 0 };
   try {
-    patternResult = await recordPatternSignals(signals, req);
+    patternResult = await recordPatternSignals(signals);
     if (patternResult.error) {
-      // POST 실패(401/5xx 등) — cron 실패로 기록해 관측성 확보
-      await recordCronFailure('compute-signals', `pattern POST failed: ${patternResult.error}`).catch(() => {});
+      // 기록 실패 — cron 실패로 기록해 관측성 확보 (#390: 고유 이름 'pattern-cron')
+      await recordCronFailure('pattern-cron', `pattern record failed: ${patternResult.error}`).catch(() => {});
     }
   } catch (e) {
-    console.error('[compute-signals] 패턴 기록 전체 실패:', e?.message);
-    await recordCronFailure('compute-signals', `pattern record exception: ${e?.message}`).catch(() => {});
+    console.error('[pattern-cron] 패턴 기록 전체 실패:', e?.message);
+    await recordCronFailure('pattern-cron', `pattern record exception: ${e?.message}`).catch(() => {});
+  }
+
+  // #390: 하트비트 + 공개 진단 요약 — 모든 종료 경로 공통(발화/탐지/기록을 시크릿 없이 검증).
+  // 이름 'pattern-cron'으로 CF Worker compute-signals와 키 분리(관측성 오염 해소).
+  const patternCandidates = signals.filter(s => PATTERN_TYPES.has(s.type)).length;
+  const summary = {
+    lastOk: Date.now(),
+    generatedAt: new Date().toISOString(),
+    fetchedCount,
+    failedCount: failed.length,
+    failRate: +(failed.length / TARGETS.length).toFixed(2),
+    failedSample: failed.slice(0, 10),
+    patternCandidates,
+    recorded: patternResult.recorded ?? 0,
+    cooldownSkipped: patternResult.skipped ?? 0,
+    postError: patternResult.error ?? null,
+    durationMs: Date.now() - startedAt,
+  };
+  if (redis) {
+    await Promise.allSettled([
+      redis.set('cron:lastOk:pattern-cron', Date.now()),
+      setSnap('cron:summary:pattern-cron', summary, 6 * 3600),
+    ]);
   }
 
   // 과반 실패 시 기존 캐시 유지 — 외부 API 장애로 빈 시그널 노출 방지
   // 패턴 기록은 위에서 먼저 처리했으므로 여기서 return해도 누락 없음
   const failRate = failed.length / TARGETS.length;
   if (failRate > 0.5) {
-    await recordCronFailure('compute-signals', `fetch fail rate ${(failRate * 100).toFixed(0)}% — KV write skipped`);
+    await recordCronFailure('pattern-cron', `fetch fail rate ${(failRate * 100).toFixed(0)}% — KV write skipped`);
     return res.status(200).json({ ok: false, skipped: true, failRate, durationMs, patterns: patternResult });
   }
 
@@ -934,7 +966,7 @@ export default async function handler(req, res) {
     // TTL 18000s(5h) — 크론 주기 4h(20 */4)보다 길게 설정해 캐시 공백 방지 (Gemini gate P1)
     await setSnap('signals:patterns', payload, 18000);
   } catch (e) {
-    await recordCronFailure('compute-signals', e?.message || String(e));
+    await recordCronFailure('pattern-cron', e?.message || String(e));
     return res.status(500).json({ error: 'kv write failed', message: e?.message });
   }
 
@@ -944,4 +976,10 @@ export default async function handler(req, res) {
     durationMs,
     patterns: patternResult,
   });
+  } catch (fatal) {
+    // #390: 어떤 크래시도 가시화 — cron:fail:pattern-cron + lastError로 간접 감지.
+    console.error('[pattern-cron] FATAL:', fatal?.message || fatal);
+    await recordCronFailure('pattern-cron', `fatal: ${fatal?.message || fatal}`).catch(() => {});
+    return res.status(500).json({ error: 'fatal', message: fatal?.message || String(fatal) });
+  }
 }
