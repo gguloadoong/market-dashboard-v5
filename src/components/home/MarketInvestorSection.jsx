@@ -26,6 +26,7 @@ function SimpleTabs({ tabs, activeTab, onChange }) {
 }
 import { formatNetAmt } from '../../api/investor';
 import { fetchHantooMarketInvestor } from '../../api/_gateway.js';
+import { useAfterIdle } from '../../hooks/useAfterIdle';
 
 // ─── 탭 정의 ─────────────────────────────────────────────────
 const TABS = [
@@ -147,6 +148,10 @@ function InvestorRow({ row, amount, barWidth }) {
 export default function MarketInvestorSection() {
   const [activeTab, setActiveTab] = useState('combined');
 
+  // afterIdle 게이팅 (#로딩최적화) — 시장투자자(t=m)는 콜드로드 mount에서 최대 6s+500이라
+  // 임계경로 부하·실패의 주범. 섹션은 below-fold라 첫 페인트 후 idle에 로드(그전엔 숨김).
+  const afterIdle = useAfterIdle();
+
   // React Query — 1분 stale, 에러 시 null 처리
   const { data, isLoading, isError } = useQuery({
     queryKey: ['market-investor'],
@@ -155,6 +160,7 @@ export default function MarketInvestorSection() {
     retry:        1,
     refetchInterval: 3 * 60_000,
     refetchIntervalInBackground: false,
+    enabled:      afterIdle,
   });
 
   // 로딩 중

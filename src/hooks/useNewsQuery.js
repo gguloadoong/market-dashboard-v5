@@ -2,7 +2,8 @@
 // initialData: 로컬스토리지 캐시를 즉시 표시 → "불러오는중" 제거
 // initialDataUpdatedAt: React Query가 staleTime 기준으로 백그라운드 갱신 여부 판단
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import { useAfterIdle } from './useAfterIdle';
 import {
   fetchAllNews, fetchNewsByCategory, invalidateNewsCache,
   getInitialNewsData, getInitialNewsTimestamp,
@@ -22,24 +23,7 @@ const NEWS_OPTIONS = {
   refetchOnWindowFocus: false,
 };
 
-// 첫 페인트 후 idle 시점에 true — 뉴스 17 RSS 네트워크 발사를 페인트 뒤로 미룬다 (#로딩최적화 2026-06-09).
-// initialData(localStorage 캐시)는 enabled=false여도 React Query가 즉시 표시하므로,
-// 캐시 있으면 네트워크 0콜, 캐시 미스만 idle 후 발사 → 콜드로드 burst에서 17콜 제거.
-function useAfterIdle() {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') { setReady(true); return; }
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(() => setReady(true), { timeout: 2000 });
-      return () => window.cancelIdleCallback?.(id);
-    }
-    const id = setTimeout(() => setReady(true), 1500);
-    return () => clearTimeout(id);
-  }, []);
-  return ready;
-}
-
-// 전체 뉴스 — 로컬스토리지 캐시가 있으면 즉시 표시, 네트워크 발사는 페인트 후 idle
+// 전체 뉴스 — 로컬스토리지 캐시가 있으면 즉시 표시, 네트워크 발사는 페인트 후 idle (useAfterIdle 공유)
 export function useAllNewsQuery() {
   const afterIdle = useAfterIdle();
   return useQuery({
