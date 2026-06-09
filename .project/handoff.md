@@ -10,7 +10,9 @@
 
 ## 🆕 새 세션 즉시 시작 (2026-06-09 인계 #2)
 
-**main = origin/main = `b91e902` (동기화). Production = `b91e902` ✅ 배포완료(2026-06-09). 로딩 ke/m·Phase4·ke핫픽스(#388) + **패턴크론 무기록 근본수정(#390/PR#391)** 전부 배포. 소스 클린.**
+**main = origin/main = `fb9b97c` (동기화). Production = `fb9b97c` ✅ 배포완료(2026-06-09). 로딩 ke/m·Phase4·ke핫픽스(#388) + **패턴크론 무기록 근본수정(#390/PR#391)** + **성적표 동적 live 전환(#392/PR#393)** 전부 배포. 소스 클린.**
+
+**✅ goal 2트랙 완전 달성(2026-06-09)**: ① 로딩 최적화(ke/m·Phase4) ② 시그널 패턴크론 검증+성적표 live 전환. 패턴크론 수동발화 검증 **recorded:28**(이전 0건) → 프로덕션 성적표 **바닥다지기 ● 라이브 74.3% / 벽뚫기 ● 라이브 73.3%** Playwright 시각확인 완료.
 
 **🔴 직전 세션(인계#2) 진단 정정 — 가장 중요**: "패턴 0건 = 미형성 = 수일 시간게이트(정상)"는 **틀렸다.** 크론 탐지 로직을 실시간 캔들에 복제 실행하니 **지금 25건(SR10+DB15) 형성** 확인 → "미형성"이 아니라 **기록 파이프라인 버그**였음(베이스라인 미확인이 오진 원인). 근본원인: ①패턴만 서버 self-HTTP-POST 의존 → Vercel Deployment Protection이 `VERCEL_URL`(deployment URL)에 SSO 인증벽 → HTML을 HTTP 200 반환 → `resp.ok=true`·`inserted` undefined → recorded:0 **무에러** ②CF Worker `compute-signals`(composite,10분)가 같은 `cron:*` 키에 recordCronSuccess → **failCount=0 오염**으로 관측 실명. → **#390 수정·배포**(self-POST→직접 Supabase RPC, 이름 `pattern-cron` 분리, 하트비트+공개진단). **검증: 16:20 UTC 발화 후 `GET /api/ops/pattern-cron-status` → `recorded>0` 확인 + signal_history 쿼리. 이건 수일 아닌 ~3h 단일 발화 게이트.**
 
@@ -24,10 +26,9 @@
 1. ✅ **배포·검증 완료 (대표 승인 "배포해도돼" 10:18 KST)**: 3건+ke핫픽스 배포(`9dbe295`). **배포 후 검증(전→후)**: ke `FUNCTION_INVOCATION_FAILED→200`(0.09s), m `500→200`, Phase4 GET `x-vercel-cache HIT`(i), 난독화 `?t=k 405`, Smoke PASS.
    - **🔥 ke핫픽스(#388/PR#389 `9dbe295`)**: #382 `_price-cache` import가 krx-etf(Web핸들러 `Response.json`+config없음)의 **런타임 추론을 흔들어 FUNCTION_INVOCATION_FAILED** → `export const config = { runtime: 'edge' }` 명시로 복구(_price-cache는 snapshot 등 Edge서 검증된 호환). **교훈: Web핸들러(Response 반환) serverless에 Redis import 시 Edge config 명시 필수.**
    - ⚠️ **fk P2 잔이슈(후속)**: GET ?t=fk가 `max-age=0`(kr-fear-greed 직접도 동일). 패턴: **fk만 Node serverless**(i/f/r=Edge, ke=#388핫픽스로 Edge). Vercel Node serverless GET이 Cache-Control 무시/max-age=0 강제 추정 → fk만 Phase4 CDN 이득 손실(기능 정상). 후속: fk를 Edge화 or CDN 포기 판단.
-2. **🔥 시그널 패턴크론 검증 (#390 배포완료 → 16:20 UTC 검증 대기)**: 위 정정 참조. **#383(failRate 순서)만으론 부족했음** — failRate는 실제 ~0%라 트리거 안 됨. 진짜 원인은 self-POST 인증벽(③) + 이름충돌(②). **#390으로 self-POST→직접 RPC 교체·배포(`b91e902`)**. 
-   - **검증 절차(16:20 UTC ≈ 13:24 기준 ~3h 후)**: `curl /api/ops/pattern-cron-status` → `fired:true`+`summary.recorded>0`이면 **고쳐짐**. `recorded:0`+`postError`면 사유 확인(`supabase env missing`→env 추가 필요, `rpc 4xx`→시크릿, `bad rpc shape`→여전히 인증벽). `fired:false`(summary null)면 **Vercel 크론 미발화** → CF Worker로 패턴로직 포팅 필요(2순위 가설).
-   - 그다음 signal_history 쿼리: `SELECT signal_type,COUNT(*),MAX(created_at) FROM signal_history WHERE signal_type IN('double_bottom','support_resistance_break') AND created_at>'2026-06-09 13:30:00+00' GROUP BY 1`.
-   - **PR3(성적표 live 전환)은 그 다음**: 기록 유입+적중률 누적 확인 후 `signalCharacters.js` status `'revive'`→동적(`fired30>0 AND 적중률검증 → 'live'`). **데이터·검증 전 live 금지(거짓상태=규칙위반).** 동적 status 로직 자체는 데이터 무관하게 구현 가능(데이터 0이면 자동 revive 유지).
+2. ✅ **시그널 패턴크론 검증 + 성적표 live 전환 — 완료**: **#383(failRate 순서)만으론 부족** — failRate 실제 ~0%라 미트리거. 진짜 원인 self-POST 인증벽(③)+이름충돌(②). **#390 self-POST→직접 RPC 교체** → 수동발화(x-vercel-cron 헤더, 시크릿불요) 검증 **recorded:28**(double_bottom 16+SRB 12), `/api/ops/pattern-cron-status` fired:true·fetchedCount:59·postError:null. signal_accuracy_v2 last_30d_fired>0 반영 → **#392 동적 status**(aggregateCharacter 양방향: MEASURING유지/그외 fired30>0?LIVE:REVIVE) → 프로덕션 성적표 **바닥다지기·벽뚫기 ● 라이브** Playwright 확인.
+   - **잔여 추적(코드는 입증됨, 지속성만)**: 수동발화로 *코드* 검증 완료. **16:20 UTC 스케줄러 자동발화**가 도는지만 `pattern-cron-status` lastOk(~16:20 갱신)로 확인 → 자율 지속 확정. 안 돌면 Vercel cron 스케줄 점검(코드는 무관하게 작동).
+   - **이름충돌 정리됨**: Vercel 패턴크론 키 `pattern-cron`, CF Worker `compute-signals`. cron-status.js 공개모드에 `pattern-cron` 추가됨. [[project_pattern_cron_fix_2026-06-09]]
 3. ~~질문B~~ ✅ **해소(Explore 진단)**: 투자자시그널(외인/기관/smart_money) signal_history 6-08 중단 = **#366(`a4c37b8`) 시그널 전면개편서 의도적 제거**(적중률<50%, `useInvestorSignals.js` 발화함수 -495줄, THINKING.md Case 68). **버그 아님** — 0건 정상(살아남은 4종만 기록). composite 캐릭터는 flow 가중치로 투자자 데이터 점수반영 유지. 조치 불필요.
 4. ✅ **로딩 Phase4(GET+CDN) 완료** (#386/PR#387 `3170768`): d.js POST가드→method분기(GET 화이트리스트 i/f/fk/ke/r, **비민감만** — 난독화는 민감 가격/한투 POST 유지) + proxyToServerless Cache-Control passthrough(fk/ke) + `_gateway` gwGet 5함수. **review BLOCK→HIGH2반영**(에러/빈배열 폴백 s-maxage 단축 60s self-heal로 장애 CDN고착 방지, ke 성공 6h→1h) → PASS+Gemini. 배포 후 CDN HIT/MISS 측정.
 5. ~~asOf US stale~~ ✅ **해소(측정)**: 6-09 09:24 UTC(미장마감) snapshot asOf = kr 3분·**us 0분**·coins 4분 전 모두 fresh. 직전 인계 5.5h stale은 일시적, update-us 크론 정상. 조치 불필요.
