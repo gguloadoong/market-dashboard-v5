@@ -105,7 +105,8 @@ export default async function handler(_req) {
         });
       }
       return Response.json({ etfs: [] }, {
-        headers: { 'Cache-Control': 'public, s-maxage=3600' },
+        // #386: 빈배열(KRX실패+last-good부재)은 짧게 — 일시장애 CDN 고착 방지(60s self-heal)
+        headers: { 'Cache-Control': 'public, s-maxage=60' },
       });
     }
 
@@ -114,7 +115,7 @@ export default async function handler(_req) {
 
     return Response.json({ etfs }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=3600', // 6시간 캐싱
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600', // #386: 6h→1h (EOD 전일종가, CDN 활성화 신선도 안전)
         'Access-Control-Allow-Origin': '*',
       },
     });

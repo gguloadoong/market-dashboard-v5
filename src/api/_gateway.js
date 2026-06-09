@@ -34,6 +34,20 @@ async function gwText(body, timeoutMs = 12000) {
   return res.text();
 }
 
+// GET 요청 — CDN 캐시가능 비민감 타입(i/f/fk/ke/r) 전용 (#386 Phase4)
+// POST /api/d는 CDN 미캐시 → 비민감 캐시가능 타입은 GET으로 재방문 origin 왕복 0.
+async function gwGet(params, timeoutMs = 12000) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${ENDPOINT}?${qs}`, {
+    method: 'GET',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`gw ${params.t}: ${res.status}`);
+  return res;
+}
+async function gwGetJson(params, timeoutMs = 12000) { return (await gwGet(params, timeoutMs)).json(); }
+async function gwGetText(params, timeoutMs = 12000) { return (await gwGet(params, timeoutMs)).text(); }
+
 // ─── 미국 주식 ───────────────────────────────────────────────
 export function fetchUsPrice(symbols, timeoutMs = 8000) {
   return gwJson({ t: 'u', s: symbols.join(',') }, timeoutMs);
@@ -56,7 +70,7 @@ export function fetchEtfPrices(symbols, timeoutMs = 10000) {
 
 // ─── 시장 지수 ───────────────────────────────────────────────
 export function fetchMarketIndices(timeoutMs = 10000) {
-  return gwJson({ t: 'i' }, timeoutMs);
+  return gwGetJson({ t: 'i' }, timeoutMs);
 }
 
 // ─── 한투 지수 ───────────────────────────────────────────────
@@ -66,7 +80,7 @@ export function fetchHantooIndices(timeoutMs = 8000) {
 
 // ─── RSS 프록시 (텍스트 응답) ────────────────────────────────
 export function fetchRss(rssUrl, timeoutMs = 4000) {
-  return gwText({ t: 'r', u: rssUrl }, timeoutMs);
+  return gwGetText({ t: 'r', u: rssUrl }, timeoutMs);
 }
 
 // ─── 차트 프록시 ─────────────────────────────────────────────
@@ -95,12 +109,12 @@ export function fetchHantooMarketInvestor(timeoutMs = 8000) {
 
 // ─── 공포탐욕 지수 ───────────────────────────────────────────
 export function fetchFearGreed(timeoutMs = 8000) {
-  return gwJson({ t: 'f' }, timeoutMs);
+  return gwGetJson({ t: 'f' }, timeoutMs);
 }
 
 // ─── 국장 공포탐욕 지수 (VKOSPI + 외국인 순매수) ────────────
 export function fetchKrFearGreed(timeoutMs = 8000) {
-  return gwJson({ t: 'fk' }, timeoutMs);
+  return gwGetJson({ t: 'fk' }, timeoutMs);
 }
 
 // ─── 한투 차트 ───────────────────────────────────────────────
@@ -155,7 +169,7 @@ export function fetchUpbitNotices(timeoutMs = 5000) {
 
 // ─── KRX ETF ─────────────────────────────────────────────────
 export function fetchKrxEtf(timeoutMs = 8000) {
-  return gwJson({ t: 'ke' }, timeoutMs);
+  return gwGetJson({ t: 'ke' }, timeoutMs);
 }
 
 // ─── 투자자 동향 추이 (N일) ──────────────────────────────────
