@@ -10,7 +10,7 @@
 
 ## 🆕 새 세션 즉시 시작 (2026-06-09 인계 #2)
 
-**main = origin/main = `3170768` (동기화). Production = `ac562e5` (미배포 코드 3건: `9022fdf` ke/m·`7bc0f3b` 패턴크론·`3170768` Phase4). 소스 클린.**
+**main = origin/main = `1323d96` (동기화). Production = `1323d96` ✅ 배포완료(2026-06-09). 소스 클린.**
 
 이번 세션 완료(머지, **미배포**):
 - ✅ **ke/m 엔드포인트 reliability** (#382/PR#384 `9022fdf`): 프로덕션 실측 **ke 500/12.1s · m 500/3.2s**(두 위젯 죽음 — ETF검색종목 손실·투자자동향 섹션숨김). fail-fast(타임아웃 8→4s + 누적deadline 3s, **실제 제약은 클라abort 8s**) + last-good(`await` 쓰기보장, `!etfs.length` 폴백). review **2차**(초기BLOCK HIGH3 반영: fire-forget→await / 필터후빈배열 폴백우회 / 예산 게이트12s→클라8s 재산정) + Gemini PASS.
