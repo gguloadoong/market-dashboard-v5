@@ -169,8 +169,8 @@ export function useCoins(krwRateRef) {
     const quickId     = setInterval(() => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); }, POLLING.FAST);
     const fullId      = setInterval(() => { if (!document.hidden) refreshCoins(); }, POLLING.BACKGROUND);
     const sparklineId = setInterval(() => { if (!document.hidden) refreshSparklines(); }, POLLING.SPARKLINE);
-    // 탭 복귀 시 즉시 갱신
-    const onVisible = () => { if (!document.hidden) refreshCoinsQuick(); };
+    // 탭 복귀 시 즉시 갱신 — WS 연결 중이면 생략(interval L169와 동일 가드, Upbit 중복콜 방지, #로딩최적화)
+    const onVisible = () => { if (!document.hidden && !wsConnectedRef.current) refreshCoinsQuick(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       clearInterval(quickId);
