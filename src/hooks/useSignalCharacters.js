@@ -43,14 +43,27 @@ export function aggregateCharacter(char, slices) {
     fired30 += Number(s.last_30d_fired) || 0;
   }
 
+  // #392 성적표 status 양방향 동적 파생(발화 로직 무변경, signal_accuracy_v2 실집계 기반):
+  //   MEASURING(표본부족)은 발화와 무관하게 유지. 그 외는 실발화로 결정 —
+  //   last_30d_fired>0 → LIVE, 0 → REVIVE('부활 예정').
+  //   기준값(출발지) 의존 없이 양방향 보정 → "발화 중단된 LIVE 고착"과
+  //   "발화 재개된 REVIVE 고착"을 모두 방지(정직 트랙레코드). 30일 무발화 시 자동 REVIVE.
+  const status =
+    char.status === CHARACTER_STATUS.MEASURING
+      ? CHARACTER_STATUS.MEASURING
+      : fired30 > 0
+        ? CHARACTER_STATUS.LIVE
+        : CHARACTER_STATUS.REVIVE;
+
   // measuring(표본부족) 또는 평가 표본 0이면 적중률 비노출
   const accuracy =
-    char.status === CHARACTER_STATUS.MEASURING || evalSum === 0
+    status === CHARACTER_STATUS.MEASURING || evalSum === 0
       ? null
       : Math.round((hitSum / evalSum) * 1000) / 10; // 소수 1자리
 
   return {
     ...char,
+    status,
     accuracy,
     sampleN: evalSum,
     last30dFired: fired30,

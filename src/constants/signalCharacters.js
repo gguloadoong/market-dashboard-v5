@@ -8,9 +8,9 @@
 // 적중률은 v2 fair-hit(노이즈밴드·거래비용 제외) 기준. 대표 horizon은 캐릭터별로 다르다
 // (거래량=1h 단기지속, 패턴=24h). 약한 horizon은 UI에서 숨긴다.
 //
-// status:
+// status (여기 값은 *기준값* — aggregateCharacter가 실데이터로 동적 보정, #392):
 //   'live'      — 현재 발화 중(last_30d_fired>0). 라이브 적중률 노출.
-//   'revive'    — 역사적 엣지 강하나 서버 미발화(last_30d_fired=0). '부활 예정' 배지 + 역사적 적중률.
+//   'revive'    — 역사적 엣지 강하나 서버 미발화. last_30d_fired>0 재개 시 aggregateCharacter가 LIVE로 전환.
 //   'measuring' — 트랙레코드 표본 부족. 적중률 숨김('측정 준비 중').
 
 export const CHARACTER_STATUS = {
@@ -41,7 +41,7 @@ export const SIGNAL_CHARACTERS = [
       { type: 'double_bottom', market: 'us', direction: 'bullish' }, // 24h 66% n213
       { type: 'double_bottom', market: 'kr', direction: 'bullish' }, // 24h 94% n94
     ],
-    status: CHARACTER_STATUS.REVIVE, // last_30d_fired=0 (서버 미발화)
+    status: CHARACTER_STATUS.REVIVE, // 기준값 — #390 패턴크론 복구로 발화 재개 시 aggregateCharacter가 LIVE 동적 전환(#392)
   },
   {
     id: 'breakout',
