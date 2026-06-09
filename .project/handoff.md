@@ -29,8 +29,9 @@
 | **1 마운트 burst 제거** | usePrices 즉시refresh 제거(미장250 fan-out 중복) + 코인가드 + 뉴스17 idle | ✅ 배포(#376/PR#377 `578cf2a`). /api/d 123→55 |
 | **2 비임계 afterPaint** | useAfterIdle 훅 + KRX-ETF(12s)·시장투자자(6s)·F&G idle. useIndices 유지(헤더임계) | ✅ 배포(#378/PR#379 `ea845ba`) |
 | **측정** | **첫 시세 페인트 ~0.32s**(스냅샷 CDN HIT, 전: 8s burst 막힘). 종목/지수/코인 렌더✓ | ✅ goal1·3 달성 |
-| **3 asOf freshness** | snapshot API가 기존 `cron:lastOk:update-kr/us/coins` 읽어 asOf 반환(크론 무변경) + `<RelativeTime>` 격리컴포넌트(자체 setInterval, 상위 리렌더 비전파 — critique must_fix) 'N초전'. 장마감라벨은 marketHours(algo) 후속 | ⬜ goal2 |
-| **ke/m reliability** | KRX-ETF 3영업일×8s=24s→게이트웨이12s타임아웃→500. fail-fast+last-good. api/krx-etf.js, api/hantoo-market-investor.js | ⬜ |
+| **3 asOf freshness** | snapshot API가 `cron:lastOk:kr/us/coins` 읽어 asOf 반환(크론 무변경) + `<RelativeTime>` 격리컴포넌트 + 탭인식 headerAsOf | ✅ **배포(#380/PR#381 `ac562e5`)**. 프로덕션 검증: 배지 "1분 전 업데이트" 렌더, asOf {kr 71s, coins 136s, **us 19981s(5.5h)**}. goal2 달성 |
+| **🔎 발견** | asOf가 **US 데이터 5.5h stale** 노출(미장 마감 — cron:lastOk:us 5.5h 전). freshness 기능이 제 역할(투명). **US 크론 주기/실패 별도 점검 가치** | 🔎 |
+| **ke/m reliability** | KRX-ETF 3영업일×8s=24s→게이트웨이12s타임아웃→500. fail-fast+last-good. api/krx-etf.js, api/hantoo-market-investor.js | ⬜ 다음 |
 | **4 캐시 GET+CDN** | d.js:120-122 POST가드→method분기, 비민감타입(i/f/fk/ke/r) GET+s-maxage | ⬜ |
 | **5 news-bundle**(L) / **6 keep-warm**(런칭직전) | | ⬜ |
 
