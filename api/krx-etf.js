@@ -3,6 +3,11 @@
 // 전일 종가 기준 (실시간 아님), GlobalSearch 종목 확보용
 // 거래일 기준 최근 5일 중 데이터 있는 날 자동 선택
 
+// #388 P0: Web handler(Response.json)인데 _price-cache import로 런타임 추론이 흔들려
+// FUNCTION_INVOCATION_FAILED → Edge 명시 (_price-cache는 snapshot·signals·ta-indicators 등
+// Edge 함수에서 검증된 호환). #382 import 추가 전엔 Web 시그니처가 Edge로 추론되어 정상이었음.
+export const config = { runtime: 'edge' };
+
 import { getSnap, setSnap } from './_price-cache.js';
 
 const KRX_BASE  = 'https://data-dbg.krx.co.kr/svc/apis';
