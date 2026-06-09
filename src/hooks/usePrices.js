@@ -283,8 +283,10 @@ export function usePrices() {
     let prevUsActive = usActive();
     let prevKrActive = krActive();
 
-    refreshUsStocks();
-    refreshKoreanStocks();
+    // 마운트 즉시 refresh 제거 (#로딩최적화 2026-06-09) — hot 스냅샷 effect(L205-209)가 이미
+    // krStocks/usStocks 시드 + setPricesReady. 여기서 또 refresh하면 us-price가 서버에서 250종목
+    // per-symbol fan-out(최대 8s 지연)을 중복 발사 → 콜드로드 burst 주범. 첫 폴링은 scheduleUs/Kr의
+    // setTimeout(NORMAL 60s / CLOSED 5min) 뒤부터. 탭복귀(onVisible)·시장전환은 즉시 refresh 유지.
     scheduleUs();
     scheduleKr();
 
