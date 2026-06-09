@@ -1,12 +1,27 @@
 ---
 세션 핸드오프
-업데이트: 2026-06-01
+업데이트: 2026-06-09
 ---
 
 # 마켓레이더 v5 — 세션 핸드오프
 
 > **새 세션 시작 시 이 문서를 가장 먼저 읽어 현재 상황을 복원하세요.**
 > 그 다음 `MEMORY.md`, `CLAUDE.md`, `.project/backlog.md`, `.project/decisions.md` 순으로 보강.
+
+## 🆕 새 세션 즉시 시작 (2026-06-09 인계)
+
+**main = origin/main = `5aa4288` (동기화). Production = `ac562e5` (전 코드 배포됨, 5aa4288은 docs만 — 미배포 코드 없음). 소스 클린.**
+
+이번 세션 완료(전부 배포):
+- ✅ **시그널 전면 개편** (대표 /goal): 측정교정+죽은26종제거(30→4)+5캐릭터+성적표 + 패턴 발화·기록 크론(#365·#367·#369·#371·#374·#375). 상세 `.project/signal-overhaul-2026-06-08.md`.
+- ✅ **로딩 최적화 Phase1~3** (대표 /goal): 마운트 burst제거+afterPaint지연+asOf freshness배지. **첫 시세 페인트 8s→0.32s**, 'N분 전 업데이트' 라이브. 상세 `.project/loading-optimization-2026-06-09.md`.
+
+**▶ 다음 작업 우선순위 (둘 다 대표 /goal 잔여):**
+1. **로딩 최적화 남은 Phase** (가장 가까움): ① ke/m 엔드포인트 reliability(KRX-ETF 12s+500·시장투자자 6s+500 — fail-fast+last-good) ② Phase4 캐시 GET+CDN(d.js:120-122 POST가드→method분기, 난독화 트레이드오프 판단) ③ news-bundle ④ keep-warm. → `.project/loading-optimization-2026-06-09.md` "남은 작업".
+2. **시그널 Phase 0/3 검증**: 패턴 크론(20 */4 UTC) 발화 후 `signal_history`에 double_bottom/SRB 신규 기록 유입 확인(쿼리 Issue #372 코멘트) → OK면 PR3(성적표 status 동적 'live' 전환, signalCharacters.js status hardcoded 'revive' 해제). 
+3. **🔎 점검 거리**: asOf가 US 데이터 5.5h stale 노출 — update-us 크론 주기/실패 점검(데이터 신뢰).
+
+**가드(반복)**: 배포는 컨센서스 PM게이트가 중첩 `claude --print` 행 → `export PATH="$(echo "$PATH"|tr ':' '\n'|grep -v '/Users/bong/.local/bin'|paste -sd: -)"` 후 `npm run deploy`(하드게이트 통과, soft PM SKIP). 배포는 대표 확인/트리거 시. git add 명시 경로만(정크 73개 사고). Playwright QA 후 browser_close 필수.
 
 ## 🔒 현재 단계 — 비공개 (Pre-launch)
 
