@@ -57,6 +57,8 @@ export function usePrices() {
   const [krStocks, setKrStocks]   = useState(() => loadPriceCache(CACHE_KEY_KR));
   const [pricesReady, setPricesReady] = useState(false);
   const [dataErrors, setDataErrors] = useState({ kr: false, us: false });
+  // #380: 데이터 freshness — 스냅샷 hot 응답의 asOf(마켓별 마지막 크론 성공 epoch ms). null이면 미표시.
+  const [asOf, setAsOf] = useState(null);
 
   // ref로 최신 stocks 유지 — useCallback 의존성에서 제외하여 무한 루프 방지
   const krStocksRef = useRef(krStocks);
@@ -115,11 +117,14 @@ export function usePrices() {
         if (mergedUs) savePriceCache(CACHE_KEY_US, mergedUs);
         checkAndAlertBatch(data, 'us');
         setDataErrors(prev => ({ ...prev, us: false }));
+        // #380: 폴링 성공 = 데이터 갱신 → asOf.us 리셋. ⚠️ 객체 형태 유지(스냅샷도 {kr,us,coins} 객체 —
+        // number로 set하면 headerAsOf의 asOf.us가 undefined→null→라벨 소멸. review CRITICAL)
+        setAsOf(prev => ({ ...(prev && typeof prev === 'object' ? prev : {}), us: Date.now() }));
       } else {
         setDataErrors(prev => ({ ...prev, us: true }));
       }
     } catch { setDataErrors(prev => ({ ...prev, us: true })); }
-  }, []); // ref 패턴 — stocks 의존성 없음
+  }, []); // ref 패턴 — stocks 의존성 없음 (setAsOf/setUsStocks 등 setter는 안정 참조)
 
   const refreshKoreanStocks = useCallback(async () => {
     try {
@@ -155,11 +160,13 @@ export function usePrices() {
         if (mergedKr) savePriceCache(CACHE_KEY_KR, mergedKr);
         checkAndAlertBatch(data, 'kr');
         setDataErrors(prev => ({ ...prev, kr: false }));
+        // #380: 폴링 성공 → asOf.kr 리셋. 객체 형태 유지(review CRITICAL — number set 시 라벨 소멸)
+        setAsOf(prev => ({ ...(prev && typeof prev === 'object' ? prev : {}), kr: Date.now() }));
       } else {
         setDataErrors(prev => ({ ...prev, kr: true }));
       }
     } catch { setDataErrors(prev => ({ ...prev, kr: true })); }
-  }, []); // ref 패턴 — stocks 의존성 없음
+  }, []); // ref 패턴 — stocks 의존성 없음 (setter는 안정 참조)
 
   // #185: snapshot 초기 로드 = hot tier(Top 200) 즉시 → full tier lazy merge.
   //        applySnapshot 로 merge 경로 단일화 → hot/full 동일 로직 공유.
@@ -206,6 +213,8 @@ export function usePrices() {
       // 1단계: hot — 작고 빠르게 (~30KB) 홈 즉시 렌더
       const hot = await fetchSnapshot({ tier: 'hot' });
       applySnapshot(hot);
+      // #380: hot 응답의 asOf 캡처 (freshness 표시용). 객체 동일성 비교 불필요 — 헤더 1곳만 소비.
+      if (!cancelled && hot?.asOf) setAsOf(hot.asOf);
       if (!cancelled) setPricesReady(true);
 
       // 2단계: full lazy — idle 시점에 전종목 보강. ric 없으면 1s setTimeout fallback.
@@ -213,6 +222,7 @@ export function usePrices() {
         if (cancelled) return;
         const full = await fetchSnapshot({ tier: 'full' });
         applySnapshot(full);
+        if (!cancelled && full?.asOf) setAsOf(full.asOf);
       };
       if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
         idleId = window.requestIdleCallback(loadFull, { timeout: 2000 });
@@ -340,5 +350,6 @@ export function usePrices() {
     dataErrors, setDataErrors,
     krSymbolsRef, usSymbolsRef,
     refreshUsStocks, refreshKoreanStocks,
+    asOf,
   };
 }

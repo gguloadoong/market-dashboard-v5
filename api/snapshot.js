@@ -3,7 +3,7 @@
 // [최적화] ETag/304 + 필드 스트리핑
 export const config = { runtime: 'edge' };
 
-import { getAllSnaps, getHotSnaps, getCronHealth } from './_price-cache.js';
+import { getAllSnaps, getHotSnaps, getCronHealth, getCronLastOk } from './_price-cache.js';
 
 // CORS 공통 헤더
 const CORS_HEADERS = {
@@ -89,7 +89,8 @@ export default async function handler(request) {
     const tier = url.searchParams.get('tier') === 'hot' ? 'hot' : 'full';
 
     if (tier === 'hot') {
-      const snaps = await getHotSnaps();
+      // #380: 스냅샷과 asOf(마지막 크론 성공 시각) 병렬 조회 — asOf 실패해도 스냅샷은 진행.
+      const [snaps, asOf] = await Promise.all([getHotSnaps(), getCronLastOk()]);
       // Redis 연결 실패 → 503 (hot 도 Redis 의존)
       if (!snaps) {
         return new Response(JSON.stringify({
@@ -103,8 +104,9 @@ export default async function handler(request) {
       const us = stripStocks(snaps.us ?? []);
       const coins = stripCoins(snaps.coins ?? []);
       const hasAny = kr.length + us.length + coins.length > 0;
+      // ETag는 데이터 내용([kr,us,coins])만 해시 — asOf/ts/_fromCache 제외(매 응답 변동 → 304 캐시 유지, #331 회귀 방지).
       const etag = `"hot-${simpleHash(JSON.stringify([kr, us, coins]))}"`;
-      const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: hasAny, tier: 'hot' });
+      const body = JSON.stringify({ kr, us, coins, asOf, ts: Date.now(), _fromCache: hasAny, tier: 'hot' });
       const clientETag = request.headers.get('if-none-match');
       if (clientETag === etag) {
         return new Response(null, {
@@ -124,7 +126,8 @@ export default async function handler(request) {
       });
     }
 
-    const snaps = await getAllSnaps();
+    // #380: 전종목 스냅샷과 asOf(마지막 크론 성공 시각) 병렬 조회.
+    const [snaps, asOf] = await Promise.all([getAllSnaps(), getCronLastOk()]);
     const fromCache = snaps !== null;
 
     // Redis 연결 자체가 안 되면 503 (인프라 장애)
@@ -146,7 +149,8 @@ export default async function handler(request) {
     // ── ETag: 데이터 내용 해시 (ts/_fromCache 제외 — 매번 바뀌므로) ──
     // #185: "full-" 프리픽스 — hot 과 ETag 네임스페이스 분리.
     const etag = `"full-${simpleHash(JSON.stringify([kr, us, coins]))}"`;
-    const body = JSON.stringify({ kr, us, coins, ts: Date.now(), _fromCache: fromCache, tier: 'full' });
+    // asOf는 ETag 해시에서 제외(ts/_fromCache와 동일) — 매 응답 변동값이라 포함 시 304 캐시 깨짐(#331).
+    const body = JSON.stringify({ kr, us, coins, asOf, ts: Date.now(), _fromCache: fromCache, tier: 'full' });
     const clientETag = request.headers.get('if-none-match');
     if (clientETag === etag) {
       return new Response(null, {

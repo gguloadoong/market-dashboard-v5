@@ -2,6 +2,7 @@
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { fmt } from '../utils/format';
 import OpsStatusBadge from './OpsStatusBadge';
+import RelativeTime from './RelativeTime';
 
 function DarkToggleIcon({ dark }) {
   return dark ? (
@@ -28,7 +29,7 @@ const TABS = [
 
 export default function Header({
   krwRate, lastUpdated, onRefresh, loading, activeTab, onTabChange,
-  dark = false, onDarkToggle,
+  dark = false, onDarkToggle, asOf = null,
 }) {
   const kr = getKoreanMarketStatus();
   const us = getUsMarketStatus();
@@ -112,6 +113,9 @@ export default function Header({
               <span className="text-[12px] text-[#B0B8C1] font-mono">{timeStr}</span>
             </div>
           )}
+
+          {/* #380: 데이터 freshness — 스냅샷 생성시각 기준 'N분 전 업데이트' (격리 컴포넌트, 자체 타이머) */}
+          <RelativeTime asOf={asOf} />
 
           {/* #164 Phase B: 크론 상태 뱃지 (localStorage opsMode=true 일 때만 표시) */}
           <OpsStatusBadge />

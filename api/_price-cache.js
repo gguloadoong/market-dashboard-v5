@@ -255,4 +255,28 @@ export async function getCronHealth() {
   }
 }
 
+// #380: 데이터 freshness — 마켓별 마지막 크론 성공 시각(epoch ms) 조회.
+// 키: cron:lastOk:{kr,us,coins} (workers/cron recordCronSuccess가 Date.now() 기록).
+// mget 1회로 3키 일괄 — 실패/미존재 시 해당 마켓 null (graceful).
+// 반환값은 number로 강제 — Upstash가 set(key, number) 를 string으로 돌려줄 수 있음.
+export async function getCronLastOk() {
+  const fallback = { kr: null, us: null, coins: null };
+  if (!redis) return fallback;
+  try {
+    const [kr, us, coins] = await redis.mget(
+      'cron:lastOk:kr',
+      'cron:lastOk:us',
+      'cron:lastOk:coins',
+    );
+    const num = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    return { kr: num(kr), us: num(us), coins: num(coins) };
+  } catch (e) {
+    console.error('[price-cache] getCronLastOk 실패:', e);
+    return fallback;
+  }
+}
+
 export { redis };
