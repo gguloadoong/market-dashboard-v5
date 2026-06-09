@@ -579,6 +579,83 @@ catch (e) { await recordCronFailure(...); }                       // 동일 — 
 - ✅ 실패 기록은 핸들러 *밖*(cron invoker 응답 코드·플랫폼 로그)에도 남겨, 프로세스가 죽어도 흔적이 남도록 이중화
 - ✅ 리뷰 체크리스트: "이 핸들러가 플랫폼 타임아웃/OOM으로 강제 종료되면, 실패를 기록할 코드도 같이 죽는가? 실행 한도는 플랫폼 레벨에서 보장되는가?"
 
+### 25. 최적화가 대체한 경로의 암묵적 복구 역할을 함께 제거 — '무손상 degrade'를 '실패 복구'로 착각 (Optimization Drops the Replaced Path's Implicit Recovery Role — Mistaking Non-Corrupting Degradation for Failure Recovery)
+
+**우리 사례** (2026-06-09 코드 리뷰, #376 로딩 최적화 Phase1 — 마운트 burst 제거): 콜드스타트 burst를 줄이려고 마운트 즉시 `refreshUsStocks()`/`refreshKoreanStocks()`(per-symbol fan-out, 최대 8s)를 제거(`usePrices.js:286-289`)하고, 대신 batched hot 스냅샷 1콜(`fetchSnapshot({tier:'hot'})`, L207-209)으로 시드한다. happy-path는 정확하다 — 콜 수 급감, 홈 즉시 렌더. 그러나 스냅샷이 실패(null 반환)하면 `applySnapshot(null)`은 no-op(L170 early return)이고 `setPricesReady(true)`는 그대로 발화 → UI는 "준비됨"이나 신선 시세는 0(구 localStorage 캐시만 표시), 그리고 **즉시 폴백이 없다.** 첫 신선 데이터는 `scheduleUs/Kr`의 정기 폴링(NORMAL 60s / lastClose **5min**) 뒤에야 도착한다. 즉, 제거된 즉시 refresh가 사실은 *콜드스타트 로더 겸 실패 복구 경로*였는데, 합치면서 그 복구 역할이 조용히 사라졌다. degrade 자체는 graceful(구 캐시 유지 → 신뢰 훼손 0)하나, `/goal`의 "지연없이/바로 노출/실서비스급" 기준에선 실패 시 최대 5분 지연이 퇴행이다. VERDICT는 PASS([HIGH] 비차단, 저비용 폴백 권장)였으나, happy-path 최적화가 실패 경로를 퇴행시킨 구조 결함 1건.
+
+**근본 원인**: AI는 N개 granular 작업(per-symbol fetch)을 1개 consolidated 작업(batched snapshot)으로 합쳐 happy-path를 최적화·검증한다. 실패 시 "구 캐시 유지"라는 graceful degradation까지 더해 "실패는 처리됐다"고 결론낸다. 그러나 두 가지를 모델링하지 않는다 — (1) 대체된 granular 경로가 happy-path 로더일 뿐 아니라 *암묵적 redundancy/복구 경로*였다는 점(합치면 콜드스타트가 **단일 장애점**이 된다), (2) *무손상 degrade(데이터 안 깨짐) ≠ 실패 복구(빠른 신선화)* 라는 구분. 결과적으로 consolidated 경로가 실패하면 복구가 가장 느린 폴백(다음 정기 폴링)으로 추락하는데도, AI는 "캐시 유지 = 안전"이라는 착시로 그 latency 퇴행을 못 본다.
+
+**발생 패턴**:
+```js
+// AI가 자주 생성 (잘못됨 — 단일 fast 경로, 실패 시 복구 없음)
+const hot = await fetchSnapshot({ tier: 'hot' }); // 콜드스타트 단일 진입점
+applySnapshot(hot);                                // 실패 시 null → no-op
+setPricesReady(true);                              // UI는 "준비됨"이라 표시
+// 제거된 즉시 refresh가 복구 경로였음 → 실패 시 다음 폴링(최대 5min)까지 신선 데이터 0
+
+// 올바른 패턴 — happy-path burst 절감은 유지, 실패 시에만 1회 granular 폴백
+const hot = await fetchSnapshot({ tier: 'hot' });
+applySnapshot(hot);
+if (!cancelled) setPricesReady(true);
+if (!hot && !cancelled) {        // 스냅샷 실패 → 즉시 per-symbol 폴백 1회 (중복 없음)
+  refreshUsStocks(); refreshKoreanStocks();
+}
+```
+
+**영향**:
+- consolidated 경로(스냅샷)가 단일 장애점 → 실패 시 복구가 즉시→다음 정기 폴링(최대 5min)으로 퇴행
+- `setPricesReady(true)`가 신선 데이터 없이도 발화 → UI는 "준비됨"인데 구 캐시만 → 빈/낡은 화면을 정상으로 위장
+- "캐시 유지로 degrade했으니 안전" 착시 — 신뢰는 지켜도 *지연없이* 같은 latency 요구는 미충족
+- happy-path 최적화 diff만 보면 "burst 절감" 성과로 위장돼 실패 경로 퇴행이 가려짐
+
+**왜 #5·#23·#24와 다른가**:
+- #5(조용한 실패)는 `catch`가 에러를 *삼켜* 관측 불가다. 여기선 실패가 degrade로 *관측·처리*되고(구 캐시 유지) 삼켜지지 않는다 — 문제는 은폐가 아니라 *복구 지연*이다(은폐 vs 지연).
+- #23(1차 산출물이 부차 side-effect 뒤)은 한 핸들러 내 두 await의 *순서* 결함이다. 여기선 *경로 교체*에서 대체 코드의 복구 역할이 누락된 것 — 순서가 아니라 redundancy 소실이다.
+- #24(플랫폼 강제 종료가 안전망 선점)는 플랫폼 kill이 안전망 코드보다 먼저 돌아 안전망이 *실행조차 못 한다*. 여기선 안전망(degrade)이 정상 실행되지만 *그 안전망이 복구가 아니라 동결*이다 — 안전망 미실행 vs 안전망 부적합.
+
+**해결책**:
+- ✅ granular→consolidated 최적화 시 자문: "대체하는 기존 코드가 happy-path 외에 *복구/redundancy/콜드스타트* 역할도 했나?" → 했다면 consolidated 실패 시 1회 granular 폴백을 명시적으로 복원
+- ✅ "무손상 degrade"와 "실패 복구"를 분리 검증 — degrade가 신뢰(데이터 무손상)를 지켜도 latency 요구(`/goal` 지연없이/실서비스급)를 만족하는지 별도로 확인
+- ✅ `setPricesReady`/`isReady` 류 플래그는 *신선 데이터 도착*과 분리 — 캐시만 있고 신선화 실패면 백그라운드 복구를 트리거(플래그만 true로 두고 끝내지 않음)
+- ✅ 리뷰 체크리스트: "이 최적화가 대체한 코드가 실패/콜드스타트 복구도 담당했나? 새 경로가 실패하면 복구는 *즉시*인가, 아니면 다음 정기 사이클까지 지연인가?"
+
 ---
 
-*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-06-08)*
+### 26. 환상 근거 주석 — 코드는 맞지만 '왜'가 날조됨 (Confabulated Rationale Comment — Correct Code, Fabricated 'Why')
+
+**우리 사례** (2026-06-09 코드 리뷰, #378 로딩 최적화 Phase2 — afterIdle 게이팅): `useFearGreed.js:57`에 F&G 3쿼리를 idle로 미루는 게 *왜 안전한지*를 설명하는 주석을 달았다 — "`useInvestorSignals` 2s 스캔 전 idle(1.5s) 완료". 그러나 두 전제가 모두 허구다. (1) `useInvestorSignals.js`에 F&G 참조는 **0건**(grep 확인) — F&G와 `useInvestorSignals` 사이엔 의존·타이밍 관계가 애초에 없다. 실제로 idle 지연이 무해한 진짜 이유는 *완전히 다른 메커니즘*이다(실소비자 3위젯 `CommandCenter`/`MarketSentiment`/`FearGreedWidget`이 전부 `crypto.data?.score` 옵셔널 체이닝 + `getFgLabel(undefined)→''` 폴백). (2) "idle(1.5s) 완료"라는 데드라인 단언도 거짓이다 — `useAfterIdle.js:17`은 `requestIdleCallback(..., { timeout: 2000 })`라 메인스레드가 바쁘면 **최대 2000ms**에 발화하고, 1500ms는 `requestIdleCallback` 미지원 시 `setTimeout` 폴백(L20)에만 적용된다. 즉 코드는 정확히 동작하나(행동 테스트·VERDICT 전부 PASS), 그 동작을 *정당화하는 주석*이 존재하지 않는 의존성과 API가 보장하지 않는 타이밍으로 지어내졌다.
+
+**근본 원인**: AI는 매직 상수(`timeout: 2000`)나 비자명한 설계 결정 옆에 "왜 안전한가"를 설명하는 권위적 산문을 생성한다. 그러나 그 근거가 *실제 코드 메커니즘에서 검증된 사실*인지(이 의존성이 grep에 잡히나? 이 API가 정말 이 데드라인을 보장하나?) 확인하지 않는다. 대신 *그럴듯하게 들리는 인과 서사*("idle이 스캔보다 먼저 끝나니 경합 없음")를 사후 합리화로 채운다. 코드가 우연히 *다른 이유로* 맞기 때문에 행동 검증은 통과하고, 허구의 근거는 검출되지 않은 채 박제된다. happy-path 동작이 맞으면 "주석도 맞다"고 가정하는 — 동작과 근거를 분리 검증하지 않는 — 맹점이다.
+
+**발생 패턴**:
+```js
+// AI가 자주 생성 (잘못됨 — 동작은 맞지만 근거가 허구)
+// useInvestorSignals 2s 스캔 전 idle(1.5s) 완료  ← (a) 존재하지 않는 의존성, (b) 보장 안 되는 데드라인
+const afterIdle = useAfterIdle();   // 실제 timeout:2000 (최대 2s), 1.5s는 폴백 경로만
+// 진짜 안전 이유는 따로 있음: 소비자 3위젯이 전부 ?. 가드 → 데이터 지연 무해
+
+// 올바른 패턴 — 실제로 코드를 안전하게 만드는 메커니즘을 근거로
+// 소비자(F&G 3위젯)가 전부 data?.score 옵셔널 체이닝 + ''  폴백이라 idle 지연이 무해.
+// 타이밍은 경합 가드가 아님(rIC timeout:2000, setTimeout 1500 — 둘 다 상한일 뿐).
+const afterIdle = useAfterIdle();
+```
+
+**영향**:
+- 후속 개발자가 허구의 근거를 신뢰 → 잘못된 결합 가정. "F&G가 `useInvestorSignals` 2s 스캔에 의존한다"고 읽고 `timeout: 2000`을 보존하거나, 반대로 `useInvestorSignals` 타이밍을 바꾸며 "F&G가 깨질라" 헛고생.
+- 보장되지 않는 타이밍("1.5s 완료")을 *진짜 보장*으로 믿고 다른 곳에 그 패턴을 복사 → 실제 경합 버그 유발.
+- 코드는 맞으니 테스트·빌드·동작 QA 전부 통과 → 정적 분석으로 안 잡히고, 잘못된 멘탈 모델만 문서로 굳음.
+
+**왜 #18·#7·#13과 다른가**:
+- #18(암묵적 불변식/주석 부패)의 주석은 *작성 시점엔 사실*이었다가 코드 진화로 거짓이 됐다(과거-참 → 미래-거짓, 갱신 누락). 이 패턴의 주석은 *처음부터 사실인 적이 없다* — 존재하지 않는 인과를 신규로 지어낸 confabulation이다(시간축이 아니라 진위 출발점이 다름).
+- #7(매직넘버 불일치)은 *같은 값*이 파일마다 다르게 박힌 것. 여기선 값이 아니라 그 값을 *정당화하는 서사*가 허구다.
+- #13(전문용어 함정)은 *사용자 대상* 표현이 어려운 것. 여기선 *개발자 대상* 근거 주석의 내용 자체가 거짓이다.
+
+**해결책**:
+- ✅ "왜 안전한가" 주석을 달 땐 그 근거를 *코드로 검증*: 인과/의존을 주장하면 grep으로 그 관계가 실재하는지, API 보장을 주장하면 시그니처/문서로 그 보장이 실재하는지 확인 후 작성.
+- ✅ 코드가 안전한 *진짜 메커니즘*을 근거로 명시 — "소비자가 `?.` 가드라 데이터 지연 무해"처럼 검증 가능한 사실. 추정 타이밍 경합을 근거로 들지 않는다.
+- ✅ 타이밍 상수 주석엔 *상한/하한의 정확한 의미*를 적는다(`timeout:2000`=최대 2s, `setTimeout 1500`=폴백 경로). "1.5s"처럼 한쪽만 적어 데드라인으로 오인시키지 않는다.
+- ✅ 리뷰 체크리스트: "이 주석이 주장하는 인과·의존·보장이 *코드에 실재하는가*? 코드가 맞는 진짜 이유와 주석이 대는 이유가 같은가?" → 다르면 근거 주석을 정정.
+
+---
+
+*이 문서는 마켓레이더 v5 개발 과정에서 직접 경험한 사례를 바탕으로 작성되었다. (마지막 업데이트: 2026-06-09)*

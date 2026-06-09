@@ -17,7 +17,26 @@
 
 상세는 CLAUDE.md "위반 불가 3원칙 → 배포 규칙 → 비공개 단계 정책" 참조.
 
-## 🚀 현재 최우선 트랙 — 시그널 시스템 전면 개편 (대표 /goal 2026-06-08)
+## ⚡ 현재 최우선 트랙 — 서비스 로딩 최적화 (대표 /goal 2026-06-09)
+
+대표 /goal: 지연없이 화면 / 이전데이터 신뢰훼손 없게 / 바로 노출 / **실서비스급** / workflow 추가진단.
+**📄 상세·측정·로드맵: `.project/loading-optimization-2026-06-09.md` 필독.**
+
+진단(실측+workflow): 셸 빠름(DCL 317ms), **데이터레이어 마운트 burst가 병목**(홈 14훅 동시→/api/d 97~123콜, 일부 6~12s).
+
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| **1 마운트 burst 제거** | usePrices 즉시refresh 제거(미장250 fan-out 중복) + 코인가드 + 뉴스17 idle | ✅ 배포(#376/PR#377 `578cf2a`). /api/d 123→55 |
+| **2 비임계 afterPaint** | useAfterIdle 훅 + KRX-ETF(12s)·시장투자자(6s)·F&G idle. useIndices 유지(헤더임계) | ✅ 배포(#378/PR#379 `ea845ba`) |
+| **측정** | **첫 시세 페인트 ~0.32s**(스냅샷 CDN HIT, 전: 8s burst 막힘). 종목/지수/코인 렌더✓ | ✅ goal1·3 달성 |
+| **3 asOf freshness** | snapshot API가 기존 `cron:lastOk:update-kr/us/coins` 읽어 asOf 반환(크론 무변경) + `<RelativeTime>` 격리컴포넌트(자체 setInterval, 상위 리렌더 비전파 — critique must_fix) 'N초전'. 장마감라벨은 marketHours(algo) 후속 | ⬜ goal2 |
+| **ke/m reliability** | KRX-ETF 3영업일×8s=24s→게이트웨이12s타임아웃→500. fail-fast+last-good. api/krx-etf.js, api/hantoo-market-investor.js | ⬜ |
+| **4 캐시 GET+CDN** | d.js:120-122 POST가드→method분기, 비민감타입(i/f/fk/ke/r) GET+s-maxage | ⬜ |
+| **5 news-bundle**(L) / **6 keep-warm**(런칭직전) | | ⬜ |
+
+**critique must_fix(반영)**: useIndices 지연금지(스냅샷 지수 미포함→헤더빈칸), useServerSignals DataHealthBadge(전탭) 보류, F&G 3쿼리, RelativeTime 격리.
+
+## 🚀 직전 트랙 — 시그널 시스템 전면 개편 (대표 /goal 2026-06-08, ✅ 완결·배포)
 
 대표 /goal: "죽은 시그널 봇·알고리즘 다 제거, 적중률 50%+ 시스템 전면개편, 캐릭터 <5, 성적표 노출, 단순 지표조합 금지, 우리만의 노하우." **workflow 활용.**
 

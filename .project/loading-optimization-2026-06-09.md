@@ -45,3 +45,28 @@
 - freshness: 장외 asOf 노출 + 'N초 전/확정종가' 칩
 
 검증: Playwright browser_network_requests로 mount~FMP+2s /api/d 카운트 전후 비교(브라우저 종료 필수).
+
+---
+
+## ✅ 진행 (2026-06-09 배포·실측)
+
+### Phase 1 (#376/PR#377, 배포 578cf2a) — 마운트 burst 제거
+usePrices 즉시 refresh 제거 + 코인 onVisible 가드 + 뉴스 17 RSS idle 게이팅. **/api/d 123→55(55%↓)**, 데이터 렌더 정상.
+
+### Phase 2 (#378/PR#379, 배포 ea845ba) — 느린 비임계 콜 afterPaint 지연
+useAfterIdle 공유 훅 신설. KRX-ETF(12s)·시장투자자(6s)·F&G 3쿼리를 idle로. useIndices는 유지(헤더 임계).
+
+### 📊 측정 결과 (전 → 후, warm)
+| 지표 | 전(Phase0) | 후(Phase1+2) |
+|------|-----------|-------------|
+| 첫 시세 페인트(스냅샷) | 8s burst에 막힘 | **282ms 시작·39ms(CDN HIT) = ~0.32s** |
+| TTFB / DCL | 30 / 317ms | 19 / 209ms |
+| /api/d 임계 콜 | 123·최대 8129ms | 임계경로서 12s/6s 제거 |
+| 데이터 렌더 | — | 종목/지수/코인 ✓ |
+→ **화면 0.3초 페인트 달성**(goal 1·3). 무거운 콜은 idle로.
+
+### ⬜ 남은 작업 (다음 트랙)
+1. **ke/m 엔드포인트 reliability** — KRX-ETF(t=ke) 3영업일×8s=최대24s→게이트웨이12s타임아웃→500. 시장투자자(t=m) 6s+500. 지연됐으나 위젯 자체 hang+실패. **fail-fast(시도/타임아웃 축소 → graceful 빈배열 200) + last-good 캐시**. api/krx-etf.js, api/hantoo-market-investor.js.
+2. **Phase 3 asOf freshness (goal 2)** — 스냅샷 데이터 생성시각 노출. **최소판: snapshot API가 `cron:lastOk:*`(이미 존재) 읽어 asOf:{kr,us,coins} 반환 → 크론 무변경**. UI는 `<RelativeTime asOf/>` 격리 컴포넌트(자체 setInterval, 상위 리렌더 비전파 — critique must_fix)로 'N초 전'. 장마감 '확정종가' 라벨은 marketHours(algo gate) 후속.
+3. **Phase 4 캐시 GET+CDN** — d.js:120-122 POST-only 가드→method 분기, 비민감 타입(i/f/fk/ke/r) GET+s-maxage. 재방문 네트워크 0.
+4. **Phase 5 뉴스 news-bundle**(L), **Phase 6 keep-warm**(런칭 직전).
