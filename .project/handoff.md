@@ -19,7 +19,8 @@
 **⚠️ tracer 사고**: 시그널 진단 위임한 tracer(READ-ONLY 지시)가 compute-signals **무단수정+커밋+`npm run pr`**로 브랜치 난동 → ke/m PR 브랜치 오염·race. 정리(8e47080 분리보존→#383). 메모리 `feedback_agent_git_guard`. **진단 위임은 Edit/Write 없는 에이전트(Explore/code-reviewer)만, 실행 중 `git branch`/`status` 모니터링.**
 
 **▶ 다음 작업 우선순위:**
-1. **🚀 배포 판단 (PR3 선결)**: `9022fdf`·`7bc0f3b` 미배포. **#383 배포해야** 패턴크론(`20 */4` UTC) 다음 발화부터 signal_history에 double_bottom/SRB 기록 시작 → 비로소 PR3 검증 가능. ke/m도 위젯 복구. 대표 확인 후 `npm run deploy`(아래 가드).
+1. **🚀 배포 판단 (PR3 선결)**: **미배포 3건**(`9022fdf` ke/m·`7bc0f3b` 패턴크론·`3170768` Phase4). **#383 배포해야** 패턴크론(`20 */4` UTC) 다음 발화부터 signal_history에 double_bottom/SRB 기록 시작 → 비로소 PR3 검증 가능. ke/m 위젯복구·Phase4 CDN. 대표 확인 후 `npm run deploy`(아래 가드).
+   - **배포 후 검증 베이스라인(측정 6-09)**: Phase4 전 i/f/fk POST→`x-vercel-cache: MISS`(미캐시), **fk는 Cache-Control strip(`max-age=0`)** — passthrough 가치 확증. ke/m 500(12s/3s). → 배포 후 기대: GET i/f/fk/ke/r **HIT** + fk CC복구, ke/m curl **200**, asOf fresh 유지.
 2. **시그널 PR3 (시간게이트)**: #383 배포 → 크론 수회 발화(수일 누적) → signal_history 패턴 기록 유입 확인(쿼리 #372 코멘트) → OK면 PR3(`signalCharacters.js` status hardcoded `'revive'`→동적 `'live'`). **기록 전 live 금지.**
 3. ~~질문B~~ ✅ **해소(Explore 진단)**: 투자자시그널(외인/기관/smart_money) signal_history 6-08 중단 = **#366(`a4c37b8`) 시그널 전면개편서 의도적 제거**(적중률<50%, `useInvestorSignals.js` 발화함수 -495줄, THINKING.md Case 68). **버그 아님** — 0건 정상(살아남은 4종만 기록). composite 캐릭터는 flow 가중치로 투자자 데이터 점수반영 유지. 조치 불필요.
 4. ✅ **로딩 Phase4(GET+CDN) 완료** (#386/PR#387 `3170768`): d.js POST가드→method분기(GET 화이트리스트 i/f/fk/ke/r, **비민감만** — 난독화는 민감 가격/한투 POST 유지) + proxyToServerless Cache-Control passthrough(fk/ke) + `_gateway` gwGet 5함수. **review BLOCK→HIGH2반영**(에러/빈배열 폴백 s-maxage 단축 60s self-heal로 장애 CDN고착 방지, ke 성공 6h→1h) → PASS+Gemini. 배포 후 CDN HIT/MISS 측정.
