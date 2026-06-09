@@ -12,6 +12,11 @@
 
 import { getHantooToken, HANTOO_BASE } from './_hantoo-token.js';
 import { todayStr, toWon } from './_hantoo-utils.js';
+import { getSnap, setSnap } from './_price-cache.js';
+
+// #382: last-good — 한투+Naver 동시 장애 시 직전 동향 유지 (response에 date/stale 필드 포함, UI 배지는 후속)
+const MI_LASTGOOD_KEY = 'market:investor:lastgood';
+const MI_LASTGOOD_TTL  = 93600; // 26h — 직전 거래일 동향까지 커버
 
 // 한투 API로 특정 지수 투자자 동향 조회
 // iscd: '0001'(코스피) | '1001'(코스닥)
@@ -57,7 +62,7 @@ async function fetchMarketFromNaver(marketCode) {
   const naverUrl = `https://m.stock.naver.com/api/index/${marketCode}/investor`;
   const res = await fetch(
     `${PROXY}${encodeURIComponent(naverUrl)}`,
-    { signal: AbortSignal.timeout(5000) },
+    { signal: AbortSignal.timeout(4000) }, // #382 HIGH: 한투4s+Naver4s=8s < 클라 10s 예산
   );
   if (!res.ok) throw new Error(`Naver proxy ${res.status}`);
   const wrapper = await res.json();
@@ -107,13 +112,26 @@ export default async function handler(req, res) {
       individual:  kospi.individual  + kosdaq.individual,
     };
 
+    const result = { kospi, kosdaq, combined, date: today };
+    // #382 HIGH: await — 응답 후 컨텍스트 동결 전 last-good 쓰기 보장 (fire-and-forget 시 드롭)
+    await setSnap(MI_LASTGOOD_KEY, result, MI_LASTGOOD_TTL);
+
     // 55초 캐시 (1분 갱신 주기에 맞춤)
     res.setHeader('Cache-Control', 's-maxage=55, stale-while-revalidate=10');
-    res.json({ kospi, kosdaq, combined, date: today });
+    res.json(result);
 
   } catch (e) {
-    // 에러 시 null 반환 — 클라이언트에서 섹션 숨김 처리
     console.error('[market-investor]', e.message);
-    res.status(500).json({ error: e.message });
+    // #382: 한투+Naver 동시 장애 → last-good 복구(stale 200), 없으면 error 200
+    // (500→200 — 게이트웨이로 5xx 전파 차단. 섹션은 data.error로 숨김 유지)
+    try {
+      const lastGood = await getSnap(MI_LASTGOOD_KEY);
+      if (lastGood && lastGood.combined) {
+        res.setHeader('Cache-Control', 's-maxage=30');
+        return res.status(200).json({ ...lastGood, stale: true });
+      }
+    } catch { /* last-good 조회 실패 무시 */ }
+    // [SEC] 내부 에러 메시지 비노출 — 클라는 error 존재 여부만 확인(섹션 숨김)
+    res.status(200).json({ error: 'unavailable' });
   }
 }

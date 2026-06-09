@@ -3,8 +3,17 @@
 // 전일 종가 기준 (실시간 아님), GlobalSearch 종목 확보용
 // 거래일 기준 최근 5일 중 데이터 있는 날 자동 선택
 
+import { getSnap, setSnap } from './_price-cache.js';
+
 const KRX_BASE  = 'https://data-dbg.krx.co.kr/svc/apis';
 const AUTH_KEY  = process.env.KRX_API_KEY;
+
+// #382: fail-fast + last-good — KRX Open API 지연/장애 시 게이트웨이 12s 타임아웃→500 방지
+const ETF_LASTGOOD_KEY  = 'etf:krx:lastgood';
+const ETF_LASTGOOD_TTL  = 172800; // 48h — 전일 종가(정적)라 장기 보존 무해
+const FETCH_TIMEOUT_MS  = 4000;   // 8s→4s. KRX 정상 응답 2~3s(#312), 느릴 때 빠르게 포기
+const TOTAL_DEADLINE_MS = 3000;   // 순차 누적 cap. 실제 바인딩 제약은 클라 abort 8s(_gateway fetchKrxEtf)
+                                  // 최악 = deadline+timeout+Redis = 3+4+α ≈ 7s < 8s → last-good를 클라까지 전달 보장
 
 // YYYYMMDD 형식 날짜 — offset 일 이전
 function dateStr(offsetDays = 0) {
@@ -23,7 +32,7 @@ async function fetchEtfForDate(basDd) {
       'Content-Type': 'application/json',
     },
     body:   JSON.stringify({ basDd }),
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`KRX ${res.status}`);
   const data = await res.json();
@@ -51,7 +60,10 @@ export default async function handler(_req) {
     const uniqueDates = [...new Set(
       Array.from({ length: 14 }, (_, i) => dateStr(i + 1)),
     )].slice(0, 3);
+    const startedAt = Date.now();
     for (const basDd of uniqueDates) {
+      // #382: 누적 deadline 가드 — KRX 지연 시 게이트웨이 타임아웃 전 중단
+      if (Date.now() - startedAt > TOTAL_DEADLINE_MS) break;
       try {
         const rows = await fetchEtfForDate(basDd);
         if (rows.length > 0) { list = rows; break; }
@@ -60,13 +72,7 @@ export default async function handler(_req) {
       }
     }
 
-    if (!list.length) {
-      return Response.json({ etfs: [] }, {
-        headers: { 'Cache-Control': 'public, s-maxage=3600' },
-      });
-    }
-
-    // KRX 응답 → 프론트 ETF_DATA 포맷으로 변환
+    // KRX 응답 → 프론트 ETF_DATA 포맷으로 변환 (list 비어도 빈 배열)
     const etfs = list.map(r => {
       const price     = num(r.TDD_CLSPRC);
       const prevClose = price - num(r.CMPPREVDD_PRC);
@@ -88,6 +94,24 @@ export default async function handler(_req) {
       };
     }).filter(e => e.symbol && e.name && e.price > 0);
 
+    // #382 HIGH: KRX 실패/타임아웃 OR 스키마 드리프트로 결과 0건 → last-good 복구
+    // (list 있어도 filter 후 빈 경우 포함 — 빈 배열 6h 고착 방지)
+    if (!etfs.length) {
+      const lastGood = await getSnap(ETF_LASTGOOD_KEY);
+      if (Array.isArray(lastGood) && lastGood.length) {
+        console.warn('[krx-etf] 결과 0건 → last-good 반환');
+        return Response.json({ etfs: lastGood, stale: true }, {
+          headers: { 'Cache-Control': 'public, s-maxage=600' },
+        });
+      }
+      return Response.json({ etfs: [] }, {
+        headers: { 'Cache-Control': 'public, s-maxage=3600' },
+      });
+    }
+
+    // #382 HIGH: await — 응답 후 컨텍스트 동결 전 last-good 쓰기 보장 (fire-and-forget 시 드롭)
+    await setSnap(ETF_LASTGOOD_KEY, etfs, ETF_LASTGOOD_TTL);
+
     return Response.json({ etfs }, {
       headers: {
         'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=3600', // 6시간 캐싱
@@ -96,9 +120,11 @@ export default async function handler(_req) {
     });
   } catch (e) {
     console.error('[krx-etf] handler 크래시:', e);
-    return Response.json(
-      { error: e?.message || String(e), etfs: [] },
-      { status: 500 },
-    );
+    // #382: 크래시에도 last-good 우선, 없으면 빈 배열 200 — 위젯 hang/500 제거
+    const lastGood = await getSnap(ETF_LASTGOOD_KEY).catch(() => null);
+    if (Array.isArray(lastGood) && lastGood.length) {
+      return Response.json({ etfs: lastGood, stale: true }, { status: 200 });
+    }
+    return Response.json({ etfs: [] }, { status: 200 });
   }
 }
