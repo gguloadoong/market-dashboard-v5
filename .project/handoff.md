@@ -23,7 +23,7 @@
 2. **시그널 PR3 (시간게이트)**: #383 배포 → 크론 수회 발화(수일 누적) → signal_history 패턴 기록 유입 확인(쿼리 #372 코멘트) → OK면 PR3(`signalCharacters.js` status hardcoded `'revive'`→동적 `'live'`). **기록 전 live 금지.**
 3. ~~질문B~~ ✅ **해소(Explore 진단)**: 투자자시그널(외인/기관/smart_money) signal_history 6-08 중단 = **#366(`a4c37b8`) 시그널 전면개편서 의도적 제거**(적중률<50%, `useInvestorSignals.js` 발화함수 -495줄, THINKING.md Case 68). **버그 아님** — 0건 정상(살아남은 4종만 기록). composite 캐릭터는 flow 가중치로 투자자 데이터 점수반영 유지. 조치 불필요.
 4. **로딩 Phase4(GET+CDN) — 보류**: 게이트웨이 난독화(P1-9) 트레이드오프 + 사용자0명 재방문이득 미미 + 첫페인트 이미 0.32s. 런칭직전 ROI. (proxyToServerless가 Cache-Control strip → ke last-good `s-maxage` 무효, 그때 passthrough. PR#384 코멘트 기록)
-5. **🔎 asOf US 5.5h stale**: update-us 크론 주기/실패 점검(직전 인계 잔여).
+5. ~~asOf US stale~~ ✅ **해소(측정)**: 6-09 09:24 UTC(미장마감) snapshot asOf = kr 3분·**us 0분**·coins 4분 전 모두 fresh. 직전 인계 5.5h stale은 일시적, update-us 크론 정상. 조치 불필요.
 
 **가드(반복)**: 배포는 컨센서스 PM게이트가 중첩 `claude --print` 행 → `export PATH="$(echo "$PATH"|tr ':' '\n'|grep -v '/Users/bong/.local/bin'|paste -sd: -)"` 후 `npm run deploy`(하드게이트 통과, soft PM SKIP). 배포는 대표 확인/트리거 시. git add 명시 경로만(정크 73개 사고). **진단 에이전트 git 난동 주의(`feedback_agent_git_guard`)**. Playwright QA 후 browser_close 필수.
 
