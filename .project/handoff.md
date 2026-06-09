@@ -21,7 +21,7 @@
 **▶ 다음 작업 우선순위:**
 1. **🚀 배포 판단 (PR3 선결)**: `9022fdf`·`7bc0f3b` 미배포. **#383 배포해야** 패턴크론(`20 */4` UTC) 다음 발화부터 signal_history에 double_bottom/SRB 기록 시작 → 비로소 PR3 검증 가능. ke/m도 위젯 복구. 대표 확인 후 `npm run deploy`(아래 가드).
 2. **시그널 PR3 (시간게이트)**: #383 배포 → 크론 수회 발화(수일 누적) → signal_history 패턴 기록 유입 확인(쿼리 #372 코멘트) → OK면 PR3(`signalCharacters.js` status hardcoded `'revive'`→동적 `'live'`). **기록 전 live 금지.**
-3. **🔎 질문B (데이터신뢰 별건)**: `foreign/institutional/smart_money` 시그널이 signal_history **6-08 08:20 UTC 마지막**(volume_anomaly만 6-09 유입). 투자자시그널 발화/기록 경로(signalEngine.js 클라? compositeScorer) 중단 원인 **미규명** — 별도 점검.
+3. ~~질문B~~ ✅ **해소(Explore 진단)**: 투자자시그널(외인/기관/smart_money) signal_history 6-08 중단 = **#366(`a4c37b8`) 시그널 전면개편서 의도적 제거**(적중률<50%, `useInvestorSignals.js` 발화함수 -495줄, THINKING.md Case 68). **버그 아님** — 0건 정상(살아남은 4종만 기록). composite 캐릭터는 flow 가중치로 투자자 데이터 점수반영 유지. 조치 불필요.
 4. **로딩 Phase4(GET+CDN) — 보류**: 게이트웨이 난독화(P1-9) 트레이드오프 + 사용자0명 재방문이득 미미 + 첫페인트 이미 0.32s. 런칭직전 ROI. (proxyToServerless가 Cache-Control strip → ke last-good `s-maxage` 무효, 그때 passthrough. PR#384 코멘트 기록)
 5. **🔎 asOf US 5.5h stale**: update-us 크론 주기/실패 점검(직전 인계 잔여).
 
