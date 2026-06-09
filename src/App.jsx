@@ -84,7 +84,7 @@ export default function App() {
     usStocks, setUsStocks, krStocks, setKrStocks,
     dataErrors, setDataErrors: _setDataErrors,
     krSymbolsRef, usSymbolsRef, refreshUsStocks, refreshKoreanStocks,
-    pricesReady,
+    pricesReady, asOf,
   } = usePrices();
   // 미장 워런트/우선주 정화 — 탭 타이틀·미국 탭·SurgeBanner에서 워런트(+189% 등) 노출 차단 (#360)
   // 홈 급등/포커스는 HomeDashboard usItems에서 별도 필터됨. 여기선 그 외 표시 경로를 정화.
@@ -95,6 +95,8 @@ export default function App() {
   // 탭별 초기 로딩 플래그 — 각 데이터 소스 독립
   const tabInitializing = { kr: !pricesReady, us: !pricesReady, coin: !coinsReady, etf: false };
 
+  // #380: headerAsOf는 activeTab 선언 뒤로 이동(TDZ 방지) — 아래 참조.
+
   // watchlist 심볼 동기화
   useEffect(() => { krSymbolsRef.current = krSymbols; }, [krSymbols, krSymbolsRef]);
   useEffect(() => { usSymbolsRef.current = usSymbols; }, [usSymbols, usSymbolsRef]);
@@ -104,6 +106,17 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') || 'home';
   });
+
+  // #380: 헤더 freshness 단일 asOf — 활성 탭 시장 우선(코인/미국 탭서 KR 시각 과대표시 방지, review HIGH).
+  // 홈/섹터/뉴스는 KR 우선, 없으면 us/coins 최신. (activeTab 선언 뒤 — TDZ 방지)
+  const headerAsOf = useMemo(() => {
+    if (!asOf || typeof asOf !== 'object') return null;
+    const byTab = { kr: asOf.kr, us: asOf.us, coin: asOf.coins, etf: asOf.kr };
+    if (byTab[activeTab] != null) return byTab[activeTab];
+    if (asOf.kr != null) return asOf.kr;
+    const rest = [asOf.us, asOf.coins].filter((v) => v != null);
+    return rest.length ? Math.max(...rest) : null;
+  }, [asOf, activeTab]);
   const [etfs, setEtfs]                 = useState(ETF_LIST);
   const [lastUpdated, setLastUpdated]   = useState(null);
   const [loading, setLoading]           = useState(false);
@@ -392,6 +405,7 @@ export default function App() {
         activeTab={activeTab} onTabChange={setActiveTab}
         krStocks={krStocks} usStocks={usStocks} coins={coins}
         dark={dark} onDarkToggle={toggleDark}
+        asOf={headerAsOf}
       />
 
       <div className={`max-w-[1440px] mx-auto ${activeTab === 'news' ? '' : 'lg:grid lg:grid-cols-[1fr_360px]'}`}>
