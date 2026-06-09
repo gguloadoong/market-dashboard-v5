@@ -6,6 +6,7 @@
 //    데이터 포렌식 결과 측정 결함·적중률 미입증. F&G 점수 데이터 쿼리(useFearGreedScores)는
 //    다른 곳(점수 표시 등)에서 사용하므로 보존한다.
 import { useQuery } from '@tanstack/react-query';
+import { useAfterIdle } from './useAfterIdle';
 
 // 점수 → 레이블 매핑
 export function getFgLabel(score) {
@@ -52,9 +53,12 @@ async function fetchKrFG() {
 
 // 3개 시장 F&G 쿼리 — useFearGreedScores/useFearGreed 양쪽에서 공유
 function useFearGreedQueries() {
-  const crypto = useQuery({ queryKey: ['fearGreed', 'crypto'], queryFn: fetchCryptoFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
-  const us = useQuery({ queryKey: ['fearGreed', 'us'], queryFn: fetchUsFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
-  const kr = useQuery({ queryKey: ['fearGreed', 'kr'], queryFn: fetchKrFG, staleTime: 10 * 60 * 1000, refetchInterval: 15 * 60 * 1000, refetchIntervalInBackground: false, retry: 1 });
+  // afterIdle 게이팅 (#로딩최적화) — F&G 3쿼리(crypto=alternative.me 직접/us/kr=/api/d)를 첫 페인트 후 idle로.
+  // staleTime 10~15분이라 첫 페인트 공백 무해(배지 progressive 렌더). useInvestorSignals 2s 스캔 전 idle(1.5s) 완료.
+  const afterIdle = useAfterIdle();
+  const crypto = useQuery({ queryKey: ['fearGreed', 'crypto'], queryFn: fetchCryptoFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1, enabled: afterIdle });
+  const us = useQuery({ queryKey: ['fearGreed', 'us'], queryFn: fetchUsFG, staleTime: 15 * 60 * 1000, refetchInterval: 30 * 60 * 1000, refetchIntervalInBackground: false, retry: 1, enabled: afterIdle });
+  const kr = useQuery({ queryKey: ['fearGreed', 'kr'], queryFn: fetchKrFG, staleTime: 10 * 60 * 1000, refetchInterval: 15 * 60 * 1000, refetchIntervalInBackground: false, retry: 1, enabled: afterIdle });
   return { crypto, us, kr };
 }
 
