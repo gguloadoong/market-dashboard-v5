@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import { fetchWsApproval } from '../api/_gateway.js';
+import { createTickBuffer } from '../utils/tickBuffer.js';
 
 const KIS_WS_URL     = 'wss://ops.koreainvestment.com:21000';
 const TR_ID          = 'H0STCNT0';
@@ -15,11 +16,11 @@ const KEY_TTL_MS     = 23 * 60 * 60 * 1000; // 23h — 한투 approval_key 24h �
 /**
  * KIS WebSocket 실시간 체결 가격 구독 훅
  * @param {string[]} symbols    - 종목코드 배열 (예: ['005930', '000660'])
- * @param {Function} onQuote    - 콜백: ({ symbol, price, change, changePct }) => void
+ * @param {Function} onQuotes   - 콜백: 1초 코얼레싱 배치 [{ symbol, price, change, changePct }, ...] (#394)
  */
-export function useKisWebSocket(symbols, onQuote) {
+export function useKisWebSocket(symbols, onQuotes) {
   // 최신 콜백·symbols을 ref로 유지 → 재연결 시 클로저 문제 방지
-  const onQuoteRef      = useRef(onQuote);
+  const onQuotesRef     = useRef(onQuotes);
   const symbolsRef      = useRef(symbols);
   const wsRef           = useRef(null);
   const retryRef        = useRef(0);
@@ -29,12 +30,14 @@ export function useKisWebSocket(symbols, onQuote) {
   const approvalKeyRef  = useRef(null);
 
   // 콜백·symbols 최신값 동기화 (재연결 없이)
-  useEffect(() => { onQuoteRef.current = onQuote; }, [onQuote]);
+  useEffect(() => { onQuotesRef.current = onQuotes; }, [onQuotes]);
   useEffect(() => { symbolsRef.current = symbols; }, [symbols]);
 
   useEffect(() => {
     mountedRef.current = true;
     let approvalKey = null;
+    // 틱 1초 코얼레싱 — 심볼별 최신 틱만 배치로 전달 (#394 리렌더 폭풍 차단)
+    const tickBuffer = createTickBuffer(batch => onQuotesRef.current?.(batch));
 
     // ── approval_key 취득 ──────────────────────────────────────
     async function fetchApprovalKey() {
@@ -141,7 +144,7 @@ export function useKisWebSocket(symbols, onQuote) {
 
         const quote = parsePipeMessage(raw);
         if (quote) {
-          onQuoteRef.current?.(quote);
+          tickBuffer.push(quote);
         }
       };
 
@@ -218,6 +221,7 @@ export function useKisWebSocket(symbols, onQuote) {
     // ── 클린업: 구독 해제 + 소켓 닫기 ───────────────────────
     return () => {
       mountedRef.current = false;
+      tickBuffer.destroy();
       clearTimeout(retryTimer.current);
       clearTimeout(keyRefreshTimer.current);
       document.removeEventListener('visibilitychange', handleVisibility);

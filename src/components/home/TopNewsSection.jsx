@@ -1,6 +1,6 @@
 // 시장을 움직이는 뉴스 — 종목 연결 카드형 뉴스 피드
 // 뉴스와 관련 종목을 뱃지로 연결, 종목 등락률 표시
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 // timeAgo를 렌더 시점에 동적 계산 — 캐시된 정적 문자열 대신 사용
 function computeTimeAgo(pubDate) {
@@ -30,32 +30,26 @@ function cleanDesc(raw) {
     .replace(/\s+/g, ' ').trim();
 }
 
-// 뉴스와 매칭되는 종목 찾기 (allItems에서)
-function findMatchedStocks(newsTitle, allItems, max = 3) {
-  if (!newsTitle || !allItems.length) return [];
+// 뉴스와 매칭되는 종목 찾기 — 키워드가 사전 빌드된 경량 종목 목록 사용 (#394)
+// 가격(pct)은 여기서 캡처하지 않는다 — 렌더 시점에 pctMap으로 lookup (매칭 ↔ 시세 분리)
+function findMatchedStocks(newsTitle, matchableItems, max = 3) {
+  if (!newsTitle || !matchableItems.length) return [];
   const matched = [];
   const seen = new Set();
 
-  for (const item of allItems) {
+  for (const item of matchableItems) {
     if (matched.length >= max) break;
-    const key = item.symbol || item.id;
-    if (seen.has(key)) continue;
+    if (seen.has(item.key) || !item.keywords.length) continue;
 
-    const keywords = buildStockKeywords(
-      item.symbol, item.name,
-      item._market === 'KR' ? 'KR' : item._market === 'COIN' ? 'COIN' : 'US'
-    );
-    if (keywords.length > 0 && matchesKeywords(newsTitle, keywords)) {
-      const confidence = getMatchConfidence(newsTitle, keywords, item.symbol);
+    if (matchesKeywords(newsTitle, item.keywords)) {
+      const confidence = getMatchConfidence(newsTitle, item.keywords, item.symbol);
       // WEAK 매칭은 제외
       if (confidence === 'WEAK') continue;
-      seen.add(key);
-      const pct = item._market === 'COIN' ? (item.change24h ?? 0) : (item.changePct ?? 0);
+      seen.add(item.key);
       matched.push({
-        symbol: item.symbol || item.id,
+        symbol: item.key,
         name: item.name,
         market: item._market,
-        pct,
         confidence,
       });
     }
@@ -87,6 +81,40 @@ function StockBadge({ stock, onClick }) {
 }
 
 export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick, allItems = [] }) {
+  // #394 매칭 ↔ 시세 분리: allItems는 WS 틱마다 identity가 바뀌므로 그대로 의존하면
+  // 틱마다 뉴스 전건 × 종목 전체 키워드 매칭이 재실행된다(렉 주범).
+  // → 종목 "구성"(심볼 목록)이 바뀔 때만 매칭을 재계산하고, 시세는 렌더 시 lookup.
+
+  // 종목 구성 지문 — 가격이 아니라 심볼 집합이 바뀔 때만 변경
+  const itemsKey = useMemo(
+    () => allItems.map(i => i.symbol || i.id).join(','),
+    [allItems],
+  );
+
+  // 매칭용 경량 종목 + 키워드 사전 빌드 — 종목당 1회 (기존: 뉴스 × 종목마다 빌드)
+  const matchableItems = useMemo(() => allItems.map(it => ({
+    key: it.symbol || it.id,
+    symbol: it.symbol,
+    name: it.name,
+    _market: it._market,
+    keywords: buildStockKeywords(
+      it.symbol, it.name,
+      it._market === 'KR' ? 'KR' : it._market === 'COIN' ? 'COIN' : 'US',
+    ),
+  })), [itemsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 시세 lookup — 틱마다 갱신되지만 O(n) Map 생성이라 저렴
+  const pctMap = useMemo(() => {
+    const m = new Map();
+    for (const it of allItems) {
+      m.set(it.symbol || it.id, it._market === 'COIN' ? (it.change24h ?? 0) : (it.changePct ?? 0));
+    }
+    return m;
+  }, [allItems]);
+  // 점수 계산용 — memo 의존성에 넣지 않고 ref로 읽어 매칭 재계산과 분리
+  const pctMapRef = useRef(pctMap);
+  pctMapRef.current = pctMap;
+
   // 24시간 이내 뉴스 중 시그널 점수 + 종목 매칭 기준 상위 5건
   const topNews = useMemo(() => {
     const cutoff = 24 * 60 * 60 * 1000;
@@ -101,9 +129,10 @@ export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick,
         const signals = extractNewsSignals(n.title, n.pubDate);
         const impact = getNewsImpact(n.title);
         const importanceScore = getNewsImportanceScore(n);
-        // 종목 실제 움직임 점수 (연결된 종목의 변동폭 합산)
-        const matchedStocks = findMatchedStocks(n.title, allItems);
-        const movementScore = matchedStocks.reduce((sum, s) => sum + Math.abs(s.pct), 0);
+        // 종목 실제 움직임 점수 (연결된 종목의 변동폭 합산) — 정렬용이므로 memo 시점 시세로 충분
+        const matchedStocks = findMatchedStocks(n.title, matchableItems);
+        const movementScore = matchedStocks.reduce(
+          (sum, s) => sum + Math.abs(pctMapRef.current.get(s.symbol) ?? 0), 0);
         // 점수: 중요도 점수 + 종목 움직임 가산
         const score = importanceScore + Math.min(movementScore * 0.5, 3);
         return { ...n, _signals: signals, _impact: impact, _score: score, _matchedStocks: matchedStocks };
@@ -122,7 +151,7 @@ export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick,
         return b._score - a._score || aAge - bAge;
       })
       .slice(0, 5);
-  }, [allNews, allItems]);
+  }, [allNews, matchableItems]);
 
   if (!topNews.length) return null;
 
@@ -192,7 +221,11 @@ export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick,
               {item._matchedStocks?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {item._matchedStocks.map(stock => (
-                    <StockBadge key={stock.symbol} stock={stock} onClick={onItemClick} />
+                    <StockBadge
+                      key={stock.symbol}
+                      stock={{ ...stock, pct: pctMap.get(stock.symbol) ?? 0 }}
+                      onClick={onItemClick}
+                    />
                   ))}
                 </div>
               )}

@@ -3,6 +3,7 @@ import { useState, useRef, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAllNewsQuery } from '../../hooks/useNewsQuery';
 import { useWatchlist } from '../../hooks/useWatchlist';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { getPct, isNoiseInstrument } from './utils';
 import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
@@ -24,6 +25,7 @@ export default function HomeDashboard({
   dataReady = true,
 }) {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const { data: allNews = [] } = useAllNewsQuery();
   const { watchlist, toggle, isWatched } = useWatchlist();
 
@@ -268,9 +270,10 @@ export default function HomeDashboard({
       <SignalLabWidget />
 
       {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 App.jsx 우측 뉴스 레일 #353) ── */}
-      <div className="lg:hidden">
+      {/* #394: lg:hidden은 데스크톱에서도 마운트되어 뉴스 매칭 연산 2배 → 렌더 분기로 교체 */}
+      {isMobile && (
         <NewsFeedWidget allNews={allNews} onNewsClick={onNewsClick} onItemClick={onItemClick} allItems={allItems} />
-      </div>
+      )}
 
     </div>
   );
