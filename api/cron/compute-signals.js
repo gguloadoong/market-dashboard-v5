@@ -426,7 +426,10 @@ const PATTERN_TYPES = new Set([
   SIGNAL_TYPES.SUPPORT_RESISTANCE_BREAK,
   SIGNAL_TYPES.DOUBLE_BOTTOM,
 ]);
-const COOLDOWN_TTL = 86400; // 24h — 패턴 horizon(SR 4h, DB 8h)의 상위 바운드
+// #398: composite도 동일 경로로 signal_history 기록 — 성적표 '수집 중'(n=1) 고착 해소.
+// CF Worker가 만든 signals:latest를 읽기만 하고(소유권 보호) 기록만 이쪽 크론이 담당.
+const RECORDABLE_TYPES = new Set([...PATTERN_TYPES, SIGNAL_TYPES.COMPOSITE_SCORE]);
+const COOLDOWN_TTL = 86400; // 24h — 패턴 horizon(SR 4h, DB 8h)의 상위 바운드, composite는 종목당 하루 1샘플
 
 // #390: 패턴 기록 경로 — self-HTTP-POST(VERCEL_URL deployment 인증벽/origin 불일치) 대신
 // Supabase RPC 직접 호출. signal-accuracy.js(Edge)가 같은 프로젝트 env로 정상 동작 중이므로
@@ -436,7 +439,7 @@ const SB_KEY    = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANO
 const SB_SECRET = process.env.SIGNAL_RPC_SECRET;
 
 async function recordPatternSignals(signals) {
-  const patterns = signals.filter(s => PATTERN_TYPES.has(s.type));
+  const patterns = signals.filter(s => RECORDABLE_TYPES.has(s.type));
   if (!patterns.length) return { recorded: 0, skipped: 0, total: 0 };
 
   // KV 쿨다운 필터 — NX(set-if-not-exists)로 원자적 중복 차단
@@ -445,7 +448,9 @@ async function recordPatternSignals(signals) {
   let skipped = 0;
 
   for (const sig of patterns) {
-    const cooldownKey = `sig:fired:${sig.type}:${sig.symbol}`;
+    // [review STYLE→수용] market 포함 — composite는 3마켓 공통이라 심볼 충돌 실존
+    // (예: NYSE 'BTC' Grayscale Mini vs 크립토 BTC). 키 체계 변경으로 기존 쿨다운 1회 리셋됨(무해).
+    const cooldownKey = `sig:fired:${sig.type}:${sig.market || 'unknown'}:${sig.symbol}`;
 
     if (!redis) {
       // Redis 미연결 시 쿨다운 없이 기록 (graceful degradation)
@@ -489,7 +494,9 @@ async function recordPatternSignals(signals) {
       strength: sig.strength || 1,
       title: sig.title || '',
       price_at_fire: Number.isFinite(pn) ? pn : null,
-      meta: sig.meta || {},
+      // [review HIGH] firedAt 보존 — composite는 CF 발화(최대 ~10분 전)와 INSERT 시각(fired_at 기본값)
+      // 사이 드리프트가 적중률을 상방 편향시킬 수 있음. 측정 쿼리가 스큐를 보정할 수 있게 원시각 기록.
+      meta: { ...(sig.meta || {}), firedAt: sig.timestamp ?? null },
     };
   });
 
@@ -522,13 +529,15 @@ async function recordPatternSignals(signals) {
     if (redis) {
       await Promise.allSettled(
         toRecord.slice(0, 50).map(sig =>
-          redis.set(`sig:fired:${sig.type}:${sig.symbol}`, 1, { ex: COOLDOWN_TTL }).catch(() => {})
+          // 쿨다운 GET(L451)과 동일 키 포맷 유지 필수 — 불일치 시 쿨다운 무력화
+          redis.set(`sig:fired:${sig.type}:${sig.market || 'unknown'}:${sig.symbol}`, 1, { ex: COOLDOWN_TTL }).catch(() => {})
         )
       );
     }
 
-    console.info(`[pattern-cron] 패턴 기록: inserted=${out.inserted}, skipped_db=${out.skipped ?? 0}, cooldown_skipped=${skipped}`);
-    return { recorded: out.inserted, skipped, total: patterns.length };
+    const dropped = Math.max(0, toRecord.length - 50); // 배치 50캡 초과분 — 쿨다운 미설정이라 다음 크론서 재시도
+    console.info(`[pattern-cron] 기록: inserted=${out.inserted}, skipped_db=${out.skipped ?? 0}, cooldown_skipped=${skipped}, dropped=${dropped}`);
+    return { recorded: out.inserted, skipped, total: patterns.length, dropped };
   } catch (e) {
     console.error('[pattern-cron] RPC 예외:', e?.message);
     return { recorded: 0, skipped, total: patterns.length, error: e?.message };
@@ -899,12 +908,15 @@ export default async function handler(req, res) {
   }
 
   const durationMs = Date.now() - startedAt;
+  // [review HIGH] 피드 payload는 패턴 타입만 — 로컬 composite(id: composite_score:*)를 실으면
+  // /api/signals 머지에서 CF composite(id: cs_*)와 id가 달라 같은 종목 카드가 2장 노출됨
+  const patternFeed = signals.filter(s => PATTERN_TYPES.has(s.type));
   const payload = {
     ts: Date.now(),
     generatedAt: new Date().toISOString(),
     ttlSec: 1200,
-    count: signals.length,
-    signals,
+    count: patternFeed.length,
+    signals: patternFeed,
     stats: {
       targetCount: TARGETS.length,
       fetchedCount,
@@ -913,13 +925,37 @@ export default async function handler(req, res) {
     },
   };
 
+  // ── #398: composite 발화 기록용 읽기 — signals:latest는 CF Worker 소유, 여기선 read-only ──
+  // composite는 10분마다 발화하지만 signal_history 기록 경로가 없어 성적표가 '수집 중'(n=1) 고착.
+  // 이 크론이 현재 살아있는 composite를 24h 쿨다운으로 샘플 기록한다.
+  let compositeSignals = [];
+  try {
+    const latestFeed = await getSnap('signals:latest');
+    if (Array.isArray(latestFeed?.signals)) {
+      const nowMs = Date.now();
+      compositeSignals = latestFeed.signals.filter(
+        // [review HIGH] currentPrice>0 — CF 빌더의 `item.price || 0` 폴백이 price_at_fire=0
+        // 쓰레기 샘플로 기록되는 것 차단(0 기준 수익률 → 적중 판정 영구 왜곡)
+        // [review STYLE] expiresAt 체크 — CF 크론 중단 시 stale KV의 만료 composite 기록 차단
+        s => s?.type === SIGNAL_TYPES.COMPOSITE_SCORE && s.symbol
+          && Number(s.meta?.currentPrice) > 0
+          && (!s.expiresAt || s.expiresAt > nowMs),
+      );
+    }
+  } catch (e) {
+    console.warn('[pattern-cron] signals:latest 읽기 실패 — composite 기록 생략:', e?.message);
+  }
+
   // ── 패턴 시그널 signal_history 기록 (#373) ──
   // failRate 체크보다 먼저 실행 — 패턴은 이미 계산된 signals[]에서 필터하므로
   // fetch 실패율과 무관. failRate>0.5 조기 return 뒤에 두면 장외 시간대에
   // 항상 누락되는 버그(#372 fix)
   let patternResult = { recorded: 0, skipped: 0, total: 0 };
   try {
-    patternResult = await recordPatternSignals(signals);
+    // [review CRITICAL] 로컬 composite(이 크론의 self-fallback 계산)는 기록 제외 —
+    // composite 기록 소스는 CF Worker 피드(signals:latest) 단일. 안 거르면 같은 종목이
+    // 한 배치에 2행 INSERT(쿨다운 GET 선확인이 배치 내 중복을 못 막음) + 계산방식 상충.
+    patternResult = await recordPatternSignals([...patternFeed, ...compositeSignals]);
     if (patternResult.error) {
       // 기록 실패 — cron 실패로 기록해 관측성 확보 (#390: 고유 이름 'pattern-cron')
       await recordCronFailure('pattern-cron', `pattern record failed: ${patternResult.error}`).catch(() => {});
@@ -931,7 +967,7 @@ export default async function handler(req, res) {
 
   // #390: 하트비트 + 공개 진단 요약 — 모든 종료 경로 공통(발화/탐지/기록을 시크릿 없이 검증).
   // 이름 'pattern-cron'으로 CF Worker compute-signals와 키 분리(관측성 오염 해소).
-  const patternCandidates = signals.filter(s => PATTERN_TYPES.has(s.type)).length;
+  const patternCandidates = patternFeed.length;
   const summary = {
     lastOk: Date.now(),
     generatedAt: new Date().toISOString(),
@@ -940,7 +976,9 @@ export default async function handler(req, res) {
     failRate: +(failed.length / TARGETS.length).toFixed(2),
     failedSample: failed.slice(0, 10),
     patternCandidates,
+    compositeCandidates: compositeSignals.length, // #398
     recorded: patternResult.recorded ?? 0,
+    dropped: patternResult.dropped ?? 0, // 배치 50캡 초과분 (review STYLE)
     cooldownSkipped: patternResult.skipped ?? 0,
     postError: patternResult.error ?? null,
     durationMs: Date.now() - startedAt,
@@ -961,9 +999,9 @@ export default async function handler(req, res) {
   }
 
   // ── signals:patterns KV 쓰기 — signals:latest(CF Worker 소유 라이브 피드)와 분리해 충돌 회피 (#372) ──
-  // 프론트는 아직 signals:patterns 미구독(무영향). 향후 패턴 피드 머지 시 사용.
+  // #398: /api/signals가 이 키를 머지 서빙 — 패턴이 시그널 보드에 표시된다.
   try {
-    // TTL 18000s(5h) — 크론 주기 4h(20 */4)보다 길게 설정해 캐시 공백 방지 (Gemini gate P1)
+    // TTL 18000s(5h) — 크론 주기(1h, #398에서 4h→1h)보다 길게 설정해 캐시 공백 방지 (Gemini gate P1)
     await setSnap('signals:patterns', payload, 18000);
   } catch (e) {
     await recordCronFailure('pattern-cron', e?.message || String(e));
