@@ -135,7 +135,9 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
   const [hero, ...rest] = topSignals;
   const heroItem = resolveStockItem(hero, allItems);
   const isBullHero = hero.direction === 'bullish';
-  const heroBotAccuracy = botMap?.get(hero.type)?.accuracy ?? null;
+  // #398: 표본 30건 미만 적중률 비노출 — n=1짜리 "적중 100%" 노출 차단 (성적표 정직성 원칙과 통일)
+  const heroBot = botMap?.get(hero.type);
+  const heroBotAccuracy = (heroBot?.totalFired ?? 0) >= 30 ? heroBot.accuracy : null;
   const heroAccent = isBullHero ? '#F04452' : '#1764ED';
   const heroBg = isBullHero ? 'rgba(240,68,82,0.03)' : 'rgba(23,100,237,0.03)';
   const heroPct = heroItem ? getPct(heroItem) : null;
