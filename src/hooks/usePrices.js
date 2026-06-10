@@ -1,6 +1,7 @@
 // 미국·국내 주식 가격 폴링 훅
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { US_STOCK_LIST } from '../data/usStockList';
+import { US_CORE_SYMBOLS } from '../constants/market';
 import { KR_SECTOR_MAP } from '../data/krStockList';
 import KR_STOCK_NAMES from '../data/krStockNames.json';
 import { fetchSnapshot } from '../api/snapshot';
@@ -72,13 +73,17 @@ export function usePrices() {
   const krSymbolsRef = useRef([]);
   const usSymbolsRef = useRef([]);
 
+  // #396: 배지 히스테리시스 — 단발 실패로 '시세 지연' 배지가 깜빡이지 않게
+  // 연속 2회 실패 시에만 에러 ON, 성공 시 즉시 OFF
+  const usFailStreakRef = useRef(0);
+  const krFailStreakRef = useRef(0);
+  const ERROR_FAIL_STREAK = 2;
+
   const refreshUsStocks = useCallback(async () => {
     try {
-      // 항상 US_STOCK_LIST 전체 심볼 기반 폴링 — snapshot 시드 여부와 무관하게 250개 전체 유지
-      const baseSymbols = US_STOCK_LIST.map(s => s.symbol);
-      const baseSet = new Set(baseSymbols);
-      const extraSymbols = usSymbolsRef.current.filter(sym => !baseSet.has(sym));
-      const symbolsToFetch = [...baseSymbols, ...extraSymbols];
+      // #396: 폴링은 코어+watchlist 소규모만 — 전종목(250)은 snapshot 크론(update-us, 2분)이 커버.
+      // 250종목 fan-out이 /api/d 간헐 502의 원인이었음(국장과 동일 패턴으로 정렬).
+      const symbolsToFetch = [...new Set([...US_CORE_SYMBOLS, ...usSymbolsRef.current])];
       if (symbolsToFetch.length === 0) return;
 
       const data = await fetchUsStocksBatch(symbolsToFetch);
@@ -116,15 +121,20 @@ export function usePrices() {
         // merged 전체 저장 — raw data만 저장 시 재방문에서 sector/nameEn 메타 소실
         if (mergedUs) savePriceCache(CACHE_KEY_US, mergedUs);
         checkAndAlertBatch(data, 'us');
-        setDataErrors(prev => ({ ...prev, us: false }));
+        usFailStreakRef.current = 0;
+        setDataErrors(prev => prev.us ? { ...prev, us: false } : prev);
         // #380: 폴링 성공 = 데이터 갱신 → asOf.us 리셋. ⚠️ 객체 형태 유지(스냅샷도 {kr,us,coins} 객체 —
         // number로 set하면 headerAsOf의 asOf.us가 undefined→null→라벨 소멸. review CRITICAL)
         setAsOf(prev => ({ ...(prev && typeof prev === 'object' ? prev : {}), us: Date.now() }));
       } else {
-        setDataErrors(prev => ({ ...prev, us: true }));
+        usFailStreakRef.current += 1;
+        if (usFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.us ? prev : { ...prev, us: true });
       }
-    } catch { setDataErrors(prev => ({ ...prev, us: true })); }
-  }, []); // ref 패턴 — stocks 의존성 없음 (setAsOf/setUsStocks 등 setter는 안정 참조)
+    } catch {
+      usFailStreakRef.current += 1;
+      if (usFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.us ? prev : { ...prev, us: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — ref 패턴, setter는 안정 참조
 
   const refreshKoreanStocks = useCallback(async () => {
     try {
@@ -159,14 +169,19 @@ export function usePrices() {
         // merged 전체 저장 — 폴링 결과(소규모)만 저장하면 재방문 시 전종목 소실
         if (mergedKr) savePriceCache(CACHE_KEY_KR, mergedKr);
         checkAndAlertBatch(data, 'kr');
-        setDataErrors(prev => ({ ...prev, kr: false }));
+        krFailStreakRef.current = 0;
+        setDataErrors(prev => prev.kr ? { ...prev, kr: false } : prev);
         // #380: 폴링 성공 → asOf.kr 리셋. 객체 형태 유지(review CRITICAL — number set 시 라벨 소멸)
         setAsOf(prev => ({ ...(prev && typeof prev === 'object' ? prev : {}), kr: Date.now() }));
       } else {
-        setDataErrors(prev => ({ ...prev, kr: true }));
+        krFailStreakRef.current += 1;
+        if (krFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.kr ? prev : { ...prev, kr: true });
       }
-    } catch { setDataErrors(prev => ({ ...prev, kr: true })); }
-  }, []); // ref 패턴 — stocks 의존성 없음 (setter는 안정 참조)
+    } catch {
+      krFailStreakRef.current += 1;
+      if (krFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.kr ? prev : { ...prev, kr: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — ref 패턴, setter는 안정 참조
 
   // #185: snapshot 초기 로드 = hot tier(Top 200) 즉시 → full tier lazy merge.
   //        applySnapshot 로 merge 경로 단일화 → hot/full 동일 로직 공유.
