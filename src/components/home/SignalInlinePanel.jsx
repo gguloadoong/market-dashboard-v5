@@ -14,12 +14,12 @@ export default function SignalInlinePanel({
   isWatched,
   onToggleWatch,
   onOpenChart,
-  botMap = new Map(),
+  characterBadge = null,
 }) {
-  // botMap은 useSignalAccuracy가 항상 Map을 반환하지만, 컴포넌트 재사용/누락 방지로 기본값 부여
-  const accuracy = botMap.get(signal?.type)?.accuracy ?? null;
-  const totalFired = botMap.get(signal?.type)?.totalFired ?? 0;
-  const showAccuracy = totalFired >= 30 && accuracy !== null;
+  // #400: 적중률은 캐릭터(공정측정 v2) 기준으로 단일화 — raw botMap 배지 제거.
+  // characterBadge = { emoji, name, accuracy|null, text } (signalCharacterMap.characterBadge)
+  const accuracy = characterBadge?.accuracy ?? null;
+  const showAccuracy = accuracy !== null;
 
   // 시그널 히스토리 타임라인 (P3-14): 패널 열렸을 때만 조회
   // limit=6으로 요청 → >= 5건 확인 시 노출 (4건 이하는 데이터 부족으로 숨김)
@@ -44,15 +44,15 @@ export default function SignalInlinePanel({
             <span className="text-[13px] font-semibold text-[#191F28] dark:text-[#F9FAFB] truncate">
               {getEasyLabel(signal)}
             </span>
-            {showAccuracy && (
+            {characterBadge && (
               <span
                 className="flex-shrink-0 text-[11px] font-bold px-1.5 py-[2px] rounded-full"
-                style={{
+                style={showAccuracy ? {
                   color: '#fff',
                   background: accuracy >= 70 ? '#2AC769' : accuracy >= 50 ? '#FF9500' : '#F04452',
-                }}
+                } : { color: '#8B95A1', background: 'rgba(139,149,161,0.12)' }}
               >
-                {accuracy}%
+                {characterBadge.text}
               </span>
             )}
           </div>

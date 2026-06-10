@@ -26,11 +26,12 @@
    ├── AltThemeChips       — 동반 테마 칩 (LEAD 모드)
    └── BridgeLine          — 전이구간 브릿지 (국장 모드, 간밤 나스닥 함의 한 줄)
 3. SignalBoardWidget       — 시그널 보드 (카운터 큰 숫자 + 텍스트 색상 구분) — 인라인 결정 패널(SignalInlinePanel) 포함
+                             #400: 카드 적중률 배지는 캐릭터(공정측정 v2) 단일 기준, '적중률 높은 시그널' 박스 제거
 4. AiDebateSection         — AI 종목토론 (별도 섹션, 4종목 칩 선택)
-5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터)
+5. ExploreTabsWidget       — 탐색 탭 (급등/급락 | 섹터) — "전체 원본 랭킹, 필터 없음" 명시 (#400)
    ├── TopMoversWidget     — 급등/급락 탭 (KR/US/COIN 서브탭)
    └── SectorMiniContent   — 섹터 탭 (HOT/COLD pill 칩 + drill-down)
-6. NewsFeedWidget          — 투자 뉴스 (lg:hidden — 모바일 전용)
+6. NewsFeedWidget          — 투자 뉴스 (모바일 전용 — #394: useIsMobile 렌더 분기, CSS hidden 이중 마운트 금지)
 ```
 
 ### 우측 패널 (`src/App.jsx` — 데스크톱 전용) — **비표시** (사용자 피로감 호소로 제거 — #339)
@@ -78,6 +79,7 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | `SurgeSection` | TopMoversWidget으로 통합 | #180 (2026-03-26) |
 | `CoinListingSection` | 거래소 상장 공지 섹션 — 사용자 요청으로 제거 | #213 (2026-03-29) |
 | `SignalFeed` | SignalSummaryWidget과 완전 중복 — 동일 데이터 소스, 시간순/강도순 차이만 있으나 UX 혼란 유발 | #8 (2026-04-01) |
+| `SignalLabWidget` | 과거 시그널 흐름 — 구(raw) 측정 적중률(23.3%)을 노출해 성적표 공정측정(64.1%)과 같은 화면에서 모순. 측정 기준은 캐릭터 성적표로 단일화 | #400 (2026-06-10) |
 
 > ⚠️ 위 목록의 파일이 `src/` 어딘가에 남아있으면 즉시 삭제하라. 파일 존재 = 살아있는 기능으로 오인.
 

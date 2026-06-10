@@ -22,9 +22,10 @@ export default function ExploreTabsWidget({
 
   return (
     <div className="bg-white rounded-2xl px-5 pt-6 pb-4">
-      {/* 섹션 헤더 */}
+      {/* 섹션 헤더 — 역할 1줄 명시 (#400): 위 섹션들과 달리 필터 없는 원본 랭킹 */}
       <div className="mb-0">
         <h2 className="text-[19px] font-bold text-[#191F28] tracking-tight">탐색</h2>
+        <p className="text-[11px] text-[#8B95A1] mt-0.5">시장 전체 등락 원본 랭킹 — 필터 없음</p>
       </div>
 
       {/* 탭 바 */}
