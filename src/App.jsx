@@ -13,7 +13,7 @@ import HomeDashboard from './components/home';
 import NewsFeedWidget from './components/home/widgets/NewsFeedWidget';
 import DataHealthBadge from './components/DataHealthBadge';
 import GlobalSearch from './components/GlobalSearch';
-import { DEFAULT_KRW_RATE } from './constants/market';
+import { DEFAULT_KRW_RATE, US_CORE_SYMBOLS } from './constants/market';
 import SectorRotation from './components/SectorRotation';
 import { isPreferredOrSpecial } from './utils/symbolKey';
 import { isNoiseInstrument } from './components/home/utils';
@@ -163,10 +163,9 @@ export default function App() {
   }, []));
 
   // KIS WebSocket HDFSCNT0 — 미장 실시간 (watchlist 우선, 최대 40개)
+  // #396: 코어 목록은 US_CORE_SYMBOLS 단일 소스 (usePrices 폴링과 공유)
   const kisUsSymbols = useMemo(() => {
-    const defaultTop = ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AVGO',
-                        'JPM','NFLX','AMD','V','MA','LLY','WMT','XOM','PLTR','ARM'];
-    const combined = [...new Set([...usSymbols, ...defaultTop])];
+    const combined = [...new Set([...usSymbols, ...US_CORE_SYMBOLS])];
     return combined.slice(0, 40);
   }, [usSymbols]);
   useKisUsWebSocket(kisUsSymbols, useCallback((quotes) => {
