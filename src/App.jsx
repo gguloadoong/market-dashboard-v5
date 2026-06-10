@@ -32,6 +32,7 @@ import { usePrices } from './hooks/usePrices';
 import { useCoins } from './hooks/useCoins';
 import { useIndices } from './hooks/useIndices';
 import { useFearGreed } from './hooks/useFearGreed';
+import { useIsMobile } from './hooks/useIsMobile';
 
 // PWA 설치 유도 배너 — standalone이 아닌 환경에서 1회 표시
 function InstallBanner() {
@@ -73,6 +74,7 @@ function InstallBanner() {
 export default function App() {
   // F&G 시그널 발화 단일 인스턴스 — 다중 호출 시 시그널 중복 발화 방지
   useFearGreed();
+  const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
   const { watchlist, krSymbols, usSymbols } = useWatchlist();
   const { indices, krwRate, krwRateLoaded } = useIndices();
@@ -140,12 +142,24 @@ export default function App() {
 
 
   // KIS WebSocket — watchlist KR 우선
+  // #394: 훅이 틱을 1초 코얼레싱한 배치(배열)로 전달 — 배열 재생성·리렌더를 초당 1회로 제한
   const kisSymbols = useMemo(() => {
     const combined = [...new Set([...krSymbols, ...krStocks.map(s => s.symbol)])];
     return combined.slice(0, 40); // H0STCNT0 세션당 최대 40개
   }, [krSymbols, krStocks]);
-  useKisWebSocket(kisSymbols, useCallback((quote) => {
-    setKrStocks(prev => prev.map(s => s.symbol === quote.symbol ? { ...s, ...quote } : s));
+  useKisWebSocket(kisSymbols, useCallback((quotes) => {
+    if (!quotes?.length) return;
+    setKrStocks(prev => {
+      const bySym = new Map(quotes.map(q => [q.symbol, q]));
+      let changed = false;
+      const next = prev.map(s => {
+        const q = bySym.get(s.symbol);
+        if (!q) return s;
+        changed = true;
+        return { ...s, ...q };
+      });
+      return changed ? next : prev;
+    });
   }, []));
 
   // KIS WebSocket HDFSCNT0 — 미장 실시간 (watchlist 우선, 최대 40개)
@@ -155,8 +169,19 @@ export default function App() {
     const combined = [...new Set([...usSymbols, ...defaultTop])];
     return combined.slice(0, 40);
   }, [usSymbols]);
-  useKisUsWebSocket(kisUsSymbols, useCallback((quote) => {
-    setUsStocks(prev => prev.map(s => s.symbol === quote.symbol ? { ...s, ...quote } : s));
+  useKisUsWebSocket(kisUsSymbols, useCallback((quotes) => {
+    if (!quotes?.length) return;
+    setUsStocks(prev => {
+      const bySym = new Map(quotes.map(q => [q.symbol, q]));
+      let changed = false;
+      const next = prev.map(s => {
+        const q = bySym.get(s.symbol);
+        if (!q) return s;
+        changed = true;
+        return { ...s, ...q };
+      });
+      return changed ? next : prev;
+    });
   }, []));
 
   // ETF 폴링 (60초)
@@ -441,7 +466,8 @@ export default function App() {
         </div>
 
         {/* 데스크톱 우측 뉴스 레일 (#353) — 뉴스 탭 제외 전 탭에서 표시. #340 회귀 복원 */}
-        {activeTab !== 'news' && (
+        {/* #394: CSS hidden은 마운트를 막지 못해 모바일에서도 뉴스 매칭 연산 발생 → 렌더 분기 */}
+        {activeTab !== 'news' && !isMobile && (
           <aside className="hidden lg:block self-start sticky top-[84px] pt-5 pr-5 pb-5">
             <NewsFeedWidget
               allNews={allNews}

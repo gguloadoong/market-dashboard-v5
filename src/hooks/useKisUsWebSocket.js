@@ -4,6 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import { fetchWsApproval } from '../api/_gateway.js';
+import { createTickBuffer } from '../utils/tickBuffer.js';
 
 const KIS_WS_URL  = 'wss://ops.koreainvestment.com:21000';
 const TR_ID       = 'HDFSCNT0';
@@ -82,10 +83,10 @@ function parseSymbol(trKey) {
 /**
  * KIS WebSocket HDFSCNT0 — 해외주식 실시간 체결 구독 훅
  * @param {string[]} symbols  - 종목코드 배열 (예: ['AAPL', 'NVDA']) 최대 40개
- * @param {Function} onQuote  - 콜백: ({ symbol, price, change, changePct }) => void
+ * @param {Function} onQuotes - 콜백: 1초 코얼레싱 배치 [{ symbol, price, change, changePct }, ...] (#394)
  */
-export function useKisUsWebSocket(symbols, onQuote) {
-  const onQuoteRef      = useRef(onQuote);
+export function useKisUsWebSocket(symbols, onQuotes) {
+  const onQuotesRef     = useRef(onQuotes);
   const symbolsRef      = useRef(symbols);
   const prevSymbolsRef  = useRef([]);
   const wsRef           = useRef(null);
@@ -95,7 +96,7 @@ export function useKisUsWebSocket(symbols, onQuote) {
   const keyRefreshTimer = useRef(null);
   const mountedRef      = useRef(true);
 
-  useEffect(() => { onQuoteRef.current = onQuote; }, [onQuote]);
+  useEffect(() => { onQuotesRef.current = onQuotes; }, [onQuotes]);
   useEffect(() => { symbolsRef.current = symbols; }, [symbols]);
 
   // ── 구독/해제 헬퍼 ──────────────────────────────────────────────
@@ -177,6 +178,8 @@ export function useKisUsWebSocket(symbols, onQuote) {
   // ── WebSocket 연결 관리 ─────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+    // 틱 1초 코얼레싱 — 심볼별 최신 틱만 배치로 전달 (#394 리렌더 폭풍 차단)
+    const tickBuffer = createTickBuffer(batch => onQuotesRef.current?.(batch));
 
     async function fetchApprovalKey() {
       try {
@@ -206,7 +209,7 @@ export function useKisUsWebSocket(symbols, onQuote) {
         const raw = event.data;
         if (typeof raw !== 'string' || raw.startsWith('{')) return;
         const quote = parsePipeMessage(raw);
-        if (quote) onQuoteRef.current?.(quote);
+        if (quote) tickBuffer.push(quote);
       };
 
       ws.onerror = (e) => {
@@ -280,6 +283,7 @@ export function useKisUsWebSocket(symbols, onQuote) {
 
     return () => {
       mountedRef.current = false;
+      tickBuffer.destroy();
       clearTimeout(retryTimer.current);
       clearTimeout(keyRefreshTimer.current);
       document.removeEventListener('visibilitychange', handleVisibility);

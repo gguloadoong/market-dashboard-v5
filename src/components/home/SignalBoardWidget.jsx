@@ -38,9 +38,15 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   const { botMap } = useSignalAccuracy();
   const { toggle: toggleWatch, isWatched } = useWatchlist();
 
+  // #394: allItems는 WS 틱마다 identity가 바뀜 — 내러티브(뉴스 매칭+섹터 동조 카운트)가
+  // 틱마다 재계산되지 않도록 ref로 분리. 섹터 동조 수는 1초 내 stale이어도 무방.
+  const allItemsRef = useRef(allItems);
+  allItemsRef.current = allItems;
+
   // 시그널별 내러티브 사전 계산 — symbol 기준 캐싱
   // sector 보강(KR), ±2시간 뉴스 매칭, 섹터 동조 종목 수 집계
   const narrativeMap = useMemo(() => {
+    const allItems = allItemsRef.current;
     const map = new Map();
     if (!allSignals.length) return map;
     for (const sig of allSignals) {
@@ -77,7 +83,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
       map.set(sig.id, { narrative, relatedNews });
     }
     return map;
-  }, [allSignals, allItems, allNews]);
+  }, [allSignals, allNews]); // allItems는 ref로 읽음 (#394 — 틱 의존 분리)
 
   // allItems O(1) 조회 맵
   const allItemsLookup = useMemo(() => {

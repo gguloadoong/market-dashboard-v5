@@ -214,7 +214,9 @@ export function useCoins(krwRateRef) {
       if (tick._connected) { wsConnectedRef.current = true; return; }
       if (tick._disconnected) { wsConnectedRef.current = false; return; }
       wsTickBufRef.current[tick.symbol] = tick;
-      if (!wsFlushTimer.current) wsFlushTimer.current = setTimeout(flushTicks, 200);
+      // 200ms → 1000ms (#394): 코인 WS 플러시가 200ms마다 setCoins → 홈 전체 리렌더 폭풍의 1차 트리거.
+      // 시세 체감(1초)을 해치지 않는 선에서 리렌더 빈도를 1/5로 제한.
+      if (!wsFlushTimer.current) wsFlushTimer.current = setTimeout(flushTicks, 1000);
     };
     wsHandlerRef.current = wsHandler;
     // 전체 심볼 목록으로 한 번만 구독 (이중 구독 방지)
