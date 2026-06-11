@@ -18,12 +18,13 @@
 - 시그널(기준2·5): 수동발화 검증 — **recorded:50**(composite 포함), /api/signals **71건 = composite 50 + SRB 11 + DB 10**(패턴 머지 서빙 작동, CDN 캐시 주의 — 검증 시 ?cb= 캐시버스터 필수). 약세 시그널 15건 표시(약세0 고착 해소). dropped:21은 쿨다운 미설정 → 다음 발화 자가치유(설계대로).
 - QA(전체): 탭·차트패널·코인·다크·모바일·성적표(라이브3종) PASS. 카드 캐릭터배지 부재는 **정상**(gate 비매칭 — us/coin volume엔 kr·bullish 측정치 안 붙임, #400 설계).
 
-**🔴 유일 미해결 — Vercel 크론 스케줄러가 pattern-cron을 자동 호출하지 않음:**
-- `pattern-cron` lastOk가 6-09T13:30Z(수동발화)에서 멈춤 — **구 4h 스케줄 시절부터 자동발화 0회** (스케줄 변경 탓 아님, 기존 결함).
-- 등록은 정상: `vercel crons ls` → `/api/cron/compute-signals  20 * * * *` 반영 확인. CF Worker 크론(kr/coins/composite)은 전부 생존.
-- 수동발화(x-vercel-cron 헤더)는 완벽 작동 → **코드 무결, 스케줄러 호출만 부재**.
-- 진단 분기: ①Vercel 대시보드 Cron Jobs 비활성 토글? (대표 확인 필요 가능성 — request-to-ceo) ②Deployment Protection이 크론 호출 차단? (vercel logs로 401/403 vs 호출0 구분) ③health-check 크론(0 * * * *)도 같은 증상인지 비교.
-- 임시 안전망 옵션: CF Worker에 hourly fetch(외부에서 x-vercel-cron 헤더로 호출)를 추가하면 스케줄러 우회 가능 — 단 근본 원인 확인 후.
+**🔴 유일 미해결 — Vercel 크론 전멸 원인 확정: Deployment Protection이 크론 호출을 401로 차단 (2026-06-11 15:2x 진단 완료):**
+- **증거**: Vercel API 조회 — crons enabled 정상, 스케줄 hourly 반영 정상. 그러나 `crons.definitions[].host`가 공개 도메인이 아닌 **deployment URL**(`market-dashboard-v5-8en7puzm2-...vercel.app`). 그 주소 직접 호출 = **HTTP 401**(x-vercel-cron 헤더 포함해도), 공개 도메인 = 200.
+- **의미**: Vercel 스케줄러의 크론 호출이 인증벽에서 죽음 → **pattern-cron뿐 아니라 health-check(매시 정각)도 개설 이래 한 번도 실행된 적 없음** (health-check 라벨 이슈 0건과 정합). #390 self-POST 인증벽과 동일 뿌리.
+- **수정 옵션**:
+  ① (권장·근본·코드무변경) 대표가 Vercel 대시보드: Settings → Deployment Protection → **Protection Bypass for Automation 활성화** → Vercel 크론이 bypass 시크릿을 자동 포함해 401 해제. 활성화 후 다음 :20 발화를 `pattern-cron-status` lastOk로 확인.
+  ② (코드 우회) CF Worker에 hourly 스케줄 추가 → 공개 도메인으로 fetch(x-vercel-cron 헤더, 200 확인됨). health-check도 동일 우회 가능. wrangler deploy 필요.
+- 대표에게 ① 요청 발신(2026-06-11). 응답 없거나 ① 실패 시 ② 진행.
 
 ## ⚡ 현재 최우선 트랙 — 서비스 정상화 (대표 /goal 2026-06-10)
 
