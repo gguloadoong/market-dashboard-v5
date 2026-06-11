@@ -9,8 +9,6 @@ import { itemKey, isPreferredOrSpecial } from '../../utils/symbolKey';
 import NewsFeedWidget from './widgets/NewsFeedWidget';
 import MorphingFocusSection from './MorphingFocusSection';
 import { useInvestorSignals } from '../../hooks/useInvestorSignals';
-import { useDerivativeSignals } from '../../hooks/useDerivativeSignals';
-import { useNewsSignals } from '../../hooks/useNewsSignals';
 import { useServerSignals } from '../../hooks/useServerSignals';
 import { isMarketIndicatorSignal } from '../../engine/signalTypes';
 import CommandCenterWidget from './CommandCenterWidget';
@@ -111,14 +109,8 @@ export default function HomeDashboard({
 
   // 거래량 이상치 시그널 스캔 (15분 간격 폴링) — 레버리지/인버스 ETF 제외 (일반 ETF·코인ETF 포함)
   // (#366: fx_impact 등 죽은 시그널 제거 — krwRate 주입 불필요)
+  // (#402: no-op 잔재 useDerivativeSignals/useNewsSignals 호출 제거 — 발화 경로는 #366에서 이미 소멸)
   useInvestorSignals(stockItems);
-
-  // 파생/소셜 시그널 스캔 (PCR, 펀딩비, 주문장, VWAP, 소셜)
-  const watchlistSymbols = useMemo(() => watchedItems.map(i => i.symbol).filter(Boolean), [watchedItems]);
-  useDerivativeSignals({ usStocks, krStocks, watchlistSymbols });
-
-  // 뉴스 클러스터 시그널 (종목별 뉴스 3건+ 집중 감지) — 레버리지/인버스 ETF 제외
-  useNewsSignals(allNews, stockItems);
 
   // 서버 사전 계산 시그널 (composite_score + 패턴) — KV에서 1분 폴링 (#213)
   useServerSignals();

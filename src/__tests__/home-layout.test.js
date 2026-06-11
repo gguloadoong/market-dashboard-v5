@@ -21,11 +21,20 @@ const homeIndex = readFileSync(homeIndexPath, 'utf-8');
 // ─── 영구 삭제된 컴포넌트 — import 금지 ──────────────────────────────────────
 // 이 목록에 추가할 때는 HOME_CONTRACT.md "영구 삭제된 컴포넌트" 표에도 추가하라.
 const BANNED_IMPORTS = [
-  { name: 'EarlySignalSection', reason: '오탐률 높음, #172에서 삭제' },
-  { name: 'EventCalendar',      reason: 'EventTicker 롤링으로 대체, 섹션 형태 금지' },
-  { name: 'DexHotSection',      reason: '데이터 소스 불안정, #180에서 삭제' },
-  { name: 'InsightsSection',    reason: 'TopMoversWidget으로 통합, #180에서 삭제' },
-  { name: 'SurgeSection',       reason: 'TopMoversWidget으로 통합, #180에서 삭제' },
+  { name: 'EarlySignalSection',    reason: '오탐률 높음, #172에서 삭제' },
+  { name: 'EventCalendar',         reason: 'EventTicker 롤링으로 대체, 섹션 형태 금지' },
+  { name: 'DexHotSection',         reason: '데이터 소스 불안정, #180에서 삭제' },
+  { name: 'InsightsSection',       reason: 'TopMoversWidget으로 통합, #180에서 삭제' },
+  { name: 'SurgeSection',          reason: 'TopMoversWidget으로 통합, #180에서 삭제' },
+  { name: 'SignalLabWidget',       reason: '구 raw 측정 노출 — 성적표 공정측정과 모순, #400에서 삭제' },
+  { name: 'SignalSummaryWidget',   reason: 'SignalBoardWidget에 통합 완료, #402에서 삭제' },
+  { name: 'NotableMoversSection',  reason: 'MorphingFocusSection에 흡수 완료(#335), #402에서 삭제' },
+  { name: 'MarketInvestorSection', reason: '참조 0건 데드코드, #402에서 삭제' },
+  { name: 'MorningBriefing',       reason: '참조 0건 데드코드, #402에서 삭제' },
+  { name: 'MarketTimeline',        reason: 'EventTicker로 충분, #402에서 삭제' },
+  { name: 'useDerivativeSignals',  reason: '#366 no-op 잔재, #402에서 삭제' },
+  { name: 'useNewsSignals',        reason: '#366 no-op 잔재, #402에서 삭제' },
+  { name: 'useSignalAccuracy',     reason: '측정 기준 캐릭터(공정측정)로 단일화, #400~#402에서 삭제' },
 ];
 
 describe('홈 레이아웃 — 삭제된 컴포넌트 재import 방지', () => {

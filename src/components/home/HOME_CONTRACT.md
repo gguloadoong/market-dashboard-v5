@@ -49,22 +49,15 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 
 ### 커맨드 센터 개편으로 홈에서 비표시인 컴포넌트
 
-| 컴포넌트 | 비표시 이유 |
+> #402 데드코드 청산: 아래 "비표시" 항목 중 파일이 남아있던 것들은 전부 **삭제**됐다
+> (ADR-014 좀비 파일 원칙 — 파일 존재 = 살아있는 기능으로 오인 → 회귀 원인 1위).
+> 복원이 필요하면 git 히스토리(`git log --all -- <path>`)에서 꺼낸다.
+
+| 컴포넌트 | 처리 |
 |---------|---------|
-| MarketPulseWidget (독립) | CommandCenterWidget의 TemperatureBar에 통합됨 |
-| MarketSentimentWidget (독립) | CommandCenterWidget의 TemperatureBar에 통합됨 |
-| WatchlistWidget (독립) | CommandCenterWidget의 WatchlistMini에 통합됨 |
-| EventTicker (독립) | CommandCenterWidget의 EventStrip에 래핑됨 |
-| MorningBriefing | "5분 안에 파악" 목표와 충돌 — 시그널 푸시로 전환 예정 |
-| FearGreedWidget (독립) | CommandCenterWidget에 인라인 통합됨 |
-| MarketTemperatureWidget (독립) | CommandCenterWidget에 통합됨 |
-| DerivativesWidget | 전문 트레이더 전용. 고급 설정 토글로 이동 예정 |
-| MarketTimeline | EventTicker 롤링으로 충분 |
-| MarketInvestorSection | SeoulForceSection과 데이터 중복 (외국인/기관 수급) |
-| SectorMiniWidget (독립) | ExploreTabsWidget의 SectorMiniContent로 통합됨 |
-| SignalSummaryWidget (독립) | SignalBoardWidget에 통합됨 |
-| SeoulForceSection (인라인) | SignalBoardWidget에 통합됨 |
-| UnifiedFeedPanel (우측 패널) | 사용자 피로감 호소로 App.jsx 렌더 제거 — #339 (파일 보존, 영구삭제 아님) |
+| EventTicker (독립) | ✅ 활성 — CommandCenterWidget의 EventStrip에 래핑됨 (파일 유지) |
+| MarketIndexSection | ✅ 활성 — CommandCenterWidget 서브컴포넌트 (파일 유지) |
+| 나머지 비표시 전부 | ❌ #402에서 삭제 — 아래 "영구 삭제" 표 참조 |
 
 ---
 
@@ -80,6 +73,15 @@ BreakingNewsPanel          — 기존 뉴스 패널 (모바일 전용, lg:hidden
 | `CoinListingSection` | 거래소 상장 공지 섹션 — 사용자 요청으로 제거 | #213 (2026-03-29) |
 | `SignalFeed` | SignalSummaryWidget과 완전 중복 — 동일 데이터 소스, 시간순/강도순 차이만 있으나 UX 혼란 유발 | #8 (2026-04-01) |
 | `SignalLabWidget` | 과거 시그널 흐름 — 구(raw) 측정 적중률(23.3%)을 노출해 성적표 공정측정(64.1%)과 같은 화면에서 모순. 측정 기준은 캐릭터 성적표로 단일화 | #400 (2026-06-10) |
+| `SignalSummaryWidget` | SignalBoardWidget에 통합 완료 후 좀비 파일 | #402 (2026-06-11) |
+| `NotableMoversSection` | MorphingFocusSection 흡수(#335) 완료 후 좀비 파일 | #402 (2026-06-11) |
+| `MarketInvestorSection` | 참조 0건 (m 데이터는 게이트웨이 라우트만 잔존) | #402 (2026-06-11) |
+| `MorningBriefing` / `MarketTimeline` | 참조 0건 | #402 (2026-06-11) |
+| `UnifiedFeedPanel` | #339 렌더 중단 후 좀비 파일 — 피로감 사유 그대로 유효 | #402 (2026-06-11) |
+| `MarketPulseWidget` / `MarketSentimentWidget` / `WatchlistWidget` / `FearGreedWidget` / `DerivativesWidget` | CommandCenter 통합 완료 후 좀비 파일 | #402 (2026-06-11) |
+| `HomeDashboard.jsx` (components 루트) | home/index.jsx로 대체된 구 모놀리스 | #402 (2026-06-11) |
+| `InvestorFlow` | 참조 0건 | #402 (2026-06-11) |
+| 훅: `useCompositeSignals`·`useDerivativeSignals`·`useNewsSignals`·`useSignalAccuracy` | 서버 이전(#213)·no-op(#366)·측정 단일화(#400) 후 잔재 | #402 (2026-06-11) |
 
 > ⚠️ 위 목록의 파일이 `src/` 어딘가에 남아있으면 즉시 삭제하라. 파일 존재 = 살아있는 기능으로 오인.
 
