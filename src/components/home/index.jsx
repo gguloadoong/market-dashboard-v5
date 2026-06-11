@@ -17,7 +17,6 @@ import CommandCenterWidget from './CommandCenterWidget';
 import SignalBoardWidget from './SignalBoardWidget';
 import AiDebateSection from './AiDebateSection';
 import ExploreTabsWidget from './ExploreTabsWidget';
-import SignalLabWidget from './SignalLabWidget';
 
 export default function HomeDashboard({
   indices = [], krStocks = [], usStocks = [], coins = [], etfs = [],
@@ -265,9 +264,6 @@ export default function HomeDashboard({
         allItems={allItems}
         onTabChange={onTabChange}
       />
-
-      {/* ─── 4.5. Signal Lab — 과거 시그널 흐름 (#274) ──────── */}
-      <SignalLabWidget />
 
       {/* ─── 5. 뉴스 (모바일 전용 — 데스크톱은 App.jsx 우측 뉴스 레일 #353) ── */}
       {/* #394: lg:hidden은 데스크톱에서도 마운트되어 뉴스 매칭 연산 2배 → 렌더 분기로 교체 */}

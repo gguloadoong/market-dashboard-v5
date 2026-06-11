@@ -5,7 +5,8 @@ import { cycleStep } from '../../utils/cycleTracker';
 import { useTopSignals } from '../../hooks/useSignals';
 import { extractName, getEasyLabel } from '../../utils/signalLabel';
 import { isMarketIndicatorSignal } from '../../engine/signalTypes';
-import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
+import { useSignalCharacters } from '../../hooks/useSignalCharacters';
+import { buildTypeCharacterMap, characterBadge } from '../../utils/signalCharacterMap';
 import { buildNarrative } from '../../utils/narrativeBuilder';
 import { matchesKeywords, buildStockKeywords } from '../../utils/newsAlias';
 import { KR_SECTOR_MAP } from '../../data/krStockList';
@@ -35,13 +36,15 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
   // 인라인 결정 패널 — 펼쳐진 시그널 id (null=모두 닫힘)
   const [expandedId, setExpandedId] = useState(null);
   const allSignals = useTopSignals(20);
-  const { botMap } = useSignalAccuracy();
+  // #400: 적중률 표시는 성적표와 동일한 캐릭터(공정측정 v2) 단일 기준 — raw 측정 botMap 제거
+  const { characters } = useSignalCharacters();
+  const charByType = useMemo(() => buildTypeCharacterMap(characters), [characters]);
   const { toggle: toggleWatch, isWatched } = useWatchlist();
 
   // #394: allItems는 WS 틱마다 identity가 바뀜 — 내러티브(뉴스 매칭+섹터 동조 카운트)가
-  // 틱마다 재계산되지 않도록 ref로 분리. 섹터 동조 수는 1초 내 stale이어도 무방.
+  // 틱마다 재계산되지 않도록 ref로 분리. 섹터 동조 수는 1~2초 stale이어도 무방.
   const allItemsRef = useRef(allItems);
-  allItemsRef.current = allItems;
+  useEffect(() => { allItemsRef.current = allItems; }, [allItems]);
 
   // 시그널별 내러티브 사전 계산 — symbol 기준 캐싱
   // sector 보강(KR), ±2시간 뉴스 매칭, 섹터 동조 종목 수 집계
@@ -124,20 +127,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     };
   }, [allSignals]);
 
-  // 적중률 높은 시그널 — totalFired >= 30 && accuracy >= 60인 현재 발화 시그널, 최대 2건
-  const highAccuracySignals = useMemo(() => {
-    return allSignals
-      .filter(s => {
-        const bot = botMap.get(s.type);
-        return bot && bot.totalFired >= 30 && bot.accuracy >= 60;
-      })
-      .sort((a, b) => {
-        const accA = botMap.get(a.type)?.accuracy ?? 0;
-        const accB = botMap.get(b.type)?.accuracy ?? 0;
-        return accB - accA;
-      })
-      .slice(0, 2);
-  }, [allSignals, botMap]);
+  // (#400) '적중률 높은 시그널' 박스 제거 — raw 측정 기반 + 카드 캐릭터 배지와 중복
 
   // 통합 리스트: 모든 시그널 (세력 포착 포함)
   const combinedList = useMemo(() => {
@@ -180,10 +170,13 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
     setExpandedId(willExpand ? signal.id : null);
   }, [expandedId]);
 
-  // 탭 헤더 공통
+  // 탭 헤더 공통 — 역할 1줄 명시 (#400): 이 섹션은 "알고리즘 신호", 적중률은 성적표와 동일 기준
   const tabHeader = (
     <div className="flex items-center justify-between mb-5">
-      <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
+      <div className="min-w-0">
+        <span className="text-[19px] font-bold text-[#191F28] tracking-tight">시그널 보드</span>
+        <p className="text-[11px] text-[#8B95A1] mt-0.5">알고리즘이 포착한 매매 신호 — 적중률은 성적표와 같은 공정 측정</p>
+      </div>
       <div className="flex bg-[#F2F4F6] rounded-lg p-0.5">
         <button
           onClick={() => setActiveTab('live')}
@@ -265,44 +258,6 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
       {/* 모바일: 카운터만 노출, 리스트는 접힌 상태 기본 — 펼치기 버튼으로 토글 */}
       {/* 데스크톱: 항상 표시 */}
       <div className={expanded ? '' : 'hidden lg:block'}>
-        {/* 적중률 높은 시그널 (있을 때만) */}
-        {highAccuracySignals.length > 0 && (
-          <div className="mb-3 rounded-xl bg-[#F0FFF6] dark:bg-[#0D2A1A] px-3 py-2.5">
-            <div className="flex items-center gap-1 mb-2">
-              <span className="text-[12px] font-bold text-[#2AC769]">✅ 적중률 높은 시그널</span>
-            </div>
-            <div className="space-y-1">
-              {highAccuracySignals.map(sig => {
-                const acc = botMap.get(sig.type)?.accuracy ?? 0;
-                const label = getEasyLabel(sig);
-                const truncated = label.length > 40 ? label.slice(0, 40) + '…' : label;
-                return (
-                  <button
-                    key={sig.id}
-                    onClick={() => handleClick(sig)}
-                    className="w-full flex items-center justify-between text-left gap-2 py-0.5"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[13px] font-semibold text-[#191F28] dark:text-[#E5E8EB] flex-shrink-0">
-                        {extractName(sig)}
-                      </span>
-                      <span className="text-[12px] text-[#4E5968] dark:text-[#8B95A1] truncate">
-                        {truncated}
-                      </span>
-                    </div>
-                    <span
-                      className="flex-shrink-0 text-[11px] font-bold px-1.5 py-[2px] rounded-full"
-                      style={{ color: '#fff', background: '#2AC769' }}
-                    >
-                      {acc}%↑
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* 시그널 리스트 — 텍스트 색상으로 강세/약세 구분, 좌측 보더 없음 */}
         <div>
           {displayList.map((signal, idx) => {
@@ -314,6 +269,9 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
             const narrative = narrativeData?.narrative;
             const relatedNews = narrativeData?.relatedNews;
             const matchedItem = matchedItemMap.get(signal.id);
+            // #400: 카드와 성적표가 같은 캐릭터·같은 공정 적중률로 말하게.
+            // gate(market/direction) 비매칭 슬라이스는 배지 없음 — 측정 주장 안 함 (review HIGH)
+            const charBadge = characterBadge(charByType.get(signal.type), signal);
             const isExpanded = expandedId === signal.id;
             const watchedKey = matchedItem?.id || signal.symbol;
             const marketKey = signal.market === 'crypto' ? 'COIN' : signal.market?.toUpperCase();
@@ -340,20 +298,18 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   </span>
                   <span className="text-[13px] text-[#8B95A1] truncate flex-1 min-w-0">
                     {getEasyLabel(signal)}
-                    {/* 적중률 배지 */}
-                    {(botMap.get(signal.type)?.totalFired ?? 0) >= 30 && (
-                      <span
-                        className="ml-1 text-[10px] font-bold px-1 py-[1px] rounded-full"
-                        style={{
-                          color: '#fff',
-                          background: (botMap.get(signal.type)?.accuracy ?? 0) >= 70 ? '#2AC769'
-                            : (botMap.get(signal.type)?.accuracy ?? 0) >= 50 ? '#FF9500' : '#F04452',
-                        }}
-                      >
-                        {botMap.get(signal.type)?.accuracy ?? 0}%
-                      </span>
-                    )}
                   </span>
+                  {/* 캐릭터 배지 — 성적표와 동일한 공정 적중률 (#400, live만 % 노출) */}
+                  {charBadge && (
+                    <span
+                      className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-[2px] rounded-full"
+                      style={charBadge.accuracy != null
+                        ? { color: '#fff', background: charBadge.accuracy >= 70 ? '#2AC769' : charBadge.accuracy >= 50 ? '#FF9500' : '#F04452' }
+                        : { color: '#8B95A1', background: 'rgba(139,149,161,0.12)' }}
+                    >
+                      {charBadge.text}
+                    </span>
+                  )}
                   {/* 강도 도트 (원형) */}
                   <div className="flex gap-[3px] flex-shrink-0">
                     {Array.from({ length: 5 }).map((_, i) => (
@@ -412,7 +368,7 @@ export default function SignalBoardWidget({ onItemClick, allItems = [], allNews 
                   isWatched={isWatched(watchedKey, marketKey)}
                   onToggleWatch={() => toggleWatch(watchedKey, marketKey)}
                   onOpenChart={() => handleClick(signal)}
-                  botMap={botMap}
+                  characterBadge={charBadge}
                 />
               </div>
             );

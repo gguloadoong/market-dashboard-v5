@@ -17,6 +17,7 @@ import { DEFAULT_KRW_RATE, US_CORE_SYMBOLS } from './constants/market';
 import SectorRotation from './components/SectorRotation';
 import { isPreferredOrSpecial } from './utils/symbolKey';
 import { isNoiseInstrument } from './components/home/utils';
+import { passesTurnoverFloor } from './utils/leadingStocks';
 
 import { ETF_LIST } from './data/etfList';
 import { fetchKoreanStocksBatch, fetchEtfPricesBatch } from './api/stocks';
@@ -110,13 +111,12 @@ export default function App() {
   });
 
   // #380: 헤더 freshness 단일 asOf — 활성 탭 시장 우선(코인/미국 탭서 KR 시각 과대표시 방지, review HIGH).
-  // 홈/섹터/뉴스는 KR 우선, 없으면 us/coins 최신. (activeTab 선언 뒤 — TDZ 방지)
+  // #400: 홈/섹터/뉴스는 "가장 신선한 마켓" 기준 — 코인이 LIVE인데 KR 기준 '1시간 전'으로 뜨는 모순 해소.
   const headerAsOf = useMemo(() => {
     if (!asOf || typeof asOf !== 'object') return null;
     const byTab = { kr: asOf.kr, us: asOf.us, coin: asOf.coins, etf: asOf.kr };
     if (byTab[activeTab] != null) return byTab[activeTab];
-    if (asOf.kr != null) return asOf.kr;
-    const rest = [asOf.us, asOf.coins].filter((v) => v != null);
+    const rest = [asOf.kr, asOf.us, asOf.coins].filter((v) => v != null);
     return rest.length ? Math.max(...rest) : null;
   }, [asOf, activeTab]);
   const [etfs, setEtfs]                 = useState(ETF_LIST);
@@ -220,15 +220,15 @@ export default function App() {
   useEffect(() => { requestNotificationPermission(); }, []);
   useEffect(() => { setAlertWatchlistIds(watchlist); }, [watchlist]);
 
-  // 탭 타이틀 업데이트
+  // 탭 타이틀 업데이트 — #400: 거래대금 하한(잡주 컷) 적용, 브라우저 탭은 서비스 첫인상
   const titleTimerRef = useRef(null);
   useEffect(() => {
     clearTimeout(titleTimerRef.current);
     titleTimerRef.current = setTimeout(() => {
       const all = [
-        ...krStocks.map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
-        ...usStocksVisible.map(s => ({ name: s.name || s.symbol, pct: s.changePct })), // 워런트 정화본 (#360)
-        ...coins.map(c =>   ({ name: c.name  || c.symbol, pct: c.change24h })),
+        ...krStocks.filter(s => passesTurnoverFloor(s, 'kr')).map(s => ({ name: s.name || s.symbol, pct: s.changePct })),
+        ...usStocksVisible.filter(s => passesTurnoverFloor(s, 'us')).map(s => ({ name: s.name || s.symbol, pct: s.changePct })), // 워런트 정화본 (#360)
+        ...coins.filter(c => passesTurnoverFloor(c, 'coin')).map(c => ({ name: c.name  || c.symbol, pct: c.change24h })),
       ].filter(x => Number.isFinite(x.pct))
        .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
       const top = all[0];

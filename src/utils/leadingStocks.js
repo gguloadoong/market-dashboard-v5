@@ -118,6 +118,26 @@ export function turnoverKRW(item, krwRate = 0) {
   return raw; // KR
 }
 
+// ─── 잡주 컷: 거래대금 하한 (#400) ────────────────────────────
+// 상단 티커(SurgeBanner)·브라우저 탭 타이틀처럼 "서비스 첫인상"을 차지하는 자리에서
+// 초저유동성 잡주를 거른다. 주도주와 동일 컷(MIN_TURNOVER).
+// volume 데이터가 아직 없으면(장 시작 직후 0) 통과 — 거짓 빈화면 방지가 우선.
+// ⚠️ passesNoiseGate(아래) 내부 컷과 동일 정책의 별도 구현(US: USD 직접 vs krwRate 환산) —
+//    하한 정책 수정 시 양쪽 동기화 필수.
+export function passesTurnoverFloor(raw, market) {
+  if (!raw) return false;
+  if (market === 'coin') {
+    const acc = Number(raw.accTradePrice24h);
+    if (!Number.isFinite(acc) || acc <= 0) return true; // 데이터 없음 → 통과
+    return acc >= MIN_TURNOVER.COIN;
+  }
+  const price = Number(raw.price);
+  const volume = Number(raw.volume);
+  if (!Number.isFinite(price) || !Number.isFinite(volume) || price <= 0 || volume <= 0) return true;
+  const turn = price * volume;
+  return market === 'us' ? turn >= MIN_TURNOVER.US_USD : turn >= MIN_TURNOVER.KR;
+}
+
 // 회전율 = 거래대금 / 시가총액. 코인(marketCap=0)은 null 반환 → 절대 percentile로 대체.
 export function turnoverRatio(item, krwRate = 0) {
   if (!item) return null; // turnoverKRW와 방어 일관성(null 유입 시 isCoinItem의 .id 접근 방지)

@@ -5,6 +5,7 @@
 import { memo, useMemo } from 'react';
 import { getKoreanMarketStatus, getUsMarketStatus } from '../utils/marketHours';
 import { DERIVATIVE_RE } from './home/utils';
+import { passesTurnoverFloor } from '../utils/leadingStocks';
 
 // 시장별 컬러 도트
 const MARKET_DOT = {
@@ -56,6 +57,7 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
       ...stocks
         .filter(s => s.market === 'kr' ? krOpen : s.market === 'us' ? usOpen : true)
         .filter(s => !isDerivative(s))
+        .filter(s => passesTurnoverFloor(s, s.market)) // #400 잡주 컷 — 첫인상 자리 거래대금 하한
         .map(s => ({
           name:            s.name || s.symbol,
           symbol:          s.symbol,
@@ -65,7 +67,7 @@ const SurgeBanner = memo(function SurgeBanner({ stocks = [], coins = [], indices
           afterHoursPct:   s.afterHoursChangePct ?? null,
           _raw:            s,
         })),
-      ...coins.map(c => ({
+      ...coins.filter(c => passesTurnoverFloor(c, 'coin')).map(c => ({
         name:            c.name,
         symbol:          c.symbol,
         pct:             c.change24h ?? 0,

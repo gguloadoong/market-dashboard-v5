@@ -82,15 +82,18 @@ export const DERIVATIVE_RE = /인버스|레버리지|2x|곱버스|bear|bull|inve
 
 // 미장 워런트/권리/트랜치/유닛 판별 — name 기반 (#355).
 // 보통주(NEWS/JEWELS/Warranty Group)는 단어경계(\b)로 오탐 0.
-export const US_NONCOMMON_RE = /\b(warrants?|warr|rights?|units?|tranche|subscription receipts?)\b/i;
+// #400: contingent 추가 — CVR(Contingent Value Right)이 종목처럼 노출됨
+// (GENVR name="Gen Digital Inc. - Contingent V" — API가 이름을 잘라도 'contingent'는 남음).
+export const US_NONCOMMON_RE = /\b(warrants?|warr|rights?|units?|tranche|subscription receipts?|contingent)\b/i;
 
 // 미장 워런트/트랜치 판별 — 티커 규약 기반 (#360).
 // #355는 name에 "Warrant"가 실린다고 가정했으나, 실제 스냅샷 name은 기초기업명과 동일
 // (예: CORZW name="Core Scientific, Inc." — 기초주 CORZ와 동명) → name 필터로 구분 불가.
-// Nasdaq 5번째 글자 규약: [4글자 기초]+W(워런트) / +Z(when-distributed·트랜치).
-//   CORZW/RVMDW/NNAVW/KYIVW(W) + CORZZ(Z) 매치. SNOW(4글자)·NEWS/JEWELS(S로 끝)는 미스 → 오탐 0.
+// Nasdaq 5번째 글자 규약: [4글자 기초]+W(워런트) / +Z(when-distributed·트랜치)
+//   / +R(권리·CVR — GENVR #400) / +U(SPAC 유닛).
+//   CORZW/RVMDW(W) + CORZZ(Z) + GENVR(R) 매치. SNOW(4글자)·NEWS/JEWELS(S로 끝)는 미스 → 오탐 0.
 // 국장(숫자 심볼)·코인(isCoinItem)은 아래 가드로 제외.
-export const US_WARRANT_TICKER_RE = /^[A-Z]{4}[WZ]$/;
+export const US_WARRANT_TICKER_RE = /^[A-Z]{4}[WZRU]$/;
 
 // 워런트·권리·파생 통합 잡주 판별 — usItems 1차 필터 + leadingStocks.passesNoiseGate 공용 단일 지점.
 export function isNoiseInstrument(item) {

@@ -1,6 +1,6 @@
 // 시장을 움직이는 뉴스 — 종목 연결 카드형 뉴스 피드
 // 뉴스와 관련 종목을 뱃지로 연결, 종목 등락률 표시
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 
 // timeAgo를 렌더 시점에 동적 계산 — 캐시된 정적 문자열 대신 사용
 function computeTimeAgo(pubDate) {
@@ -111,9 +111,9 @@ export default function TopNewsSection({ allNews = [], onNewsClick, onItemClick,
     }
     return m;
   }, [allItems]);
-  // 점수 계산용 — memo 의존성에 넣지 않고 ref로 읽어 매칭 재계산과 분리
+  // 점수 계산용 — memo 의존성에 넣지 않고 ref로 읽어 매칭 재계산과 분리 (1렌더 stale 무해)
   const pctMapRef = useRef(pctMap);
-  pctMapRef.current = pctMap;
+  useEffect(() => { pctMapRef.current = pctMap; }, [pctMap]);
 
   // 24시간 이내 뉴스 중 시그널 점수 + 종목 매칭 기준 상위 5건
   const topNews = useMemo(() => {

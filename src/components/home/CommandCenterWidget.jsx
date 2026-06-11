@@ -1,6 +1,7 @@
 // 커맨드 센터 위젯 — MarketPulse + Sentiment + HeroSignal + Watchlist + EventTicker 통합
 import { useMemo } from 'react';
-import { useSignalAccuracy } from '../../hooks/useSignalAccuracy';
+import { useSignalCharacters } from '../../hooks/useSignalCharacters';
+import { buildTypeCharacterMap, characterBadge } from '../../utils/signalCharacterMap';
 import { useSignals, useTopSignals } from '../../hooks/useSignals';
 import { useWatchlistAlert } from '../../hooks/useWatchlistAlert';
 import { useFearGreedScores } from '../../hooks/useFearGreed';
@@ -108,7 +109,9 @@ function MiniSparkline({ data, color, width = 80, height = 28 }) {
 function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
   // HERO_SIGNAL_BUFFER건 받아 종목 검증 통과분만 3건 렌더 — market/종목없음 stock은 카드 자리에서 drop (#343)
   const rawSignals = useTopSignals(HERO_SIGNAL_BUFFER);
-  const { botMap } = useSignalAccuracy();
+  // #400: 히어로 = "알고리즘 신호" — 캐릭터(공정측정)로 성적표와 같은 언어 사용
+  const { characters } = useSignalCharacters();
+  const charByType = useMemo(() => buildTypeCharacterMap(characters), [characters]);
 
   // Hero는 종목 카드 전용 자리 — 시장 지표 + 종목 못 찾는 stock은 drop (#343)
   const topSignals = useMemo(
@@ -135,9 +138,9 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
   const [hero, ...rest] = topSignals;
   const heroItem = resolveStockItem(hero, allItems);
   const isBullHero = hero.direction === 'bullish';
-  // #398: 표본 30건 미만 적중률 비노출 — n=1짜리 "적중 100%" 노출 차단 (성적표 정직성 원칙과 통일)
-  const heroBot = botMap?.get(hero.type);
-  const heroBotAccuracy = (heroBot?.totalFired ?? 0) >= 30 ? heroBot.accuracy : null;
+  // #398/#400: 캐릭터 공정측정 기준 — live만 % 노출, 그 외 '검증 중' (n=1 "적중 100%" 차단)
+  // gate(market/direction) 비매칭 슬라이스는 배지 생략 — 측정 주장 안 함 (review HIGH)
+  const heroBadge = characterBadge(charByType.get(hero.type), hero);
   const heroAccent = isBullHero ? '#F04452' : '#1764ED';
   const heroBg = isBullHero ? 'rgba(240,68,82,0.03)' : 'rgba(23,100,237,0.03)';
   const heroPct = heroItem ? getPct(heroItem) : null;
@@ -194,10 +197,12 @@ function HeroSignalCard({ onItemClick, allItems, onShowScorecard }) {
           </div>
           <span className="text-[13px] text-[#4E5968] truncate flex-1 min-w-0">{getEasyLabel(hero)}</span>
           <span className="text-[11px] text-[#8B95A1] flex-shrink-0">{TYPE_META[hero.type]?.label || ''}</span>
-          {heroBotAccuracy != null && heroBotAccuracy > 0 && (
+          {heroBadge && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0"
-              style={{ background: 'rgba(49,130,246,0.08)', color: '#3182F6' }}>
-              적중 {heroBotAccuracy}%
+              style={heroBadge.accuracy != null
+                ? { background: 'rgba(49,130,246,0.08)', color: '#3182F6' }
+                : { background: 'rgba(139,149,161,0.1)', color: '#8B95A1' }}>
+              {heroBadge.text}
             </span>
           )}
         </div>

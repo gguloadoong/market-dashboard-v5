@@ -134,7 +134,7 @@ export function usePrices() {
       usFailStreakRef.current += 1;
       if (usFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.us ? prev : { ...prev, us: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — ref 패턴, setter는 안정 참조
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- ref 패턴, setter는 안정 참조
 
   const refreshKoreanStocks = useCallback(async () => {
     try {
@@ -181,7 +181,7 @@ export function usePrices() {
       krFailStreakRef.current += 1;
       if (krFailStreakRef.current >= ERROR_FAIL_STREAK) setDataErrors(prev => prev.kr ? prev : { ...prev, kr: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — ref 패턴, setter는 안정 참조
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- ref 패턴, setter는 안정 참조
 
   // #185: snapshot 초기 로드 = hot tier(Top 200) 즉시 → full tier lazy merge.
   //        applySnapshot 로 merge 경로 단일화 → hot/full 동일 로직 공유.
