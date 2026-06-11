@@ -1,8 +1,9 @@
 // 코인 가격 폴링 + Upbit WebSocket 훅
 // 가격: WebSocket(실시간, 우선) + REST fallback(30초)
 // 스파크라인: CoinGecko(5분) — 유일한 소스
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
 import { fetchSnapshot } from '../api/snapshot';
+import { TICK_FLUSH_MS } from '../utils/tickBuffer';
 import { fetchCoinsUpbitOnly, fetchUpbitAllSymbols, fetchCoinGecko, getSparklineCache } from '../api/coins';
 import { subscribeCoinPrices, unsubscribeCoinPrices } from '../api/coinWs';
 import { POLLING } from '../constants/polling';
@@ -196,7 +197,8 @@ export function useCoins(krwRateRef) {
       const buf = wsTickBufRef.current;
       if (!Object.keys(buf).length) return;
       wsTickBufRef.current = {};
-      setCoins(prev => {
+      // #404: 틱 갱신 비긴급 — startTransition 타임슬라이싱 (KIS WS와 동일 패턴)
+      startTransition(() => setCoins(prev => {
         const rate    = krwRateRef.current;
         const updated = [...prev];
         let changed   = false;
@@ -208,15 +210,15 @@ export function useCoins(krwRateRef) {
           changed = true;
         }
         return changed ? updated : prev;
-      });
+      }));
     };
     const wsHandler = (tick) => {
       if (tick._connected) { wsConnectedRef.current = true; return; }
       if (tick._disconnected) { wsConnectedRef.current = false; return; }
       wsTickBufRef.current[tick.symbol] = tick;
-      // 200ms → 1000ms (#394): 코인 WS 플러시가 200ms마다 setCoins → 홈 전체 리렌더 폭풍의 1차 트리거.
-      // 시세 체감(1초)을 해치지 않는 선에서 리렌더 빈도를 1/5로 제한.
-      if (!wsFlushTimer.current) wsFlushTimer.current = setTimeout(flushTicks, 1000);
+      // 200ms→1000ms(#394)→TICK_FLUSH_MS 2000ms(#404): 플러시당 전체 트리 렌더 비용 실측 근거.
+      // KIS WS(tickBuffer)와 단일 상수 공유 — 한쪽만 조정되는 사고 방지.
+      if (!wsFlushTimer.current) wsFlushTimer.current = setTimeout(flushTicks, TICK_FLUSH_MS);
     };
     wsHandlerRef.current = wsHandler;
     // 전체 심볼 목록으로 한 번만 구독 (이중 구독 방지)

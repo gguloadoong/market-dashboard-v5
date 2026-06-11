@@ -1,5 +1,5 @@
 // 마켓레이더 — 메인 앱 (훅 기반 상태 관리)
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from 'react';
 import { cycleStart, cycleStep } from './utils/cycleTracker';
 import Header from './components/Header';
 import MobileBottomNav from './components/MobileBottomNav';
@@ -149,7 +149,8 @@ export default function App() {
   }, [krSymbols, krStocks]);
   useKisWebSocket(kisSymbols, useCallback((quotes) => {
     if (!quotes?.length) return;
-    setKrStocks(prev => {
+    // #404: 틱 갱신은 비긴급 — startTransition으로 렌더를 타임슬라이싱(롱태스크 분해, 인터랙션 우선)
+    startTransition(() => setKrStocks(prev => {
       const bySym = new Map(quotes.map(q => [q.symbol, q]));
       let changed = false;
       const next = prev.map(s => {
@@ -159,7 +160,7 @@ export default function App() {
         return { ...s, ...q };
       });
       return changed ? next : prev;
-    });
+    }));
   }, []));
 
   // KIS WebSocket HDFSCNT0 — 미장 실시간 (watchlist 우선, 최대 40개)
@@ -170,7 +171,8 @@ export default function App() {
   }, [usSymbols]);
   useKisUsWebSocket(kisUsSymbols, useCallback((quotes) => {
     if (!quotes?.length) return;
-    setUsStocks(prev => {
+    // #404: 틱 갱신 비긴급 전환 (KR과 동일)
+    startTransition(() => setUsStocks(prev => {
       const bySym = new Map(quotes.map(q => [q.symbol, q]));
       let changed = false;
       const next = prev.map(s => {
@@ -180,7 +182,7 @@ export default function App() {
         return { ...s, ...q };
       });
       return changed ? next : prev;
-    });
+    }));
   }, []));
 
   // ETF 폴링 (60초)
