@@ -66,8 +66,8 @@ describe('createTickBuffer', () => {
     expect(onFlush).not.toHaveBeenCalled();
   });
 
-  it('기본 플러시 주기는 TICK_FLUSH_MS(1000ms)다', () => {
-    expect(TICK_FLUSH_MS).toBe(1000);
+  it('기본 플러시 주기는 TICK_FLUSH_MS(2000ms — #404 실측 근거)다', () => {
+    expect(TICK_FLUSH_MS).toBe(2000);
     const onFlush = vi.fn();
     const buf = createTickBuffer(onFlush);
     buf.push({ symbol: 'BTC', price: 1 });
