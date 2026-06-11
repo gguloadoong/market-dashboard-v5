@@ -16,5 +16,7 @@ crons = [
   "50 23 * * *",
   "0 21 * * *",        # ai-debate pre-gen — UTC 21:00 = KST 06:00 (25종목 daily)
   "*/10 * * * *",      # #164 Phase C: watchdog — cron:fail:* >= 3 시 Discord 알림
-  "5-55/10 * * * *"   # #296: compute-signals  — COMPOSITE_SCORE 사전계산
+  "5-55/10 * * * *",   # #296: compute-signals  — COMPOSITE_SCORE 사전계산
+  "25 * * * *",        # #406: Vercel 패턴크론 브릿지 (Vercel 스케줄러 401 영구차단 우회)
+  "58 * * * *"         # #406: Vercel health-check 브릿지
 ]
