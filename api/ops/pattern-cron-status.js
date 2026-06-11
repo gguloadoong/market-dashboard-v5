@@ -1,5 +1,5 @@
 // api/ops/pattern-cron-status.js — Vercel 패턴 크론 공개 진단 (#390)
-// 대상: api/cron/compute-signals.js (schedule '20 */4', SR/DB → signal_history).
+// 대상: api/cron/compute-signals.js (schedule '20 * * * *' hourly #398, SR/DB+composite → signal_history).
 // 목적: 시크릿 없이 다음 발화의 "발화여부 / 패턴탐지수 / 기록수 / 실패사유"를 검증.
 //   - CF Worker 'compute-signals'(composite, 10분)와 키 분리된 'pattern-cron' 네임스페이스를 읽는다.
 //   - 공개 응답엔 통제된 진단 필드(summary)만 노출. raw lastError(자유 메시지)는 비노출 — 토큰 유출/내부구조 노출 회피.
@@ -39,7 +39,7 @@ export default async function handler() {
 
   return new Response(JSON.stringify({
     ts: new Date().toISOString(),
-    cron: 'pattern-cron (api/cron/compute-signals.js, schedule 20 */4)',
+    cron: 'pattern-cron (api/cron/compute-signals.js, schedule 20 * * * *)',
     fired: lastOkMs != null,                                  // 하트비트 존재 → 발화 확정
     lastOk: lastOkMs ? new Date(lastOkMs).toISOString() : null,
     ageMinutes,                                               // null/과도하게 큼 → 미발화 의심
