@@ -27,13 +27,6 @@ async function gwJson(body, timeoutMs = 12000) {
   return res.json();
 }
 
-// 텍스트 응답 (RSS XML 등)
-async function gwText(body, timeoutMs = 12000) {
-  const res = await gw(body, timeoutMs);
-  if (!res.ok) throw new Error(`gw ${body.t}: ${res.status}`);
-  return res.text();
-}
-
 // GET 요청 — CDN 캐시가능 비민감 타입(i/f/fk/ke/r) 전용 (#386 Phase4)
 // POST /api/d는 CDN 미캐시 → 비민감 캐시가능 타입은 GET으로 재방문 origin 왕복 0.
 async function gwGet(params, timeoutMs = 12000) {
@@ -102,10 +95,8 @@ export function fetchHantooInvestor(symbol, timeoutMs = 8000) {
   return gwJson({ t: 'v', s: symbol }, timeoutMs);
 }
 
-// ─── 시장 투자자 동향 ────────────────────────────────────────
-export function fetchHantooMarketInvestor(timeoutMs = 8000) {
-  return gwJson({ t: 'm' }, timeoutMs);
-}
+// (#402: fetchHantooMarketInvestor 제거 — 유일 소비자 MarketInvestorSection 삭제.
+//  서버 t:'m' 라우트는 유지 — 서버 표면 정리는 별도 판단)
 
 // ─── 공포탐욕 지수 ───────────────────────────────────────────
 export function fetchFearGreed(timeoutMs = 8000) {
