@@ -8,6 +8,7 @@ import { watchdog } from './crons/watchdog.js';
 import { updateAiDebate } from './crons/update-ai-debate.js';
 import { computeSignals } from './crons/compute-signals.js';
 import { updateNaverExtended } from './crons/update-naver-extended.js';
+import { bridgeVercelCron } from './crons/vercel-bridge.js';
 
 export default {
   async scheduled(event, env, ctx) {
@@ -69,6 +70,12 @@ export default {
     } else if (cron === '5-55/10 * * * *') {
       // #296: 서버 사전계산 시그널 — COMPOSITE_SCORE cross-section-v1
       ctx.waitUntil(computeSignals(env));
+    } else if (cron === '25 * * * *') {
+      // #406: Vercel 패턴크론 브릿지 — Vercel 스케줄러 401 영구차단 우회 (패턴탐지+성적표 기록)
+      ctx.waitUntil(bridgeVercelCron('/api/cron/compute-signals'));
+    } else if (cron === '58 * * * *') {
+      // #406: Vercel health-check 브릿지 — 데이터 소스 감시 크론도 동일 차단이었음
+      ctx.waitUntil(bridgeVercelCron('/api/cron/health-check'));
     }
   },
 
