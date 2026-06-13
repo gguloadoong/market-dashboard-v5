@@ -205,3 +205,12 @@
 - **결정**: 마켓레이더 v5에서 Codex CLI, omc ask codex, Codex gate 일체 사용 금지
 - **근거**: 코드 정크 73개 유입 사고 발생. 신뢰도 기준 미충족.
 - **대안**: Claude Opus code-reviewer + Gemini gate 조합으로 대체.
+
+## ADR-021: Vercel 크론을 CF Worker 브릿지로 우회 (Deployment Protection 401)
+- **날짜**: 2026-06-13
+- **컨텍스트**: Vercel 크론 2종(`pattern-cron` 매시20, `health-check` 매시정각)이 **개설 이래 자동 실행 0회**. 서비스 정상화(#398) 중 패턴 시그널·성적표 기록·데이터 소스 감시가 죽어있던 원인.
+- **확정 진단**: Vercel 스케줄러의 크론 호출 대상이 **deployment URL**인데 Deployment Protection(`ssoProtection: all_except_custom_domains`)이 이를 **401 차단**. 실측: deployment URL 직접 호출 401 / 공개 도메인 200. Protection Bypass for Automation 시크릿 발급+재배포(새 배포 바인딩 확인)에도 12:20~17:20 5회 연속 미발화 → Vercel 측 수단 소진. #390 self-POST 인증벽과 동일 뿌리.
+- **결정**: 수개월 무중단 가동 중인 CF Worker(`mdv5-cron`) 스케줄러에 브릿지 트리거 2개 추가 — 공개 도메인(보호 비대상)으로 `x-vercel-cron` 헤더 GET. (`25 * * * *`→compute-signals, `58 * * * *`→health-check). :20/:00 회피로 발화 주체 구분 + Vercel 스케줄러가 미래 복구돼도 24h 쿨다운이 이중기록 차단.
+- **근거**: ① `x-vercel-cron` 경로는 `compute-signals.js:799`가 명시 신뢰(`isVercelInternal`) + 수동발화 recorded:50 실측 통과 ② CF fetch는 전역 API라 env/Bearer 불필요 ③ CF 크론 10종이 수개월 정상 → 신뢰성 입증. Gemini gate의 "외부 x-vercel-cron 무시" 일반론은 본 앱 핸들러에 미적용이라 사유 기록 후 기각(code-reviewer Opus PASS).
+- **대안 기각**: Protection Bypass 시크릿(검증 실패) / 대시보드 토글(대표 수동 필요·불확실). vercel.json 크론 등록은 유지(무해 — 작동해도 쿨다운 안전).
+- **구현**: `workers/cron/src/crons/vercel-bridge.js`, `index.js` 라우팅, `wrangler.toml` 트리거 2개. PR #407.
