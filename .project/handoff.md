@@ -8,9 +8,25 @@
 > **새 세션 시작 시 이 문서를 가장 먼저 읽어 현재 상황을 복원하세요.**
 > 그 다음 `MEMORY.md`, `CLAUDE.md`, `.project/backlog.md`, `.project/decisions.md` 순으로 보강.
 
-## 🆕 새 세션 즉시 시작 (2026-06-11 인계)
+## 🆕 새 세션 즉시 시작 (2026-06-13 인계)
 
-**main = origin/main = `f205062`. Production = `f205062` ✅ (2026-06-11 2회 배포 — 5트랙+#405 전부 라이브).**
+**main = origin/main = HEAD(#407 머지 후). Production = 6-13 배포(5트랙+#405+#406 CF브릿지 전부 라이브). CF Worker `mdv5-cron`도 배포(브릿지 트리거 25/58 등록 확인).**
+
+**🟢 정상화 /goal 10기준 전부 완료 — 마지막 검증만 진행 중:**
+- A~E 5트랙(렉·지연배지·시그널·정보구조·데드코드) 배포·검증 완료 (아래 표·6-11 검증결과 참조)
+- **크론 전멸(유일 잔여) → CF Worker 브릿지로 해결** (ADR-021, #406/PR#407). Vercel Deployment Protection이 크론 호출을 401 영구차단 → bypass 시크릿·재배포 5회 발화 모두 실패 → CF 스케줄러가 공개도메인으로 `x-vercel-cron` GET 우회(`25 * * * *` 패턴크론 / `58` health-check).
+- **⏳ 검증 대기**: CF 브릿지 첫 자동발화(매시 :25)에서 `GET /api/ops/pattern-cron-status?cb=$(date +%s)` → lastOk가 당일 최신 :25분대(UTC 기준 KST-9h)로 갱신 + recorded 정상 확인. 안 되면 CF Worker 로그(`wrangler tail` in workers/cron) 점검. **브릿지 로직 자체는 수동발화 recorded:50으로 입증됨 — 남은 불확실성은 CF 스케줄러 발화뿐(CF 크론 10종 수개월 정상이라 거의 확실).**
+
+**▶ 다음 세션 시작 시 할 일:**
+1. `curl -s "https://market-dashboard-v5.vercel.app/api/ops/pattern-cron-status?cb=$(date +%s)"` → lastOk 신선도 확인. 갱신됐으면 **정상화 완결 — /goal 달성 보고**. 안 됐으면 `cd workers/cron && wrangler tail`로 브릿지 발화/에러 추적.
+2. signal_accuracy_v2에 composite 표본 누적 시작 확인(시간당 1샘플/종목, 24h 쿨다운). 30건 도달(~한 달)하면 성적표 종합신호 자동 라이브 전환.
+3. 잔여 P2: 렉 추가 최적화(섹션 가상화 등 — 현재 6.5s/20s로 체감 해소됨), api/hantoo-market-investor.js 서버 표면 정리 판단.
+
+---
+
+### 📌 이전 인계 (2026-06-11) — 참고용
+
+**main = `f205062`. Production = `f205062` (2026-06-11 2회 배포 — 5트랙+#405 라이브).**
 
 **✅ 정상화 검증 결과 (2026-06-11):**
 - 렉(기준1): CPU4x 20s 롱태스크 **17.5s → 6.5s** (steady 5~20s 구간 3.7s, 최악 블록 0.6s 수준, 절반 구간 완전 idle). startTransition(#405)으로 인터랙션 우선. **체감 해소 판단** — 추가 최적화(가상화 등)는 P2.
