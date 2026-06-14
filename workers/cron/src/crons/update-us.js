@@ -34,6 +34,11 @@ async function fetchNasdaqSymbols(limit = 1000) {
       const rows = data?.data?.table?.rows || [];
       for (const row of rows) {
         if (!row.symbol || row.symbol.includes('^') || row.symbol.includes('/')) continue;
+        // #357: 워런트/권리/유닛/트랜치/CVR universe 진입 차단 (정제 전 원본 name 기준).
+        // 클라이언트 필터(#355 isNoiseInstrument / #360 티커규약)와 이중 방어 — 스냅샷 universe 자체를 정화해
+        // 급등 랭킹·시그널 풀에 잡주가 들어오는 것을 근본 차단.
+        // ⚠️ rights/units는 복수형만 — 단수는 정상주 오탐(Unit Corporation=UNT 등). SPAC 유닛/권리주는 항상 복수.
+        if (/\b(warrants?|rights|units|tranche|contingent)\b/i.test(row.name || '')) continue;
         // 시가총액 파싱 (문자열 "1,234,567" → 숫자)
         const mcStr = (row.marketCap || '').replace(/,/g, '');
         const mc = parseInt(mcStr, 10) || 0;
