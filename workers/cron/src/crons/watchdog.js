@@ -106,6 +106,10 @@ export async function watchdog(env) {
     `조치: [Workers 대시보드](${dashboardUrl}) 에서 tail / 로그 확인`,
   ].join('\n');
 
+  // [디스코드 전면개편] 기존 발송 전부 비활성화 — redesign in progress
+  console.log(`[watchdog] Discord 발송 비활성화(kill switch) — alerts=${alerts.length}건 감지되었으나 발송 안 함`);
+  return { ok: false, reason: 'discord-disabled', alerts: alerts.length, cronsAlerted: alerts.map((a) => a.cron) };
+
   try {
     const res = await fetch(webhookUrl, {
       method: 'POST',
