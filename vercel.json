@@ -10,8 +10,5 @@
   "functions": {
     "api/krx-etf.js": { "maxDuration": 30 }
   },
-  "crons": [
-    { "path": "/api/cron/health-check", "schedule": "0 * * * *" },
-    { "path": "/api/cron/compute-signals", "schedule": "20 * * * *" }
-  ]
+  "crons": []
 }
